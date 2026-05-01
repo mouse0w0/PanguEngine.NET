@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/PanguEngine.Launcher/PanguEngine.Launcher.csproj" />
+  <Project Path="src/PanguEngine/PanguEngine.csproj" />
+</Solution>
