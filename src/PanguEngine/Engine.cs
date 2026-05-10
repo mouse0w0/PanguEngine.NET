@@ -2,34 +2,18 @@ using Microsoft.Extensions.Logging;
 
 namespace PanguEngine;
 
-public abstract class Engine
+public static class Engine
 {
-    public static Engine Instance { get; private set; } = null!;
     public static ILogger Logger { get; private set; } = null!;
 
-    public void Run()
+    internal static void Initialize()
     {
-        Instance = this;
-
         Log.Initialize();
         Logger = Log.CreateLogger("Engine");
+    }
 
-        OnInit();
-        OnRunning();
-        OnShutdown();
-
+    internal static void Shutdown()
+    {
         Log.Shutdown();
-    }
-
-    protected virtual void OnInit()
-    {
-    }
-
-    protected virtual void OnRunning()
-    {
-    }
-
-    protected virtual void OnShutdown()
-    {
     }
 }

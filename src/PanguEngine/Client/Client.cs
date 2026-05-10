@@ -6,16 +6,27 @@ using Silk.NET.Windowing;
 
 namespace PanguEngine.Client;
 
-public unsafe class ClientEngine : Engine
+public unsafe class Client
 {
-    public new static ClientEngine Instance => (ClientEngine)Engine.Instance;
+    public static Client Instance { get; private set; } = null!;
 
     public VulkanContext VulkanContext { get; private set; } = null!;
     public VulkanWindow VulkanWindow { get; private set; } = null!;
     public VulkanRenderer Renderer { get; private set; } = null!;
 
-    protected override void OnInit()
+    public void Run()
     {
+        Instance = this;
+
+        OnInit();
+        OnRunning();
+        OnShutdown();
+    }
+
+    private void OnInit()
+    {
+        Engine.Initialize();
+
         VulkanContext = new VulkanContext();
 
         var options = WindowOptions.DefaultVulkan with
@@ -34,23 +45,26 @@ public unsafe class ClientEngine : Engine
 
         VulkanContext.InitInstance(requiredExtensions);
 
-        var surface = window.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null).ToSurface();
+        var surface = window.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
+            .ToSurface();
         VulkanContext.InitDevice(surface);
 
         VulkanWindow = new VulkanWindow(VulkanContext, window, surface);
         Renderer = new VulkanRenderer(VulkanContext, VulkanWindow);
     }
 
-    protected override void OnRunning()
+    private void OnRunning()
     {
         VulkanWindow.Window.Render += dt => Renderer.DrawFrame(dt);
         VulkanWindow.Window.Run();
     }
 
-    protected override void OnShutdown()
+    private void OnShutdown()
     {
         Renderer.Destroy();
         VulkanWindow.Destroy();
         VulkanContext.Destroy();
+
+        Engine.Shutdown();
     }
 }
