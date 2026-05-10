@@ -427,9 +427,17 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
 
         PhysicalDeviceFeatures deviceFeatures = new();
 
+        PhysicalDeviceVulkan13Features vulkan13Features = new()
+        {
+            SType = StructureType.PhysicalDeviceVulkan13Features,
+            DynamicRendering = true,
+            Synchronization2 = true,
+        };
+
         DeviceCreateInfo createInfo = new()
         {
             SType = StructureType.DeviceCreateInfo,
+            PNext = &vulkan13Features,
             QueueCreateInfoCount = (uint)uniqueQueueFamilies.Length,
             PQueueCreateInfos = queueCreateInfos,
             PEnabledFeatures = &deviceFeatures,

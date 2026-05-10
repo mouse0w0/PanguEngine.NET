@@ -143,9 +143,18 @@ public sealed unsafe class VulkanRenderer
         if (_context.Vk.CreatePipelineLayout(_context.Device, in pipelineLayoutInfo, null, out _pipelineLayout) != Result.Success)
             throw new InvalidOperationException("Failed to create pipeline layout.");
 
+        var colorFormat = _window.ImageFormat;
+        PipelineRenderingCreateInfo renderingCreateInfo = new()
+        {
+            SType = StructureType.PipelineRenderingCreateInfo,
+            ColorAttachmentCount = 1,
+            PColorAttachmentFormats = &colorFormat,
+        };
+
         GraphicsPipelineCreateInfo pipelineInfo = new()
         {
             SType = StructureType.GraphicsPipelineCreateInfo,
+            PNext = &renderingCreateInfo,
             StageCount = 2,
             PStages = shaderStages,
             PVertexInputState = &vertexInputInfo,
@@ -156,8 +165,6 @@ public sealed unsafe class VulkanRenderer
             PColorBlendState = &colorBlending,
             PDynamicState = &dynamicState,
             Layout = _pipelineLayout,
-            RenderPass = _window.RenderPass,
-            Subpass = 0,
             BasePipelineHandle = default,
         };
 
@@ -193,29 +200,68 @@ public sealed unsafe class VulkanRenderer
         if (_context.Vk.BeginCommandBuffer(commandBuffer, &beginInfo) != Result.Success)
             throw new InvalidOperationException("Failed to begin recording command buffer.");
 
+        var swapchainImage = _window.Images[imageIndex];
+        var swapchainImageView = _window.ImageViews[imageIndex];
+        var extent = _window.Extent;
+
+        ImageMemoryBarrier2 preRenderBarrier = new()
+        {
+            SType = StructureType.ImageMemoryBarrier2,
+            SrcStageMask = PipelineStageFlags2.TopOfPipeBit,
+            SrcAccessMask = AccessFlags2.None,
+            DstStageMask = PipelineStageFlags2.ColorAttachmentOutputBit,
+            DstAccessMask = AccessFlags2.ColorAttachmentWriteBit,
+            OldLayout = ImageLayout.Undefined,
+            NewLayout = ImageLayout.ColorAttachmentOptimal,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = swapchainImage,
+            SubresourceRange = new ImageSubresourceRange
+            {
+                AspectMask = ImageAspectFlags.ColorBit,
+                BaseMipLevel = 0,
+                LevelCount = 1,
+                BaseArrayLayer = 0,
+                LayerCount = 1,
+            },
+        };
+
+        DependencyInfo preRenderDep = new()
+        {
+            SType = StructureType.DependencyInfo,
+            ImageMemoryBarrierCount = 1,
+            PImageMemoryBarriers = &preRenderBarrier,
+        };
+
+        _context.Vk.CmdPipelineBarrier2(commandBuffer, &preRenderDep);
+
         ClearValue clearColor = new()
         {
             Color = new ClearColorValue { Float32_0 = 0, Float32_1 = 0, Float32_2 = 0, Float32_3 = 1 },
         };
 
-        RenderPassBeginInfo renderPassInfo = new()
+        RenderingAttachmentInfo colorAttachment = new()
         {
-            SType = StructureType.RenderPassBeginInfo,
-            RenderPass = _window.RenderPass,
-            Framebuffer = _window.Framebuffers[imageIndex],
-            RenderArea =
-            {
-                Offset = { X = 0, Y = 0 },
-                Extent = _window.Extent,
-            },
-            ClearValueCount = 1,
-            PClearValues = &clearColor,
+            SType = StructureType.RenderingAttachmentInfo,
+            ImageView = swapchainImageView,
+            ImageLayout = ImageLayout.ColorAttachmentOptimal,
+            LoadOp = AttachmentLoadOp.Clear,
+            StoreOp = AttachmentStoreOp.Store,
+            ClearValue = clearColor,
         };
 
-        _context.Vk.CmdBeginRenderPass(commandBuffer, &renderPassInfo, SubpassContents.Inline);
+        RenderingInfo renderingInfo = new()
+        {
+            SType = StructureType.RenderingInfo,
+            RenderArea = new Rect2D { Offset = new Offset2D(0, 0), Extent = extent },
+            LayerCount = 1,
+            ColorAttachmentCount = 1,
+            PColorAttachments = &colorAttachment,
+        };
+
+        _context.Vk.CmdBeginRendering(commandBuffer, &renderingInfo);
         _context.Vk.CmdBindPipeline(commandBuffer, PipelineBindPoint.Graphics, _pipeline);
 
-        var extent = _window.Extent;
         Viewport viewport = new()
         {
             X = 0,
@@ -234,7 +280,38 @@ public sealed unsafe class VulkanRenderer
         _context.Vk.CmdSetScissor(commandBuffer, 0, 1, &scissor);
 
         _context.Vk.CmdDraw(commandBuffer, 3, 1, 0, 0);
-        _context.Vk.CmdEndRenderPass(commandBuffer);
+        _context.Vk.CmdEndRendering(commandBuffer);
+
+        ImageMemoryBarrier2 postRenderBarrier = new()
+        {
+            SType = StructureType.ImageMemoryBarrier2,
+            SrcStageMask = PipelineStageFlags2.ColorAttachmentOutputBit,
+            SrcAccessMask = AccessFlags2.ColorAttachmentWriteBit,
+            DstStageMask = PipelineStageFlags2.BottomOfPipeBit,
+            DstAccessMask = AccessFlags2.None,
+            OldLayout = ImageLayout.ColorAttachmentOptimal,
+            NewLayout = ImageLayout.PresentSrcKhr,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = swapchainImage,
+            SubresourceRange = new ImageSubresourceRange
+            {
+                AspectMask = ImageAspectFlags.ColorBit,
+                BaseMipLevel = 0,
+                LevelCount = 1,
+                BaseArrayLayer = 0,
+                LayerCount = 1,
+            },
+        };
+
+        DependencyInfo postRenderDep = new()
+        {
+            SType = StructureType.DependencyInfo,
+            ImageMemoryBarrierCount = 1,
+            PImageMemoryBarriers = &postRenderBarrier,
+        };
+
+        _context.Vk.CmdPipelineBarrier2(commandBuffer, &postRenderDep);
 
         if (_context.Vk.EndCommandBuffer(commandBuffer) != Result.Success)
             throw new InvalidOperationException("Failed to record command buffer.");

@@ -18,8 +18,6 @@ public sealed unsafe class VulkanWindow
     private SwapchainKHR _swapchain;
     private Image[]? _images;
     private ImageView[]? _imageViews;
-    private RenderPass _renderPass;
-    private Framebuffer[]? _framebuffers;
     private Semaphore[]? _imageAvailableSemaphores;
     private Semaphore[]? _renderFinishedSemaphores;
     private Fence[]? _inFlightFences;
@@ -34,12 +32,10 @@ public sealed unsafe class VulkanWindow
     public Format ImageFormat { get; private set; }
     /// <summary>The current extent (width and height) of the swapchain images.</summary>
     public Extent2D Extent { get; private set; }
+    /// <summary>The image handles for each swapchain image.</summary>
+    public Image[] Images => _images!;
     /// <summary>The image views for each swapchain image.</summary>
     public ImageView[] ImageViews => _imageViews!;
-    /// <summary>The render pass used for rendering to the swapchain.</summary>
-    public RenderPass RenderPass => _renderPass;
-    /// <summary>The framebuffers corresponding to each swapchain image view.</summary>
-    public Framebuffer[] Framebuffers => _framebuffers!;
     /// <summary>The current frame index within the in-flight frame ring.</summary>
     public int CurrentFrame { get; private set; }
 
@@ -157,8 +153,6 @@ public sealed unsafe class VulkanWindow
             _context.Vk.DestroyFence(_context.Device, _inFlightFences![i], null);
         }
 
-        DestroyFramebuffers();
-        _context.Vk.DestroyRenderPass(_context.Device, _renderPass, null);
         DestroyImageViews();
         DestroySwapchain();
 
@@ -172,8 +166,6 @@ public sealed unsafe class VulkanWindow
 
         CreateSwapchain();
         CreateImageViews();
-        CreateRenderPass();
-        CreateFramebuffers();
         CreateSyncObjects();
     }
 
@@ -189,13 +181,11 @@ public sealed unsafe class VulkanWindow
 
         _context.Vk.DeviceWaitIdle(_context.Device);
 
-        DestroyFramebuffers();
         DestroyImageViews();
         DestroySwapchain();
 
         CreateSwapchain();
         CreateImageViews();
-        CreateFramebuffers();
     }
 
     private void OnFramebufferResize(Vector2D<int> _) => _framebufferResized = true;
@@ -295,83 +285,6 @@ public sealed unsafe class VulkanWindow
         }
     }
 
-    private void CreateRenderPass()
-    {
-        AttachmentDescription colorAttachment = new()
-        {
-            Format = ImageFormat,
-            Samples = SampleCountFlags.Count1Bit,
-            LoadOp = AttachmentLoadOp.Clear,
-            StoreOp = AttachmentStoreOp.Store,
-            StencilLoadOp = AttachmentLoadOp.DontCare,
-            StencilStoreOp = AttachmentStoreOp.DontCare,
-            InitialLayout = ImageLayout.Undefined,
-            FinalLayout = ImageLayout.PresentSrcKhr,
-        };
-
-        AttachmentReference colorAttachmentRef = new()
-        {
-            Attachment = 0,
-            Layout = ImageLayout.ColorAttachmentOptimal,
-        };
-
-        SubpassDescription subpass = new()
-        {
-            PipelineBindPoint = PipelineBindPoint.Graphics,
-            ColorAttachmentCount = 1,
-            PColorAttachments = &colorAttachmentRef,
-        };
-
-        SubpassDependency dependency = new()
-        {
-            SrcSubpass = Vk.SubpassExternal,
-            DstSubpass = 0,
-            SrcStageMask = PipelineStageFlags.ColorAttachmentOutputBit,
-            SrcAccessMask = 0,
-            DstStageMask = PipelineStageFlags.ColorAttachmentOutputBit,
-            DstAccessMask = AccessFlags.ColorAttachmentWriteBit,
-        };
-
-        RenderPassCreateInfo renderPassInfo = new()
-        {
-            SType = StructureType.RenderPassCreateInfo,
-            AttachmentCount = 1,
-            PAttachments = &colorAttachment,
-            SubpassCount = 1,
-            PSubpasses = &subpass,
-            DependencyCount = 1,
-            PDependencies = &dependency,
-        };
-
-        if (_context.Vk.CreateRenderPass(_context.Device, in renderPassInfo, null, out _renderPass) != Result.Success)
-            throw new InvalidOperationException("Failed to create render pass.");
-    }
-
-    private void CreateFramebuffers()
-    {
-        _framebuffers = new Framebuffer[_imageViews!.Length];
-
-        for (var i = 0; i < _imageViews.Length; i++)
-        {
-            var attachment = _imageViews[i];
-
-            FramebufferCreateInfo framebufferInfo = new()
-            {
-                SType = StructureType.FramebufferCreateInfo,
-                RenderPass = _renderPass,
-                AttachmentCount = 1,
-                PAttachments = &attachment,
-                Width = Extent.Width,
-                Height = Extent.Height,
-                Layers = 1,
-            };
-
-            if (_context.Vk.CreateFramebuffer(_context.Device, in framebufferInfo, null, out _framebuffers[i]) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to create framebuffer.");
-        }
-    }
-
     private void CreateSyncObjects()
     {
         _imageAvailableSemaphores = new Semaphore[_context.MaxFramesInFlight];
@@ -411,13 +324,6 @@ public sealed unsafe class VulkanWindow
     private void DestroySwapchain()
     {
         _context.KhrSwapchain.DestroySwapchain(_context.Device, _swapchain, null);
-    }
-
-    private void DestroyFramebuffers()
-    {
-        if (_framebuffers is null) return;
-        foreach (var framebuffer in _framebuffers)
-            _context.Vk.DestroyFramebuffer(_context.Device, framebuffer, null);
     }
 
     private SurfaceFormatKHR ChooseSwapSurfaceFormat(IReadOnlyList<SurfaceFormatKHR> availableFormats)
