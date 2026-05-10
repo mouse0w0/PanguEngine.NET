@@ -30,7 +30,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
     /// The Vulkan instance handle.
     /// </summary>
     public Instance VkInstance { get; private set; }
-    
+
     private ExtDebugUtils? _debugUtils;
     private DebugUtilsMessengerEXT _debugMessenger;
     private DebugUtilsMessengerCallbackFunctionEXT? _debugCallbackDelegate;
@@ -74,7 +74,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
     /// The presentation queue handle.
     /// </summary>
     public Queue PresentQueue { get; private set; }
-    
+
     /// <summary>
     /// Maximum number of frames that can be processed concurrently.
     /// </summary>
@@ -106,7 +106,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
 
         if (!Vk.TryGetInstanceExtension<KhrSurface>(VkInstance, out var khrSurface))
             throw new NotSupportedException("VK_KHR_surface extension not found.");
-        
+
         KhrSurface = khrSurface;
     }
 
@@ -130,7 +130,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             MaxFramesInFlight = (int)capabilities.MaxImageCount;
 
         CreateLogicalDevice(surface);
-        
+
         if (!Vk.TryGetDeviceExtension<KhrSwapchain>(VkInstance, Device, out var khrSwapchain))
             throw new NotSupportedException("VK_KHR_swapchain extension not found.");
         KhrSwapchain = khrSwapchain;
@@ -171,7 +171,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             ApplicationVersion = new Version32(1, 0, 0),
             PEngineName = (byte*)Marshal.StringToHGlobalAnsi("PanguEngine"),
             EngineVersion = new Version32(1, 0, 0),
-            ApiVersion = Vk.Version12
+            ApiVersion = Vk.Version13
         };
 
         var extensions = EnableValidationLayers
@@ -193,8 +193,8 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(_validationLayers);
             debugCreateInfo.SType = StructureType.DebugUtilsMessengerCreateInfoExt;
             debugCreateInfo.MessageSeverity = DebugUtilsMessageSeverityFlagsEXT.VerboseBitExt |
-                                               DebugUtilsMessageSeverityFlagsEXT.WarningBitExt |
-                                               DebugUtilsMessageSeverityFlagsEXT.ErrorBitExt;
+                                              DebugUtilsMessageSeverityFlagsEXT.WarningBitExt |
+                                              DebugUtilsMessageSeverityFlagsEXT.ErrorBitExt;
             debugCreateInfo.MessageType = DebugUtilsMessageTypeFlagsEXT.GeneralBitExt |
                                           DebugUtilsMessageTypeFlagsEXT.PerformanceBitExt |
                                           DebugUtilsMessageTypeFlagsEXT.ValidationBitExt;
@@ -219,11 +219,11 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         if (EnableValidationLayers)
             SilkMarshal.Free((nint)createInfo.PpEnabledLayerNames);
     }
-    
+
     private void SetupDebugMessenger()
     {
         if (!Vk.TryGetInstanceExtension(VkInstance, out _debugUtils)) return;
-        
+
         _debugCallbackDelegate = DebugCallback;
         DebugUtilsMessengerCreateInfoEXT createInfo = new()
         {
@@ -237,7 +237,8 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             PfnUserCallback = _debugCallbackDelegate
         };
 
-        if (_debugUtils!.CreateDebugUtilsMessenger(VkInstance, in createInfo, null, out _debugMessenger) != Result.Success)
+        if (_debugUtils!.CreateDebugUtilsMessenger(VkInstance, in createInfo, null, out _debugMessenger) !=
+            Result.Success)
             throw new InvalidOperationException("Failed to set up debug messenger.");
     }
 
