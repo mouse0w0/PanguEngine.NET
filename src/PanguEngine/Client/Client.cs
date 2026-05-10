@@ -6,14 +6,34 @@ using Silk.NET.Windowing;
 
 namespace PanguEngine.Client;
 
+/// <summary>
+/// Application client.
+/// </summary>
 public unsafe class Client
 {
+    /// <summary>
+    /// The singleton instance of the client.
+    /// </summary>
     public static Client Instance { get; private set; } = null!;
 
+    /// <summary>
+    /// The Vulkan context.
+    /// </summary>
     public VulkanContext VulkanContext { get; private set; } = null!;
+
+    /// <summary>
+    /// The Vulkan window.
+    /// </summary>
     public VulkanWindow VulkanWindow { get; private set; } = null!;
+
+    /// <summary>
+    /// The Vulkan renderer.
+    /// </summary>
     public VulkanRenderer Renderer { get; private set; } = null!;
 
+    /// <summary>
+    /// Runs the application.
+    /// </summary>
     public void Run()
     {
         Instance = this;
@@ -23,6 +43,9 @@ public unsafe class Client
         OnShutdown();
     }
 
+    /// <summary>
+    /// Initializes the client.
+    /// </summary>
     private void OnInit()
     {
         Engine.Initialize();
@@ -53,12 +76,18 @@ public unsafe class Client
         Renderer = new VulkanRenderer(VulkanContext, VulkanWindow);
     }
 
+    /// <summary>
+    /// Enters the main loop.
+    /// </summary>
     private void OnRunning()
     {
         VulkanWindow.Window.Render += dt => Renderer.DrawFrame(dt);
         VulkanWindow.Window.Run();
     }
 
+    /// <summary>
+    /// Shuts down the client.
+    /// </summary>
     private void OnShutdown()
     {
         Renderer.Destroy();
