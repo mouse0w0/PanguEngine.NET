@@ -85,7 +85,7 @@ public static unsafe class VulkanContext
     /// Initializes the Vulkan instance with the specified required extensions.
     /// </summary>
     /// <param name="requiredExtensions">Extensions required by the application (e.g., surface extensions).</param>
-    internal static void InitInstance(string[] requiredExtensions, bool enableValidationLayers = true)
+    internal static void InitializeInstance(string[] requiredExtensions, bool enableValidationLayers = true)
     {
         if (_instanceInitialized)
             throw new InvalidOperationException("Vulkan instance already initialized.");
@@ -113,7 +113,7 @@ public static unsafe class VulkanContext
     /// Initializes the logical device and queues for the given surface.
     /// </summary>
     /// <param name="surface">The window surface to present to.</param>
-    internal static void InitDevice(SurfaceKHR surface)
+    internal static void InitializeDevice(SurfaceKHR surface)
     {
         if (!_instanceInitialized)
             throw new InvalidOperationException("Vulkan instance must be initialized first.");

@@ -15,7 +15,7 @@ public static unsafe class VulkanAllocator
     /// <summary>
     /// Initializes the VMA allocator using the Vulkan context.
     /// </summary>
-    public static void Init()
+    public static void Initialize()
     {
         var createInfo = new AllocatorCreateInfo
         {

@@ -59,13 +59,13 @@ public unsafe class Client
         var glfwExtensions = window.VkSurface.GetRequiredExtensions(out var count);
         var requiredExtensions = SilkMarshal.PtrToStringArray((nint)glfwExtensions, (int)count);
 
-        VulkanContext.InitInstance(requiredExtensions);
+        VulkanContext.InitializeInstance(requiredExtensions);
 
         var surface = window.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
             .ToSurface();
-        VulkanContext.InitDevice(surface);
+        VulkanContext.InitializeDevice(surface);
 
-        VulkanAllocator.Init();
+        VulkanAllocator.Initialize();
         VulkanWindow = new VulkanWindow(window, surface);
         Renderer = new VulkanRenderer(VulkanWindow);
     }
