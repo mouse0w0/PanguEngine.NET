@@ -17,19 +17,9 @@ public unsafe class Client
     public static Client Instance { get; private set; } = null!;
 
     /// <summary>
-    /// The Vulkan context.
-    /// </summary>
-    public VulkanContext VulkanContext { get; private set; } = null!;
-
-    /// <summary>
     /// The Vulkan window.
     /// </summary>
     public VulkanWindow VulkanWindow { get; private set; } = null!;
-
-    /// <summary>
-    /// The Vulkan memory allocator.
-    /// </summary>
-    public VulkanAllocator VulkanAllocator { get; private set; } = null!;
 
     /// <summary>
     /// The Vulkan renderer.
@@ -55,8 +45,6 @@ public unsafe class Client
     {
         Engine.Initialize();
 
-        VulkanContext = new VulkanContext();
-
         var options = WindowOptions.DefaultVulkan with
         {
             Size = new Vector2D<int>(800, 600),
@@ -77,9 +65,9 @@ public unsafe class Client
             .ToSurface();
         VulkanContext.InitDevice(surface);
 
-        VulkanAllocator = new VulkanAllocator(VulkanContext);
-        VulkanWindow = new VulkanWindow(VulkanContext, window, surface);
-        Renderer = new VulkanRenderer(VulkanContext, VulkanWindow);
+        VulkanAllocator.Init();
+        VulkanWindow = new VulkanWindow(window, surface);
+        Renderer = new VulkanRenderer(VulkanWindow);
     }
 
     /// <summary>

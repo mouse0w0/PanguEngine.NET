@@ -8,7 +8,6 @@ namespace PanguEngine.Rendering.Vulkan;
 /// </summary>
 public sealed unsafe class VulkanRenderer
 {
-    private readonly VulkanContext _context;
     private readonly VulkanWindow _window;
     private readonly VulkanCommandPool _commandPool;
 
@@ -20,11 +19,9 @@ public sealed unsafe class VulkanRenderer
     /// <summary>
     /// Initializes the renderer by loading shaders, creating the graphics pipeline, and allocating a command pool.
     /// </summary>
-    /// <param name="context">The Vulkan device and instance context.</param>
     /// <param name="window">The Vulkan swapchain window used for rendering.</param>
-    public VulkanRenderer(VulkanContext context, VulkanWindow window)
+    public VulkanRenderer(VulkanWindow window)
     {
-        _context = context;
         _window = window;
 
         var basePath = AppContext.BaseDirectory;
@@ -34,11 +31,11 @@ public sealed unsafe class VulkanRenderer
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        _vertShaderModule = context.CreateVertexShader(vertSource, "triangle.vert");
-        _fragShaderModule = context.CreateFragmentShader(fragSource, "triangle.frag");
+        _vertShaderModule = VulkanShader.CreateVertexShader(vertSource, "triangle.vert");
+        _fragShaderModule = VulkanShader.CreateFragmentShader(fragSource, "triangle.frag");
 
         CreatePipeline();
-        _commandPool = new VulkanCommandPool(context);
+        _commandPool = new VulkanCommandPool();
     }
 
     private void CreatePipeline()
@@ -115,7 +112,8 @@ public sealed unsafe class VulkanRenderer
 
         PipelineColorBlendAttachmentState colorBlendAttachment = new()
         {
-            ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit | ColorComponentFlags.ABit,
+            ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit |
+                             ColorComponentFlags.ABit,
             BlendEnable = false,
         };
 
@@ -140,7 +138,8 @@ public sealed unsafe class VulkanRenderer
             PushConstantRangeCount = 0,
         };
 
-        if (_context.Vk.CreatePipelineLayout(_context.Device, in pipelineLayoutInfo, null, out _pipelineLayout) != Result.Success)
+        if (VulkanContext.Vk.CreatePipelineLayout(VulkanContext.Device, in pipelineLayoutInfo, null,
+                out _pipelineLayout) != Result.Success)
             throw new InvalidOperationException("Failed to create pipeline layout.");
 
         var colorFormat = _window.ImageFormat;
@@ -168,7 +167,8 @@ public sealed unsafe class VulkanRenderer
             BasePipelineHandle = default,
         };
 
-        if (_context.Vk.CreateGraphicsPipelines(_context.Device, default, 1, in pipelineInfo, null, out _pipeline) != Result.Success)
+        if (VulkanContext.Vk.CreateGraphicsPipelines(VulkanContext.Device, default, 1, in pipelineInfo, null,
+                out _pipeline) != Result.Success)
             throw new InvalidOperationException("Failed to create graphics pipeline.");
 
         SilkMarshal.Free((nint)vertShaderStageInfo.PName);
@@ -190,14 +190,14 @@ public sealed unsafe class VulkanRenderer
         _window.ResetInFlightFence();
 
         var commandBuffer = _commandPool.CommandBuffers[_window.CurrentFrame];
-        _context.Vk.ResetCommandBuffer(commandBuffer, 0);
+        VulkanContext.Vk.ResetCommandBuffer(commandBuffer, 0);
 
         CommandBufferBeginInfo beginInfo = new()
         {
             SType = StructureType.CommandBufferBeginInfo,
         };
 
-        if (_context.Vk.BeginCommandBuffer(commandBuffer, &beginInfo) != Result.Success)
+        if (VulkanContext.Vk.BeginCommandBuffer(commandBuffer, &beginInfo) != Result.Success)
             throw new InvalidOperationException("Failed to begin recording command buffer.");
 
         var swapchainImage = _window.Images[imageIndex];
@@ -233,7 +233,7 @@ public sealed unsafe class VulkanRenderer
             PImageMemoryBarriers = &preRenderBarrier,
         };
 
-        _context.Vk.CmdPipelineBarrier2(commandBuffer, &preRenderDep);
+        VulkanContext.Vk.CmdPipelineBarrier2(commandBuffer, &preRenderDep);
 
         ClearValue clearColor = new()
         {
@@ -259,8 +259,8 @@ public sealed unsafe class VulkanRenderer
             PColorAttachments = &colorAttachment,
         };
 
-        _context.Vk.CmdBeginRendering(commandBuffer, &renderingInfo);
-        _context.Vk.CmdBindPipeline(commandBuffer, PipelineBindPoint.Graphics, _pipeline);
+        VulkanContext.Vk.CmdBeginRendering(commandBuffer, &renderingInfo);
+        VulkanContext.Vk.CmdBindPipeline(commandBuffer, PipelineBindPoint.Graphics, _pipeline);
 
         Viewport viewport = new()
         {
@@ -276,11 +276,11 @@ public sealed unsafe class VulkanRenderer
             Offset = { X = 0, Y = 0 },
             Extent = extent,
         };
-        _context.Vk.CmdSetViewport(commandBuffer, 0, 1, &viewport);
-        _context.Vk.CmdSetScissor(commandBuffer, 0, 1, &scissor);
+        VulkanContext.Vk.CmdSetViewport(commandBuffer, 0, 1, &viewport);
+        VulkanContext.Vk.CmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-        _context.Vk.CmdDraw(commandBuffer, 3, 1, 0, 0);
-        _context.Vk.CmdEndRendering(commandBuffer);
+        VulkanContext.Vk.CmdDraw(commandBuffer, 3, 1, 0, 0);
+        VulkanContext.Vk.CmdEndRendering(commandBuffer);
 
         ImageMemoryBarrier2 postRenderBarrier = new()
         {
@@ -311,9 +311,9 @@ public sealed unsafe class VulkanRenderer
             PImageMemoryBarriers = &postRenderBarrier,
         };
 
-        _context.Vk.CmdPipelineBarrier2(commandBuffer, &postRenderDep);
+        VulkanContext.Vk.CmdPipelineBarrier2(commandBuffer, &postRenderDep);
 
-        if (_context.Vk.EndCommandBuffer(commandBuffer) != Result.Success)
+        if (VulkanContext.Vk.EndCommandBuffer(commandBuffer) != Result.Success)
             throw new InvalidOperationException("Failed to record command buffer.");
 
         var waitSemaphores = stackalloc[] { _window.GetImageAvailableSemaphore() };
@@ -332,7 +332,8 @@ public sealed unsafe class VulkanRenderer
             PSignalSemaphores = signalSemaphores,
         };
 
-        if (_context.Vk.QueueSubmit(_context.GraphicsQueue, 1, in submitInfo, _window.GetInFlightFence()) != Result.Success)
+        if (VulkanContext.Vk.QueueSubmit(VulkanContext.GraphicsQueue, 1, in submitInfo, _window.GetInFlightFence()) !=
+            Result.Success)
             throw new InvalidOperationException("Failed to submit draw command buffer.");
 
         _window.PresentImage(imageIndex);
@@ -344,12 +345,12 @@ public sealed unsafe class VulkanRenderer
     /// </summary>
     public void Destroy()
     {
-        _context.Vk.DeviceWaitIdle(_context.Device);
+        VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
 
         _commandPool.Destroy();
-        _context.Vk.DestroyPipeline(_context.Device, _pipeline, null);
-        _context.Vk.DestroyPipelineLayout(_context.Device, _pipelineLayout, null);
-        _context.DestroyShaderModule(_vertShaderModule);
-        _context.DestroyShaderModule(_fragShaderModule);
+        VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, _pipeline, null);
+        VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, _pipelineLayout, null);
+        VulkanShader.DestroyShaderModule(_vertShaderModule);
+        VulkanShader.DestroyShaderModule(_fragShaderModule);
     }
 }

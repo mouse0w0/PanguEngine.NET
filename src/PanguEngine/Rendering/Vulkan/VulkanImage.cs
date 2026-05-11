@@ -13,14 +13,12 @@ public sealed unsafe class VulkanImage
     /// </summary>
     public Image Image { get; }
 
-    private readonly VulkanAllocator _allocator;
     private readonly Allocation* _allocation;
     private bool _destroyed;
 
-    internal VulkanImage(Image image, VulkanAllocator allocator, Allocation* allocation)
+    internal VulkanImage(Image image, Allocation* allocation)
     {
         Image = image;
-        _allocator = allocator;
         _allocation = allocation;
     }
 
@@ -32,6 +30,6 @@ public sealed unsafe class VulkanImage
         if (_destroyed) return;
         _destroyed = true;
 
-        _allocator.DestroyImage(Image, _allocation);
+        VulkanAllocator.DestroyImage(Image, _allocation);
     }
 }

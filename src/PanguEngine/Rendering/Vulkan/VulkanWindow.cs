@@ -10,8 +10,6 @@ namespace PanguEngine.Rendering.Vulkan;
 /// </summary>
 public sealed unsafe class VulkanWindow
 {
-    private readonly VulkanContext _context;
-
     private bool _framebufferResized;
     private bool _destroyed;
 
@@ -24,42 +22,46 @@ public sealed unsafe class VulkanWindow
 
     /// <summary>The underlying window used for presentation.</summary>
     public IWindow Window { get; private set; }
+
     /// <summary>The Vulkan surface created from the window.</summary>
     public SurfaceKHR Surface { get; private set; }
+
     /// <summary>The swapchain handle.</summary>
     public SwapchainKHR Swapchain => _swapchain;
+
     /// <summary>The image format selected for the swapchain images.</summary>
     public Format ImageFormat { get; private set; }
+
     /// <summary>The current extent (width and height) of the swapchain images.</summary>
     public Extent2D Extent { get; private set; }
+
     /// <summary>The image handles for each swapchain image.</summary>
     public Image[] Images => _images!;
+
     /// <summary>The image views for each swapchain image.</summary>
     public ImageView[] ImageViews => _imageViews!;
+
     /// <summary>The current frame index within the in-flight frame ring.</summary>
     public int CurrentFrame { get; private set; }
 
     /// <summary>Creates a <see cref="VulkanWindow"/> with default Vulkan window options.</summary>
-    internal VulkanWindow(VulkanContext context) : this(context, WindowOptions.DefaultVulkan)
+    internal VulkanWindow() : this(WindowOptions.DefaultVulkan)
     {
     }
 
     /// <summary>Creates a <see cref="VulkanWindow"/> with the specified window options.</summary>
-    internal VulkanWindow(VulkanContext context, WindowOptions options)
+    internal VulkanWindow(WindowOptions options)
     {
-        _context = context;
-
         Window = Silk.NET.Windowing.Window.Create(options);
         Window.Initialize();
-        Surface = Window.VkSurface!.Create<AllocationCallbacks>(_context.VkInstance.ToHandle(), null).ToSurface();
+        Surface = Window.VkSurface!.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null).ToSurface();
 
         Initialize();
     }
 
     /// <summary>Creates a <see cref="VulkanWindow"/> from an existing window and surface.</summary>
-    internal VulkanWindow(VulkanContext context, IWindow window, SurfaceKHR surface)
+    internal VulkanWindow(IWindow window, SurfaceKHR surface)
     {
-        _context = context;
         Window = window;
         Surface = surface;
 
@@ -70,8 +72,8 @@ public sealed unsafe class VulkanWindow
     public Result AcquireNextImage(out uint imageIndex)
     {
         imageIndex = 0;
-        var result = _context.KhrSwapchain.AcquireNextImage(
-            _context.Device, _swapchain, ulong.MaxValue,
+        var result = VulkanContext.KhrSwapchain.AcquireNextImage(
+            VulkanContext.Device, _swapchain, ulong.MaxValue,
             _imageAvailableSemaphores![CurrentFrame], default, ref imageIndex);
 
         if (result == Result.ErrorOutOfDateKhr)
@@ -102,7 +104,7 @@ public sealed unsafe class VulkanWindow
             PImageIndices = &imageIndex
         };
 
-        var result = _context.KhrSwapchain.QueuePresent(_context.PresentQueue, in presentInfo);
+        var result = VulkanContext.KhrSwapchain.QueuePresent(VulkanContext.PresentQueue, in presentInfo);
 
         if (result == Result.ErrorOutOfDateKhr || result == Result.SuboptimalKhr || _framebufferResized)
         {
@@ -118,25 +120,28 @@ public sealed unsafe class VulkanWindow
     /// <summary>Advances the current frame index to the next in-flight frame slot.</summary>
     public void AdvanceFrame()
     {
-        CurrentFrame = (CurrentFrame + 1) % _context.MaxFramesInFlight;
+        CurrentFrame = (CurrentFrame + 1) % VulkanContext.MaxFramesInFlight;
     }
 
     /// <summary>Blocks until the in-flight fence for the current frame is signaled.</summary>
     public void WaitForInFlightFence()
     {
-        _context.Vk.WaitForFences(_context.Device, 1, in _inFlightFences![CurrentFrame], true, ulong.MaxValue);
+        VulkanContext.Vk.WaitForFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrame], true,
+            ulong.MaxValue);
     }
 
     /// <summary>Resets the in-flight fence for the current frame back to unsignaled state.</summary>
     public void ResetInFlightFence()
     {
-        _context.Vk.ResetFences(_context.Device, 1, in _inFlightFences![CurrentFrame]);
+        VulkanContext.Vk.ResetFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrame]);
     }
 
     /// <summary>Gets a reference to the image-available semaphore for the current frame.</summary>
     public ref Semaphore GetImageAvailableSemaphore() => ref _imageAvailableSemaphores![CurrentFrame];
+
     /// <summary>Gets a reference to the render-finished semaphore for the current frame.</summary>
     public ref Semaphore GetRenderFinishedSemaphore() => ref _renderFinishedSemaphores![CurrentFrame];
+
     /// <summary>Gets a reference to the in-flight fence for the current frame.</summary>
     public ref Fence GetInFlightFence() => ref _inFlightFences![CurrentFrame];
 
@@ -146,17 +151,17 @@ public sealed unsafe class VulkanWindow
         if (_destroyed) return;
         _destroyed = true;
 
-        for (var i = 0; i < _context.MaxFramesInFlight; i++)
+        for (var i = 0; i < VulkanContext.MaxFramesInFlight; i++)
         {
-            _context.Vk.DestroySemaphore(_context.Device, _renderFinishedSemaphores![i], null);
-            _context.Vk.DestroySemaphore(_context.Device, _imageAvailableSemaphores![i], null);
-            _context.Vk.DestroyFence(_context.Device, _inFlightFences![i], null);
+            VulkanContext.Vk.DestroySemaphore(VulkanContext.Device, _renderFinishedSemaphores![i], null);
+            VulkanContext.Vk.DestroySemaphore(VulkanContext.Device, _imageAvailableSemaphores![i], null);
+            VulkanContext.Vk.DestroyFence(VulkanContext.Device, _inFlightFences![i], null);
         }
 
         DestroyImageViews();
         DestroySwapchain();
 
-        _context.KhrSurface.DestroySurface(_context.VkInstance, Surface, null);
+        VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, Surface, null);
         Window.Dispose();
     }
 
@@ -179,7 +184,7 @@ public sealed unsafe class VulkanWindow
             Window.DoEvents();
         }
 
-        _context.Vk.DeviceWaitIdle(_context.Device);
+        VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
 
         DestroyImageViews();
         DestroySwapchain();
@@ -192,14 +197,14 @@ public sealed unsafe class VulkanWindow
 
     private void CreateSwapchain()
     {
-        var swapChainSupport = _context.QuerySwapChainSupport(_context.PhysicalDevice, Surface);
+        var swapChainSupport = VulkanContext.QuerySwapChainSupport(VulkanContext.PhysicalDevice, Surface);
         var surfaceFormat = ChooseSwapSurfaceFormat(swapChainSupport.Formats);
         var presentMode = ChoosePresentMode(swapChainSupport.PresentModes);
         var extent = ChooseSwapExtent(swapChainSupport.Capabilities);
 
-        var imageCount = (uint)_context.MaxFramesInFlight;
+        var imageCount = (uint)VulkanContext.MaxFramesInFlight;
 
-        var queueFamilyIndices = stackalloc[] { _context.GraphicsQueueFamily, _context.PresentQueueFamily };
+        var queueFamilyIndices = stackalloc[] { VulkanContext.GraphicsQueueFamily, VulkanContext.PresentQueueFamily };
 
         SwapchainCreateInfoKHR createInfo = new()
         {
@@ -213,7 +218,7 @@ public sealed unsafe class VulkanWindow
             ImageUsage = ImageUsageFlags.ColorAttachmentBit,
         };
 
-        if (_context.GraphicsQueueFamily != _context.PresentQueueFamily)
+        if (VulkanContext.GraphicsQueueFamily != VulkanContext.PresentQueueFamily)
         {
             createInfo = createInfo with
             {
@@ -235,15 +240,16 @@ public sealed unsafe class VulkanWindow
             Clipped = true,
         };
 
-        if (_context.KhrSwapchain.CreateSwapchain(_context.Device, in createInfo, null, out _swapchain) !=
+        if (VulkanContext.KhrSwapchain.CreateSwapchain(VulkanContext.Device, in createInfo, null, out _swapchain) !=
             Result.Success)
             throw new InvalidOperationException("Failed to create swap chain.");
 
-        _context.KhrSwapchain.GetSwapchainImages(_context.Device, _swapchain, ref imageCount, null);
+        VulkanContext.KhrSwapchain.GetSwapchainImages(VulkanContext.Device, _swapchain, ref imageCount, null);
         _images = new Image[imageCount];
         fixed (Image* swapchainImagesPtr = _images)
         {
-            _context.KhrSwapchain.GetSwapchainImages(_context.Device, _swapchain, ref imageCount, swapchainImagesPtr);
+            VulkanContext.KhrSwapchain.GetSwapchainImages(VulkanContext.Device, _swapchain, ref imageCount,
+                swapchainImagesPtr);
         }
 
         ImageFormat = surfaceFormat.Format;
@@ -279,7 +285,7 @@ public sealed unsafe class VulkanWindow
                 }
             };
 
-            if (_context.Vk.CreateImageView(_context.Device, in createInfo, null, out _imageViews[i]) !=
+            if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in createInfo, null, out _imageViews[i]) !=
                 Result.Success)
                 throw new InvalidOperationException("Failed to create image views.");
         }
@@ -287,9 +293,9 @@ public sealed unsafe class VulkanWindow
 
     private void CreateSyncObjects()
     {
-        _imageAvailableSemaphores = new Semaphore[_context.MaxFramesInFlight];
-        _renderFinishedSemaphores = new Semaphore[_context.MaxFramesInFlight];
-        _inFlightFences = new Fence[_context.MaxFramesInFlight];
+        _imageAvailableSemaphores = new Semaphore[VulkanContext.MaxFramesInFlight];
+        _renderFinishedSemaphores = new Semaphore[VulkanContext.MaxFramesInFlight];
+        _inFlightFences = new Fence[VulkanContext.MaxFramesInFlight];
 
         SemaphoreCreateInfo semaphoreInfo = new()
         {
@@ -302,13 +308,14 @@ public sealed unsafe class VulkanWindow
             Flags = FenceCreateFlags.SignaledBit,
         };
 
-        for (var i = 0; i < _context.MaxFramesInFlight; i++)
+        for (var i = 0; i < VulkanContext.MaxFramesInFlight; i++)
         {
-            if (_context.Vk.CreateSemaphore(_context.Device, in semaphoreInfo, null,
+            if (VulkanContext.Vk.CreateSemaphore(VulkanContext.Device, in semaphoreInfo, null,
                     out _imageAvailableSemaphores[i]) != Result.Success ||
-                _context.Vk.CreateSemaphore(_context.Device, in semaphoreInfo, null,
+                VulkanContext.Vk.CreateSemaphore(VulkanContext.Device, in semaphoreInfo, null,
                     out _renderFinishedSemaphores[i]) != Result.Success ||
-                _context.Vk.CreateFence(_context.Device, in fenceInfo, null, out _inFlightFences[i]) != Result.Success)
+                VulkanContext.Vk.CreateFence(VulkanContext.Device, in fenceInfo, null, out _inFlightFences[i]) !=
+                Result.Success)
             {
                 throw new InvalidOperationException("Failed to create synchronization objects for a frame.");
             }
@@ -318,12 +325,12 @@ public sealed unsafe class VulkanWindow
     private void DestroyImageViews()
     {
         foreach (var imageView in _imageViews!)
-            _context.Vk.DestroyImageView(_context.Device, imageView, null);
+            VulkanContext.Vk.DestroyImageView(VulkanContext.Device, imageView, null);
     }
 
     private void DestroySwapchain()
     {
-        _context.KhrSwapchain.DestroySwapchain(_context.Device, _swapchain, null);
+        VulkanContext.KhrSwapchain.DestroySwapchain(VulkanContext.Device, _swapchain, null);
     }
 
     private SurfaceFormatKHR ChooseSwapSurfaceFormat(IReadOnlyList<SurfaceFormatKHR> availableFormats)

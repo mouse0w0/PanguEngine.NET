@@ -11,97 +11,96 @@ namespace PanguEngine.Rendering.Vulkan;
 /// <summary>
 /// Manages Vulkan instance, device, and queue initialization lifecycle.
 /// </summary>
-public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
+public static unsafe class VulkanContext
 {
-    private readonly string[] _validationLayers = ["VK_LAYER_KHRONOS_validation"];
-    private readonly string[] _deviceExtensions = [KhrSwapchain.ExtensionName];
+    private static readonly string[] ValidationLayers = ["VK_LAYER_KHRONOS_validation"];
+    private static readonly string[] DeviceExtensions = [KhrSwapchain.ExtensionName];
 
-    /// <summary>
-    /// Whether Vulkan validation layers are enabled.
-    /// </summary>
-    public bool EnableValidationLayers { get; } = enableValidationLayers;
+    private static bool _enableValidationLayers;
 
     /// <summary>
     /// The core Vulkan API.
     /// </summary>
-    public Vk Vk { get; private set; } = null!;
+    public static Vk Vk { get; private set; } = null!;
 
     /// <summary>
     /// The Vulkan instance handle.
     /// </summary>
-    public Instance VkInstance { get; private set; }
+    public static Instance VkInstance { get; private set; }
 
-    private ExtDebugUtils? _debugUtils;
-    private DebugUtilsMessengerEXT _debugMessenger;
-    private DebugUtilsMessengerCallbackFunctionEXT? _debugCallbackDelegate;
+    private static ExtDebugUtils? _debugUtils;
+    private static DebugUtilsMessengerEXT _debugMessenger;
+    private static DebugUtilsMessengerCallbackFunctionEXT? _debugCallbackDelegate;
 
     /// <summary>
     /// The VK_KHR_surface extension.
     /// </summary>
-    public KhrSurface KhrSurface { get; private set; } = null!;
+    public static KhrSurface KhrSurface { get; private set; } = null!;
 
     /// <summary>
     /// The VK_KHR_swapchain extension.
     /// </summary>
-    public KhrSwapchain KhrSwapchain { get; private set; } = null!;
+    public static KhrSwapchain KhrSwapchain { get; private set; } = null!;
 
     /// <summary>
     /// The selected physical device (GPU).
     /// </summary>
-    public PhysicalDevice PhysicalDevice { get; private set; }
+    public static PhysicalDevice PhysicalDevice { get; private set; }
 
     /// <summary>
     /// The logical device handle.
     /// </summary>
-    public Device Device { get; private set; }
+    public static Device Device { get; private set; }
 
     /// <summary>
     /// The queue family index for graphics operations.
     /// </summary>
-    public uint GraphicsQueueFamily { get; private set; }
+    public static uint GraphicsQueueFamily { get; private set; }
 
     /// <summary>
     /// The queue family index for presentation operations.
     /// </summary>
-    public uint PresentQueueFamily { get; private set; }
+    public static uint PresentQueueFamily { get; private set; }
 
     /// <summary>
     /// The graphics queue handle.
     /// </summary>
-    public Queue GraphicsQueue { get; private set; }
+    public static Queue GraphicsQueue { get; private set; }
 
     /// <summary>
     /// The presentation queue handle.
     /// </summary>
-    public Queue PresentQueue { get; private set; }
+    public static Queue PresentQueue { get; private set; }
 
     /// <summary>
     /// Maximum number of frames that can be processed concurrently.
     /// </summary>
-    public int MaxFramesInFlight { get; private set; }
+    public static int MaxFramesInFlight { get; private set; }
 
-    private bool _instanceInitialized;
-    private bool _deviceInitialized;
-    private bool _destroyed;
+    private static bool _instanceInitialized;
+    private static bool _deviceInitialized;
+    private static bool _destroyed;
 
     /// <summary>
     /// Initializes the Vulkan instance with the specified required extensions.
     /// </summary>
     /// <param name="requiredExtensions">Extensions required by the application (e.g., surface extensions).</param>
-    internal void InitInstance(string[] requiredExtensions)
+    internal static void InitInstance(string[] requiredExtensions, bool enableValidationLayers = true)
     {
         if (_instanceInitialized)
             throw new InvalidOperationException("Vulkan instance already initialized.");
         _instanceInitialized = true;
 
+        _enableValidationLayers = enableValidationLayers;
+
         Vk = Vk.GetApi();
 
-        if (EnableValidationLayers && !CheckValidationLayerSupport())
+        if (_enableValidationLayers && !CheckValidationLayerSupport())
             throw new InvalidOperationException("Validation layers requested, but not available.");
 
         CreateInstance(requiredExtensions);
 
-        if (EnableValidationLayers)
+        if (_enableValidationLayers)
             SetupDebugMessenger();
 
         if (!Vk.TryGetInstanceExtension<KhrSurface>(VkInstance, out var khrSurface))
@@ -114,7 +113,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
     /// Initializes the logical device and queues for the given surface.
     /// </summary>
     /// <param name="surface">The window surface to present to.</param>
-    internal void InitDevice(SurfaceKHR surface)
+    internal static void InitDevice(SurfaceKHR surface)
     {
         if (!_instanceInitialized)
             throw new InvalidOperationException("Vulkan instance must be initialized first.");
@@ -139,7 +138,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
     /// <summary>
     /// Releases all Vulkan resources in the correct order.
     /// </summary>
-    internal void Destroy()
+    internal static void Destroy()
     {
         if (_destroyed) return;
         _destroyed = true;
@@ -150,7 +149,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             Vk.DestroyDevice(Device, null);
         }
 
-        if (EnableValidationLayers && _debugUtils is not null)
+        if (_enableValidationLayers && _debugUtils is not null)
         {
             _debugUtils.DestroyDebugUtilsMessenger(VkInstance, _debugMessenger, null);
         }
@@ -162,7 +161,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         }
     }
 
-    private void CreateInstance(string[] requiredExtensions)
+    private static void CreateInstance(string[] requiredExtensions)
     {
         ApplicationInfo appInfo = new()
         {
@@ -174,7 +173,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             ApiVersion = Vk.Version13
         };
 
-        var extensions = EnableValidationLayers
+        var extensions = _enableValidationLayers
             ? requiredExtensions.Append(ExtDebugUtils.ExtensionName).ToArray()
             : requiredExtensions;
 
@@ -187,10 +186,10 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         };
 
         DebugUtilsMessengerCreateInfoEXT debugCreateInfo = new();
-        if (EnableValidationLayers)
+        if (_enableValidationLayers)
         {
-            createInfo.EnabledLayerCount = (uint)_validationLayers.Length;
-            createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(_validationLayers);
+            createInfo.EnabledLayerCount = (uint)ValidationLayers.Length;
+            createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(ValidationLayers);
             debugCreateInfo.SType = StructureType.DebugUtilsMessengerCreateInfoExt;
             debugCreateInfo.MessageSeverity = DebugUtilsMessageSeverityFlagsEXT.VerboseBitExt |
                                               DebugUtilsMessageSeverityFlagsEXT.WarningBitExt |
@@ -216,11 +215,11 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         Marshal.FreeHGlobal((IntPtr)appInfo.PEngineName);
         SilkMarshal.Free((nint)createInfo.PpEnabledExtensionNames);
 
-        if (EnableValidationLayers)
+        if (_enableValidationLayers)
             SilkMarshal.Free((nint)createInfo.PpEnabledLayerNames);
     }
 
-    private void SetupDebugMessenger()
+    private static void SetupDebugMessenger()
     {
         if (!Vk.TryGetInstanceExtension(VkInstance, out _debugUtils)) return;
 
@@ -242,7 +241,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             throw new InvalidOperationException("Failed to set up debug messenger.");
     }
 
-    private uint DebugCallback(DebugUtilsMessageSeverityFlagsEXT messageSeverity,
+    private static uint DebugCallback(DebugUtilsMessageSeverityFlagsEXT messageSeverity,
         DebugUtilsMessageTypeFlagsEXT messageTypes,
         DebugUtilsMessengerCallbackDataEXT* pCallbackData,
         void* pUserData)
@@ -252,7 +251,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         return Vk.False;
     }
 
-    private bool CheckValidationLayerSupport()
+    private static bool CheckValidationLayerSupport()
     {
         uint layerCount = 0;
         Vk.EnumerateInstanceLayerProperties(ref layerCount, null);
@@ -266,10 +265,10 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             .Select(layer => Marshal.PtrToStringAnsi((IntPtr)layer.LayerName))
             .ToHashSet();
 
-        return _validationLayers.All(availableLayerNames.Contains);
+        return ValidationLayers.All(availableLayerNames.Contains);
     }
 
-    private void PickPhysicalDevice(SurfaceKHR surface)
+    private static void PickPhysicalDevice(SurfaceKHR surface)
     {
         var devices = Vk.GetPhysicalDevices(VkInstance);
 
@@ -286,7 +285,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             throw new InvalidOperationException("Failed to find a suitable GPU.");
     }
 
-    private bool IsDeviceSuitable(PhysicalDevice device, SurfaceKHR surface)
+    private static bool IsDeviceSuitable(PhysicalDevice device, SurfaceKHR surface)
     {
         var indices = FindQueueFamilies(device, surface);
         var extensionsSupported = CheckDeviceExtensionsSupport(device);
@@ -301,7 +300,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         return indices.IsComplete && extensionsSupported && swapChainAdequate;
     }
 
-    private bool CheckDeviceExtensionsSupport(PhysicalDevice device)
+    private static bool CheckDeviceExtensionsSupport(PhysicalDevice device)
     {
         uint extensionsCount = 0;
         Vk.EnumerateDeviceExtensionProperties(device, (byte*)null, ref extensionsCount, null);
@@ -316,10 +315,10 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             .Select(ext => Marshal.PtrToStringAnsi((IntPtr)ext.ExtensionName))
             .ToHashSet();
 
-        return _deviceExtensions.All(availableExtensionNames.Contains);
+        return DeviceExtensions.All(availableExtensionNames.Contains);
     }
 
-    private QueueFamilyIndices FindQueueFamilies(PhysicalDevice device, SurfaceKHR surface)
+    private static QueueFamilyIndices FindQueueFamilies(PhysicalDevice device, SurfaceKHR surface)
     {
         var indices = new QueueFamilyIndices();
 
@@ -358,7 +357,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
     /// <param name="device">The physical device to query.</param>
     /// <param name="surface">The surface to query against.</param>
     /// <returns>Swapchain capabilities, formats, and present modes.</returns>
-    internal SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device, SurfaceKHR surface)
+    internal static SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device, SurfaceKHR surface)
     {
         var details = new SwapChainSupportDetails();
 
@@ -399,7 +398,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         return details;
     }
 
-    private void CreateLogicalDevice(SurfaceKHR surface)
+    private static void CreateLogicalDevice(SurfaceKHR surface)
     {
         var indices = FindQueueFamilies(PhysicalDevice, surface);
 
@@ -441,14 +440,14 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
             QueueCreateInfoCount = (uint)uniqueQueueFamilies.Length,
             PQueueCreateInfos = queueCreateInfos,
             PEnabledFeatures = &deviceFeatures,
-            EnabledExtensionCount = (uint)_deviceExtensions.Length,
-            PpEnabledExtensionNames = (byte**)SilkMarshal.StringArrayToPtr(_deviceExtensions)
+            EnabledExtensionCount = (uint)DeviceExtensions.Length,
+            PpEnabledExtensionNames = (byte**)SilkMarshal.StringArrayToPtr(DeviceExtensions)
         };
 
-        if (EnableValidationLayers)
+        if (_enableValidationLayers)
         {
-            createInfo.EnabledLayerCount = (uint)_validationLayers.Length;
-            createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(_validationLayers);
+            createInfo.EnabledLayerCount = (uint)ValidationLayers.Length;
+            createInfo.PpEnabledLayerNames = (byte**)SilkMarshal.StringArrayToPtr(ValidationLayers);
         }
         else
         {
@@ -464,7 +463,7 @@ public sealed unsafe class VulkanContext(bool enableValidationLayers = true)
         GraphicsQueue = graphicsQueue;
         PresentQueue = presentQueue;
 
-        if (EnableValidationLayers)
+        if (_enableValidationLayers)
             SilkMarshal.Free((nint)createInfo.PpEnabledLayerNames);
 
         SilkMarshal.Free((nint)createInfo.PpEnabledExtensionNames);

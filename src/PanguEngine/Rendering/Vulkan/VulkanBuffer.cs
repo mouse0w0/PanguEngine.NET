@@ -13,14 +13,12 @@ public sealed unsafe class VulkanBuffer
     /// </summary>
     public Buffer Buffer { get; }
 
-    private readonly VulkanAllocator _allocator;
     private readonly Allocation* _allocation;
     private bool _destroyed;
 
-    internal VulkanBuffer(Buffer buffer, VulkanAllocator allocator, Allocation* allocation)
+    internal VulkanBuffer(Buffer buffer, Allocation* allocation)
     {
         Buffer = buffer;
-        _allocator = allocator;
         _allocation = allocation;
     }
 
@@ -31,7 +29,7 @@ public sealed unsafe class VulkanBuffer
     /// <returns>A pointer to the mapped memory.</returns>
     public T* Map<T>() where T : unmanaged
     {
-        return _allocator.Map<T>(_allocation);
+        return VulkanAllocator.Map<T>(_allocation);
     }
 
     /// <summary>
@@ -39,7 +37,7 @@ public sealed unsafe class VulkanBuffer
     /// </summary>
     public void Unmap()
     {
-        _allocator.Unmap(_allocation);
+        VulkanAllocator.Unmap(_allocation);
     }
 
     /// <summary>
@@ -50,6 +48,6 @@ public sealed unsafe class VulkanBuffer
         if (_destroyed) return;
         _destroyed = true;
 
-        _allocator.DestroyBuffer(Buffer, _allocation);
+        VulkanAllocator.DestroyBuffer(Buffer, _allocation);
     }
 }

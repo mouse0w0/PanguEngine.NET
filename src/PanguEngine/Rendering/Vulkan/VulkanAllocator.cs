@@ -7,29 +7,23 @@ namespace PanguEngine.Rendering.Vulkan;
 /// <summary>
 /// Vulkan Memory Allocator (VMA) wrapper.
 /// </summary>
-public sealed unsafe class VulkanAllocator
+public static unsafe class VulkanAllocator
 {
-    private readonly Allocator* _allocator;
-    private readonly Vk _vk;
-    private readonly Device _device;
-    private bool _destroyed;
+    private static Allocator* _allocator;
+    private static bool _destroyed;
 
     /// <summary>
     /// Initializes the VMA allocator using the Vulkan context.
     /// </summary>
-    /// <param name="context">The initialized Vulkan context.</param>
-    public VulkanAllocator(VulkanContext context)
+    public static void Init()
     {
-        _vk = context.Vk;
-        _device = context.Device;
-
         var createInfo = new AllocatorCreateInfo
         {
             Flags = AllocatorCreateFlags.ExternallySynchronizedBit,
             VulkanApiVersion = Vk.Version13,
-            Instance = context.VkInstance,
-            PhysicalDevice = context.PhysicalDevice,
-            Device = _device,
+            Instance = VulkanContext.VkInstance,
+            PhysicalDevice = VulkanContext.PhysicalDevice,
+            Device = VulkanContext.Device,
         };
 
         Allocator* allocator;
@@ -49,11 +43,11 @@ public sealed unsafe class VulkanAllocator
     /// for optimal memory type selection.
     /// </param>
     /// <returns>The created buffer.</returns>
-    public VulkanBuffer CreateBuffer(
+    public static VulkanBuffer CreateBuffer(
         in BufferCreateInfo bufferInfo,
         in AllocationCreateInfo allocInfo = default)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
 
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)
@@ -70,7 +64,7 @@ public sealed unsafe class VulkanAllocator
         if (result != Result.Success)
             throw new InvalidOperationException($"Failed to allocate buffer: {result}");
 
-        return new VulkanBuffer(buffer, this, allocation);
+        return new VulkanBuffer(buffer, allocation);
     }
 
     /// <summary>
@@ -82,11 +76,11 @@ public sealed unsafe class VulkanAllocator
     /// for optimal memory type selection.
     /// </param>
     /// <returns>The created image.</returns>
-    public VulkanImage CreateImage(
+    public static VulkanImage CreateImage(
         in ImageCreateInfo imageInfo,
         in AllocationCreateInfo allocationCreateInfo = default)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
 
         var actualAllocInfo = allocationCreateInfo;
         if (actualAllocInfo.Usage == 0)
@@ -103,7 +97,7 @@ public sealed unsafe class VulkanAllocator
         if (result != Result.Success)
             throw new InvalidOperationException($"Failed to allocate image: {result}");
 
-        return new VulkanImage(image, this, allocation);
+        return new VulkanImage(image, allocation);
     }
 
     /// <summary>
@@ -112,7 +106,7 @@ public sealed unsafe class VulkanAllocator
     /// <typeparam name="T">The unmanaged type to map as.</typeparam>
     /// <param name="allocation">The VMA allocation to map.</param>
     /// <returns>A pointer to the mapped memory.</returns>
-    internal T* Map<T>(Allocation* allocation) where T : unmanaged
+    internal static T* Map<T>(Allocation* allocation) where T : unmanaged
     {
         void* data;
         var result = Apis.MapMemory(_allocator, allocation, &data);
@@ -126,7 +120,7 @@ public sealed unsafe class VulkanAllocator
     /// Unmaps previously mapped memory.
     /// </summary>
     /// <param name="allocation">The VMA allocation to unmap.</param>
-    internal void Unmap(Allocation* allocation)
+    internal static void Unmap(Allocation* allocation)
     {
         Apis.UnmapMemory(_allocator, allocation);
     }
@@ -136,7 +130,7 @@ public sealed unsafe class VulkanAllocator
     /// </summary>
     /// <param name="buffer">The buffer handle to destroy.</param>
     /// <param name="allocation">The VMA allocation to free.</param>
-    internal void DestroyBuffer(Buffer buffer, Allocation* allocation)
+    internal static void DestroyBuffer(Buffer buffer, Allocation* allocation)
     {
         Apis.DestroyBuffer(_allocator, buffer, allocation);
     }
@@ -146,7 +140,7 @@ public sealed unsafe class VulkanAllocator
     /// </summary>
     /// <param name="image">The image handle to destroy.</param>
     /// <param name="allocation">The VMA allocation to free.</param>
-    internal void DestroyImage(Image image, Allocation* allocation)
+    internal static void DestroyImage(Image image, Allocation* allocation)
     {
         Apis.DestroyImage(_allocator, image, allocation);
     }
@@ -155,14 +149,14 @@ public sealed unsafe class VulkanAllocator
     /// Destroys the VMA allocator and releases all associated resources.
     /// All allocations must be freed before calling this method.
     /// </summary>
-    public void Destroy()
+    public static void Destroy()
     {
         if (_destroyed) return;
         _destroyed = true;
 
         if (_allocator != null)
         {
-            _vk.DeviceWaitIdle(_device);
+            VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
             Apis.DestroyAllocator(_allocator);
         }
     }
