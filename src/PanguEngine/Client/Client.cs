@@ -27,6 +27,11 @@ public unsafe class Client
     public VulkanWindow VulkanWindow { get; private set; } = null!;
 
     /// <summary>
+    /// The Vulkan memory allocator.
+    /// </summary>
+    public VulkanAllocator VulkanAllocator { get; private set; } = null!;
+
+    /// <summary>
     /// The Vulkan renderer.
     /// </summary>
     public VulkanRenderer Renderer { get; private set; } = null!;
@@ -72,6 +77,7 @@ public unsafe class Client
             .ToSurface();
         VulkanContext.InitDevice(surface);
 
+        VulkanAllocator = new VulkanAllocator(VulkanContext);
         VulkanWindow = new VulkanWindow(VulkanContext, window, surface);
         Renderer = new VulkanRenderer(VulkanContext, VulkanWindow);
     }
@@ -92,6 +98,7 @@ public unsafe class Client
     {
         Renderer.Destroy();
         VulkanWindow.Destroy();
+        VulkanAllocator.Destroy();
         VulkanContext.Destroy();
 
         Engine.Shutdown();
