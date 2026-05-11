@@ -19,7 +19,7 @@ public static unsafe class VulkanAllocator
     {
         var createInfo = new AllocatorCreateInfo
         {
-            Flags = AllocatorCreateFlags.ExternallySynchronizedBit,
+            Flags = 0,
             VulkanApiVersion = Vk.Version13,
             Instance = VulkanContext.VkInstance,
             PhysicalDevice = VulkanContext.PhysicalDevice,
