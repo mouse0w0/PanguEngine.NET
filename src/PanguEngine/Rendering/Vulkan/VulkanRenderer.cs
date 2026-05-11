@@ -183,6 +183,8 @@ public sealed unsafe class VulkanRenderer
     {
         _window.WaitForInFlightFence();
 
+        var timelineValue = VulkanContext.NextGlobalTimelineValue();
+
         var result = _window.AcquireNextImage(out var imageIndex);
         if (result == Result.ErrorOutOfDateKhr)
             return;
@@ -321,7 +323,7 @@ public sealed unsafe class VulkanRenderer
         var signalSemaphores = stackalloc[]
             { _window.GetRenderFinishedSemaphore(), VulkanContext.GlobalTimelineSemaphore };
 
-        var signalValues = stackalloc[] { 0UL, VulkanContext.NextGlobalTimelineValue() };
+        var signalValues = stackalloc[] { 0UL, timelineValue };
 
         TimelineSemaphoreSubmitInfo timelineSubmitInfo = new()
         {
@@ -349,6 +351,8 @@ public sealed unsafe class VulkanRenderer
 
         _window.PresentImage(imageIndex);
         _window.AdvanceFrame();
+
+        VulkanDeletionQueue.Collect();
     }
 
     /// <summary>

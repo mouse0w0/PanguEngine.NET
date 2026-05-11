@@ -86,6 +86,7 @@ public unsafe class Client
     {
         Renderer.Destroy();
         VulkanWindow.Destroy();
+        VulkanDeletionQueue.Drain();
         VulkanAllocator.Destroy();
         VulkanContext.Destroy();
 

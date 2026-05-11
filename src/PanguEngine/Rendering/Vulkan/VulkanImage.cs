@@ -30,6 +30,9 @@ public sealed unsafe class VulkanImage
         if (_destroyed) return;
         _destroyed = true;
 
-        VulkanAllocator.DestroyImage(Image, _allocation);
+        var image = Image;
+        var allocation = _allocation;
+        var retireValue = VulkanContext.GlobalTimelineValue + (ulong)VulkanContext.MaxFramesInFlight;
+        VulkanDeletionQueue.Enqueue(retireValue, () => VulkanAllocator.DestroyImage(image, allocation));
     }
 }

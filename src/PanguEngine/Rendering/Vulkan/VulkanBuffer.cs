@@ -48,6 +48,9 @@ public sealed unsafe class VulkanBuffer
         if (_destroyed) return;
         _destroyed = true;
 
-        VulkanAllocator.DestroyBuffer(Buffer, _allocation);
+        var buffer = Buffer;
+        var allocation = _allocation;
+        var retireValue = VulkanContext.GlobalTimelineValue + (ulong)VulkanContext.MaxFramesInFlight;
+        VulkanDeletionQueue.Enqueue(retireValue, () => VulkanAllocator.DestroyBuffer(buffer, allocation));
     }
 }
