@@ -12,7 +12,7 @@ public sealed unsafe class VulkanCommandPool
     public CommandBuffer[] CommandBuffers { get; private set; }
 
     /// <summary>Creates a command pool and allocates command buffers using <see cref="VulkanContext.MaxFramesInFlight"/> as the buffer count.</summary>
-    public VulkanCommandPool() : this((uint)VulkanContext.MaxFramesInFlight)
+    public VulkanCommandPool() : this(VulkanContext.MaxFramesInFlight)
     {
     }
 

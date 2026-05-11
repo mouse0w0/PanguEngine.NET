@@ -76,7 +76,7 @@ public static unsafe class VulkanContext
     /// <summary>
     /// Maximum number of frames that can be processed concurrently.
     /// </summary>
-    public static int MaxFramesInFlight { get; private set; }
+    public static uint MaxFramesInFlight { get; private set; }
 
     private static Semaphore _globalTimelineSemaphore;
     private static ulong _globalTimelineValue;
@@ -146,9 +146,9 @@ public static unsafe class VulkanContext
         PickPhysicalDevice(surface);
 
         KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
-        MaxFramesInFlight = (int)(capabilities.MinImageCount + 1);
+        MaxFramesInFlight = capabilities.MinImageCount + 1;
         if (capabilities.MaxImageCount > 0 && MaxFramesInFlight > capabilities.MaxImageCount)
-            MaxFramesInFlight = (int)capabilities.MaxImageCount;
+            MaxFramesInFlight = capabilities.MaxImageCount;
 
         CreateLogicalDevice(surface);
 

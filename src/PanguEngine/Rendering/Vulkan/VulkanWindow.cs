@@ -42,7 +42,7 @@ public sealed unsafe class VulkanWindow
     public ImageView[] ImageViews => _imageViews!;
 
     /// <summary>The current frame index within the in-flight frame ring.</summary>
-    public int CurrentFrame { get; private set; }
+    public uint CurrentFrame { get; private set; }
 
     /// <summary>Creates a <see cref="VulkanWindow"/> with default Vulkan window options.</summary>
     internal VulkanWindow() : this(WindowOptions.DefaultVulkan)
@@ -202,7 +202,7 @@ public sealed unsafe class VulkanWindow
         var presentMode = ChoosePresentMode(swapChainSupport.PresentModes);
         var extent = ChooseSwapExtent(swapChainSupport.Capabilities);
 
-        var imageCount = (uint)VulkanContext.MaxFramesInFlight;
+        var imageCount = VulkanContext.MaxFramesInFlight;
 
         var queueFamilyIndices = stackalloc[] { VulkanContext.GraphicsQueueFamily, VulkanContext.PresentQueueFamily };
 
