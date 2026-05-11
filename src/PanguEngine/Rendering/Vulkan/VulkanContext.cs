@@ -5,6 +5,7 @@ using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using Silk.NET.Vulkan.Extensions.EXT;
 using Silk.NET.Vulkan.Extensions.KHR;
+using Semaphore = Silk.NET.Vulkan.Semaphore;
 
 namespace PanguEngine.Rendering.Vulkan;
 
@@ -77,6 +78,27 @@ public static unsafe class VulkanContext
     /// </summary>
     public static int MaxFramesInFlight { get; private set; }
 
+    private static Semaphore _globalTimelineSemaphore;
+    private static ulong _globalTimelineValue;
+
+    /// <summary>
+    /// A global timeline semaphore signaled by every window's QueueSubmit to track GPU progress across all windows.
+    /// </summary>
+    public static Semaphore GlobalTimelineSemaphore => _globalTimelineSemaphore;
+
+    /// <summary>
+    /// The latest CPU-side value of the global timeline counter.
+    /// </summary>
+    public static ulong GlobalTimelineValue => Volatile.Read(ref _globalTimelineValue);
+
+    /// <summary>
+    /// Atomically advances the global timeline counter and returns the value to signal in QueueSubmit.
+    /// </summary>
+    public static ulong NextGlobalTimelineValue()
+    {
+        return Interlocked.Increment(ref _globalTimelineValue);
+    }
+
     private static bool _instanceInitialized;
     private static bool _deviceInitialized;
     private static bool _destroyed;
@@ -130,6 +152,20 @@ public static unsafe class VulkanContext
 
         CreateLogicalDevice(surface);
 
+        SemaphoreTypeCreateInfo timelineCreateInfo = new()
+        {
+            SType = StructureType.SemaphoreTypeCreateInfo,
+            SemaphoreType = SemaphoreType.Timeline,
+            InitialValue = 0,
+        };
+        SemaphoreCreateInfo semaphoreInfo = new()
+        {
+            SType = StructureType.SemaphoreCreateInfo,
+            PNext = &timelineCreateInfo,
+        };
+        if (Vk.CreateSemaphore(Device, in semaphoreInfo, null, out _globalTimelineSemaphore) != Result.Success)
+            throw new InvalidOperationException("Failed to create global timeline semaphore.");
+
         if (!Vk.TryGetDeviceExtension<KhrSwapchain>(VkInstance, Device, out var khrSwapchain))
             throw new NotSupportedException("VK_KHR_swapchain extension not found.");
         KhrSwapchain = khrSwapchain;
@@ -146,6 +182,7 @@ public static unsafe class VulkanContext
         if (_deviceInitialized)
         {
             Vk.DeviceWaitIdle(Device);
+            Vk.DestroySemaphore(Device, _globalTimelineSemaphore, null);
             Vk.DestroyDevice(Device, null);
         }
 
@@ -426,9 +463,16 @@ public static unsafe class VulkanContext
 
         PhysicalDeviceFeatures deviceFeatures = new();
 
+        PhysicalDeviceVulkan12Features vulkan12Features = new()
+        {
+            SType = StructureType.PhysicalDeviceVulkan12Features,
+            TimelineSemaphore = true,
+        };
+
         PhysicalDeviceVulkan13Features vulkan13Features = new()
         {
             SType = StructureType.PhysicalDeviceVulkan13Features,
+            PNext = &vulkan12Features,
             DynamicRendering = true,
             Synchronization2 = true,
         };

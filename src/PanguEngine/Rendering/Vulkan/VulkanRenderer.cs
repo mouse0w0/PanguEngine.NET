@@ -318,17 +318,28 @@ public sealed unsafe class VulkanRenderer
 
         var waitSemaphores = stackalloc[] { _window.GetImageAvailableSemaphore() };
         var waitStages = stackalloc[] { PipelineStageFlags.ColorAttachmentOutputBit };
-        var signalSemaphores = stackalloc[] { _window.GetRenderFinishedSemaphore() };
+        var signalSemaphores = stackalloc[]
+            { _window.GetRenderFinishedSemaphore(), VulkanContext.GlobalTimelineSemaphore };
+
+        var signalValues = stackalloc[] { 0UL, VulkanContext.NextGlobalTimelineValue() };
+
+        TimelineSemaphoreSubmitInfo timelineSubmitInfo = new()
+        {
+            SType = StructureType.TimelineSemaphoreSubmitInfo,
+            SignalSemaphoreValueCount = 2,
+            PSignalSemaphoreValues = signalValues,
+        };
 
         SubmitInfo submitInfo = new()
         {
             SType = StructureType.SubmitInfo,
+            PNext = &timelineSubmitInfo,
             WaitSemaphoreCount = 1,
             PWaitSemaphores = waitSemaphores,
             PWaitDstStageMask = waitStages,
             CommandBufferCount = 1,
             PCommandBuffers = &commandBuffer,
-            SignalSemaphoreCount = 1,
+            SignalSemaphoreCount = 2,
             PSignalSemaphores = signalSemaphores,
         };
 
