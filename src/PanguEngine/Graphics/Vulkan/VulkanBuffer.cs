@@ -2,7 +2,7 @@ using Silk.NET.Vulkan;
 using Vma;
 using Buffer = Silk.NET.Vulkan.Buffer;
 
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// A Vulkan buffer with bound GPU memory.

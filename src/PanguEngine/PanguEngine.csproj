@@ -24,7 +24,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Content Include="Rendering\Vulkan\Shaders\*.vert;Rendering\Vulkan\Shaders\*.frag">
+        <Content Include="Graphics\Vulkan\Shaders\*.vert;Graphics\Vulkan\Shaders\*.frag">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>

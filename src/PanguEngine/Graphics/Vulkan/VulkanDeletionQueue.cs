@@ -1,4 +1,4 @@
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// Queues deferred deletion of Vulkan resources.

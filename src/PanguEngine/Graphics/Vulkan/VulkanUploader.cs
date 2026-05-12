@@ -5,7 +5,7 @@ using Silk.NET.Vulkan;
 using Vma;
 using Buffer = Silk.NET.Vulkan.Buffer;
 
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// Thread-safe staging buffer upload system that batches GPU buffer transfers.

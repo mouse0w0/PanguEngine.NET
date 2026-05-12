@@ -1,7 +1,7 @@
 using Silk.NET.Vulkan;
 using Vma;
 
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// A Vulkan image with bound GPU memory.

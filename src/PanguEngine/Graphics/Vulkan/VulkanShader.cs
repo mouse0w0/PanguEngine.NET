@@ -1,7 +1,7 @@
 using Silk.NET.Shaderc;
 using Silk.NET.Vulkan;
 
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// Provides static methods for compiling GLSL shaders to SPIR-V and managing Vulkan shader modules.

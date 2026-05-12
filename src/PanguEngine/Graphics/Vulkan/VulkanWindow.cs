@@ -3,7 +3,7 @@ using Silk.NET.Vulkan;
 using Silk.NET.Windowing;
 using Semaphore = Silk.NET.Vulkan.Semaphore;
 
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// Manages a Vulkan swapchain surface and its associated rendering resources bound to a window.

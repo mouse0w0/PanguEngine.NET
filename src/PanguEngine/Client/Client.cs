@@ -1,4 +1,4 @@
-using PanguEngine.Rendering.Vulkan;
+using PanguEngine.Graphics.Vulkan;
 using Silk.NET.Core.Native;
 using Silk.NET.Maths;
 using Silk.NET.Vulkan;

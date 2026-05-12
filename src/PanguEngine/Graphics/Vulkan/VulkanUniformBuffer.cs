@@ -1,7 +1,7 @@
 using Silk.NET.Vulkan;
 using Vma;
 
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// A persistently mapped uniform buffer with <see cref="VulkanContext.MaxFramesInFlight"/>

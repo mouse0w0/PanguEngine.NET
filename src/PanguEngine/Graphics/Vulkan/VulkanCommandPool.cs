@@ -1,6 +1,6 @@
 using Silk.NET.Vulkan;
 
-namespace PanguEngine.Rendering.Vulkan;
+namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>Manages a Vulkan command pool and its allocated command buffers.</summary>
 public sealed unsafe class VulkanCommandPool
