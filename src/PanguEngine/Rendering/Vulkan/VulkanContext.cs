@@ -78,6 +78,11 @@ public static unsafe class VulkanContext
     /// </summary>
     public static uint MaxFramesInFlight { get; private set; }
 
+    /// <summary>
+    /// Minimum required alignment for uniform buffer offsets, in bytes.
+    /// </summary>
+    public static ulong MinUniformBufferOffsetAlignment { get; private set; }
+
     private static Semaphore _globalTimelineSemaphore;
     private static ulong _globalTimelineValue;
 
@@ -144,6 +149,10 @@ public static unsafe class VulkanContext
         _deviceInitialized = true;
 
         PickPhysicalDevice(surface);
+
+        PhysicalDeviceProperties props;
+        Vk.GetPhysicalDeviceProperties(PhysicalDevice, out props);
+        MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
 
         KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
         MaxFramesInFlight = capabilities.MinImageCount + 1;
