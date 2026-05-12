@@ -25,8 +25,8 @@ public sealed unsafe class VulkanRenderer
         _window = window;
 
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Graphics", "Vulkan", "Shaders", "triangle.vert");
-        var fragPath = Path.Combine(basePath, "Graphics", "Vulkan", "Shaders", "triangle.frag");
+        var vertPath = Path.Combine(basePath, "Assets", "Shaders", "triangle.vert");
+        var fragPath = Path.Combine(basePath, "Assets", "Shaders", "triangle.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
