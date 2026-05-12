@@ -64,7 +64,7 @@ public static unsafe class VulkanAllocator
         if (result != Result.Success)
             throw new InvalidOperationException($"Failed to allocate buffer: {result}");
 
-        return new VulkanBuffer(buffer, allocation);
+        return new VulkanBuffer(buffer, allocation, bufInfo.Size, bufInfo.Usage);
     }
 
     /// <summary>

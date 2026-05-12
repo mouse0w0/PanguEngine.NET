@@ -1,3 +1,4 @@
+using Silk.NET.Vulkan;
 using Vma;
 using Buffer = Silk.NET.Vulkan.Buffer;
 
@@ -13,13 +14,25 @@ public sealed unsafe class VulkanBuffer
     /// </summary>
     public Buffer Buffer { get; }
 
+    /// <summary>
+    /// The size of the buffer allocation in bytes.
+    /// </summary>
+    public ulong Size { get; }
+
+    /// <summary>
+    /// The buffer usage flags.
+    /// </summary>
+    public BufferUsageFlags Usage { get; }
+
     private readonly Allocation* _allocation;
     private bool _destroyed;
 
-    internal VulkanBuffer(Buffer buffer, Allocation* allocation)
+    internal VulkanBuffer(Buffer buffer, Allocation* allocation, ulong size, BufferUsageFlags usage)
     {
         Buffer = buffer;
         _allocation = allocation;
+        Size = size;
+        Usage = usage;
     }
 
     /// <summary>
