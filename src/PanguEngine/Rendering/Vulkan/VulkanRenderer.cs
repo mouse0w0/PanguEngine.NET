@@ -182,6 +182,7 @@ public sealed unsafe class VulkanRenderer
     public void DrawFrame(double delta)
     {
         _window.WaitForInFlightFence();
+        VulkanUploader.FlushPendingUploads();
 
         var timelineValue = VulkanContext.NextGlobalTimelineValue();
 

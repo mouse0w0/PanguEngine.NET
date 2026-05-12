@@ -66,6 +66,7 @@ public unsafe class Client
         VulkanContext.InitializeDevice(surface);
 
         VulkanAllocator.Initialize();
+        VulkanUploader.Initialize();
         VulkanWindow = new VulkanWindow(window, surface);
         Renderer = new VulkanRenderer(VulkanWindow);
     }
@@ -86,6 +87,7 @@ public unsafe class Client
     {
         Renderer.Destroy();
         VulkanWindow.Destroy();
+        VulkanUploader.Destroy();
         VulkanDeletionQueue.Drain();
         VulkanAllocator.Destroy();
         VulkanContext.Destroy();
