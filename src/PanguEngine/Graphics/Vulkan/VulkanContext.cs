@@ -112,6 +112,7 @@ public static unsafe class VulkanContext
     /// Initializes the Vulkan instance with the specified required extensions.
     /// </summary>
     /// <param name="requiredExtensions">Extensions required by the application (e.g., surface extensions).</param>
+    /// <param name="enableValidationLayers">Whether to enable Vulkan validation layers for debugging.</param>
     internal static void InitializeInstance(string[] requiredExtensions, bool enableValidationLayers = true)
     {
         if (_instanceInitialized)
