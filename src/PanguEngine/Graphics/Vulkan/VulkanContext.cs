@@ -151,8 +151,7 @@ public static unsafe class VulkanContext
 
         PickPhysicalDevice(surface);
 
-        PhysicalDeviceProperties props;
-        Vk.GetPhysicalDeviceProperties(PhysicalDevice, out props);
+        Vk.GetPhysicalDeviceProperties(PhysicalDevice, out var props);
         MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
 
         KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
