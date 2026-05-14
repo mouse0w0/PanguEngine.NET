@@ -1,4 +1,7 @@
 <Solution>
   <Project Path="src/PanguEngine.Launcher/PanguEngine.Launcher.csproj" />
   <Project Path="src/PanguEngine/PanguEngine.csproj" />
+  <Project Path="test/PanguEngine.Graphics.Test/PanguEngine.Graphics.Test.csproj"/>
+  <Project Path="test/PanguEngine.Graphics.Test.Clear/PanguEngine.Graphics.Test.Clear.csproj"/>
+  <Project Path="test/PanguEngine.Graphics.Test.Triangle/PanguEngine.Graphics.Test.Triangle.csproj"/>
 </Solution>
