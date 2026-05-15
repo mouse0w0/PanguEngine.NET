@@ -5,4 +5,5 @@
   <Project Path="test/PanguEngine.Graphics.Test.BufferUpload/PanguEngine.Graphics.Test.BufferUpload.csproj"/>
   <Project Path="test/PanguEngine.Graphics.Test.Clear/PanguEngine.Graphics.Test.Clear.csproj"/>
   <Project Path="test/PanguEngine.Graphics.Test.Triangle/PanguEngine.Graphics.Test.Triangle.csproj"/>
+  <Project Path="test/PanguEngine.Graphics.Test.UniformBuffer/PanguEngine.Graphics.Test.UniformBuffer.csproj"/>
 </Solution>
