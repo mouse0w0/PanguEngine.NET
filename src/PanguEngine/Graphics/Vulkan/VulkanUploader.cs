@@ -3,7 +3,6 @@ using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Silk.NET.Vulkan;
 using Vma;
-using Buffer = Silk.NET.Vulkan.Buffer;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -101,8 +100,7 @@ public static unsafe class VulkanUploader
 
     private static int _renderSubmitThreadId;
 
-    private static Buffer _stagingBufferHandle;
-    private static Allocation* _stagingAlloc;
+    private static VulkanBuffer _stagingBuffer = null!;
     private static CommandPool _commandPool;
     private static CommandBuffer _commandBuffer;
     private static Fence _fence;
@@ -143,10 +141,7 @@ public static unsafe class VulkanUploader
                 Usage = MemoryUsage.CpuToGpu,
             };
 
-            if (VulkanContext.Vk.CreateBuffer(VulkanContext.Device, in bufferInfo, null, out _stagingBufferHandle) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to create staging buffer.");
-            VulkanAllocator.AllocateMemoryForBuffer(_stagingBufferHandle, allocInfo, out _stagingAlloc);
+            _stagingBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
 
             CommandPoolCreateInfo poolInfo = new()
             {
@@ -217,7 +212,7 @@ public static unsafe class VulkanUploader
 
         VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
 
-        VulkanAllocator.DestroyBuffer(_stagingBufferHandle, _stagingAlloc);
+        _stagingBuffer.Destroy();
         VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, _commandPool, null);
         VulkanContext.Vk.DestroyFence(VulkanContext.Device, _fence, null);
 
@@ -355,7 +350,7 @@ public static unsafe class VulkanUploader
         byte* mapped;
         try
         {
-            mapped = VulkanAllocator.Map<byte>(_stagingAlloc);
+            mapped = _stagingBuffer.Map<byte>();
         }
         catch (Exception ex)
         {
@@ -371,7 +366,7 @@ public static unsafe class VulkanUploader
             stagingOffset += upload.Size;
         }
 
-        VulkanAllocator.Unmap(_stagingAlloc);
+        _stagingBuffer.Unmap();
 
         if (VulkanContext.Vk.ResetCommandBuffer(_commandBuffer, 0) != Result.Success)
         {
@@ -404,7 +399,7 @@ public static unsafe class VulkanUploader
                 DstOffset = upload.DstOffset,
                 Size = upload.Size,
             };
-            VulkanContext.Vk.CmdCopyBuffer(_commandBuffer, _stagingBufferHandle, upload.Dst.Buffer, 1, in copyRegion);
+            VulkanContext.Vk.CmdCopyBuffer(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Buffer, 1, in copyRegion);
             stagingOffset += upload.Size;
         }
 
@@ -502,14 +497,10 @@ public static unsafe class VulkanUploader
             Usage = MemoryUsage.CpuToGpu,
         };
 
-        if (VulkanContext.Vk.CreateBuffer(VulkanContext.Device, in bufferInfo, null, out var newBuffer) !=
-            Result.Success)
-            throw new InvalidOperationException("Failed to create larger staging buffer.");
-        VulkanAllocator.AllocateMemoryForBuffer(newBuffer, allocInfo, out var newAlloc);
+        var newBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
 
-        VulkanAllocator.DestroyBuffer(_stagingBufferHandle, _stagingAlloc);
-        _stagingBufferHandle = newBuffer;
-        _stagingAlloc = newAlloc;
+        _stagingBuffer.Destroy();
+        _stagingBuffer = newBuffer;
         _size = newSize;
     }
 
