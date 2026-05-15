@@ -9,9 +9,13 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 public sealed unsafe class VulkanUniformBuffer
 {
-    private readonly VulkanBuffer _buffer;
     private readonly byte* _mappedPtr;
     private bool _destroyed;
+
+    /// <summary>
+    /// The underlying Vulkan buffer resource.
+    /// </summary>
+    public VulkanBuffer Buffer { get; }
 
     /// <summary>
     /// The aligned size for a single frame's uniform data, in bytes.
@@ -79,8 +83,8 @@ public sealed unsafe class VulkanUniformBuffer
             RequiredFlags = MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit,
         };
 
-        _buffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
-        _mappedPtr = _buffer.Map<byte>();
+        Buffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
+        _mappedPtr = Buffer.Map<byte>();
     }
 
     /// <summary>
@@ -127,7 +131,7 @@ public sealed unsafe class VulkanUniformBuffer
         if (_destroyed) return;
         _destroyed = true;
 
-        _buffer.Unmap();
-        _buffer.Destroy();
+        Buffer.Unmap();
+        Buffer.Destroy();
     }
 }
