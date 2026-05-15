@@ -12,6 +12,7 @@ public sealed unsafe class VulkanTestApp(IVulkanTestScene scene)
     private VulkanCommandPool? _commandPool;
     private bool _sceneInitialized;
     private bool _windowInitialized;
+    private bool _uploaderInitialized;
     private bool _allocatorInitialized;
     private bool _contextInitialized;
     private bool _engineInitialized;
@@ -61,6 +62,9 @@ public sealed unsafe class VulkanTestApp(IVulkanTestScene scene)
 
         VulkanAllocator.Initialize();
         _allocatorInitialized = true;
+
+        VulkanUploader.Initialize();
+        _uploaderInitialized = true;
 
         _vulkanWindow = new VulkanWindow(window, surface);
         _windowInitialized = true;
@@ -224,6 +228,9 @@ public sealed unsafe class VulkanTestApp(IVulkanTestScene scene)
 
         if (_windowInitialized)
             _vulkanWindow!.Destroy();
+
+        if (_uploaderInitialized)
+            VulkanUploader.Destroy();
 
         if (_allocatorInitialized)
         {
