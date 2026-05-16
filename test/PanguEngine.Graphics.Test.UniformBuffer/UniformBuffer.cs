@@ -435,14 +435,7 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly struct Vertex(float x, float y, float r, float g, float b)
-    {
-        public readonly float X = x;
-        public readonly float Y = y;
-        public readonly float R = r;
-        public readonly float G = g;
-        public readonly float B = b;
-    }
+    private readonly record struct Vertex(float X, float Y, float R, float G, float B);
 
     [StructLayout(LayoutKind.Sequential)]
     private struct FrameUniform
