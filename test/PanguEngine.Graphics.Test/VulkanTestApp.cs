@@ -78,7 +78,11 @@ public sealed unsafe class VulkanTestApp(IVulkanTestScene scene)
     {
         var window = _vulkanWindow!;
 
+        scene.PrepareFrame();
+
         window.WaitForInFlightFence();
+
+        VulkanUploader.FlushPendingUploads();
 
         var timelineValue = VulkanContext.NextGlobalTimelineValue();
         var result = window.AcquireNextImage(out var imageIndex);

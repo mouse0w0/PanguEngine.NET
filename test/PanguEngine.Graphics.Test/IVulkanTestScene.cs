@@ -9,6 +9,10 @@ public interface IVulkanTestScene
 
     void Initialize(VulkanWindow window);
 
+    void PrepareFrame()
+    {
+    }
+
     void Record(CommandBuffer commandBuffer, ImageView targetImageView, Extent2D extent, Format imageFormat);
 
     void Destroy();

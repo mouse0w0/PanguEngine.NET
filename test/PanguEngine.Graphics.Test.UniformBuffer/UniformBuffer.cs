@@ -51,7 +51,6 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
 
     public void Record(CommandBuffer commandBuffer, ImageView targetImageView, Extent2D extent, Format imageFormat)
     {
-        VulkanUploader.FlushPendingUploads();
         if (_uploadHandle is { IsCompleted: false })
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
