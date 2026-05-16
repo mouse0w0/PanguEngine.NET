@@ -1,5 +1,6 @@
 using Silk.NET.Vulkan;
 using Vma;
+using VmaMemoryUsage = Vma.MemoryUsage;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -78,7 +79,7 @@ public sealed unsafe class VulkanUniformBuffer
 
         AllocationCreateInfo allocInfo = new()
         {
-            Usage = MemoryUsage.Auto,
+            Usage = VmaMemoryUsage.Auto,
             Flags = AllocationCreateFlags.HostAccessSequentialWriteBit,
             RequiredFlags = MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit,
         };

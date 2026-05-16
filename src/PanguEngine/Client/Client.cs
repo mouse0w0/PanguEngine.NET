@@ -1,3 +1,4 @@
+using PanguEngine.Graphics;
 using PanguEngine.Graphics.Vulkan;
 using Silk.NET.Core.Native;
 using Silk.NET.Maths;
@@ -67,6 +68,7 @@ public unsafe class Client
 
         VulkanAllocator.Initialize();
         VulkanUploader.Initialize();
+        GraphicsContext.Initialize(new VulkanGraphicsDevice());
         VulkanWindow = new VulkanWindow(window, surface);
         Renderer = new VulkanRenderer(VulkanWindow);
     }
@@ -87,6 +89,7 @@ public unsafe class Client
     {
         Renderer.Destroy();
         VulkanWindow.Destroy();
+        GraphicsContext.Shutdown();
         VulkanUploader.Destroy();
         VulkanDeletionQueue.Drain();
         VulkanAllocator.Destroy();

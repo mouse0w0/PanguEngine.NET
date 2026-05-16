@@ -1,33 +1,33 @@
 using Silk.NET.Vulkan;
 using Vma;
-using Buffer = Silk.NET.Vulkan.Buffer;
+using VkBuffer = Silk.NET.Vulkan.Buffer;
 
 namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// A Vulkan buffer with bound GPU memory.
 /// </summary>
-public sealed unsafe class VulkanBuffer
+public sealed unsafe class VulkanBuffer : Buffer
 {
-    /// <summary>
-    /// The Vulkan buffer handle.
-    /// </summary>
-    public Buffer Buffer { get; }
-
-    /// <summary>
-    /// The size of the buffer allocation in bytes.
-    /// </summary>
-    public ulong Size { get; }
-
-    /// <summary>
-    /// The buffer usage flags.
-    /// </summary>
-    public BufferUsageFlags Usage { get; }
-
     private readonly Allocation* _allocation;
     private bool _destroyed;
 
-    internal VulkanBuffer(Buffer buffer, Allocation* allocation, ulong size, BufferUsageFlags usage)
+    /// <summary>
+    /// The Vulkan buffer handle.
+    /// </summary>
+    public VkBuffer Buffer { get; }
+
+    /// <summary>
+    /// Gets the size of the buffer in bytes.
+    /// </summary>
+    public override ulong Size { get; }
+
+    /// <summary>
+    /// The Vulkan buffer usage flags.
+    /// </summary>
+    public BufferUsageFlags Usage { get; }
+
+    internal VulkanBuffer(VkBuffer buffer, Allocation* allocation, ulong size, BufferUsageFlags usage)
     {
         Buffer = buffer;
         _allocation = allocation;
@@ -42,6 +42,8 @@ public sealed unsafe class VulkanBuffer
     /// <returns>A pointer to the mapped memory.</returns>
     public T* Map<T>() where T : unmanaged
     {
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+
         return VulkanAllocator.Map<T>(_allocation);
     }
 
@@ -50,13 +52,15 @@ public sealed unsafe class VulkanBuffer
     /// </summary>
     public void Unmap()
     {
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+
         VulkanAllocator.Unmap(_allocation);
     }
 
     /// <summary>
     /// Destroys the buffer and frees its GPU memory.
     /// </summary>
-    public void Destroy()
+    public override void Destroy()
     {
         if (_destroyed) return;
         _destroyed = true;

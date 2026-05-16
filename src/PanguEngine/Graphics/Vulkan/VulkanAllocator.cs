@@ -1,6 +1,7 @@
 using Silk.NET.Vulkan;
 using Vma;
-using Buffer = Silk.NET.Vulkan.Buffer;
+using VkBuffer = Silk.NET.Vulkan.Buffer;
+using VmaMemoryUsage = Vma.MemoryUsage;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -39,7 +40,7 @@ public static unsafe class VulkanAllocator
     /// </summary>
     /// <param name="bufferInfo">The Vulkan buffer creation info.</param>
     /// <param name="allocInfo">
-    /// The VMA allocation creation info. Uses <see cref="MemoryUsage.Auto"/> by default
+    /// The VMA allocation creation info. Uses <see cref="VmaMemoryUsage.Auto"/> by default
     /// for optimal memory type selection.
     /// </param>
     /// <returns>The created buffer.</returns>
@@ -51,10 +52,10 @@ public static unsafe class VulkanAllocator
 
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)
-            actualAllocInfo.Usage = MemoryUsage.Auto;
+            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
 
         var bufInfo = bufferInfo;
-        Buffer buffer = default;
+        VkBuffer buffer = default;
         Allocation* allocation;
 
         var pAllocInfo = &actualAllocInfo;
@@ -72,7 +73,7 @@ public static unsafe class VulkanAllocator
     /// </summary>
     /// <param name="imageInfo">The Vulkan image creation info.</param>
     /// <param name="allocationCreateInfo">
-    /// The VMA allocation creation info. Uses <see cref="MemoryUsage.Auto"/> by default
+    /// The VMA allocation creation info. Uses <see cref="VmaMemoryUsage.Auto"/> by default
     /// for optimal memory type selection.
     /// </param>
     /// <returns>The created image.</returns>
@@ -84,7 +85,7 @@ public static unsafe class VulkanAllocator
 
         var actualAllocInfo = allocationCreateInfo;
         if (actualAllocInfo.Usage == 0)
-            actualAllocInfo.Usage = MemoryUsage.Auto;
+            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
 
         var imgInfo = imageInfo;
         Image image = default;
@@ -105,11 +106,11 @@ public static unsafe class VulkanAllocator
     /// </summary>
     /// <param name="buffer">The buffer to bind memory to.</param>
     /// <param name="allocInfo">
-    /// The VMA allocation creation info. Uses <see cref="MemoryUsage.Auto"/> by default.
+    /// The VMA allocation creation info. Uses <see cref="VmaMemoryUsage.Auto"/> by default.
     /// </param>
     /// <param name="allocation">The VMA allocation pointer.</param>
     internal static void AllocateMemoryForBuffer(
-        Buffer buffer,
+        VkBuffer buffer,
         in AllocationCreateInfo allocInfo,
         out Allocation* allocation)
     {
@@ -117,7 +118,7 @@ public static unsafe class VulkanAllocator
 
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)
-            actualAllocInfo.Usage = MemoryUsage.Auto;
+            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
 
         Allocation* alloc;
         var result = Apis.AllocateMemoryForBuffer(_allocator, buffer, &actualAllocInfo, &alloc, null);
@@ -132,7 +133,7 @@ public static unsafe class VulkanAllocator
     /// </summary>
     /// <param name="image">The image to bind memory to.</param>
     /// <param name="allocInfo">
-    /// The VMA allocation creation info. Uses <see cref="MemoryUsage.Auto"/> by default.
+    /// The VMA allocation creation info. Uses <see cref="VmaMemoryUsage.Auto"/> by default.
     /// </param>
     /// <param name="allocation">The VMA allocation pointer.</param>
     internal static void AllocateMemoryForImage(
@@ -144,7 +145,7 @@ public static unsafe class VulkanAllocator
 
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)
-            actualAllocInfo.Usage = MemoryUsage.Auto;
+            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
 
         Allocation* alloc;
         var result = Apis.AllocateMemoryForImage(_allocator, image, &actualAllocInfo, &alloc, null);
@@ -184,7 +185,7 @@ public static unsafe class VulkanAllocator
     /// </summary>
     /// <param name="buffer">The buffer handle to destroy.</param>
     /// <param name="allocation">The VMA allocation to free.</param>
-    internal static void DestroyBuffer(Buffer buffer, Allocation* allocation)
+    internal static void DestroyBuffer(VkBuffer buffer, Allocation* allocation)
     {
         Apis.DestroyBuffer(_allocator, buffer, allocation);
     }
@@ -208,10 +209,8 @@ public static unsafe class VulkanAllocator
         if (_destroyed) return;
         _destroyed = true;
 
-        if (_allocator != null)
-        {
-            VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
-            Apis.DestroyAllocator(_allocator);
-        }
+        if (_allocator == null) return;
+        VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
+        Apis.DestroyAllocator(_allocator);
     }
 }

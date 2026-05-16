@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Silk.NET.Vulkan;
 using Vma;
+using VmaMemoryUsage = Vma.MemoryUsage;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -138,7 +139,7 @@ public static unsafe class VulkanUploader
 
             AllocationCreateInfo allocInfo = new()
             {
-                Usage = MemoryUsage.CpuToGpu,
+                Usage = VmaMemoryUsage.CpuToGpu,
             };
 
             _stagingBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
@@ -494,7 +495,7 @@ public static unsafe class VulkanUploader
 
         AllocationCreateInfo allocInfo = new()
         {
-            Usage = MemoryUsage.CpuToGpu,
+            Usage = VmaMemoryUsage.CpuToGpu,
         };
 
         var newBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
