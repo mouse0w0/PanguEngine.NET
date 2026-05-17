@@ -69,39 +69,6 @@ public static unsafe class VulkanAllocator
     }
 
     /// <summary>
-    /// Creates an image with bound GPU memory.
-    /// </summary>
-    /// <param name="imageInfo">The Vulkan image creation info.</param>
-    /// <param name="allocationCreateInfo">
-    /// The VMA allocation creation info. Uses <see cref="VmaMemoryUsage.Auto"/> by default
-    /// for optimal memory type selection.
-    /// </param>
-    /// <returns>The created image.</returns>
-    public static VulkanImage CreateImage(
-        in ImageCreateInfo imageInfo,
-        in AllocationCreateInfo allocationCreateInfo = default)
-    {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
-
-        var actualAllocInfo = allocationCreateInfo;
-        if (actualAllocInfo.Usage == 0)
-            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
-
-        var imgInfo = imageInfo;
-        Image image = default;
-        Allocation* allocation;
-
-        var pAllocInfo = &actualAllocInfo;
-        var pImgInfo = &imgInfo;
-        var result = Apis.CreateImage(_allocator, pImgInfo, pAllocInfo,
-            &image, &allocation, null);
-        if (result != Result.Success)
-            throw new InvalidOperationException($"Failed to allocate image: {result}");
-
-        return new VulkanImage(image, allocation);
-    }
-
-    /// <summary>
     /// Maps memory for CPU access.
     /// </summary>
     /// <typeparam name="T">The unmanaged type to map as.</typeparam>
@@ -134,16 +101,6 @@ public static unsafe class VulkanAllocator
     internal static void DestroyBuffer(VkBuffer buffer, Allocation* allocation)
     {
         Apis.DestroyBuffer(_allocator, buffer, allocation);
-    }
-
-    /// <summary>
-    /// Destroys an image and frees its GPU memory.
-    /// </summary>
-    /// <param name="image">The image handle to destroy.</param>
-    /// <param name="allocation">The VMA allocation to free.</param>
-    internal static void DestroyImage(Image image, Allocation* allocation)
-    {
-        Apis.DestroyImage(_allocator, image, allocation);
     }
 
     /// <summary>
