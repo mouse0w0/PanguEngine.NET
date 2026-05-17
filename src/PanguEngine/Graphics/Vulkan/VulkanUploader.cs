@@ -62,6 +62,10 @@ public static unsafe class VulkanUploader
         /// </summary>
         public bool IsCompleted => _completed;
 
+        public bool IsFaulted => _exception != null;
+
+        public Exception? Exception => _exception?.SourceException;
+
         internal void SignalSuccess()
         {
             _completed = true;

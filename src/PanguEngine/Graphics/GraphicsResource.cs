@@ -5,6 +5,8 @@ namespace PanguEngine.Graphics;
 /// </summary>
 public abstract class GraphicsResource
 {
+    public abstract bool IsDestroyed { get; }
+
     /// <summary>
     /// Destroys the resource and releases its GPU memory.
     /// </summary>

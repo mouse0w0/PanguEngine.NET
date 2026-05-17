@@ -9,6 +9,21 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 {
+    private sealed class CompletedGraphicsUploadHandle : GraphicsUploadHandle
+    {
+        public static readonly CompletedGraphicsUploadHandle Instance = new();
+
+        public override bool IsCompleted => true;
+
+        public override bool IsFaulted => false;
+
+        public override Exception? Exception => null;
+
+        public override void Wait()
+        {
+        }
+    }
+
     /// <inheritdoc/>
     public override Buffer CreateBuffer(in BufferDescription description)
     {
@@ -51,5 +66,40 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         };
 
         return VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
+    }
+
+    public override GraphicsUploadHandle UploadBuffer<T>(
+        Buffer destination,
+        ReadOnlySpan<T> data,
+        ulong destinationOffset = 0)
+    {
+        if (destination == null)
+            throw new ArgumentNullException(nameof(destination));
+
+        var vulkanBuffer = RequireVulkanBuffer(destination);
+
+        if (vulkanBuffer.IsDestroyed)
+            throw new ObjectDisposedException(nameof(VulkanBuffer));
+
+        if (destinationOffset > vulkanBuffer.Size)
+            throw new ArgumentOutOfRangeException(nameof(destinationOffset),
+                "Destination offset exceeds the buffer bounds.");
+
+        var dataSize = checked((ulong)data.Length * (ulong)sizeof(T));
+        if (dataSize > vulkanBuffer.Size - destinationOffset)
+            throw new ArgumentOutOfRangeException(nameof(destinationOffset),
+                "Destination offset and data size exceed the buffer bounds.");
+
+        if (dataSize == 0)
+            return CompletedGraphicsUploadHandle.Instance;
+
+        var handle = VulkanUploader.EnqueueBufferUpload(vulkanBuffer, data, destinationOffset);
+        return new VulkanGraphicsUploadHandle(handle);
+    }
+
+    private static VulkanBuffer RequireVulkanBuffer(Buffer buffer)
+    {
+        return buffer as VulkanBuffer
+               ?? throw new InvalidOperationException("Graphics buffer was not created by the Vulkan backend.");
     }
 }

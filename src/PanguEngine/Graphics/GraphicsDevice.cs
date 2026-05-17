@@ -11,4 +11,9 @@ public abstract class GraphicsDevice
     /// <param name="description">The buffer description.</param>
     /// <returns>The created buffer.</returns>
     public abstract Buffer CreateBuffer(in BufferDescription description);
+
+    public abstract GraphicsUploadHandle UploadBuffer<T>(
+        Buffer destination,
+        ReadOnlySpan<T> data,
+        ulong destinationOffset = 0) where T : unmanaged;
 }
