@@ -5,6 +5,9 @@ namespace PanguEngine.Graphics;
 /// </summary>
 public abstract class GraphicsResource
 {
+    /// <summary>
+    /// Gets whether the resource has been destroyed.
+    /// </summary>
     public abstract bool IsDestroyed { get; }
 
     /// <summary>

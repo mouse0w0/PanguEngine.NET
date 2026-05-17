@@ -62,8 +62,14 @@ public static unsafe class VulkanUploader
         /// </summary>
         public bool IsCompleted => _completed;
 
+        /// <summary>
+        /// Gets whether the upload completed with an error.
+        /// </summary>
         public bool IsFaulted => _exception != null;
 
+        /// <summary>
+        /// Gets the error that caused the upload to fail, if any.
+        /// </summary>
         public Exception? Exception => _exception?.SourceException;
 
         internal void SignalSuccess()

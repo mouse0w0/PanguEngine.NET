@@ -27,6 +27,9 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// </summary>
     public BufferUsageFlags Usage { get; }
 
+    /// <summary>
+    /// Gets whether the buffer has been destroyed.
+    /// </summary>
     public override bool IsDestroyed => _destroyed;
 
     internal VulkanBuffer(VkBuffer buffer, Allocation* allocation, ulong size, BufferUsageFlags usage)
