@@ -102,60 +102,6 @@ public static unsafe class VulkanAllocator
     }
 
     /// <summary>
-    /// Allocates and binds GPU memory for an existing buffer using VMA.
-    /// </summary>
-    /// <param name="buffer">The buffer to bind memory to.</param>
-    /// <param name="allocInfo">
-    /// The VMA allocation creation info. Uses <see cref="VmaMemoryUsage.Auto"/> by default.
-    /// </param>
-    /// <param name="allocation">The VMA allocation pointer.</param>
-    internal static void AllocateMemoryForBuffer(
-        VkBuffer buffer,
-        in AllocationCreateInfo allocInfo,
-        out Allocation* allocation)
-    {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
-
-        var actualAllocInfo = allocInfo;
-        if (actualAllocInfo.Usage == 0)
-            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
-
-        Allocation* alloc;
-        var result = Apis.AllocateMemoryForBuffer(_allocator, buffer, &actualAllocInfo, &alloc, null);
-        if (result != Result.Success)
-            throw new InvalidOperationException($"Failed to allocate memory for buffer: {result}");
-
-        allocation = alloc;
-    }
-
-    /// <summary>
-    /// Allocates and binds GPU memory for an existing image using VMA.
-    /// </summary>
-    /// <param name="image">The image to bind memory to.</param>
-    /// <param name="allocInfo">
-    /// The VMA allocation creation info. Uses <see cref="VmaMemoryUsage.Auto"/> by default.
-    /// </param>
-    /// <param name="allocation">The VMA allocation pointer.</param>
-    internal static void AllocateMemoryForImage(
-        Image image,
-        in AllocationCreateInfo allocInfo,
-        out Allocation* allocation)
-    {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
-
-        var actualAllocInfo = allocInfo;
-        if (actualAllocInfo.Usage == 0)
-            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
-
-        Allocation* alloc;
-        var result = Apis.AllocateMemoryForImage(_allocator, image, &actualAllocInfo, &alloc, null);
-        if (result != Result.Success)
-            throw new InvalidOperationException($"Failed to allocate memory for image: {result}");
-
-        allocation = alloc;
-    }
-
-    /// <summary>
     /// Maps memory for CPU access.
     /// </summary>
     /// <typeparam name="T">The unmanaged type to map as.</typeparam>
