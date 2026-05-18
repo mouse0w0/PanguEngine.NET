@@ -1,6 +1,7 @@
 using Silk.NET.Vulkan;
 using Vma;
 using VkBuffer = Silk.NET.Vulkan.Buffer;
+using VkImage = Silk.NET.Vulkan.Image;
 using VmaMemoryUsage = Vma.MemoryUsage;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -69,6 +70,39 @@ public static unsafe class VulkanAllocator
     }
 
     /// <summary>
+    /// Creates an image with bound GPU memory.
+    /// </summary>
+    /// <param name="imageInfo">The Vulkan image creation info.</param>
+    /// <param name="allocInfo">The VMA allocation creation info.</param>
+    /// <param name="image">The created image handle.</param>
+    /// <param name="allocation">The created VMA allocation.</param>
+    internal static void CreateImage(
+        in ImageCreateInfo imageInfo,
+        in AllocationCreateInfo allocInfo,
+        out VkImage image,
+        out Allocation* allocation)
+    {
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
+
+        var actualAllocInfo = allocInfo;
+        if (actualAllocInfo.Usage == 0)
+            actualAllocInfo.Usage = VmaMemoryUsage.Auto;
+
+        var imgInfo = imageInfo;
+        VkImage createdImage = default;
+        Allocation* createdAllocation;
+
+        var pAllocInfo = &actualAllocInfo;
+        var pImgInfo = &imgInfo;
+        var result = Apis.CreateImage(_allocator, pImgInfo, pAllocInfo, &createdImage, &createdAllocation, null);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"Failed to allocate image: {result}");
+
+        image = createdImage;
+        allocation = createdAllocation;
+    }
+
+    /// <summary>
     /// Maps memory for CPU access.
     /// </summary>
     /// <typeparam name="T">The unmanaged type to map as.</typeparam>
@@ -101,6 +135,16 @@ public static unsafe class VulkanAllocator
     internal static void DestroyBuffer(VkBuffer buffer, Allocation* allocation)
     {
         Apis.DestroyBuffer(_allocator, buffer, allocation);
+    }
+
+    /// <summary>
+    /// Destroys an image and frees its GPU memory.
+    /// </summary>
+    /// <param name="image">The image handle to destroy.</param>
+    /// <param name="allocation">The VMA allocation to free.</param>
+    internal static void DestroyImage(VkImage image, Allocation* allocation)
+    {
+        Apis.DestroyImage(_allocator, image, allocation);
     }
 
     /// <summary>

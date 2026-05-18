@@ -83,6 +83,11 @@ public static unsafe class VulkanContext
     /// </summary>
     public static ulong MinUniformBufferOffsetAlignment { get; private set; }
 
+    /// <summary>
+    /// Maximum supported width or height for two-dimensional images.
+    /// </summary>
+    public static uint MaxImageDimension2D { get; private set; }
+
     private static Semaphore _globalTimelineSemaphore;
     private static ulong _globalTimelineValue;
 
@@ -153,6 +158,7 @@ public static unsafe class VulkanContext
 
         Vk.GetPhysicalDeviceProperties(PhysicalDevice, out var props);
         MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
+        MaxImageDimension2D = props.Limits.MaxImageDimension2D;
 
         KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
         MaxFramesInFlight = capabilities.MinImageCount + 1;

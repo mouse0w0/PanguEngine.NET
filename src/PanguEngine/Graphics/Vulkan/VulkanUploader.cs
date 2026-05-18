@@ -44,6 +44,19 @@ public static unsafe class VulkanUploader
         public UploadHandle Handle { get; init; } = null!;
     }
 
+    private sealed class PendingTextureUpload
+    {
+        public VulkanTexture2D Dst { get; init; } = null!;
+
+        public byte[] Data { get; init; } = null!;
+
+        public ulong Size { get; init; }
+
+        public TextureUploadRegion Region { get; init; }
+
+        public UploadHandle Handle { get; init; } = null!;
+    }
+
     /// <summary>
     /// Represents the completion state of a staging buffer upload request.
     /// </summary>
@@ -108,6 +121,7 @@ public static unsafe class VulkanUploader
     private static Exception? _faultException;
     private static readonly Lock LifecycleLock = new();
     private static readonly ConcurrentQueue<PendingBufferUpload> PendingUploads = new();
+    private static readonly ConcurrentQueue<PendingTextureUpload> PendingTextureUploads = new();
 
     private static int _renderSubmitThreadId;
 
@@ -203,7 +217,8 @@ public static unsafe class VulkanUploader
     /// </summary>
     public static void Destroy()
     {
-        List<PendingBufferUpload>? remaining = null;
+        List<PendingBufferUpload>? remainingBuffers = null;
+        List<PendingTextureUpload>? remainingTextures = null;
 
         lock (LifecycleLock)
         {
@@ -212,8 +227,14 @@ public static unsafe class VulkanUploader
 
             while (PendingUploads.TryDequeue(out var upload))
             {
-                remaining ??= new List<PendingBufferUpload>();
-                remaining.Add(upload);
+                remainingBuffers ??= new List<PendingBufferUpload>();
+                remainingBuffers.Add(upload);
+            }
+
+            while (PendingTextureUploads.TryDequeue(out var upload))
+            {
+                remainingTextures ??= new List<PendingTextureUpload>();
+                remainingTextures.Add(upload);
             }
 
             _initialized = false;
@@ -227,10 +248,19 @@ public static unsafe class VulkanUploader
         VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, _commandPool, null);
         VulkanContext.Vk.DestroyFence(VulkanContext.Device, _fence, null);
 
-        if (remaining != null)
+        if (remainingBuffers != null)
         {
             var disposedEx = new ObjectDisposedException(nameof(VulkanUploader));
-            foreach (var upload in remaining)
+            foreach (var upload in remainingBuffers)
+            {
+                upload.Handle.SignalFailure(disposedEx);
+            }
+        }
+
+        if (remainingTextures != null)
+        {
+            var disposedEx = new ObjectDisposedException(nameof(VulkanUploader));
+            foreach (var upload in remainingTextures)
             {
                 upload.Handle.SignalFailure(disposedEx);
             }
@@ -299,6 +329,44 @@ public static unsafe class VulkanUploader
         return handle;
     }
 
+    internal static UploadHandle EnqueueTextureUpload(
+        VulkanTexture2D dst,
+        ReadOnlySpan<byte> data,
+        TextureUploadRegion region)
+    {
+        if (data.Length == 0)
+            throw new ArgumentException("Texture upload data must not be empty.", nameof(data));
+
+        lock (LifecycleLock)
+        {
+            if (!_initialized)
+                throw new InvalidOperationException("VulkanUploader is not initialized.");
+
+            if (_faulted)
+                throw _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.");
+        }
+
+        if (dst == null)
+            throw new ArgumentNullException(nameof(dst));
+
+        if (dst.IsDestroyed)
+            throw new ObjectDisposedException(nameof(VulkanTexture2D));
+        ValidateTextureUploadRegion(dst, region);
+
+        var dataCopy = data.ToArray();
+        var handle = new UploadHandle();
+        PendingTextureUploads.Enqueue(new PendingTextureUpload
+        {
+            Dst = dst,
+            Data = dataCopy,
+            Size = (ulong)dataCopy.Length,
+            Region = region,
+            Handle = handle,
+        });
+
+        return handle;
+    }
+
     /// <summary>
     /// Executes all pending uploads by recording copy commands, submitting to the GPU, and waiting for completion.
     /// Must only be called from a single dedicated thread (the render submit thread).
@@ -315,7 +383,7 @@ public static unsafe class VulkanUploader
         BindRenderSubmitThread();
 
         var batch = DrainPendingUploads();
-        if (batch.Count == 0)
+        if (batch.Buffers.Count == 0 && batch.Textures.Count == 0)
             return;
 
         ulong totalSize;
@@ -371,8 +439,16 @@ public static unsafe class VulkanUploader
         }
 
         ulong stagingOffset = 0;
-        foreach (var upload in batch)
+        foreach (var upload in batch.Buffers)
         {
+            stagingOffset = AlignStagingOffset(stagingOffset);
+            upload.Data.AsSpan().CopyTo(new Span<byte>(mapped + stagingOffset, (int)upload.Size));
+            stagingOffset += upload.Size;
+        }
+
+        foreach (var upload in batch.Textures)
+        {
+            stagingOffset = AlignStagingOffset(stagingOffset);
             upload.Data.AsSpan().CopyTo(new Span<byte>(mapped + stagingOffset, (int)upload.Size));
             stagingOffset += upload.Size;
         }
@@ -402,8 +478,9 @@ public static unsafe class VulkanUploader
         }
 
         stagingOffset = 0;
-        foreach (var upload in batch)
+        foreach (var upload in batch.Buffers)
         {
+            stagingOffset = AlignStagingOffset(stagingOffset);
             BufferCopy copyRegion = new()
             {
                 SrcOffset = stagingOffset,
@@ -411,6 +488,13 @@ public static unsafe class VulkanUploader
                 Size = upload.Size,
             };
             VulkanContext.Vk.CmdCopyBuffer(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Buffer, 1, in copyRegion);
+            stagingOffset += upload.Size;
+        }
+
+        foreach (var upload in batch.Textures)
+        {
+            stagingOffset = AlignStagingOffset(stagingOffset);
+            RecordTextureUpload(upload, stagingOffset);
             stagingOffset += upload.Size;
         }
 
@@ -447,8 +531,14 @@ public static unsafe class VulkanUploader
             return;
         }
 
-        foreach (var upload in batch)
+        foreach (var upload in batch.Buffers)
         {
+            upload.Handle.SignalSuccess();
+        }
+
+        foreach (var upload in batch.Textures)
+        {
+            upload.Dst.CompleteUpload(ImageLayout.ShaderReadOnlyOptimal);
             upload.Handle.SignalSuccess();
         }
     }
@@ -467,26 +557,152 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static List<PendingBufferUpload> DrainPendingUploads()
+    private static (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures) DrainPendingUploads()
     {
-        var batch = new List<PendingBufferUpload>();
+        var buffers = new List<PendingBufferUpload>();
         while (PendingUploads.TryDequeue(out var upload))
         {
-            batch.Add(upload);
+            buffers.Add(upload);
         }
 
-        return batch;
+        var textures = new List<PendingTextureUpload>();
+        while (PendingTextureUploads.TryDequeue(out var upload))
+        {
+            textures.Add(upload);
+        }
+
+        return (buffers, textures);
     }
 
-    private static ulong CalculateTotalSize(List<PendingBufferUpload> batch)
+    private static ulong CalculateTotalSize(
+        (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures) batch)
     {
         ulong total = 0;
-        foreach (var upload in batch)
+        foreach (var upload in batch.Buffers)
         {
+            total = AlignStagingOffset(total);
+            total = checked(total + upload.Size);
+        }
+
+        foreach (var upload in batch.Textures)
+        {
+            total = AlignStagingOffset(total);
             total = checked(total + upload.Size);
         }
 
         return total;
+    }
+
+    private static ulong AlignStagingOffset(ulong offset)
+    {
+        return checked((offset + 3UL) & ~3UL);
+    }
+
+    private static void ValidateTextureUploadRegion(VulkanTexture2D texture, TextureUploadRegion region)
+    {
+        if (region.X != 0)
+            throw new ArgumentOutOfRangeException(nameof(region.X), "Texture upload X must be zero.");
+        if (region.Y != 0)
+            throw new ArgumentOutOfRangeException(nameof(region.Y), "Texture upload Y must be zero.");
+        if (region.Z != 0)
+            throw new ArgumentOutOfRangeException(nameof(region.Z), "Texture upload Z must be zero.");
+        if (region.MipLevel != 0)
+            throw new ArgumentOutOfRangeException(nameof(region.MipLevel), "Texture upload mip level must be zero.");
+        if (region.ArrayLayer != 0)
+            throw new ArgumentOutOfRangeException(nameof(region.ArrayLayer),
+                "Texture upload array layer must be zero.");
+        if (region.Width == 0 || region.Width > texture.Width)
+            throw new ArgumentOutOfRangeException(nameof(region.Width), "Texture upload width is out of range.");
+        if (region.Height == 0 || region.Height > texture.Height)
+            throw new ArgumentOutOfRangeException(nameof(region.Height), "Texture upload height is out of range.");
+        if (region.Depth != 1)
+            throw new ArgumentOutOfRangeException(nameof(region.Depth), "Texture upload depth must be one.");
+        if (region.Width != texture.Width || region.Height != texture.Height)
+            throw new ArgumentException("Texture upload region must cover the full base level.", nameof(region));
+    }
+
+    private static void RecordTextureUpload(PendingTextureUpload upload, ulong stagingOffset)
+    {
+        ImageMemoryBarrier2 toTransferBarrier = new()
+        {
+            SType = StructureType.ImageMemoryBarrier2,
+            SrcStageMask = PipelineStageFlags2.TopOfPipeBit,
+            SrcAccessMask = AccessFlags2.None,
+            DstStageMask = PipelineStageFlags2.TransferBit,
+            DstAccessMask = AccessFlags2.TransferWriteBit,
+            OldLayout = ImageLayout.Undefined,
+            NewLayout = ImageLayout.TransferDstOptimal,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = upload.Dst.Image,
+            SubresourceRange = new ImageSubresourceRange
+            {
+                AspectMask = ImageAspectFlags.ColorBit,
+                BaseMipLevel = 0,
+                LevelCount = 1,
+                BaseArrayLayer = 0,
+                LayerCount = 1,
+            },
+        };
+
+        DependencyInfo toTransferDependency = new()
+        {
+            SType = StructureType.DependencyInfo,
+            ImageMemoryBarrierCount = 1,
+            PImageMemoryBarriers = &toTransferBarrier,
+        };
+        VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &toTransferDependency);
+
+        BufferImageCopy copyRegion = new()
+        {
+            BufferOffset = stagingOffset,
+            BufferRowLength = 0,
+            BufferImageHeight = 0,
+            ImageSubresource = new ImageSubresourceLayers
+            {
+                AspectMask = ImageAspectFlags.ColorBit,
+                MipLevel = 0,
+                BaseArrayLayer = 0,
+                LayerCount = 1,
+            },
+            ImageOffset = new Offset3D
+            {
+                X = 0,
+                Y = 0,
+                Z = 0,
+            },
+            ImageExtent = new Extent3D
+            {
+                Width = upload.Region.Width,
+                Height = upload.Region.Height,
+                Depth = 1,
+            },
+        };
+        VulkanContext.Vk.CmdCopyBufferToImage(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Image,
+            ImageLayout.TransferDstOptimal, 1, in copyRegion);
+
+        ImageMemoryBarrier2 toShaderReadBarrier = new()
+        {
+            SType = StructureType.ImageMemoryBarrier2,
+            SrcStageMask = PipelineStageFlags2.TransferBit,
+            SrcAccessMask = AccessFlags2.TransferWriteBit,
+            DstStageMask = PipelineStageFlags2.FragmentShaderBit,
+            DstAccessMask = AccessFlags2.ShaderSampledReadBit,
+            OldLayout = ImageLayout.TransferDstOptimal,
+            NewLayout = ImageLayout.ShaderReadOnlyOptimal,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Image = upload.Dst.Image,
+            SubresourceRange = toTransferBarrier.SubresourceRange,
+        };
+
+        DependencyInfo toShaderReadDependency = new()
+        {
+            SType = StructureType.DependencyInfo,
+            ImageMemoryBarrierCount = 1,
+            PImageMemoryBarriers = &toShaderReadBarrier,
+        };
+        VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &toShaderReadDependency);
     }
 
     private static void Grow(ulong requiredSize)
@@ -526,9 +742,15 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static void FailBatch(List<PendingBufferUpload> batch, Exception exception)
+    private static void FailBatch((List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures) batch,
+        Exception exception)
     {
-        foreach (var upload in batch)
+        foreach (var upload in batch.Buffers)
+        {
+            upload.Handle.SignalFailure(exception);
+        }
+
+        foreach (var upload in batch.Textures)
         {
             upload.Handle.SignalFailure(exception);
         }

@@ -24,4 +24,21 @@ public abstract class GraphicsDevice
         Buffer destination,
         ReadOnlySpan<T> data,
         ulong destinationOffset = 0) where T : unmanaged;
+
+    /// <summary>
+    /// Creates a two-dimensional texture with the given description.
+    /// </summary>
+    /// <param name="description">The texture description.</param>
+    /// <returns>The created texture.</returns>
+    public abstract Texture2D CreateTexture2D(in Texture2DDescription description);
+
+    /// <summary>
+    /// Queues data for upload into a two-dimensional texture.
+    /// </summary>
+    /// <param name="destination">The destination texture.</param>
+    /// <param name="data">The texture data to upload.</param>
+    /// <returns>A handle that represents the queued upload completion state.</returns>
+    public abstract GraphicsUploadHandle UploadTexture2D(
+        Texture2D destination,
+        ReadOnlySpan<byte> data);
 }
