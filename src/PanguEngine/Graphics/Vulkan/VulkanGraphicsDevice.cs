@@ -1,5 +1,6 @@
 using Silk.NET.Vulkan;
 using Vma;
+using VKSampler = Silk.NET.Vulkan.Sampler;
 using VmaMemoryUsage = Vma.MemoryUsage;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -195,6 +196,38 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         return new VulkanGraphicsUploadHandle(handle);
     }
 
+    public override Sampler CreateSampler(in SamplerDescription description)
+    {
+        ValidateSamplerDescription(description);
+
+        var anisotropyEnable = description.MaxAnisotropy > 1;
+        SamplerCreateInfo samplerInfo = new()
+        {
+            SType = StructureType.SamplerCreateInfo,
+            MinFilter = ToVulkanFilter(description.MinFilter),
+            MagFilter = ToVulkanFilter(description.MagFilter),
+            MipmapMode = ToVulkanMipmapMode(description.MipmapMode),
+            AddressModeU = ToVulkanAddressMode(description.AddressU),
+            AddressModeV = ToVulkanAddressMode(description.AddressV),
+            AddressModeW = ToVulkanAddressMode(description.AddressW),
+            MipLodBias = description.MipLodBias,
+            AnisotropyEnable = anisotropyEnable,
+            MaxAnisotropy = anisotropyEnable ? description.MaxAnisotropy : 1,
+            MinLod = description.MinLod,
+            MaxLod = description.MaxLod,
+            BorderColor = BorderColor.FloatTransparentBlack,
+            CompareEnable = false,
+            CompareOp = CompareOp.Always,
+            UnnormalizedCoordinates = false,
+        };
+
+        if (VulkanContext.Vk.CreateSampler(VulkanContext.Device, in samplerInfo, null, out VKSampler sampler) !=
+            Result.Success)
+            throw new InvalidOperationException("Failed to create Vulkan sampler.");
+
+        return new VulkanSampler(sampler);
+    }
+
     private static VulkanBuffer RequireVulkanBuffer(Buffer buffer)
     {
         return buffer as VulkanBuffer
@@ -205,6 +238,41 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     {
         return texture as VulkanTexture
                ?? throw new InvalidOperationException("Texture was not created by the Vulkan backend.");
+    }
+
+    private static void ValidateSamplerDescription(in SamplerDescription description)
+    {
+        if (!float.IsFinite(description.MaxAnisotropy) || description.MaxAnisotropy < 0)
+            throw new ArgumentOutOfRangeException(nameof(description.MaxAnisotropy),
+                "MaxAnisotropy must be a non-negative finite value.");
+        if (!float.IsFinite(description.MinLod))
+            throw new ArgumentOutOfRangeException(nameof(description.MinLod), "MinLod must be a finite value.");
+        if (!float.IsFinite(description.MaxLod))
+            throw new ArgumentOutOfRangeException(nameof(description.MaxLod), "MaxLod must be a finite value.");
+        if (!float.IsFinite(description.MipLodBias))
+            throw new ArgumentOutOfRangeException(nameof(description.MipLodBias), "MipLodBias must be a finite value.");
+
+        if (description.MinLod < 0)
+            throw new ArgumentOutOfRangeException(nameof(description.MinLod), "MinLod must be non-negative.");
+        if (description.MaxLod < 0)
+            throw new ArgumentOutOfRangeException(nameof(description.MaxLod), "MaxLod must be non-negative.");
+        if (description.MinLod > description.MaxLod)
+            throw new ArgumentOutOfRangeException(nameof(description.MinLod), "MinLod must not exceed MaxLod.");
+
+        if (MathF.Abs(description.MipLodBias) > VulkanContext.MaxSamplerLodBias)
+            throw new ArgumentOutOfRangeException(nameof(description.MipLodBias),
+                "MipLodBias exceeds the device limit.");
+
+        if (description.MaxAnisotropy <= 1)
+            return;
+
+        if (!VulkanContext.SamplerAnisotropySupported)
+            throw new InvalidOperationException("Anisotropic filtering is not supported by the device.");
+        if (description.MaxAnisotropy > VulkanContext.MaxSamplerAnisotropy)
+            throw new ArgumentOutOfRangeException(nameof(description.MaxAnisotropy),
+                "MaxAnisotropy exceeds the device limit.");
+        if (description.MinFilter != FilterMode.Linear || description.MagFilter != FilterMode.Linear)
+            throw new InvalidOperationException("Anisotropic filtering requires MinFilter and MagFilter to be Linear.");
     }
 
     private static void ValidateTextureDescription(in TextureDescription description)
@@ -299,6 +367,38 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             TextureDimension.Type3D => ImageType.Type3D,
             TextureDimension.CubeMap => ImageType.Type2D,
             _ => throw new InvalidOperationException("Unsupported texture dimension."),
+        };
+    }
+
+    private static Filter ToVulkanFilter(FilterMode mode)
+    {
+        return mode switch
+        {
+            FilterMode.Nearest => Filter.Nearest,
+            FilterMode.Linear => Filter.Linear,
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported filter mode."),
+        };
+    }
+
+    private static SamplerMipmapMode ToVulkanMipmapMode(MipmapMode mode)
+    {
+        return mode switch
+        {
+            MipmapMode.Nearest => SamplerMipmapMode.Nearest,
+            MipmapMode.Linear => SamplerMipmapMode.Linear,
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported mipmap mode."),
+        };
+    }
+
+    private static SamplerAddressMode ToVulkanAddressMode(WrapMode mode)
+    {
+        return mode switch
+        {
+            WrapMode.Repeat => SamplerAddressMode.Repeat,
+            WrapMode.MirroredRepeat => SamplerAddressMode.MirroredRepeat,
+            WrapMode.ClampToEdge => SamplerAddressMode.ClampToEdge,
+            WrapMode.ClampToBorder => SamplerAddressMode.ClampToBorder,
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported wrap mode."),
         };
     }
 

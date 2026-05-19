@@ -41,4 +41,11 @@ public abstract class GraphicsDevice
     public abstract GraphicsUploadHandle UploadTexture(
         Texture destination,
         ReadOnlySpan<byte> data);
+
+    /// <summary>
+    /// Creates a sampler with the given description.
+    /// </summary>
+    /// <param name="description">The sampler description.</param>
+    /// <returns>The created sampler.</returns>
+    public abstract Sampler CreateSampler(in SamplerDescription description);
 }

@@ -103,6 +103,21 @@ public static unsafe class VulkanContext
     /// </summary>
     public static uint MaxImageArrayLayers { get; private set; }
 
+    /// <summary>
+    /// Gets whether sampler anisotropy is supported by the physical device.
+    /// </summary>
+    public static bool SamplerAnisotropySupported { get; private set; }
+
+    /// <summary>
+    /// Gets the maximum supported sampler anisotropy level.
+    /// </summary>
+    public static float MaxSamplerAnisotropy { get; private set; }
+
+    /// <summary>
+    /// Gets the maximum absolute sampler LOD bias supported by the physical device.
+    /// </summary>
+    public static float MaxSamplerLodBias { get; private set; }
+
     private static Semaphore _globalTimelineSemaphore;
     private static ulong _globalTimelineValue;
 
@@ -172,11 +187,15 @@ public static unsafe class VulkanContext
         PickPhysicalDevice(surface);
 
         Vk.GetPhysicalDeviceProperties(PhysicalDevice, out var props);
+        Vk.GetPhysicalDeviceFeatures(PhysicalDevice, out var physicalDeviceFeatures);
         MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
         MaxImageDimension1D = props.Limits.MaxImageDimension1D;
         MaxImageDimension2D = props.Limits.MaxImageDimension2D;
         MaxImageDimension3D = props.Limits.MaxImageDimension3D;
         MaxImageArrayLayers = props.Limits.MaxImageArrayLayers;
+        SamplerAnisotropySupported = physicalDeviceFeatures.SamplerAnisotropy;
+        MaxSamplerAnisotropy = props.Limits.MaxSamplerAnisotropy;
+        MaxSamplerLodBias = props.Limits.MaxSamplerLodBias;
 
         KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
         MaxFramesInFlight = capabilities.MinImageCount + 1;
@@ -494,7 +513,10 @@ public static unsafe class VulkanContext
             };
         }
 
-        PhysicalDeviceFeatures deviceFeatures = new();
+        PhysicalDeviceFeatures deviceFeatures = new()
+        {
+            SamplerAnisotropy = SamplerAnisotropySupported,
+        };
 
         PhysicalDeviceVulkan12Features vulkan12Features = new()
         {
