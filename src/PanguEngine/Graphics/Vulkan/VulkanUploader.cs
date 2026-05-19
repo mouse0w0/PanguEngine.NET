@@ -46,7 +46,7 @@ public static unsafe class VulkanUploader
 
     private sealed class PendingTextureUpload
     {
-        public VulkanTexture2D Dst { get; init; } = null!;
+        public VulkanTexture Dst { get; init; } = null!;
 
         public byte[] Data { get; init; } = null!;
 
@@ -330,7 +330,7 @@ public static unsafe class VulkanUploader
     }
 
     internal static UploadHandle EnqueueTextureUpload(
-        VulkanTexture2D dst,
+        VulkanTexture dst,
         ReadOnlySpan<byte> data,
         TextureUploadRegion region)
     {
@@ -350,7 +350,7 @@ public static unsafe class VulkanUploader
             throw new ArgumentNullException(nameof(dst));
 
         if (dst.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanTexture2D));
+            throw new ObjectDisposedException(nameof(VulkanTexture));
         ValidateTextureUploadRegion(dst, region);
 
         var dataCopy = data.ToArray();
@@ -598,7 +598,7 @@ public static unsafe class VulkanUploader
         return checked((offset + 3UL) & ~3UL);
     }
 
-    private static void ValidateTextureUploadRegion(VulkanTexture2D texture, TextureUploadRegion region)
+    private static void ValidateTextureUploadRegion(VulkanTexture texture, TextureUploadRegion region)
     {
         if (region.X != 0)
             throw new ArgumentOutOfRangeException(nameof(region.X), "Texture upload X must be zero.");
@@ -611,13 +611,20 @@ public static unsafe class VulkanUploader
         if (region.ArrayLayer != 0)
             throw new ArgumentOutOfRangeException(nameof(region.ArrayLayer),
                 "Texture upload array layer must be zero.");
+        if (region.LayerCount == 0 || region.LayerCount > texture.ArrayLayers)
+            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
+                "Texture upload layer count is out of range.");
         if (region.Width == 0 || region.Width > texture.Width)
             throw new ArgumentOutOfRangeException(nameof(region.Width), "Texture upload width is out of range.");
         if (region.Height == 0 || region.Height > texture.Height)
             throw new ArgumentOutOfRangeException(nameof(region.Height), "Texture upload height is out of range.");
-        if (region.Depth != 1)
-            throw new ArgumentOutOfRangeException(nameof(region.Depth), "Texture upload depth must be one.");
-        if (region.Width != texture.Width || region.Height != texture.Height)
+        if (region.Depth == 0 || region.Depth > texture.Depth)
+            throw new ArgumentOutOfRangeException(nameof(region.Depth), "Texture upload depth is out of range.");
+        if (texture.Dimension == TextureDimension.Type3D && region.LayerCount != 1)
+            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
+                "3D texture upload layer count must be one.");
+        if (region.Width != texture.Width || region.Height != texture.Height || region.Depth != texture.Depth ||
+            region.LayerCount != texture.ArrayLayers)
             throw new ArgumentException("Texture upload region must cover the full base level.", nameof(region));
     }
 
@@ -641,7 +648,7 @@ public static unsafe class VulkanUploader
                 BaseMipLevel = 0,
                 LevelCount = 1,
                 BaseArrayLayer = 0,
-                LayerCount = 1,
+                LayerCount = upload.Region.LayerCount,
             },
         };
 
@@ -663,7 +670,7 @@ public static unsafe class VulkanUploader
                 AspectMask = ImageAspectFlags.ColorBit,
                 MipLevel = 0,
                 BaseArrayLayer = 0,
-                LayerCount = 1,
+                LayerCount = upload.Dst.Dimension == TextureDimension.Type3D ? 1 : upload.Region.LayerCount,
             },
             ImageOffset = new Offset3D
             {
@@ -675,7 +682,7 @@ public static unsafe class VulkanUploader
             {
                 Width = upload.Region.Width,
                 Height = upload.Region.Height,
-                Depth = 1,
+                Depth = upload.Region.Depth,
             },
         };
         VulkanContext.Vk.CmdCopyBufferToImage(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Image,

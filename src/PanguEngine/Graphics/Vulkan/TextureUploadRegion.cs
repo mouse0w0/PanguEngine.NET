@@ -8,4 +8,5 @@ internal readonly record struct TextureUploadRegion(
     uint Height,
     uint Depth,
     uint MipLevel,
-    uint ArrayLayer);
+    uint ArrayLayer,
+    uint LayerCount);

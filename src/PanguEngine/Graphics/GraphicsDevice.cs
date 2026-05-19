@@ -26,19 +26,19 @@ public abstract class GraphicsDevice
         ulong destinationOffset = 0) where T : unmanaged;
 
     /// <summary>
-    /// Creates a two-dimensional texture with the given description.
+    /// Creates a texture with the given description.
     /// </summary>
     /// <param name="description">The texture description.</param>
     /// <returns>The created texture.</returns>
-    public abstract Texture2D CreateTexture2D(in Texture2DDescription description);
+    public abstract Texture CreateTexture(in TextureDescription description);
 
     /// <summary>
-    /// Queues data for upload into a two-dimensional texture.
+    /// Queues data for upload into a texture.
     /// </summary>
     /// <param name="destination">The destination texture.</param>
     /// <param name="data">The texture data to upload.</param>
     /// <returns>A handle that represents the queued upload completion state.</returns>
-    public abstract GraphicsUploadHandle UploadTexture2D(
-        Texture2D destination,
+    public abstract GraphicsUploadHandle UploadTexture(
+        Texture destination,
         ReadOnlySpan<byte> data);
 }

@@ -4,7 +4,7 @@ using VkImage = Silk.NET.Vulkan.Image;
 
 namespace PanguEngine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanTexture2D : Texture2D
+internal sealed unsafe class VulkanTexture : Texture
 {
     private readonly Allocation* _allocation;
     private bool _destroyed;
@@ -18,32 +18,41 @@ internal sealed unsafe class VulkanTexture2D : Texture2D
 
     public override TextureFormat Format { get; }
 
+    public override TextureDimension Dimension { get; }
+
     public override uint Width { get; }
 
     public override uint Height { get; }
 
+    public override uint Depth { get; }
+
     public override uint MipLevels { get; }
+
+    public override uint ArrayLayers { get; }
 
     public override TextureUsage Usage { get; }
 
     public ImageLayout CurrentLayout { get; private set; } = ImageLayout.Undefined;
 
-    internal VulkanTexture2D(VkImage image, Allocation* allocation, ImageView imageView, TextureFormat format,
-        uint width, uint height, uint mipLevels, TextureUsage usage)
+    internal VulkanTexture(VkImage image, Allocation* allocation, ImageView imageView, TextureDimension dimension,
+        TextureFormat format, uint width, uint height, uint depth, uint mipLevels, uint arrayLayers, TextureUsage usage)
     {
         Image = image;
         _allocation = allocation;
         ImageView = imageView;
+        Dimension = dimension;
         Format = format;
         Width = width;
         Height = height;
+        Depth = depth;
         MipLevels = mipLevels;
+        ArrayLayers = arrayLayers;
         Usage = usage;
     }
 
     public void MarkUploadQueued()
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture2D));
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
         if (_uploadQueued)
             throw new InvalidOperationException("Texture already has a pending upload.");
         if (CurrentLayout != ImageLayout.Undefined)
@@ -53,7 +62,7 @@ internal sealed unsafe class VulkanTexture2D : Texture2D
 
     public void CompleteUpload(ImageLayout layout)
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture2D));
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
         CurrentLayout = layout;
         _uploadQueued = false;
     }

@@ -97,23 +97,31 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         return new VulkanGraphicsUploadHandle(handle);
     }
 
-    public override Texture2D CreateTexture2D(in Texture2DDescription description)
+    public override Texture CreateTexture(in TextureDescription description)
     {
-        ValidateTexture2DDescription(description);
+        ValidateTextureDescription(description);
+
+        var imageType = ToImageType(description.Dimension);
+        var imageViewType = ToImageViewType(description.Dimension, description.ArrayLayers);
+        var imageArrayLayers = GetImageArrayLayers(description);
+        var imageCreateFlags = description.Dimension == TextureDimension.CubeMap
+            ? ImageCreateFlags.CreateCubeCompatibleBit
+            : ImageCreateFlags.None;
 
         ImageCreateInfo imageInfo = new()
         {
             SType = StructureType.ImageCreateInfo,
-            ImageType = ImageType.Type2D,
+            Flags = imageCreateFlags,
+            ImageType = imageType,
             Format = ToVulkanFormat(description.Format),
             Extent = new Extent3D
             {
                 Width = description.Width,
                 Height = description.Height,
-                Depth = 1,
+                Depth = description.Dimension == TextureDimension.Type3D ? description.Depth : 1,
             },
-            MipLevels = 1,
-            ArrayLayers = 1,
+            MipLevels = description.MipLevels,
+            ArrayLayers = imageArrayLayers,
             Samples = SampleCountFlags.Count1Bit,
             Tiling = ImageTiling.Optimal,
             Usage = ToImageUsage(description.Usage),
@@ -134,15 +142,15 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             {
                 SType = StructureType.ImageViewCreateInfo,
                 Image = image,
-                ViewType = ImageViewType.Type2D,
+                ViewType = imageViewType,
                 Format = imageInfo.Format,
                 SubresourceRange = new ImageSubresourceRange
                 {
                     AspectMask = ImageAspectFlags.ColorBit,
                     BaseMipLevel = 0,
-                    LevelCount = 1,
+                    LevelCount = description.MipLevels,
                     BaseArrayLayer = 0,
-                    LayerCount = 1,
+                    LayerCount = imageArrayLayers,
                 },
             };
 
@@ -150,8 +158,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                 Result.Success)
                 throw new InvalidOperationException("Failed to create texture image view.");
 
-            return new VulkanTexture2D(image, allocation, imageView, description.Format, description.Width,
-                description.Height, description.MipLevels, description.Usage);
+            return new VulkanTexture(image, allocation, imageView, description.Dimension, description.Format,
+                description.Width, description.Height, description.Depth, description.MipLevels, imageArrayLayers,
+                description.Usage);
         }
         catch
         {
@@ -160,26 +169,28 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         }
     }
 
-    public override GraphicsUploadHandle UploadTexture2D(Texture2D destination, ReadOnlySpan<byte> data)
+    public override GraphicsUploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data)
     {
         if (destination == null)
             throw new ArgumentNullException(nameof(destination));
 
-        var texture = RequireVulkanTexture2D(destination);
+        var texture = RequireVulkanTexture(destination);
         if (texture.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanTexture2D));
+            throw new ObjectDisposedException(nameof(VulkanTexture));
 
         if (!texture.Usage.HasFlag(TextureUsage.TransferDestination))
-            throw new InvalidOperationException("Texture2D was not created with TransferDestination usage.");
+            throw new InvalidOperationException("Texture was not created with TransferDestination usage.");
 
-        var requiredSize = CalculateTextureDataSize(texture.Width, texture.Height, texture.Format);
+        var requiredSize = CalculateTextureDataSize(texture.Width, texture.Height, texture.Depth, texture.ArrayLayers,
+            texture.Format);
         if ((ulong)data.Length != requiredSize)
             throw new ArgumentException("Texture upload data size does not match the full base level size.",
                 nameof(data));
 
         texture.MarkUploadQueued();
 
-        var region = new TextureUploadRegion(0, 0, 0, texture.Width, texture.Height, 1, 0, 0);
+        var region = new TextureUploadRegion(0, 0, 0, texture.Width, texture.Height, texture.Depth, 0, 0,
+            texture.ArrayLayers);
         var handle = VulkanUploader.EnqueueTextureUpload(texture, data, region);
         return new VulkanGraphicsUploadHandle(handle);
     }
@@ -190,13 +201,13 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                ?? throw new InvalidOperationException("Graphics buffer was not created by the Vulkan backend.");
     }
 
-    private static VulkanTexture2D RequireVulkanTexture2D(Texture2D texture)
+    private static VulkanTexture RequireVulkanTexture(Texture texture)
     {
-        return texture as VulkanTexture2D
-               ?? throw new InvalidOperationException("Texture2D was not created by the Vulkan backend.");
+        return texture as VulkanTexture
+               ?? throw new InvalidOperationException("Texture was not created by the Vulkan backend.");
     }
 
-    private static void ValidateTexture2DDescription(in Texture2DDescription description)
+    private static void ValidateTextureDescription(in TextureDescription description)
     {
         if (description.Width == 0)
             throw new ArgumentOutOfRangeException(nameof(description.Width),
@@ -204,16 +215,108 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         if (description.Height == 0)
             throw new ArgumentOutOfRangeException(nameof(description.Height),
                 "Texture height must be greater than zero.");
+        if (description.Depth == 0)
+            throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                "Texture depth must be greater than zero.");
+        if (description.ArrayLayers == 0)
+            throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+                "Texture array layers must be greater than zero.");
         if (description.MipLevels != 1)
             throw new ArgumentOutOfRangeException(nameof(description.MipLevels),
-                "Texture2D currently supports exactly one mip level.");
+                "Textures currently support exactly one mip level.");
         if (description.Usage == TextureUsage.None)
             throw new ArgumentException("Texture usage must not be None.", nameof(description.Usage));
-        if (description.Width > VulkanContext.MaxImageDimension2D)
-            throw new ArgumentOutOfRangeException(nameof(description.Width), "Texture width exceeds the device limit.");
-        if (description.Height > VulkanContext.MaxImageDimension2D)
-            throw new ArgumentOutOfRangeException(nameof(description.Height),
-                "Texture height exceeds the device limit.");
+        if (description.ArrayLayers > VulkanContext.MaxImageArrayLayers)
+            throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+                "Texture array layers exceed the device limit.");
+
+        switch (description.Dimension)
+        {
+            case TextureDimension.Type1D:
+                if (description.Width > VulkanContext.MaxImageDimension1D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                        "Texture width exceeds the device limit.");
+                if (description.Height != 1)
+                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                        "1D textures must have a height of one.");
+                if (description.Depth != 1)
+                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                        "1D textures must have a depth of one.");
+                break;
+            case TextureDimension.Type2D:
+                if (description.Width > VulkanContext.MaxImageDimension2D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                        "Texture width exceeds the device limit.");
+                if (description.Height > VulkanContext.MaxImageDimension2D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                        "Texture height exceeds the device limit.");
+                if (description.Depth != 1)
+                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                        "2D textures must have a depth of one.");
+                break;
+            case TextureDimension.Type3D:
+                if (description.Width > VulkanContext.MaxImageDimension3D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                        "Texture width exceeds the device limit.");
+                if (description.Height > VulkanContext.MaxImageDimension3D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                        "Texture height exceeds the device limit.");
+                if (description.Depth > VulkanContext.MaxImageDimension3D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                        "Texture depth exceeds the device limit.");
+                if (description.ArrayLayers != 1)
+                    throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+                        "3D textures must have exactly one array layer.");
+                break;
+            case TextureDimension.CubeMap:
+                if (description.Width > VulkanContext.MaxImageDimension2D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                        "Texture width exceeds the device limit.");
+                if (description.Height > VulkanContext.MaxImageDimension2D)
+                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                        "Texture height exceeds the device limit.");
+                if (description.Height != description.Width)
+                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                        "Cube map textures must be square.");
+                if (description.Depth != 1)
+                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                        "Cube map textures must have a depth of one.");
+                if (description.ArrayLayers % 6 != 0)
+                    throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+                        "Cube map texture array layers must be a multiple of six.");
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(description.Dimension), "Unsupported texture dimension.");
+        }
+    }
+
+    private static ImageType ToImageType(TextureDimension dimension)
+    {
+        return dimension switch
+        {
+            TextureDimension.Type1D => ImageType.Type1D,
+            TextureDimension.Type2D => ImageType.Type2D,
+            TextureDimension.Type3D => ImageType.Type3D,
+            TextureDimension.CubeMap => ImageType.Type2D,
+            _ => throw new InvalidOperationException("Unsupported texture dimension."),
+        };
+    }
+
+    private static ImageViewType ToImageViewType(TextureDimension dimension, uint arrayLayers)
+    {
+        return dimension switch
+        {
+            TextureDimension.Type1D => arrayLayers == 1 ? ImageViewType.Type1D : ImageViewType.Type1DArray,
+            TextureDimension.Type2D => arrayLayers == 1 ? ImageViewType.Type2D : ImageViewType.Type2DArray,
+            TextureDimension.Type3D => ImageViewType.Type3D,
+            TextureDimension.CubeMap => arrayLayers == 6 ? ImageViewType.TypeCube : ImageViewType.TypeCubeArray,
+            _ => throw new InvalidOperationException("Unsupported texture dimension."),
+        };
+    }
+
+    private static uint GetImageArrayLayers(in TextureDescription description)
+    {
+        return description.Dimension == TextureDimension.Type3D ? 1 : description.ArrayLayers;
     }
 
     private static Format ToVulkanFormat(TextureFormat format)
@@ -250,8 +353,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         };
     }
 
-    private static ulong CalculateTextureDataSize(uint width, uint height, TextureFormat format)
+    private static ulong CalculateTextureDataSize(uint width, uint height, uint depth, uint arrayLayers,
+        TextureFormat format)
     {
-        return checked((ulong)width * height * GetTextureBytesPerPixel(format));
+        return checked((ulong)width * height * depth * arrayLayers * GetTextureBytesPerPixel(format));
     }
 }

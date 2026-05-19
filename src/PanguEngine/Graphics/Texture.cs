@@ -11,6 +11,11 @@ public abstract class Texture : GraphicsResource
     public abstract override bool IsDestroyed { get; }
 
     /// <summary>
+    /// Gets the texture dimensional shape.
+    /// </summary>
+    public abstract TextureDimension Dimension { get; }
+
+    /// <summary>
     /// Gets the texture pixel format.
     /// </summary>
     public abstract TextureFormat Format { get; }
