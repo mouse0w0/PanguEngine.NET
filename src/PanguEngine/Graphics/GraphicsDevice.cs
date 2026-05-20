@@ -48,4 +48,18 @@ public abstract class GraphicsDevice
     /// <param name="description">The sampler description.</param>
     /// <returns>The created sampler.</returns>
     public abstract Sampler CreateSampler(in SamplerDescription description);
+
+    /// <summary>
+    /// Creates a shader with the given description.
+    /// </summary>
+    /// <param name="description">The shader description.</param>
+    /// <returns>The created shader.</returns>
+    public abstract Shader CreateShader(in ShaderDescription description);
+
+    /// <summary>
+    /// Creates a graphics pipeline with the given description.
+    /// </summary>
+    /// <param name="description">The graphics pipeline description.</param>
+    /// <returns>The created graphics pipeline.</returns>
+    public abstract GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description);
 }

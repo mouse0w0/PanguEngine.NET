@@ -1,6 +1,8 @@
 using PanguEngine.Graphics.Vulkan;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
+using VkFrontFace = Silk.NET.Vulkan.FrontFace;
+using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
 
 namespace PanguEngine.Graphics.Test.Triangle;
 
@@ -30,8 +32,8 @@ internal sealed unsafe class TriangleScene : IVulkanTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        _vertShaderModule = VulkanShader.CreateVertexShader(vertSource, "triangle.vert");
-        _fragShaderModule = VulkanShader.CreateFragmentShader(fragSource, "triangle.frag");
+        _vertShaderModule = VulkanTestShader.CreateVertexShader(vertSource, "triangle.vert");
+        _fragShaderModule = VulkanTestShader.CreateFragmentShader(fragSource, "triangle.frag");
 
         CreatePipeline(window.ImageFormat);
     }
@@ -93,9 +95,9 @@ internal sealed unsafe class TriangleScene : IVulkanTestScene
         if (_pipelineLayout.Handle != 0)
             VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, _pipelineLayout, null);
         if (_vertShaderModule.Handle != 0)
-            VulkanShader.DestroyShaderModule(_vertShaderModule);
+            VulkanTestShader.DestroyShaderModule(_vertShaderModule);
         if (_fragShaderModule.Handle != 0)
-            VulkanShader.DestroyShaderModule(_fragShaderModule);
+            VulkanTestShader.DestroyShaderModule(_fragShaderModule);
     }
 
     private void CreatePipeline(Format imageFormat)
@@ -134,7 +136,7 @@ internal sealed unsafe class TriangleScene : IVulkanTestScene
             PipelineInputAssemblyStateCreateInfo inputAssembly = new()
             {
                 SType = StructureType.PipelineInputAssemblyStateCreateInfo,
-                Topology = PrimitiveTopology.TriangleList,
+                Topology = VkPrimitiveTopology.TriangleList,
                 PrimitiveRestartEnable = false,
             };
 
@@ -161,7 +163,7 @@ internal sealed unsafe class TriangleScene : IVulkanTestScene
                 PolygonMode = PolygonMode.Fill,
                 LineWidth = 1,
                 CullMode = CullModeFlags.BackBit,
-                FrontFace = FrontFace.Clockwise,
+                FrontFace = VkFrontFace.Clockwise,
                 DepthBiasEnable = false,
             };
 

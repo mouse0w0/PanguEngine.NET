@@ -4,84 +4,114 @@ using Silk.NET.Vulkan;
 namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
-/// Provides static methods for compiling GLSL shaders to SPIR-V and managing Vulkan shader modules.
+/// Vulkan implementation of <see cref="Shader"/>.
 /// </summary>
-public static unsafe class VulkanShader
+internal sealed unsafe class VulkanShader : Shader
 {
-    /// <summary>
-    /// Compiles a GLSL vertex shader to SPIR-V and creates a Vulkan shader module.
-    /// </summary>
-    /// <param name="glslSource">The GLSL source code of the vertex shader.</param>
-    /// <param name="fileName">The filename used for diagnostic messages during compilation.</param>
-    /// <returns>The created <see cref="ShaderModule"/>.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when compilation or module creation fails.</exception>
-    public static ShaderModule CreateVertexShader(string glslSource, string fileName = "vertex.glsl")
-    {
-        return CreateShaderModule(ShaderKind.VertexShader, glslSource, fileName);
-    }
+    private bool _destroyed;
 
     /// <summary>
-    /// Compiles a GLSL fragment shader to SPIR-V and creates a Vulkan shader module.
+    /// Creates a Vulkan shader from the given description.
     /// </summary>
-    /// <param name="glslSource">The GLSL source code of the fragment shader.</param>
-    /// <param name="fileName">The filename used for diagnostic messages during compilation.</param>
-    /// <returns>The created <see cref="ShaderModule"/>.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when compilation or module creation fails.</exception>
-    public static ShaderModule CreateFragmentShader(string glslSource, string fileName = "fragment.glsl")
+    /// <param name="description">The shader description.</param>
+    public VulkanShader(in ShaderDescription description)
     {
-        return CreateShaderModule(ShaderKind.FragmentShader, glslSource, fileName);
+        Stage = description.Stage;
+        EntryPoint = description.EntryPoint;
+        Name = description.Name;
+        Module = CreateShaderModule(description);
     }
+
+    /// <inheritdoc/>
+    public override ShaderStage Stage { get; }
+
+    /// <inheritdoc/>
+    public override string EntryPoint { get; }
+
+    /// <inheritdoc/>
+    public override bool IsDestroyed => _destroyed;
 
     /// <summary>
-    /// Destroys a Vulkan shader module and releases its resources.
+    /// Gets the shader name used for diagnostics.
     /// </summary>
-    /// <param name="module">The shader module to destroy.</param>
-    public static void DestroyShaderModule(ShaderModule module)
+    internal string Name { get; }
+
+    /// <summary>
+    /// Gets the Vulkan shader module.
+    /// </summary>
+    internal ShaderModule Module { get; private set; }
+
+    /// <inheritdoc/>
+    public override void Destroy()
     {
-        VulkanContext.Vk.DestroyShaderModule(VulkanContext.Device, module, null);
+        if (_destroyed)
+            return;
+
+        if (Module.Handle != 0)
+        {
+            VulkanContext.Vk.DestroyShaderModule(VulkanContext.Device, Module, null);
+            Module = default;
+        }
+
+        _destroyed = true;
     }
 
-    private static ShaderModule CreateShaderModule(ShaderKind kind, string glslSource, string fileName)
+    private static ShaderModule CreateShaderModule(in ShaderDescription description)
     {
         var shaderc = Shaderc.GetApi();
         var compiler = shaderc.CompilerInitialize();
 
-        var result = shaderc.CompileIntoSpv(compiler, glslSource, (nuint)glslSource.Length,
-            kind, fileName, "main", null);
-
-        var status = shaderc.ResultGetCompilationStatus(result);
-        if (status != CompilationStatus.Success)
+        try
         {
-            var errorMessage = shaderc.ResultGetErrorMessageS(result);
-            shaderc.ResultRelease(result);
+            var result = shaderc.CompileIntoSpv(compiler, description.Source, (nuint)description.Source.Length,
+                ToShaderKind(description.Stage), description.Name, description.EntryPoint, null);
+
+            try
+            {
+                var status = shaderc.ResultGetCompilationStatus(result);
+                if (status != CompilationStatus.Success)
+                {
+                    var errorMessage = shaderc.ResultGetErrorMessageS(result);
+                    throw new InvalidOperationException(
+                        $"Shader compilation failed ({description.Name}, {description.Stage}): {errorMessage}");
+                }
+
+                var codePtr = shaderc.ResultGetBytes(result);
+                var codeSize = shaderc.ResultGetLength(result);
+
+                ShaderModuleCreateInfo createInfo = new()
+                {
+                    SType = StructureType.ShaderModuleCreateInfo,
+                    CodeSize = codeSize,
+                    PCode = (uint*)codePtr,
+                };
+
+                if (VulkanContext.Vk.CreateShaderModule(VulkanContext.Device, in createInfo, null, out var module) !=
+                    Result.Success)
+                    throw new InvalidOperationException(
+                        $"Failed to create shader module ({description.Name}, {description.Stage}).");
+
+                return module;
+            }
+            finally
+            {
+                shaderc.ResultRelease(result);
+            }
+        }
+        finally
+        {
             shaderc.CompilerRelease(compiler);
             shaderc.Dispose();
-            throw new InvalidOperationException($"Shader compilation failed ({fileName}): {errorMessage}");
         }
+    }
 
-        var codePtr = shaderc.ResultGetBytes(result);
-        var codeSize = shaderc.ResultGetLength(result);
-
-        ShaderModuleCreateInfo createInfo = new()
+    private static ShaderKind ToShaderKind(ShaderStage stage)
+    {
+        return stage switch
         {
-            SType = StructureType.ShaderModuleCreateInfo,
-            CodeSize = codeSize,
-            PCode = (uint*)codePtr,
+            ShaderStage.Vertex => ShaderKind.VertexShader,
+            ShaderStage.Fragment => ShaderKind.FragmentShader,
+            _ => throw new ArgumentOutOfRangeException(nameof(stage), "Unsupported shader stage."),
         };
-
-        if (VulkanContext.Vk.CreateShaderModule(VulkanContext.Device, in createInfo, null, out var module) !=
-            Result.Success)
-        {
-            shaderc.ResultRelease(result);
-            shaderc.CompilerRelease(compiler);
-            shaderc.Dispose();
-            throw new InvalidOperationException($"Failed to create shader module ({fileName}).");
-        }
-
-        shaderc.ResultRelease(result);
-        shaderc.CompilerRelease(compiler);
-        shaderc.Dispose();
-
-        return module;
     }
 }

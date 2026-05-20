@@ -228,6 +228,34 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         return new VulkanSampler(sampler);
     }
 
+    /// <inheritdoc/>
+    public override Shader CreateShader(in ShaderDescription description)
+    {
+        ValidateShaderDescription(description);
+        return new VulkanShader(description);
+    }
+
+    /// <inheritdoc/>
+    public override GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description)
+    {
+        ValidateGraphicsPipelineDescription(description);
+        return new VulkanGraphicsPipeline(description);
+    }
+
+    /// <summary>
+    /// Creates a graphics pipeline with Vulkan descriptor set layouts.
+    /// </summary>
+    /// <param name="description">The graphics pipeline description.</param>
+    /// <param name="descriptorSetLayouts">The Vulkan descriptor set layouts used by the pipeline layout.</param>
+    /// <returns>The created graphics pipeline.</returns>
+    internal GraphicsPipeline CreateGraphicsPipeline(
+        in GraphicsPipelineDescription description,
+        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts)
+    {
+        ValidateGraphicsPipelineDescription(description);
+        return new VulkanGraphicsPipeline(description, descriptorSetLayouts);
+    }
+
     private static VulkanBuffer RequireVulkanBuffer(Buffer buffer)
     {
         return buffer as VulkanBuffer
@@ -238,6 +266,96 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     {
         return texture as VulkanTexture
                ?? throw new InvalidOperationException("Texture was not created by the Vulkan backend.");
+    }
+
+    private static VulkanShader RequireVulkanShader(Shader shader)
+    {
+        return shader as VulkanShader
+               ?? throw new InvalidOperationException("Shader was not created by the Vulkan backend.");
+    }
+
+    private static void ValidateShaderDescription(in ShaderDescription description)
+    {
+        if (string.IsNullOrWhiteSpace(description.Source))
+            throw new ArgumentException("Shader source must not be empty.", nameof(description.Source));
+        if (string.IsNullOrWhiteSpace(description.EntryPoint))
+            throw new ArgumentException("Shader entry point must not be empty.", nameof(description.EntryPoint));
+        if (description.SourceLanguage != ShaderSourceLanguage.Glsl)
+            throw new ArgumentOutOfRangeException(nameof(description.SourceLanguage),
+                "Only GLSL shader source is currently supported.");
+    }
+
+    internal static void ValidateGraphicsPipelineDescription(in GraphicsPipelineDescription description)
+    {
+        var shaders = description.Shaders.Span;
+        if (shaders.Length == 0)
+            throw new ArgumentException("Graphics pipeline must contain shaders.", nameof(description.Shaders));
+
+        var hasVertexShader = false;
+        var hasFragmentShader = false;
+        foreach (var shader in shaders)
+        {
+            if (shader == null)
+                throw new ArgumentException("Graphics pipeline shaders must not contain null entries.",
+                    nameof(description.Shaders));
+
+            var vulkanShader = RequireVulkanShader(shader);
+            if (vulkanShader.IsDestroyed)
+                throw new ObjectDisposedException(nameof(VulkanShader));
+
+            hasVertexShader |= vulkanShader.Stage == ShaderStage.Vertex;
+            hasFragmentShader |= vulkanShader.Stage == ShaderStage.Fragment;
+        }
+
+        if (!hasVertexShader)
+            throw new ArgumentException("Graphics pipeline must contain a vertex shader.", nameof(description.Shaders));
+        if (!hasFragmentShader)
+            throw new ArgumentException("Graphics pipeline must contain a fragment shader.",
+                nameof(description.Shaders));
+
+        _ = ToVulkanFormat(description.ColorAttachmentFormat);
+
+        if (!float.IsFinite(description.Rasterizer.LineWidth) || description.Rasterizer.LineWidth < 0)
+            throw new ArgumentOutOfRangeException(nameof(description.Rasterizer.LineWidth),
+                "Rasterizer line width must be a non-negative finite value.");
+
+        ValidateVertexInputDescription(description.VertexInput);
+    }
+
+    private static void ValidateVertexInputDescription(in VertexInputDescription description)
+    {
+        var buffers = description.Buffers.Span;
+        var attributes = description.Attributes.Span;
+
+        foreach (var buffer in buffers)
+        {
+            if (buffer.Stride == 0)
+                throw new ArgumentOutOfRangeException(nameof(buffer.Stride),
+                    "Vertex buffer stride must be greater than zero.");
+        }
+
+        foreach (var attribute in attributes)
+        {
+            var foundBinding = false;
+            uint stride = 0;
+
+            foreach (var buffer in buffers)
+            {
+                if (buffer.Binding != attribute.Binding)
+                    continue;
+
+                foundBinding = true;
+                stride = buffer.Stride;
+                break;
+            }
+
+            if (!foundBinding)
+                throw new ArgumentException("Vertex attribute binding must reference an existing vertex buffer layout.",
+                    nameof(description.Attributes));
+            if (attribute.Offset > stride)
+                throw new ArgumentOutOfRangeException(nameof(attribute.Offset),
+                    "Vertex attribute offset must not exceed the vertex buffer stride.");
+        }
     }
 
     private static void ValidateSamplerDescription(in SamplerDescription description)
@@ -419,7 +537,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         return description.Dimension == TextureDimension.Type3D ? 1 : description.ArrayLayers;
     }
 
-    private static Format ToVulkanFormat(TextureFormat format)
+    internal static Format ToVulkanFormat(TextureFormat format)
     {
         return format switch
         {
@@ -427,6 +545,17 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             TextureFormat.B8G8R8A8Unorm => Format.B8G8R8A8Unorm,
             TextureFormat.R8Unorm => Format.R8Unorm,
             _ => throw new InvalidOperationException("Unsupported texture format."),
+        };
+    }
+
+    internal static TextureFormat FromVulkanFormat(Format format)
+    {
+        return format switch
+        {
+            Format.R8G8B8A8Unorm => TextureFormat.R8G8B8A8Unorm,
+            Format.B8G8R8A8Unorm => TextureFormat.B8G8R8A8Unorm,
+            Format.R8Unorm => TextureFormat.R8Unorm,
+            _ => throw new InvalidOperationException("Unsupported Vulkan texture format."),
         };
     }
 

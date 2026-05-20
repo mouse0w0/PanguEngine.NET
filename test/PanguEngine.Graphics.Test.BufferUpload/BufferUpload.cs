@@ -3,6 +3,9 @@ using PanguEngine.Graphics.Vulkan;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using Vma;
+using VkFrontFace = Silk.NET.Vulkan.FrontFace;
+using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
+using VkVertexInputRate = Silk.NET.Vulkan.VertexInputRate;
 
 namespace PanguEngine.Graphics.Test.BufferUpload;
 
@@ -106,9 +109,9 @@ internal sealed unsafe class BufferUploadScene : IVulkanTestScene
         if (_pipelineLayout.Handle != 0)
             VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, _pipelineLayout, null);
         if (_vertShaderModule.Handle != 0)
-            VulkanShader.DestroyShaderModule(_vertShaderModule);
+            VulkanTestShader.DestroyShaderModule(_vertShaderModule);
         if (_fragShaderModule.Handle != 0)
-            VulkanShader.DestroyShaderModule(_fragShaderModule);
+            VulkanTestShader.DestroyShaderModule(_fragShaderModule);
     }
 
     private void CreateVertexBuffer()
@@ -142,8 +145,8 @@ internal sealed unsafe class BufferUploadScene : IVulkanTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        _vertShaderModule = VulkanShader.CreateVertexShader(vertSource, "buffer_upload.vert");
-        _fragShaderModule = VulkanShader.CreateFragmentShader(fragSource, "buffer_upload.frag");
+        _vertShaderModule = VulkanTestShader.CreateVertexShader(vertSource, "buffer_upload.vert");
+        _fragShaderModule = VulkanTestShader.CreateFragmentShader(fragSource, "buffer_upload.frag");
     }
 
     private void CreatePipeline(Format imageFormat)
@@ -176,7 +179,7 @@ internal sealed unsafe class BufferUploadScene : IVulkanTestScene
             {
                 Binding = 0,
                 Stride = (uint)Marshal.SizeOf<Vertex>(),
-                InputRate = VertexInputRate.Vertex,
+                InputRate = VkVertexInputRate.Vertex,
             };
 
             var attributeDescriptions = stackalloc VertexInputAttributeDescription[]
@@ -209,7 +212,7 @@ internal sealed unsafe class BufferUploadScene : IVulkanTestScene
             PipelineInputAssemblyStateCreateInfo inputAssembly = new()
             {
                 SType = StructureType.PipelineInputAssemblyStateCreateInfo,
-                Topology = PrimitiveTopology.TriangleList,
+                Topology = VkPrimitiveTopology.TriangleList,
                 PrimitiveRestartEnable = false,
             };
 
@@ -236,7 +239,7 @@ internal sealed unsafe class BufferUploadScene : IVulkanTestScene
                 PolygonMode = PolygonMode.Fill,
                 LineWidth = 1,
                 CullMode = CullModeFlags.BackBit,
-                FrontFace = FrontFace.Clockwise,
+                FrontFace = VkFrontFace.Clockwise,
                 DepthBiasEnable = false,
             };
 

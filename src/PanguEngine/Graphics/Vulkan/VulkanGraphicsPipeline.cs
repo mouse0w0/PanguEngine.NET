@@ -1,0 +1,346 @@
+using Silk.NET.Core.Native;
+using Silk.NET.Vulkan;
+using VkCullMode = Silk.NET.Vulkan.CullModeFlags;
+using VkFormat = Silk.NET.Vulkan.Format;
+using VkFrontFace = Silk.NET.Vulkan.FrontFace;
+using VkPipeline = Silk.NET.Vulkan.Pipeline;
+using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
+using VkVertexInputRate = Silk.NET.Vulkan.VertexInputRate;
+
+namespace PanguEngine.Graphics.Vulkan;
+
+/// <summary>
+/// Vulkan implementation of <see cref="GraphicsPipeline"/>.
+/// </summary>
+internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
+{
+    private bool _destroyed;
+
+    /// <summary>
+    /// Creates a Vulkan graphics pipeline with no descriptor set layouts.
+    /// </summary>
+    /// <param name="description">The graphics pipeline description.</param>
+    public VulkanGraphicsPipeline(in GraphicsPipelineDescription description)
+        : this(description, ReadOnlySpan<DescriptorSetLayout>.Empty)
+    {
+    }
+
+    /// <summary>
+    /// Creates a Vulkan graphics pipeline with the given descriptor set layouts.
+    /// </summary>
+    /// <param name="description">The graphics pipeline description.</param>
+    /// <param name="descriptorSetLayouts">The Vulkan descriptor set layouts used by the pipeline layout.</param>
+    internal VulkanGraphicsPipeline(
+        in GraphicsPipelineDescription description,
+        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts)
+    {
+        CreatePipeline(description, descriptorSetLayouts);
+    }
+
+    /// <inheritdoc/>
+    public override bool IsDestroyed => _destroyed;
+
+    /// <summary>
+    /// Gets the Vulkan graphics pipeline handle.
+    /// </summary>
+    internal VkPipeline Pipeline { get; private set; }
+
+    /// <summary>
+    /// Gets the Vulkan pipeline layout handle.
+    /// </summary>
+    internal PipelineLayout Layout { get; private set; }
+
+    /// <inheritdoc/>
+    public override void Destroy()
+    {
+        if (_destroyed)
+            return;
+
+        if (Pipeline.Handle != 0)
+        {
+            VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, Pipeline, null);
+            Pipeline = default;
+        }
+
+        if (Layout.Handle != 0)
+        {
+            VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, Layout, null);
+            Layout = default;
+        }
+
+        _destroyed = true;
+    }
+
+    private void CreatePipeline(
+        in GraphicsPipelineDescription description,
+        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts)
+    {
+        var shaders = description.Shaders.Span;
+        var stageInfos = new PipelineShaderStageCreateInfo[shaders.Length];
+        var entryPointPointers = new nint[shaders.Length];
+
+        try
+        {
+            for (var i = 0; i < shaders.Length; i++)
+            {
+                var shader = (VulkanShader)shaders[i];
+                entryPointPointers[i] = SilkMarshal.StringToPtr(shader.EntryPoint);
+                stageInfos[i] = new PipelineShaderStageCreateInfo
+                {
+                    SType = StructureType.PipelineShaderStageCreateInfo,
+                    Stage = ToShaderStageFlags(shader.Stage),
+                    Module = shader.Module,
+                    PName = (byte*)entryPointPointers[i],
+                };
+            }
+
+            CreatePipeline(description, descriptorSetLayouts, stageInfos);
+        }
+        finally
+        {
+            foreach (var pointer in entryPointPointers)
+            {
+                if (pointer != 0)
+                    SilkMarshal.Free(pointer);
+            }
+        }
+    }
+
+    private void CreatePipeline(
+        in GraphicsPipelineDescription description,
+        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts,
+        PipelineShaderStageCreateInfo[] stageInfos)
+    {
+        var bufferLayouts = description.VertexInput.Buffers.Span;
+        var attributes = description.VertexInput.Attributes.Span;
+        var bindingDescriptions = stackalloc VertexInputBindingDescription[bufferLayouts.Length];
+        var attributeDescriptions = stackalloc VertexInputAttributeDescription[attributes.Length];
+
+        for (var i = 0; i < bufferLayouts.Length; i++)
+        {
+            bindingDescriptions[i] = new VertexInputBindingDescription
+            {
+                Binding = bufferLayouts[i].Binding,
+                Stride = bufferLayouts[i].Stride,
+                InputRate = ToVulkanVertexInputRate(bufferLayouts[i].InputRate),
+            };
+        }
+
+        for (var i = 0; i < attributes.Length; i++)
+        {
+            attributeDescriptions[i] = new VertexInputAttributeDescription
+            {
+                Location = attributes[i].Location,
+                Binding = attributes[i].Binding,
+                Format = ToVulkanVertexAttributeFormat(attributes[i].Format),
+                Offset = attributes[i].Offset,
+            };
+        }
+
+        PipelineVertexInputStateCreateInfo vertexInputInfo = new()
+        {
+            SType = StructureType.PipelineVertexInputStateCreateInfo,
+            VertexBindingDescriptionCount = (uint)bufferLayouts.Length,
+            PVertexBindingDescriptions = bufferLayouts.Length == 0 ? null : bindingDescriptions,
+            VertexAttributeDescriptionCount = (uint)attributes.Length,
+            PVertexAttributeDescriptions = attributes.Length == 0 ? null : attributeDescriptions,
+        };
+
+        PipelineInputAssemblyStateCreateInfo inputAssembly = new()
+        {
+            SType = StructureType.PipelineInputAssemblyStateCreateInfo,
+            Topology = ToVulkanPrimitiveTopology(description.Topology),
+            PrimitiveRestartEnable = false,
+        };
+
+        Viewport viewport = new() { X = 0, Y = 0, Width = 1, Height = 1, MinDepth = 0, MaxDepth = 1 };
+        Rect2D scissor = new() { Offset = new Offset2D(0, 0), Extent = new Extent2D(1, 1) };
+        PipelineViewportStateCreateInfo viewportState = new()
+        {
+            SType = StructureType.PipelineViewportStateCreateInfo,
+            ViewportCount = 1,
+            PViewports = description.DynamicViewport ? null : &viewport,
+            ScissorCount = 1,
+            PScissors = description.DynamicScissor ? null : &scissor,
+        };
+
+        var dynamicStateCount = (description.DynamicViewport ? 1 : 0) + (description.DynamicScissor ? 1 : 0);
+        var dynamicStates = stackalloc DynamicState[dynamicStateCount];
+        var dynamicStateIndex = 0;
+        if (description.DynamicViewport)
+            dynamicStates[dynamicStateIndex++] = DynamicState.Viewport;
+        if (description.DynamicScissor)
+            dynamicStates[dynamicStateIndex] = DynamicState.Scissor;
+
+        PipelineDynamicStateCreateInfo dynamicState = new()
+        {
+            SType = StructureType.PipelineDynamicStateCreateInfo,
+            DynamicStateCount = (uint)dynamicStateCount,
+            PDynamicStates = dynamicStateCount == 0 ? null : dynamicStates,
+        };
+
+        PipelineRasterizationStateCreateInfo rasterizer = new()
+        {
+            SType = StructureType.PipelineRasterizationStateCreateInfo,
+            DepthClampEnable = false,
+            RasterizerDiscardEnable = false,
+            PolygonMode = PolygonMode.Fill,
+            LineWidth = description.Rasterizer.LineWidth == 0 ? 1 : description.Rasterizer.LineWidth,
+            CullMode = ToVulkanCullMode(description.Rasterizer.CullMode),
+            FrontFace = ToVulkanFrontFace(description.Rasterizer.FrontFace),
+            DepthBiasEnable = false,
+        };
+
+        PipelineMultisampleStateCreateInfo multisampling = new()
+        {
+            SType = StructureType.PipelineMultisampleStateCreateInfo,
+            SampleShadingEnable = false,
+            RasterizationSamples = SampleCountFlags.Count1Bit,
+        };
+
+        PipelineColorBlendAttachmentState colorBlendAttachment = CreateColorBlendAttachment(description.ColorBlend);
+        PipelineColorBlendStateCreateInfo colorBlending = new()
+        {
+            SType = StructureType.PipelineColorBlendStateCreateInfo,
+            LogicOpEnable = false,
+            LogicOp = LogicOp.Copy,
+            AttachmentCount = 1,
+            PAttachments = &colorBlendAttachment,
+        };
+
+        fixed (DescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
+        fixed (PipelineShaderStageCreateInfo* stages = stageInfos)
+        {
+            PipelineLayoutCreateInfo pipelineLayoutInfo = new()
+            {
+                SType = StructureType.PipelineLayoutCreateInfo,
+                SetLayoutCount = (uint)descriptorSetLayouts.Length,
+                PSetLayouts = descriptorSetLayouts.Length == 0 ? null : descriptorLayouts,
+                PushConstantRangeCount = 0,
+            };
+
+            if (VulkanContext.Vk.CreatePipelineLayout(VulkanContext.Device, in pipelineLayoutInfo, null,
+                    out var pipelineLayout) != Result.Success)
+                throw new InvalidOperationException("Failed to create pipeline layout.");
+
+            Layout = pipelineLayout;
+
+            var colorFormat = VulkanGraphicsDevice.ToVulkanFormat(description.ColorAttachmentFormat);
+            PipelineRenderingCreateInfo renderingCreateInfo = new()
+            {
+                SType = StructureType.PipelineRenderingCreateInfo,
+                ColorAttachmentCount = 1,
+                PColorAttachmentFormats = &colorFormat,
+            };
+
+            GraphicsPipelineCreateInfo pipelineInfo = new()
+            {
+                SType = StructureType.GraphicsPipelineCreateInfo,
+                PNext = &renderingCreateInfo,
+                StageCount = (uint)stageInfos.Length,
+                PStages = stages,
+                PVertexInputState = &vertexInputInfo,
+                PInputAssemblyState = &inputAssembly,
+                PViewportState = &viewportState,
+                PRasterizationState = &rasterizer,
+                PMultisampleState = &multisampling,
+                PColorBlendState = &colorBlending,
+                PDynamicState = dynamicStateCount == 0 ? null : &dynamicState,
+                Layout = Layout,
+                BasePipelineHandle = default,
+            };
+
+            if (VulkanContext.Vk.CreateGraphicsPipelines(VulkanContext.Device, default, 1, in pipelineInfo, null,
+                    out var pipeline) != Result.Success)
+            {
+                VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, Layout, null);
+                Layout = default;
+                throw new InvalidOperationException("Failed to create graphics pipeline.");
+            }
+
+            Pipeline = pipeline;
+        }
+    }
+
+    private static PipelineColorBlendAttachmentState CreateColorBlendAttachment(ColorBlendDescription description)
+    {
+        PipelineColorBlendAttachmentState result = new()
+        {
+            ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit |
+                             ColorComponentFlags.ABit,
+            BlendEnable = description.AlphaBlend,
+        };
+
+        if (!description.AlphaBlend)
+            return result;
+
+        result.SrcColorBlendFactor = BlendFactor.SrcAlpha;
+        result.DstColorBlendFactor = BlendFactor.OneMinusSrcAlpha;
+        result.ColorBlendOp = BlendOp.Add;
+        result.SrcAlphaBlendFactor = BlendFactor.One;
+        result.DstAlphaBlendFactor = BlendFactor.OneMinusSrcAlpha;
+        result.AlphaBlendOp = BlendOp.Add;
+        return result;
+    }
+
+    private static ShaderStageFlags ToShaderStageFlags(ShaderStage stage)
+    {
+        return stage switch
+        {
+            ShaderStage.Vertex => ShaderStageFlags.VertexBit,
+            ShaderStage.Fragment => ShaderStageFlags.FragmentBit,
+            _ => throw new ArgumentOutOfRangeException(nameof(stage), "Unsupported shader stage."),
+        };
+    }
+
+    private static VkVertexInputRate ToVulkanVertexInputRate(VertexInputRate inputRate)
+    {
+        return inputRate switch
+        {
+            VertexInputRate.Vertex => VkVertexInputRate.Vertex,
+            VertexInputRate.Instance => VkVertexInputRate.Instance,
+            _ => throw new ArgumentOutOfRangeException(nameof(inputRate), "Unsupported vertex input rate."),
+        };
+    }
+
+    private static VkFormat ToVulkanVertexAttributeFormat(VertexAttributeFormat format)
+    {
+        return format switch
+        {
+            VertexAttributeFormat.Float32x2 => VkFormat.R32G32Sfloat,
+            VertexAttributeFormat.Float32x3 => VkFormat.R32G32B32Sfloat,
+            VertexAttributeFormat.Float32x4 => VkFormat.R32G32B32A32Sfloat,
+            _ => throw new ArgumentOutOfRangeException(nameof(format), "Unsupported vertex attribute format."),
+        };
+    }
+
+    private static VkPrimitiveTopology ToVulkanPrimitiveTopology(PrimitiveTopology topology)
+    {
+        return topology switch
+        {
+            PrimitiveTopology.TriangleList => VkPrimitiveTopology.TriangleList,
+            _ => throw new ArgumentOutOfRangeException(nameof(topology), "Unsupported primitive topology."),
+        };
+    }
+
+    private static VkCullMode ToVulkanCullMode(CullMode cullMode)
+    {
+        return cullMode switch
+        {
+            CullMode.None => VkCullMode.None,
+            CullMode.Front => VkCullMode.FrontBit,
+            CullMode.Back => VkCullMode.BackBit,
+            _ => throw new ArgumentOutOfRangeException(nameof(cullMode), "Unsupported cull mode."),
+        };
+    }
+
+    private static VkFrontFace ToVulkanFrontFace(FrontFace frontFace)
+    {
+        return frontFace switch
+        {
+            FrontFace.Clockwise => VkFrontFace.Clockwise,
+            FrontFace.CounterClockwise => VkFrontFace.CounterClockwise,
+            _ => throw new ArgumentOutOfRangeException(nameof(frontFace), "Unsupported front face."),
+        };
+    }
+}

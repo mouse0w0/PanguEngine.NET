@@ -4,6 +4,9 @@ using PanguEngine.Graphics.Vulkan;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using Vma;
+using VkFrontFace = Silk.NET.Vulkan.FrontFace;
+using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
+using VkVertexInputRate = Silk.NET.Vulkan.VertexInputRate;
 
 namespace PanguEngine.Graphics.Test.UniformBuffer;
 
@@ -127,9 +130,9 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
         if (_descriptorSetLayout.Handle != 0)
             VulkanContext.Vk.DestroyDescriptorSetLayout(VulkanContext.Device, _descriptorSetLayout, null);
         if (_vertShaderModule.Handle != 0)
-            VulkanShader.DestroyShaderModule(_vertShaderModule);
+            VulkanTestShader.DestroyShaderModule(_vertShaderModule);
         if (_fragShaderModule.Handle != 0)
-            VulkanShader.DestroyShaderModule(_fragShaderModule);
+            VulkanTestShader.DestroyShaderModule(_fragShaderModule);
 
         _uniformBuffer?.Destroy();
         _vertexBuffer?.Destroy();
@@ -253,8 +256,8 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        _vertShaderModule = VulkanShader.CreateVertexShader(vertSource, "uniform_buffer.vert");
-        _fragShaderModule = VulkanShader.CreateFragmentShader(fragSource, "uniform_buffer.frag");
+        _vertShaderModule = VulkanTestShader.CreateVertexShader(vertSource, "uniform_buffer.vert");
+        _fragShaderModule = VulkanTestShader.CreateFragmentShader(fragSource, "uniform_buffer.frag");
     }
 
     private void CreatePipeline(Format imageFormat)
@@ -287,7 +290,7 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
             {
                 Binding = 0,
                 Stride = (uint)Marshal.SizeOf<Vertex>(),
-                InputRate = VertexInputRate.Vertex,
+                InputRate = VkVertexInputRate.Vertex,
             };
 
             var attributeDescriptions = stackalloc VertexInputAttributeDescription[]
@@ -320,7 +323,7 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
             PipelineInputAssemblyStateCreateInfo inputAssembly = new()
             {
                 SType = StructureType.PipelineInputAssemblyStateCreateInfo,
-                Topology = PrimitiveTopology.TriangleList,
+                Topology = VkPrimitiveTopology.TriangleList,
                 PrimitiveRestartEnable = false,
             };
 
@@ -347,7 +350,7 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
                 PolygonMode = PolygonMode.Fill,
                 LineWidth = 1,
                 CullMode = CullModeFlags.BackBit,
-                FrontFace = FrontFace.Clockwise,
+                FrontFace = VkFrontFace.Clockwise,
                 DepthBiasEnable = false,
             };
 

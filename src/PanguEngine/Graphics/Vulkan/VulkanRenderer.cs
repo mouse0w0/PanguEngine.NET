@@ -1,4 +1,3 @@
-using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -11,10 +10,9 @@ public sealed unsafe class VulkanRenderer
     private readonly VulkanWindow _window;
     private readonly VulkanCommandPool _commandPool;
 
-    private ShaderModule _vertShaderModule;
-    private ShaderModule _fragShaderModule;
-    private PipelineLayout _pipelineLayout;
-    private Pipeline _pipeline;
+    private readonly Shader _vertexShader;
+    private readonly Shader _fragmentShader;
+    private readonly GraphicsPipeline _pipeline;
 
     /// <summary>
     /// Initializes the renderer by loading shaders, creating the graphics pipeline, and allocating a command pool.
@@ -31,148 +29,20 @@ public sealed unsafe class VulkanRenderer
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        _vertShaderModule = VulkanShader.CreateVertexShader(vertSource, "triangle.vert");
-        _fragShaderModule = VulkanShader.CreateFragmentShader(fragSource, "triangle.frag");
+        _vertexShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+            ShaderStage.Vertex,
+            vertSource,
+            Name: "triangle.vert"));
+        _fragmentShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+            ShaderStage.Fragment,
+            fragSource,
+            Name: "triangle.frag"));
+        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+            new[] { _vertexShader, _fragmentShader },
+            VertexInputDescription.Empty,
+            ColorAttachmentFormat: VulkanGraphicsDevice.FromVulkanFormat(_window.ImageFormat)));
 
-        CreatePipeline();
         _commandPool = new VulkanCommandPool();
-    }
-
-    private void CreatePipeline()
-    {
-        PipelineShaderStageCreateInfo vertShaderStageInfo = new()
-        {
-            SType = StructureType.PipelineShaderStageCreateInfo,
-            Stage = ShaderStageFlags.VertexBit,
-            Module = _vertShaderModule,
-            PName = (byte*)SilkMarshal.StringToPtr("main"),
-        };
-
-        PipelineShaderStageCreateInfo fragShaderStageInfo = new()
-        {
-            SType = StructureType.PipelineShaderStageCreateInfo,
-            Stage = ShaderStageFlags.FragmentBit,
-            Module = _fragShaderModule,
-            PName = (byte*)SilkMarshal.StringToPtr("main"),
-        };
-
-        var shaderStages = stackalloc[]
-        {
-            vertShaderStageInfo,
-            fragShaderStageInfo,
-        };
-
-        PipelineVertexInputStateCreateInfo vertexInputInfo = new()
-        {
-            SType = StructureType.PipelineVertexInputStateCreateInfo,
-            VertexBindingDescriptionCount = 0,
-            VertexAttributeDescriptionCount = 0,
-        };
-
-        PipelineInputAssemblyStateCreateInfo inputAssembly = new()
-        {
-            SType = StructureType.PipelineInputAssemblyStateCreateInfo,
-            Topology = PrimitiveTopology.TriangleList,
-            PrimitiveRestartEnable = false,
-        };
-
-        PipelineViewportStateCreateInfo viewportState = new()
-        {
-            SType = StructureType.PipelineViewportStateCreateInfo,
-            ViewportCount = 1,
-            ScissorCount = 1,
-        };
-
-        var dynamicStates = stackalloc[] { DynamicState.Viewport, DynamicState.Scissor };
-        PipelineDynamicStateCreateInfo dynamicState = new()
-        {
-            SType = StructureType.PipelineDynamicStateCreateInfo,
-            DynamicStateCount = 2,
-            PDynamicStates = dynamicStates,
-        };
-
-        PipelineRasterizationStateCreateInfo rasterizer = new()
-        {
-            SType = StructureType.PipelineRasterizationStateCreateInfo,
-            DepthClampEnable = false,
-            RasterizerDiscardEnable = false,
-            PolygonMode = PolygonMode.Fill,
-            LineWidth = 1,
-            CullMode = CullModeFlags.BackBit,
-            FrontFace = FrontFace.Clockwise,
-            DepthBiasEnable = false,
-        };
-
-        PipelineMultisampleStateCreateInfo multisampling = new()
-        {
-            SType = StructureType.PipelineMultisampleStateCreateInfo,
-            SampleShadingEnable = false,
-            RasterizationSamples = SampleCountFlags.Count1Bit,
-        };
-
-        PipelineColorBlendAttachmentState colorBlendAttachment = new()
-        {
-            ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit |
-                             ColorComponentFlags.ABit,
-            BlendEnable = false,
-        };
-
-        PipelineColorBlendStateCreateInfo colorBlending = new()
-        {
-            SType = StructureType.PipelineColorBlendStateCreateInfo,
-            LogicOpEnable = false,
-            LogicOp = LogicOp.Copy,
-            AttachmentCount = 1,
-            PAttachments = &colorBlendAttachment,
-        };
-
-        colorBlending.BlendConstants[0] = 0;
-        colorBlending.BlendConstants[1] = 0;
-        colorBlending.BlendConstants[2] = 0;
-        colorBlending.BlendConstants[3] = 0;
-
-        PipelineLayoutCreateInfo pipelineLayoutInfo = new()
-        {
-            SType = StructureType.PipelineLayoutCreateInfo,
-            SetLayoutCount = 0,
-            PushConstantRangeCount = 0,
-        };
-
-        if (VulkanContext.Vk.CreatePipelineLayout(VulkanContext.Device, in pipelineLayoutInfo, null,
-                out _pipelineLayout) != Result.Success)
-            throw new InvalidOperationException("Failed to create pipeline layout.");
-
-        var colorFormat = _window.ImageFormat;
-        PipelineRenderingCreateInfo renderingCreateInfo = new()
-        {
-            SType = StructureType.PipelineRenderingCreateInfo,
-            ColorAttachmentCount = 1,
-            PColorAttachmentFormats = &colorFormat,
-        };
-
-        GraphicsPipelineCreateInfo pipelineInfo = new()
-        {
-            SType = StructureType.GraphicsPipelineCreateInfo,
-            PNext = &renderingCreateInfo,
-            StageCount = 2,
-            PStages = shaderStages,
-            PVertexInputState = &vertexInputInfo,
-            PInputAssemblyState = &inputAssembly,
-            PViewportState = &viewportState,
-            PRasterizationState = &rasterizer,
-            PMultisampleState = &multisampling,
-            PColorBlendState = &colorBlending,
-            PDynamicState = &dynamicState,
-            Layout = _pipelineLayout,
-            BasePipelineHandle = default,
-        };
-
-        if (VulkanContext.Vk.CreateGraphicsPipelines(VulkanContext.Device, default, 1, in pipelineInfo, null,
-                out _pipeline) != Result.Success)
-            throw new InvalidOperationException("Failed to create graphics pipeline.");
-
-        SilkMarshal.Free((nint)vertShaderStageInfo.PName);
-        SilkMarshal.Free((nint)fragShaderStageInfo.PName);
     }
 
     /// <summary>
@@ -263,7 +133,7 @@ public sealed unsafe class VulkanRenderer
         };
 
         VulkanContext.Vk.CmdBeginRendering(commandBuffer, &renderingInfo);
-        VulkanContext.Vk.CmdBindPipeline(commandBuffer, PipelineBindPoint.Graphics, _pipeline);
+        VulkanContext.Vk.CmdBindPipeline(commandBuffer, PipelineBindPoint.Graphics, GetVulkanPipeline().Pipeline);
 
         Viewport viewport = new()
         {
@@ -364,9 +234,15 @@ public sealed unsafe class VulkanRenderer
         VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
 
         _commandPool.Destroy();
-        VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, _pipeline, null);
-        VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, _pipelineLayout, null);
-        VulkanShader.DestroyShaderModule(_vertShaderModule);
-        VulkanShader.DestroyShaderModule(_fragShaderModule);
+        _pipeline.Destroy();
+        _fragmentShader.Destroy();
+        _vertexShader.Destroy();
+    }
+
+    private VulkanGraphicsPipeline GetVulkanPipeline()
+    {
+        return _pipeline as VulkanGraphicsPipeline
+               ?? throw new InvalidOperationException(
+                   "Renderer graphics pipeline was not created by the Vulkan backend.");
     }
 }
