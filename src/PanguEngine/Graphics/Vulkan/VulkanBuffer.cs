@@ -10,6 +10,8 @@ namespace PanguEngine.Graphics.Vulkan;
 public sealed unsafe class VulkanBuffer : Buffer
 {
     private readonly Allocation* _allocation;
+    private byte* _mappedData;
+    private bool _persistentlyMapped;
     private bool _destroyed;
 
     /// <summary>
@@ -45,7 +47,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// </summary>
     /// <typeparam name="T">The unmanaged type to map as.</typeparam>
     /// <returns>A pointer to the mapped memory.</returns>
-    public T* Map<T>() where T : unmanaged
+    internal T* Map<T>() where T : unmanaged
     {
         if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
 
@@ -55,11 +57,51 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// <summary>
     /// Unmaps the buffer memory.
     /// </summary>
-    public void Unmap()
+    internal void Unmap()
     {
         if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
 
         VulkanAllocator.Unmap(_allocation);
+    }
+
+    internal void PersistentlyMapForWrite()
+    {
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+        if (_persistentlyMapped)
+            return;
+
+        _mappedData = Map<byte>();
+        _persistentlyMapped = true;
+    }
+
+    /// <inheritdoc/>
+    public override void Write<T>(in T value, ulong destinationOffset = 0)
+    {
+        var copy = value;
+        Write(new ReadOnlySpan<T>(&copy, 1), destinationOffset);
+    }
+
+    /// <inheritdoc/>
+    public override void Write<T>(ReadOnlySpan<T> data, ulong destinationOffset = 0)
+    {
+        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+        if (!Usage.HasFlag(BufferUsageFlags.UniformBufferBit))
+            throw new InvalidOperationException(
+                "Buffer.Write is only supported for buffers created with Uniform usage.");
+
+        var dataSize = checked((ulong)data.Length * (ulong)sizeof(T));
+        if (destinationOffset > Size || dataSize > Size - destinationOffset)
+            throw new ArgumentOutOfRangeException(nameof(destinationOffset),
+                "Destination offset and data size exceed the buffer bounds.");
+        if (dataSize == 0)
+            return;
+        if (!_persistentlyMapped)
+            throw new InvalidOperationException("Buffer.Write requires a persistently mapped uniform buffer.");
+
+        fixed (T* source = data)
+        {
+            System.Buffer.MemoryCopy(source, _mappedData + destinationOffset, Size - destinationOffset, dataSize);
+        }
     }
 
     /// <summary>
@@ -68,6 +110,13 @@ public sealed unsafe class VulkanBuffer : Buffer
     public override void Destroy()
     {
         if (_destroyed) return;
+
+        if (_persistentlyMapped)
+        {
+            _mappedData = null;
+            _persistentlyMapped = false;
+        }
+
         _destroyed = true;
 
         var buffer = Buffer;

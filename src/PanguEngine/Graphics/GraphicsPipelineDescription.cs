@@ -11,6 +11,7 @@ namespace PanguEngine.Graphics;
 /// <param name="ColorAttachmentFormat">The color attachment format.</param>
 /// <param name="DynamicViewport">Whether viewport state is dynamic.</param>
 /// <param name="DynamicScissor">Whether scissor state is dynamic.</param>
+/// <param name="DescriptorSetLayouts">The descriptor set layouts used by the pipeline.</param>
 public readonly record struct GraphicsPipelineDescription(
     ReadOnlyMemory<Shader> Shaders,
     VertexInputDescription VertexInput,
@@ -19,4 +20,5 @@ public readonly record struct GraphicsPipelineDescription(
     ColorBlendDescription ColorBlend = default,
     TextureFormat ColorAttachmentFormat = TextureFormat.B8G8R8A8Unorm,
     bool DynamicViewport = true,
-    bool DynamicScissor = true);
+    bool DynamicScissor = true,
+    ReadOnlyMemory<DescriptorSetLayout> DescriptorSetLayouts = default);

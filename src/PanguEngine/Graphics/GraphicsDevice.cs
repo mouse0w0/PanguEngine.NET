@@ -57,6 +57,27 @@ public abstract class GraphicsDevice
     public abstract Shader CreateShader(in ShaderDescription description);
 
     /// <summary>
+    /// Creates a descriptor set layout with the given description.
+    /// </summary>
+    /// <param name="description">The descriptor set layout description.</param>
+    /// <returns>The created descriptor set layout.</returns>
+    public abstract DescriptorSetLayout CreateDescriptorSetLayout(in DescriptorSetLayoutDescription description);
+
+    /// <summary>
+    /// Creates a descriptor set with the given description.
+    /// </summary>
+    /// <param name="description">The descriptor set description.</param>
+    /// <returns>The created descriptor set.</returns>
+    public abstract DescriptorSet CreateDescriptorSet(in DescriptorSetDescription description);
+
+    /// <summary>
+    /// Calculates a uniform buffer binding size that satisfies the backend alignment requirement.
+    /// </summary>
+    /// <param name="rawSize">The unaligned size in bytes.</param>
+    /// <returns>The aligned size in bytes.</returns>
+    public abstract ulong GetAlignedUniformSize(ulong rawSize);
+
+    /// <summary>
     /// Creates a graphics pipeline with the given description.
     /// </summary>
     /// <param name="description">The graphics pipeline description.</param>

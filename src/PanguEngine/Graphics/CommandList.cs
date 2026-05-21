@@ -41,6 +41,21 @@ public abstract class CommandList
     public abstract void SetGraphicsPipeline(GraphicsPipeline pipeline);
 
     /// <summary>
+    /// Binds a vertex buffer to the given input slot.
+    /// </summary>
+    /// <param name="slot">The vertex input slot.</param>
+    /// <param name="buffer">The vertex buffer.</param>
+    /// <param name="offset">The byte offset within the vertex buffer.</param>
+    public abstract void SetVertexBuffer(uint slot, Buffer buffer, ulong offset = 0);
+
+    /// <summary>
+    /// Binds a shader-visible descriptor set to the given slot.
+    /// </summary>
+    /// <param name="slot">The descriptor set slot.</param>
+    /// <param name="descriptorSet">The descriptor set.</param>
+    public abstract void SetDescriptorSet(uint slot, DescriptorSet descriptorSet);
+
+    /// <summary>
     /// Records a non-indexed draw command.
     /// </summary>
     /// <param name="vertexCount">The number of vertices to draw.</param>

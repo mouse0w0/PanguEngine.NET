@@ -21,7 +21,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// </summary>
     /// <param name="description">The graphics pipeline description.</param>
     public VulkanGraphicsPipeline(in GraphicsPipelineDescription description)
-        : this(description, ReadOnlySpan<DescriptorSetLayout>.Empty)
+        : this(description, GetVulkanDescriptorSetLayouts(description))
     {
     }
 
@@ -32,8 +32,9 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// <param name="descriptorSetLayouts">The Vulkan descriptor set layouts used by the pipeline layout.</param>
     internal VulkanGraphicsPipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts)
+        ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts)
     {
+        DescriptorSetLayouts = GetDescriptorSetLayouts(description);
         CreatePipeline(description, descriptorSetLayouts);
     }
 
@@ -49,6 +50,11 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// Gets the Vulkan pipeline layout handle.
     /// </summary>
     internal PipelineLayout Layout { get; private set; }
+
+    /// <summary>
+    /// Gets the descriptor set layouts used by this pipeline.
+    /// </summary>
+    internal IReadOnlyList<VulkanDescriptorSetLayout> DescriptorSetLayouts { get; }
 
     /// <inheritdoc/>
     public override void Destroy()
@@ -73,7 +79,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
 
     private void CreatePipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts)
+        ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts)
     {
         var shaders = description.Shaders.Span;
         var stageInfos = new PipelineShaderStageCreateInfo[shaders.Length];
@@ -108,7 +114,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
 
     private void CreatePipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts,
+        ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts,
         PipelineShaderStageCreateInfo[] stageInfos)
     {
         var bufferLayouts = description.VertexInput.Buffers.Span;
@@ -208,7 +214,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             PAttachments = &colorBlendAttachment,
         };
 
-        fixed (DescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
+        fixed (Silk.NET.Vulkan.DescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
         fixed (PipelineShaderStageCreateInfo* stages = stageInfos)
         {
             PipelineLayoutCreateInfo pipelineLayoutInfo = new()
@@ -342,5 +348,41 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             FrontFace.CounterClockwise => VkFrontFace.CounterClockwise,
             _ => throw new ArgumentOutOfRangeException(nameof(frontFace), "Unsupported front face."),
         };
+    }
+
+    private static VulkanDescriptorSetLayout[] GetDescriptorSetLayouts(in GraphicsPipelineDescription description)
+    {
+        var layouts = description.DescriptorSetLayouts.Span;
+        if (layouts.Length == 0)
+            return [];
+
+        var result = new VulkanDescriptorSetLayout[layouts.Length];
+        for (var i = 0; i < layouts.Length; i++)
+        {
+            result[i] = layouts[i] as VulkanDescriptorSetLayout
+                        ?? throw new InvalidOperationException(
+                            "Descriptor set layout was not created by the Vulkan backend.");
+        }
+
+        return result;
+    }
+
+    private static Silk.NET.Vulkan.DescriptorSetLayout[] GetVulkanDescriptorSetLayouts(
+        in GraphicsPipelineDescription description)
+    {
+        var layouts = description.DescriptorSetLayouts.Span;
+        if (layouts.Length == 0)
+            return [];
+
+        var result = new Silk.NET.Vulkan.DescriptorSetLayout[layouts.Length];
+        for (var i = 0; i < layouts.Length; i++)
+        {
+            var layout = layouts[i] as VulkanDescriptorSetLayout
+                         ?? throw new InvalidOperationException(
+                             "Descriptor set layout was not created by the Vulkan backend.");
+            result[i] = layout.DescriptorSetLayout;
+        }
+
+        return result;
     }
 }

@@ -14,6 +14,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
     private bool _rendering;
     private bool _presentTransitionRecorded;
     private bool _valid;
+    private VulkanGraphicsPipeline? _graphicsPipeline;
 
     /// <summary>
     /// Gets whether command recording has ended.
@@ -39,6 +40,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         _rendering = false;
         _presentTransitionRecorded = false;
         _valid = true;
+        _graphicsPipeline = null;
     }
 
     /// <inheritdoc/>
@@ -158,6 +160,54 @@ internal sealed unsafe class VulkanCommandList : CommandList
             throw new ObjectDisposedException(nameof(VulkanGraphicsPipeline));
 
         VulkanContext.Vk.CmdBindPipeline(_commandBuffer, PipelineBindPoint.Graphics, vulkanPipeline.Pipeline);
+        _graphicsPipeline = vulkanPipeline;
+    }
+
+    /// <inheritdoc/>
+    public override void SetVertexBuffer(uint slot, Buffer buffer, ulong offset = 0)
+    {
+        EnsureRecording();
+        ArgumentNullException.ThrowIfNull(buffer);
+
+        var vulkanBuffer = buffer as VulkanBuffer
+                           ?? throw new InvalidOperationException(
+                               "Graphics buffer was not created by the Vulkan backend.");
+        if (vulkanBuffer.IsDestroyed)
+            throw new ObjectDisposedException(nameof(VulkanBuffer));
+        if (!vulkanBuffer.Usage.HasFlag(BufferUsageFlags.VertexBufferBit))
+            throw new InvalidOperationException("Buffer was not created with Vertex usage.");
+        if (offset > vulkanBuffer.Size)
+            throw new ArgumentOutOfRangeException(nameof(offset), "Vertex buffer offset exceeds the buffer bounds.");
+
+        var vkBuffer = vulkanBuffer.Buffer;
+        var vkOffset = offset;
+        VulkanContext.Vk.CmdBindVertexBuffers(_commandBuffer, slot, 1, &vkBuffer, &vkOffset);
+    }
+
+    /// <inheritdoc/>
+    public override void SetDescriptorSet(uint slot, DescriptorSet descriptorSet)
+    {
+        EnsureRecording();
+        ArgumentNullException.ThrowIfNull(descriptorSet);
+
+        var pipeline = _graphicsPipeline
+                       ?? throw new InvalidOperationException(
+                           "A graphics pipeline must be bound before binding a descriptor set.");
+        var vulkanDescriptorSet = descriptorSet as VulkanDescriptorSet
+                                  ?? throw new InvalidOperationException(
+                                      "Descriptor set was not created by the Vulkan backend.");
+        if (vulkanDescriptorSet.IsDestroyed)
+            throw new ObjectDisposedException(nameof(VulkanDescriptorSet));
+        if (slot >= pipeline.DescriptorSetLayouts.Count)
+            throw new ArgumentOutOfRangeException(nameof(slot),
+                "Descriptor set slot exceeds the graphics pipeline layout count.");
+        if (!ReferenceEquals(pipeline.DescriptorSetLayouts[(int)slot], vulkanDescriptorSet.Layout))
+            throw new InvalidOperationException(
+                "Descriptor set layout does not match the graphics pipeline layout slot.");
+
+        var vulkanDescriptorSetHandle = vulkanDescriptorSet.Handle;
+        VulkanContext.Vk.CmdBindDescriptorSets(_commandBuffer, PipelineBindPoint.Graphics, pipeline.Layout, slot, 1,
+            &vulkanDescriptorSetHandle, 0, null);
     }
 
     /// <inheritdoc/>
@@ -229,6 +279,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         _valid = false;
         _frame = null;
         _commandBuffer = default;
+        _graphicsPipeline = null;
     }
 
     private VulkanFrame GetFrame()

@@ -1,5 +1,6 @@
 using Silk.NET.Vulkan;
 using Vma;
+using VkDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
 using VKSampler = Silk.NET.Vulkan.Sampler;
 using VmaMemoryUsage = Vma.MemoryUsage;
 
@@ -66,7 +67,18 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             Usage = vmaUsage,
         };
 
-        return VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
+        if (description.Usage.HasFlag(BufferUsage.Uniform))
+        {
+            allocInfo.Usage = VmaMemoryUsage.Auto;
+            allocInfo.Flags = AllocationCreateFlags.HostAccessSequentialWriteBit;
+            allocInfo.RequiredFlags = MemoryPropertyFlags.HostVisibleBit | MemoryPropertyFlags.HostCoherentBit;
+        }
+
+        var buffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
+        if (description.Usage.HasFlag(BufferUsage.Uniform))
+            buffer.PersistentlyMapForWrite();
+
+        return buffer;
     }
 
     public override GraphicsUploadHandle UploadBuffer<T>(
@@ -236,10 +248,43 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     }
 
     /// <inheritdoc/>
+    public override DescriptorSetLayout CreateDescriptorSetLayout(in DescriptorSetLayoutDescription description)
+    {
+        return new VulkanDescriptorSetLayout(description);
+    }
+
+    /// <inheritdoc/>
+    public override DescriptorSet CreateDescriptorSet(in DescriptorSetDescription description)
+    {
+        return new VulkanDescriptorSet(description);
+    }
+
+    /// <inheritdoc/>
+    public override ulong GetAlignedUniformSize(ulong rawSize)
+    {
+        if (rawSize == 0)
+            throw new ArgumentOutOfRangeException(nameof(rawSize), "Raw size must be greater than zero.");
+
+        var align = VulkanContext.MinUniformBufferOffsetAlignment;
+        if (align == 0)
+            throw new InvalidOperationException(
+                "VulkanContext.MinUniformBufferOffsetAlignment is 0. Ensure VulkanContext is initialized.");
+        return checked(((rawSize + align - 1) / align) * align);
+    }
+
+    /// <inheritdoc/>
     public override GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description)
     {
         ValidateGraphicsPipelineDescription(description);
-        return new VulkanGraphicsPipeline(description);
+        var descriptorSetLayouts = description.DescriptorSetLayouts.Span;
+        if (descriptorSetLayouts.Length == 0)
+            return new VulkanGraphicsPipeline(description);
+
+        var vulkanDescriptorSetLayouts = new VkDescriptorSetLayout[descriptorSetLayouts.Length];
+        for (var i = 0; i < descriptorSetLayouts.Length; i++)
+            vulkanDescriptorSetLayouts[i] = ((VulkanDescriptorSetLayout)descriptorSetLayouts[i]).DescriptorSetLayout;
+
+        return new VulkanGraphicsPipeline(description, vulkanDescriptorSetLayouts);
     }
 
     /// <summary>
@@ -250,7 +295,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     /// <returns>The created graphics pipeline.</returns>
     internal GraphicsPipeline CreateGraphicsPipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<DescriptorSetLayout> descriptorSetLayouts)
+        ReadOnlySpan<VkDescriptorSetLayout> descriptorSetLayouts)
     {
         ValidateGraphicsPipelineDescription(description);
         return new VulkanGraphicsPipeline(description, descriptorSetLayouts);
@@ -272,6 +317,12 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     {
         return shader as VulkanShader
                ?? throw new InvalidOperationException("Shader was not created by the Vulkan backend.");
+    }
+
+    private static VulkanDescriptorSetLayout RequireVulkanDescriptorSetLayout(DescriptorSetLayout layout)
+    {
+        return layout as VulkanDescriptorSetLayout
+               ?? throw new InvalidOperationException("Descriptor set layout was not created by the Vulkan backend.");
     }
 
     private static void ValidateShaderDescription(in ShaderDescription description)
@@ -320,6 +371,17 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                 "Rasterizer line width must be a non-negative finite value.");
 
         ValidateVertexInputDescription(description.VertexInput);
+
+        foreach (var layout in description.DescriptorSetLayouts.Span)
+        {
+            if (layout == null)
+                throw new ArgumentException("Graphics pipeline descriptor set layouts must not contain null entries.",
+                    nameof(description.DescriptorSetLayouts));
+
+            var vulkanLayout = RequireVulkanDescriptorSetLayout(layout);
+            if (vulkanLayout.IsDestroyed)
+                throw new ObjectDisposedException(nameof(VulkanDescriptorSetLayout));
+        }
     }
 
     private static void ValidateVertexInputDescription(in VertexInputDescription description)
