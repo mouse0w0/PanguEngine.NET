@@ -23,9 +23,14 @@ public unsafe class Client
     public VulkanWindow VulkanWindow { get; private set; } = null!;
 
     /// <summary>
+    /// The graphics presenter.
+    /// </summary>
+    public Presenter Presenter { get; private set; } = null!;
+
+    /// <summary>
     /// The Vulkan renderer.
     /// </summary>
-    public VulkanRenderer Renderer { get; private set; } = null!;
+    private VulkanRenderer Renderer { get; set; } = null!;
 
     /// <summary>
     /// Runs the application.
@@ -70,7 +75,9 @@ public unsafe class Client
         VulkanUploader.Initialize();
         GraphicsContext.Initialize(new VulkanGraphicsDevice());
         VulkanWindow = new VulkanWindow(window, surface);
-        Renderer = new VulkanRenderer(VulkanWindow);
+        var presenter = new VulkanPresenter(VulkanWindow);
+        Presenter = presenter;
+        Renderer = new VulkanRenderer(presenter);
     }
 
     /// <summary>
@@ -88,6 +95,7 @@ public unsafe class Client
     private void OnShutdown()
     {
         Renderer.Destroy();
+        Presenter.Destroy();
         VulkanWindow.Destroy();
         GraphicsContext.Shutdown();
         VulkanUploader.Destroy();

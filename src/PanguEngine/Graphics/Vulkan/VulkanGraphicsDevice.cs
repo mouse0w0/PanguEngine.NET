@@ -543,6 +543,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         {
             TextureFormat.R8G8B8A8Unorm => Format.R8G8B8A8Unorm,
             TextureFormat.B8G8R8A8Unorm => Format.B8G8R8A8Unorm,
+            TextureFormat.B8G8R8A8Srgb => Format.B8G8R8A8Srgb,
             TextureFormat.R8Unorm => Format.R8Unorm,
             _ => throw new InvalidOperationException("Unsupported texture format."),
         };
@@ -554,6 +555,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         {
             Format.R8G8B8A8Unorm => TextureFormat.R8G8B8A8Unorm,
             Format.B8G8R8A8Unorm => TextureFormat.B8G8R8A8Unorm,
+            Format.B8G8R8A8Srgb => TextureFormat.B8G8R8A8Srgb,
             Format.R8Unorm => TextureFormat.R8Unorm,
             _ => throw new InvalidOperationException("Unsupported Vulkan texture format."),
         };
@@ -577,6 +579,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         {
             TextureFormat.R8G8B8A8Unorm => 4,
             TextureFormat.B8G8R8A8Unorm => 4,
+            TextureFormat.B8G8R8A8Srgb => 4,
             TextureFormat.R8Unorm => 1,
             _ => throw new InvalidOperationException("Unsupported texture format."),
         };
