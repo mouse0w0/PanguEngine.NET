@@ -21,10 +21,27 @@ public abstract class Presenter : GraphicsResource
     public abstract TextureFormat ColorFormat { get; }
 
     /// <summary>
+    /// Gets the number of in-flight frame slots available to frame-local resources.
+    /// </summary>
+    public abstract uint MaxFramesInFlight { get; }
+
+    /// <summary>
+    /// Gets the current in-flight frame slot index.
+    /// </summary>
+    public abstract uint CurrentFrameIndex { get; }
+
+    /// <summary>
     /// Begins a graphics frame for command recording.
     /// </summary>
     /// <returns>The active graphics frame.</returns>
     public abstract Frame BeginFrame();
+
+    /// <summary>
+    /// Attempts to begin a graphics frame for command recording.
+    /// </summary>
+    /// <param name="frame">The active graphics frame when one is available.</param>
+    /// <returns>Whether a frame was available for command recording.</returns>
+    public abstract bool TryBeginFrame(out Frame? frame);
 
     /// <summary>
     /// Ends, submits, and presents a graphics frame.

@@ -36,11 +36,28 @@ internal sealed unsafe class VulkanPresenter : Presenter
     public override TextureFormat ColorFormat => VulkanGraphicsDevice.FromVulkanFormat(_window.ImageFormat);
 
     /// <inheritdoc/>
+    public override uint MaxFramesInFlight => VulkanContext.MaxFramesInFlight;
+
+    /// <inheritdoc/>
+    public override uint CurrentFrameIndex => _window.CurrentFrame;
+
+    /// <inheritdoc/>
     public override Frame BeginFrame()
+    {
+        if (TryBeginFrame(out var frame))
+            return frame!;
+
+        throw new InvalidOperationException("Failed to acquire a renderable swapchain image after recreation.");
+    }
+
+    /// <inheritdoc/>
+    public override bool TryBeginFrame(out Frame? frame)
     {
         ThrowIfDestroyed();
         if (_currentFrame != null)
             throw new InvalidOperationException("A graphics frame is already active.");
+
+        frame = null;
 
         _window.WaitForInFlightFence();
         VulkanUploader.FlushPendingUploads();
@@ -50,12 +67,12 @@ internal sealed unsafe class VulkanPresenter : Presenter
             result = _window.AcquireNextImage(out imageIndex);
 
         if (result == Result.ErrorOutOfDateKhr)
-            throw new InvalidOperationException("Failed to acquire a renderable swapchain image after recreation.");
+            return false;
 
         var commandBuffer = _commandPool.CommandBuffers[_window.CurrentFrame];
         VulkanContext.Vk.ResetCommandBuffer(commandBuffer, 0);
 
-        var frame = new VulkanFrame(
+        var vulkanFrame = new VulkanFrame(
             imageIndex,
             _window.Images[imageIndex],
             _window.ImageViews[imageIndex],
@@ -64,9 +81,10 @@ internal sealed unsafe class VulkanPresenter : Presenter
             ColorFormat,
             _commandList);
 
-        _commandList.Reset(frame, commandBuffer);
-        _currentFrame = frame;
-        return frame;
+        _commandList.Reset(vulkanFrame, commandBuffer);
+        _currentFrame = vulkanFrame;
+        frame = vulkanFrame;
+        return true;
     }
 
     /// <inheritdoc/>
