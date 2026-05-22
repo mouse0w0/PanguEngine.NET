@@ -142,7 +142,7 @@ internal sealed class BufferLifecycleScene : IGraphicsTestScene
 
     private sealed record Mesh(
         GraphicsBuffer Buffer,
-        GraphicsUploadHandle UploadHandle,
+        UploadHandle UploadHandle,
         uint VertexCount);
 
     [StructLayout(LayoutKind.Sequential)]

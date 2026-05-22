@@ -3,7 +3,7 @@ namespace PanguEngine.Graphics;
 /// <summary>
 /// Represents the completion state of a queued graphics upload request.
 /// </summary>
-public abstract class GraphicsUploadHandle
+public abstract class UploadHandle
 {
     /// <summary>
     /// Gets whether the upload has completed successfully or failed.

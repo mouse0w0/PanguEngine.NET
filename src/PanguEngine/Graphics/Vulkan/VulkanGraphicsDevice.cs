@@ -11,9 +11,9 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 {
-    private sealed class CompletedGraphicsUploadHandle : GraphicsUploadHandle
+    private sealed class CompletedUploadHandle : UploadHandle
     {
-        public static readonly CompletedGraphicsUploadHandle Instance = new();
+        public static readonly CompletedUploadHandle Instance = new();
 
         public override bool IsCompleted => true;
 
@@ -81,7 +81,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         return buffer;
     }
 
-    public override GraphicsUploadHandle UploadBuffer<T>(
+    public override UploadHandle UploadBuffer<T>(
         Buffer destination,
         ReadOnlySpan<T> data,
         ulong destinationOffset = 0)
@@ -104,10 +104,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                 "Destination offset and data size exceed the buffer bounds.");
 
         if (dataSize == 0)
-            return CompletedGraphicsUploadHandle.Instance;
+            return CompletedUploadHandle.Instance;
 
-        var handle = VulkanUploader.EnqueueBufferUpload(vulkanBuffer, data, destinationOffset);
-        return new VulkanGraphicsUploadHandle(handle);
+        return VulkanUploader.EnqueueBufferUpload(vulkanBuffer, data, destinationOffset);
     }
 
     public override Texture CreateTexture(in TextureDescription description)
@@ -182,7 +181,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         }
     }
 
-    public override GraphicsUploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data)
+    public override UploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data)
     {
         if (destination == null)
             throw new ArgumentNullException(nameof(destination));
@@ -204,8 +203,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
         var region = new TextureUploadRegion(0, 0, 0, texture.Width, texture.Height, texture.Depth, 0, 0,
             texture.ArrayLayers);
-        var handle = VulkanUploader.EnqueueTextureUpload(texture, data, region);
-        return new VulkanGraphicsUploadHandle(handle);
+        return VulkanUploader.EnqueueTextureUpload(texture, data, region);
     }
 
     public override Sampler CreateSampler(in SamplerDescription description)

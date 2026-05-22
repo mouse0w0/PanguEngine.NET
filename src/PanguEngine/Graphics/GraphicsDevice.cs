@@ -20,7 +20,7 @@ public abstract class GraphicsDevice
     /// <param name="data">The data to upload.</param>
     /// <param name="destinationOffset">The destination byte offset within the buffer.</param>
     /// <returns>A handle that represents the queued upload completion state.</returns>
-    public abstract GraphicsUploadHandle UploadBuffer<T>(
+    public abstract UploadHandle UploadBuffer<T>(
         Buffer destination,
         ReadOnlySpan<T> data,
         ulong destinationOffset = 0) where T : unmanaged;
@@ -38,7 +38,7 @@ public abstract class GraphicsDevice
     /// <param name="destination">The destination texture.</param>
     /// <param name="data">The texture data to upload.</param>
     /// <returns>A handle that represents the queued upload completion state.</returns>
-    public abstract GraphicsUploadHandle UploadTexture(
+    public abstract UploadHandle UploadTexture(
         Texture destination,
         ReadOnlySpan<byte> data);
 

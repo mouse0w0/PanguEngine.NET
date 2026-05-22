@@ -35,7 +35,7 @@ internal sealed class UniformBufferScene : IGraphicsTestScene
     private GraphicsPipeline _pipeline = null!;
     private GraphicsBuffer _vertexBuffer = null!;
     private GraphicsBuffer _uniformBuffer = null!;
-    private GraphicsUploadHandle _uploadHandle = null!;
+    private UploadHandle _uploadHandle = null!;
     private Presenter _presenter = null!;
     private ulong _uniformStride;
 

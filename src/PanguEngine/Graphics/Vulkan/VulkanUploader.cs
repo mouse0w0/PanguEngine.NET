@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Silk.NET.Vulkan;
 using Vma;
@@ -41,7 +40,7 @@ public static unsafe class VulkanUploader
         /// <summary>
         /// The future representing this upload's completion.
         /// </summary>
-        public UploadHandle Handle { get; init; } = null!;
+        public VulkanUploadHandle Handle { get; init; } = null!;
     }
 
     private sealed class PendingTextureUpload
@@ -54,64 +53,7 @@ public static unsafe class VulkanUploader
 
         public TextureUploadRegion Region { get; init; }
 
-        public UploadHandle Handle { get; init; } = null!;
-    }
-
-    /// <summary>
-    /// Represents the completion state of a staging buffer upload request.
-    /// </summary>
-    public sealed class UploadHandle
-    {
-        private readonly ManualResetEventSlim _event = new(false);
-        private volatile bool _completed;
-        private ExceptionDispatchInfo? _exception;
-
-        internal UploadHandle()
-        {
-        }
-
-        /// <summary>
-        /// Gets whether the upload has completed (either succeeded or failed).
-        /// </summary>
-        public bool IsCompleted => _completed;
-
-        /// <summary>
-        /// Gets whether the upload completed with an error.
-        /// </summary>
-        public bool IsFaulted => _exception != null;
-
-        /// <summary>
-        /// Gets the error that caused the upload to fail, if any.
-        /// </summary>
-        public Exception? Exception => _exception?.SourceException;
-
-        internal void SignalSuccess()
-        {
-            _completed = true;
-            _event.Set();
-        }
-
-        internal void SignalFailure(Exception exception)
-        {
-            _exception = ExceptionDispatchInfo.Capture(exception);
-            _completed = true;
-            _event.Set();
-        }
-
-        /// <summary>
-        /// Blocks the calling thread until the upload completes.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown when called from the render submit thread to prevent deadlock.</exception>
-        public void Wait()
-        {
-            if (IsRenderSubmitThread)
-                throw new InvalidOperationException(
-                    "Cannot wait on an UploadHandle from the render submit thread; this would cause a deadlock.");
-
-            _event.Wait();
-
-            _exception?.Throw();
-        }
+        public VulkanUploadHandle Handle { get; init; } = null!;
     }
 
     private const ulong DefaultStagingSize = 4 * 1024 * 1024;
@@ -281,7 +223,7 @@ public static unsafe class VulkanUploader
     /// <exception cref="ArgumentException">Thrown when <paramref name="dst"/> was not created with <see cref="BufferUsageFlags.TransferDstBit"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="dstOffset"/> or data size exceeds the buffer bounds.</exception>
     /// <exception cref="OverflowException">Thrown when the data size calculation overflows.</exception>
-    public static UploadHandle EnqueueBufferUpload<T>(
+    internal static VulkanUploadHandle EnqueueBufferUpload<T>(
         VulkanBuffer dst,
         ReadOnlySpan<T> data,
         ulong dstOffset = 0) where T : unmanaged
@@ -313,7 +255,7 @@ public static unsafe class VulkanUploader
         var dataCopy = new byte[dataSize];
         data.CopyTo(MemoryMarshal.Cast<byte, T>(dataCopy.AsSpan()));
 
-        var handle = new UploadHandle();
+        var handle = new VulkanUploadHandle();
 
         var upload = new PendingBufferUpload
         {
@@ -329,7 +271,7 @@ public static unsafe class VulkanUploader
         return handle;
     }
 
-    internal static UploadHandle EnqueueTextureUpload(
+    internal static VulkanUploadHandle EnqueueTextureUpload(
         VulkanTexture dst,
         ReadOnlySpan<byte> data,
         TextureUploadRegion region)
@@ -354,7 +296,7 @@ public static unsafe class VulkanUploader
         ValidateTextureUploadRegion(dst, region);
 
         var dataCopy = data.ToArray();
-        var handle = new UploadHandle();
+        var handle = new VulkanUploadHandle();
         PendingTextureUploads.Enqueue(new PendingTextureUpload
         {
             Dst = dst,
@@ -763,9 +705,9 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static UploadHandle CreateCompletedHandle()
+    private static VulkanUploadHandle CreateCompletedHandle()
     {
-        var handle = new UploadHandle();
+        var handle = new VulkanUploadHandle();
         handle.SignalSuccess();
         return handle;
     }

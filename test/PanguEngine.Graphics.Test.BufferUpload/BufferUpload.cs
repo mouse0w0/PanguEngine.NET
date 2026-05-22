@@ -30,7 +30,7 @@ internal sealed class BufferUploadScene : IGraphicsTestScene
     private Shader _fragShader = null!;
     private GraphicsPipeline _pipeline = null!;
     private GraphicsBuffer _vertexBuffer = null!;
-    private GraphicsUploadHandle _uploadHandle = null!;
+    private UploadHandle _uploadHandle = null!;
 
     /// <inheritdoc/>
     public string Name => "BufferUpload";
