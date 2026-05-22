@@ -1,138 +1,83 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using PanguEngine.Graphics.Vulkan;
-using Silk.NET.Core.Native;
-using Silk.NET.Vulkan;
-using Vma;
-using VkFrontFace = Silk.NET.Vulkan.FrontFace;
-using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
-using VkVertexInputRate = Silk.NET.Vulkan.VertexInputRate;
+using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.BufferLifecycle;
 
+/// <summary>
+/// Entry point for the buffer lifecycle graphics test.
+/// </summary>
 internal static class BufferLifecycle
 {
     private static void Main()
     {
-        new VulkanTestApp(new BufferLifecycleScene()).Run();
+        new GraphicsTestApp(new BufferLifecycleScene()).Run();
     }
 }
 
-internal sealed unsafe class BufferLifecycleScene : IVulkanTestScene
+/// <summary>
+/// Renders a triangle from a per-frame vertex buffer and destroys it after recording.
+/// </summary>
+internal sealed class BufferLifecycleScene : IGraphicsTestScene
 {
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
 
-    private ShaderModule _vertShaderModule;
-    private ShaderModule _fragShaderModule;
-    private PipelineLayout _pipelineLayout;
-    private Pipeline _pipeline;
+    private Shader _vertShader = null!;
+    private Shader _fragShader = null!;
+    private GraphicsPipeline _pipeline = null!;
     private Mesh _mesh = null!;
 
+    /// <inheritdoc/>
     public string Name => "BufferLifecycle";
 
-    public void Initialize(VulkanWindow window)
+    /// <inheritdoc/>
+    public void Initialize(Presenter presenter)
     {
         CreateShaders();
-        CreatePipeline(window.ImageFormat);
+        CreatePipeline(presenter.ColorFormat);
     }
 
+    /// <inheritdoc/>
     public void PrepareFrame()
     {
         _mesh = CreateMesh();
     }
 
-    public void Record(CommandBuffer commandBuffer, ImageView targetImageView, Extent2D extent, Format imageFormat)
+    /// <inheritdoc/>
+    public void Record(Frame frame, CommandList commands)
     {
-        ClearValue clearColor = new()
-        {
-            Color = new ClearColorValue { Float32_0 = 0.008f, Float32_1 = 0.01f, Float32_2 = 0.016f, Float32_3 = 1 },
-        };
-
-        RenderingAttachmentInfo colorAttachment = new()
-        {
-            SType = StructureType.RenderingAttachmentInfo,
-            ImageView = targetImageView,
-            ImageLayout = ImageLayout.ColorAttachmentOptimal,
-            LoadOp = AttachmentLoadOp.Clear,
-            StoreOp = AttachmentStoreOp.Store,
-            ClearValue = clearColor,
-        };
-
-        RenderingInfo renderingInfo = new()
-        {
-            SType = StructureType.RenderingInfo,
-            RenderArea = new Rect2D { Offset = new Offset2D(0, 0), Extent = extent },
-            LayerCount = 1,
-            ColorAttachmentCount = 1,
-            PColorAttachments = &colorAttachment,
-        };
-
-        VulkanContext.Vk.CmdBeginRendering(commandBuffer, &renderingInfo);
-        VulkanContext.Vk.CmdBindPipeline(commandBuffer, PipelineBindPoint.Graphics, _pipeline);
-
-        Viewport viewport = new()
-        {
-            X = 0,
-            Y = 0,
-            Width = extent.Width,
-            Height = extent.Height,
-            MinDepth = 0,
-            MaxDepth = 1,
-        };
-        Rect2D scissor = new()
-        {
-            Offset = { X = 0, Y = 0 },
-            Extent = extent,
-        };
-        VulkanContext.Vk.CmdSetViewport(commandBuffer, 0, 1, &viewport);
-        VulkanContext.Vk.CmdSetScissor(commandBuffer, 0, 1, &scissor);
+        commands.BeginRendering(new RenderingDescription(new ClearColor(0.008f, 0.01f, 0.016f, 1)));
+        commands.SetGraphicsPipeline(_pipeline);
+        commands.SetViewport(0, 0, frame.Width, frame.Height);
+        commands.SetScissor(0, 0, frame.Width, frame.Height);
 
         if (!_mesh.UploadHandle.IsCompleted)
             throw new InvalidOperationException("Mesh buffer upload did not complete after flushing pending uploads.");
 
-        var vertexBuffer = _mesh.Buffer.Buffer;
-        var offsets = stackalloc ulong[] { 0 };
-        VulkanContext.Vk.CmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-        VulkanContext.Vk.CmdDraw(commandBuffer, _mesh.VertexCount, 1, 0, 0);
-
-        VulkanContext.Vk.CmdEndRendering(commandBuffer);
+        commands.SetVertexBuffer(0, _mesh.Buffer);
+        commands.Draw(_mesh.VertexCount);
+        commands.EndRendering();
 
         _mesh.Buffer.Destroy();
     }
 
+    /// <inheritdoc/>
     public void Destroy()
     {
-        if (_pipeline.Handle != 0)
-            VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, _pipeline, null);
-        if (_pipelineLayout.Handle != 0)
-            VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, _pipelineLayout, null);
-        if (_vertShaderModule.Handle != 0)
-            VulkanTestShader.DestroyShaderModule(_vertShaderModule);
-        if (_fragShaderModule.Handle != 0)
-            VulkanTestShader.DestroyShaderModule(_fragShaderModule);
+        _pipeline.Destroy();
+        _fragShader.Destroy();
+        _vertShader.Destroy();
     }
 
     private Mesh CreateMesh()
     {
         var vertices = CreateVertices();
         var size = (ulong)(Marshal.SizeOf<Vertex>() * vertices.Length);
-
-        BufferCreateInfo bufferInfo = new()
-        {
-            SType = StructureType.BufferCreateInfo,
-            Size = size,
-            Usage = BufferUsageFlags.TransferDstBit | BufferUsageFlags.VertexBufferBit,
-            SharingMode = SharingMode.Exclusive,
-        };
-
-        AllocationCreateInfo allocInfo = new()
-        {
-            Usage = MemoryUsage.Auto,
-            PreferredFlags = MemoryPropertyFlags.DeviceLocalBit,
-        };
-
-        var buffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
-        var uploadHandle = VulkanUploader.EnqueueBufferUpload(buffer, vertices);
+        var buffer = GraphicsContext.Device.CreateBuffer(new BufferDescription(
+            size,
+            BufferUsage.TransferDestination | BufferUsage.Vertex,
+            MemoryUsage.GpuOnly));
+        var uploadHandle = GraphicsContext.Device.UploadBuffer(buffer, vertices);
         return new Mesh(buffer, uploadHandle, (uint)vertices.Length);
     }
 
@@ -163,176 +108,41 @@ internal sealed unsafe class BufferLifecycleScene : IVulkanTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        _vertShaderModule = VulkanTestShader.CreateVertexShader(vertSource, "buffer_lifecycle.vert");
-        _fragShaderModule = VulkanTestShader.CreateFragmentShader(fragSource, "buffer_lifecycle.frag");
+        _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+            ShaderStage.Vertex,
+            vertSource,
+            Name: "buffer_lifecycle.vert"));
+        _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+            ShaderStage.Fragment,
+            fragSource,
+            Name: "buffer_lifecycle.frag"));
     }
 
-    private void CreatePipeline(Format imageFormat)
+    private void CreatePipeline(TextureFormat colorFormat)
     {
-        PipelineShaderStageCreateInfo vertShaderStageInfo = new()
-        {
-            SType = StructureType.PipelineShaderStageCreateInfo,
-            Stage = ShaderStageFlags.VertexBit,
-            Module = _vertShaderModule,
-            PName = (byte*)SilkMarshal.StringToPtr("main"),
-        };
+        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+            new[] { _vertShader, _fragShader },
+            CreateVertexInputDescription(),
+            ColorAttachmentFormat: colorFormat));
+    }
 
-        PipelineShaderStageCreateInfo fragShaderStageInfo = new()
-        {
-            SType = StructureType.PipelineShaderStageCreateInfo,
-            Stage = ShaderStageFlags.FragmentBit,
-            Module = _fragShaderModule,
-            PName = (byte*)SilkMarshal.StringToPtr("main"),
-        };
-
-        try
-        {
-            var shaderStages = stackalloc[]
+    private static VertexInputDescription CreateVertexInputDescription()
+    {
+        return new VertexInputDescription(
+            new[]
             {
-                vertShaderStageInfo,
-                fragShaderStageInfo,
-            };
-
-            VertexInputBindingDescription bindingDescription = new()
+                new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
+            },
+            new[]
             {
-                Binding = 0,
-                Stride = (uint)Marshal.SizeOf<Vertex>(),
-                InputRate = VkVertexInputRate.Vertex,
-            };
-
-            var attributeDescriptions = stackalloc VertexInputAttributeDescription[]
-            {
-                new()
-                {
-                    Binding = 0,
-                    Location = 0,
-                    Format = Format.R32G32Sfloat,
-                    Offset = 0,
-                },
-                new()
-                {
-                    Binding = 0,
-                    Location = 1,
-                    Format = Format.R32G32B32Sfloat,
-                    Offset = 8,
-                },
-            };
-
-            PipelineVertexInputStateCreateInfo vertexInputInfo = new()
-            {
-                SType = StructureType.PipelineVertexInputStateCreateInfo,
-                VertexBindingDescriptionCount = 1,
-                PVertexBindingDescriptions = &bindingDescription,
-                VertexAttributeDescriptionCount = 2,
-                PVertexAttributeDescriptions = attributeDescriptions,
-            };
-
-            PipelineInputAssemblyStateCreateInfo inputAssembly = new()
-            {
-                SType = StructureType.PipelineInputAssemblyStateCreateInfo,
-                Topology = VkPrimitiveTopology.TriangleList,
-                PrimitiveRestartEnable = false,
-            };
-
-            PipelineViewportStateCreateInfo viewportState = new()
-            {
-                SType = StructureType.PipelineViewportStateCreateInfo,
-                ViewportCount = 1,
-                ScissorCount = 1,
-            };
-
-            var dynamicStates = stackalloc[] { DynamicState.Viewport, DynamicState.Scissor };
-            PipelineDynamicStateCreateInfo dynamicState = new()
-            {
-                SType = StructureType.PipelineDynamicStateCreateInfo,
-                DynamicStateCount = 2,
-                PDynamicStates = dynamicStates,
-            };
-
-            PipelineRasterizationStateCreateInfo rasterizer = new()
-            {
-                SType = StructureType.PipelineRasterizationStateCreateInfo,
-                DepthClampEnable = false,
-                RasterizerDiscardEnable = false,
-                PolygonMode = PolygonMode.Fill,
-                LineWidth = 1,
-                CullMode = CullModeFlags.BackBit,
-                FrontFace = VkFrontFace.Clockwise,
-                DepthBiasEnable = false,
-            };
-
-            PipelineMultisampleStateCreateInfo multisampling = new()
-            {
-                SType = StructureType.PipelineMultisampleStateCreateInfo,
-                SampleShadingEnable = false,
-                RasterizationSamples = SampleCountFlags.Count1Bit,
-            };
-
-            PipelineColorBlendAttachmentState colorBlendAttachment = new()
-            {
-                ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit |
-                                 ColorComponentFlags.ABit,
-                BlendEnable = false,
-            };
-
-            PipelineColorBlendStateCreateInfo colorBlending = new()
-            {
-                SType = StructureType.PipelineColorBlendStateCreateInfo,
-                LogicOpEnable = false,
-                LogicOp = LogicOp.Copy,
-                AttachmentCount = 1,
-                PAttachments = &colorBlendAttachment,
-            };
-
-            PipelineLayoutCreateInfo pipelineLayoutInfo = new()
-            {
-                SType = StructureType.PipelineLayoutCreateInfo,
-                SetLayoutCount = 0,
-                PushConstantRangeCount = 0,
-            };
-
-            if (VulkanContext.Vk.CreatePipelineLayout(VulkanContext.Device, in pipelineLayoutInfo, null,
-                    out _pipelineLayout) != Result.Success)
-                throw new InvalidOperationException("Failed to create pipeline layout.");
-
-            PipelineRenderingCreateInfo renderingCreateInfo = new()
-            {
-                SType = StructureType.PipelineRenderingCreateInfo,
-                ColorAttachmentCount = 1,
-                PColorAttachmentFormats = &imageFormat,
-            };
-
-            GraphicsPipelineCreateInfo pipelineInfo = new()
-            {
-                SType = StructureType.GraphicsPipelineCreateInfo,
-                PNext = &renderingCreateInfo,
-                StageCount = 2,
-                PStages = shaderStages,
-                PVertexInputState = &vertexInputInfo,
-                PInputAssemblyState = &inputAssembly,
-                PViewportState = &viewportState,
-                PRasterizationState = &rasterizer,
-                PMultisampleState = &multisampling,
-                PColorBlendState = &colorBlending,
-                PDynamicState = &dynamicState,
-                Layout = _pipelineLayout,
-                BasePipelineHandle = default,
-            };
-
-            if (VulkanContext.Vk.CreateGraphicsPipelines(VulkanContext.Device, default, 1, in pipelineInfo, null,
-                    out _pipeline) != Result.Success)
-                throw new InvalidOperationException("Failed to create graphics pipeline.");
-        }
-        finally
-        {
-            SilkMarshal.Free((nint)vertShaderStageInfo.PName);
-            SilkMarshal.Free((nint)fragShaderStageInfo.PName);
-        }
+                new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
+                new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 8)
+            });
     }
 
     private sealed record Mesh(
-        VulkanBuffer Buffer,
-        VulkanUploader.UploadHandle UploadHandle,
+        GraphicsBuffer Buffer,
+        GraphicsUploadHandle UploadHandle,
         uint VertexCount);
 
     [StructLayout(LayoutKind.Sequential)]

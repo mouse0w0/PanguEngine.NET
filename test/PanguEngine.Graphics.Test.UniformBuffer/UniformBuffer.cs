@@ -1,24 +1,24 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using PanguEngine.Graphics.Vulkan;
-using Silk.NET.Core.Native;
-using Silk.NET.Vulkan;
-using Vma;
-using VkFrontFace = Silk.NET.Vulkan.FrontFace;
-using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
-using VkVertexInputRate = Silk.NET.Vulkan.VertexInputRate;
+using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.UniformBuffer;
 
+/// <summary>
+/// Entry point for the uniform buffer graphics test.
+/// </summary>
 internal static class UniformBuffer
 {
     private static void Main()
     {
-        new VulkanTestApp(new UniformBufferScene()).Run();
+        new GraphicsTestApp(new UniformBufferScene()).Run();
     }
 }
 
-internal sealed unsafe class UniformBufferScene : IVulkanTestScene
+/// <summary>
+/// Renders a triangle with per-frame uniform buffer bindings.
+/// </summary>
+internal sealed class UniformBufferScene : IGraphicsTestScene
 {
     private readonly Vertex[] _vertices =
     [
@@ -27,224 +27,113 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
         new(-0.45f, 0.45f, 1, 1, 1),
     ];
 
-    private ShaderModule _vertShaderModule;
-    private ShaderModule _fragShaderModule;
-    private DescriptorSetLayout _descriptorSetLayout;
-    private DescriptorPool _descriptorPool;
-    private PipelineLayout _pipelineLayout;
-    private Pipeline _pipeline;
-    private DescriptorSet[]? _descriptorSets;
-    private VulkanBuffer? _vertexBuffer;
-    private VulkanUniformBuffer? _uniformBuffer;
-    private VulkanUploader.UploadHandle? _uploadHandle;
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
-    private uint _frameCount;
+    private Shader _vertShader = null!;
+    private Shader _fragShader = null!;
+    private DescriptorSetLayout _descriptorSetLayout = null!;
+    private DescriptorSet[] _descriptorSets = null!;
+    private GraphicsPipeline _pipeline = null!;
+    private GraphicsBuffer _vertexBuffer = null!;
+    private GraphicsBuffer _uniformBuffer = null!;
+    private GraphicsUploadHandle _uploadHandle = null!;
+    private Presenter _presenter = null!;
+    private ulong _uniformStride;
 
+    /// <inheritdoc/>
     public string Name => "UniformBuffer";
 
-    public void Initialize(VulkanWindow window)
+    /// <inheritdoc/>
+    public void Initialize(Presenter presenter)
     {
+        _presenter = presenter;
         CreateVertexBuffer();
-        _uniformBuffer = new VulkanUniformBuffer((ulong)Marshal.SizeOf<FrameUniform>());
+        CreateUniformBuffer(presenter.MaxFramesInFlight);
         CreateDescriptorSetLayout();
-        CreateDescriptorSets();
+        CreateDescriptorSets(presenter.MaxFramesInFlight);
         CreateShaders();
-        CreatePipeline(window.ImageFormat);
+        CreatePipeline(presenter.ColorFormat);
     }
 
-    public void Record(CommandBuffer commandBuffer, ImageView targetImageView, Extent2D extent, Format imageFormat)
+    /// <inheritdoc/>
+    public void Record(Frame frame, CommandList commands)
     {
-        if (_uploadHandle is { IsCompleted: false })
+        if (!_uploadHandle.IsCompleted)
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
 
-        var frameIndex = _frameCount % VulkanContext.MaxFramesInFlight;
+        var frameIndex = _presenter.CurrentFrameIndex;
         var descriptorIndex = checked((int)frameIndex);
         WriteFrameUniform(frameIndex);
-        _frameCount++;
 
-        ClearValue clearColor = new()
-        {
-            Color = new ClearColorValue { Float32_0 = 0.01f, Float32_1 = 0.012f, Float32_2 = 0.018f, Float32_3 = 1 },
-        };
-
-        RenderingAttachmentInfo colorAttachment = new()
-        {
-            SType = StructureType.RenderingAttachmentInfo,
-            ImageView = targetImageView,
-            ImageLayout = ImageLayout.ColorAttachmentOptimal,
-            LoadOp = AttachmentLoadOp.Clear,
-            StoreOp = AttachmentStoreOp.Store,
-            ClearValue = clearColor,
-        };
-
-        RenderingInfo renderingInfo = new()
-        {
-            SType = StructureType.RenderingInfo,
-            RenderArea = new Rect2D { Offset = new Offset2D(0, 0), Extent = extent },
-            LayerCount = 1,
-            ColorAttachmentCount = 1,
-            PColorAttachments = &colorAttachment,
-        };
-
-        VulkanContext.Vk.CmdBeginRendering(commandBuffer, &renderingInfo);
-        VulkanContext.Vk.CmdBindPipeline(commandBuffer, PipelineBindPoint.Graphics, _pipeline);
-
-        Viewport viewport = new()
-        {
-            X = 0,
-            Y = 0,
-            Width = extent.Width,
-            Height = extent.Height,
-            MinDepth = 0,
-            MaxDepth = 1,
-        };
-        Rect2D scissor = new()
-        {
-            Offset = { X = 0, Y = 0 },
-            Extent = extent,
-        };
-        VulkanContext.Vk.CmdSetViewport(commandBuffer, 0, 1, &viewport);
-        VulkanContext.Vk.CmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-        var vertexBuffer = _vertexBuffer!.Buffer;
-        var offsets = stackalloc ulong[] { 0 };
-        VulkanContext.Vk.CmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-
-        var descriptorSet = _descriptorSets![descriptorIndex];
-        VulkanContext.Vk.CmdBindDescriptorSets(commandBuffer, PipelineBindPoint.Graphics, _pipelineLayout, 0, 1,
-            &descriptorSet, 0, null);
-
-        VulkanContext.Vk.CmdDraw(commandBuffer, (uint)_vertices.Length, 1, 0, 0);
-        VulkanContext.Vk.CmdEndRendering(commandBuffer);
+        commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.012f, 0.018f, 1)));
+        commands.SetGraphicsPipeline(_pipeline);
+        commands.SetViewport(0, 0, frame.Width, frame.Height);
+        commands.SetScissor(0, 0, frame.Width, frame.Height);
+        commands.SetVertexBuffer(0, _vertexBuffer);
+        commands.SetDescriptorSet(0, _descriptorSets[descriptorIndex]);
+        commands.Draw((uint)_vertices.Length);
+        commands.EndRendering();
     }
 
+    /// <inheritdoc/>
     public void Destroy()
     {
-        if (_pipeline.Handle != 0)
-            VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, _pipeline, null);
-        if (_pipelineLayout.Handle != 0)
-            VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, _pipelineLayout, null);
-        if (_descriptorPool.Handle != 0)
-            VulkanContext.Vk.DestroyDescriptorPool(VulkanContext.Device, _descriptorPool, null);
-        if (_descriptorSetLayout.Handle != 0)
-            VulkanContext.Vk.DestroyDescriptorSetLayout(VulkanContext.Device, _descriptorSetLayout, null);
-        if (_vertShaderModule.Handle != 0)
-            VulkanTestShader.DestroyShaderModule(_vertShaderModule);
-        if (_fragShaderModule.Handle != 0)
-            VulkanTestShader.DestroyShaderModule(_fragShaderModule);
+        _pipeline.Destroy();
+        foreach (var descriptorSet in _descriptorSets)
+            descriptorSet.Destroy();
 
-        _uniformBuffer?.Destroy();
-        _vertexBuffer?.Destroy();
+        _descriptorSetLayout.Destroy();
+        _fragShader.Destroy();
+        _vertShader.Destroy();
+        _uniformBuffer.Destroy();
+        _vertexBuffer.Destroy();
     }
 
     private void CreateVertexBuffer()
     {
         var size = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
+        _vertexBuffer = GraphicsContext.Device.CreateBuffer(new BufferDescription(
+            size,
+            BufferUsage.TransferDestination | BufferUsage.Vertex,
+            MemoryUsage.GpuOnly));
+        _uploadHandle = GraphicsContext.Device.UploadBuffer(_vertexBuffer, _vertices);
+    }
 
-        BufferCreateInfo bufferInfo = new()
-        {
-            SType = StructureType.BufferCreateInfo,
-            Size = size,
-            Usage = BufferUsageFlags.TransferDstBit | BufferUsageFlags.VertexBufferBit,
-            SharingMode = SharingMode.Exclusive,
-        };
-
-        AllocationCreateInfo allocInfo = new()
-        {
-            Usage = MemoryUsage.Auto,
-            PreferredFlags = MemoryPropertyFlags.DeviceLocalBit,
-        };
-
-        _vertexBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
-        _uploadHandle = VulkanUploader.EnqueueBufferUpload(_vertexBuffer, _vertices);
+    private void CreateUniformBuffer(uint frameCount)
+    {
+        var uniformSize = (ulong)Marshal.SizeOf<FrameUniform>();
+        _uniformStride = GraphicsContext.Device.GetAlignedUniformSize(uniformSize);
+        _uniformBuffer = GraphicsContext.Device.CreateBuffer(new BufferDescription(
+            _uniformStride * frameCount,
+            BufferUsage.Uniform,
+            MemoryUsage.CpuToGpu));
     }
 
     private void CreateDescriptorSetLayout()
     {
-        DescriptorSetLayoutBinding binding = new()
-        {
-            Binding = 0,
-            DescriptorType = DescriptorType.UniformBuffer,
-            DescriptorCount = 1,
-            StageFlags = ShaderStageFlags.VertexBit,
-        };
-
-        DescriptorSetLayoutCreateInfo layoutInfo = new()
-        {
-            SType = StructureType.DescriptorSetLayoutCreateInfo,
-            BindingCount = 1,
-            PBindings = &binding,
-        };
-
-        if (VulkanContext.Vk.CreateDescriptorSetLayout(VulkanContext.Device, in layoutInfo, null,
-                out _descriptorSetLayout) != Result.Success)
-            throw new InvalidOperationException("Failed to create descriptor set layout.");
+        _descriptorSetLayout = GraphicsContext.Device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
+            new[]
+            {
+                new DescriptorSetLayoutBinding(0, DescriptorType.UniformBuffer, ShaderStage.Vertex)
+            }));
     }
 
-    private void CreateDescriptorSets()
+    private void CreateDescriptorSets(uint frameCount)
     {
-        DescriptorPoolSize poolSize = new()
+        var descriptorSets = new DescriptorSet[checked((int)frameCount)];
+        var uniformSize = (ulong)Marshal.SizeOf<FrameUniform>();
+
+        for (var i = 0; i < descriptorSets.Length; i++)
         {
-            Type = DescriptorType.UniformBuffer,
-            DescriptorCount = VulkanContext.MaxFramesInFlight,
-        };
-
-        DescriptorPoolCreateInfo poolInfo = new()
-        {
-            SType = StructureType.DescriptorPoolCreateInfo,
-            MaxSets = VulkanContext.MaxFramesInFlight,
-            PoolSizeCount = 1,
-            PPoolSizes = &poolSize,
-        };
-
-        if (VulkanContext.Vk.CreateDescriptorPool(VulkanContext.Device, in poolInfo, null, out _descriptorPool) !=
-            Result.Success)
-            throw new InvalidOperationException("Failed to create descriptor pool.");
-
-        var frameCount = checked((int)VulkanContext.MaxFramesInFlight);
-        _descriptorSets = new DescriptorSet[frameCount];
-        var layouts = stackalloc DescriptorSetLayout[frameCount];
-        for (var i = 0; i < frameCount; i++)
-            layouts[i] = _descriptorSetLayout;
-
-        fixed (DescriptorSet* descriptorSets = _descriptorSets)
-        {
-            DescriptorSetAllocateInfo allocInfo = new()
-            {
-                SType = StructureType.DescriptorSetAllocateInfo,
-                DescriptorPool = _descriptorPool,
-                DescriptorSetCount = VulkanContext.MaxFramesInFlight,
-                PSetLayouts = layouts,
-            };
-
-            if (VulkanContext.Vk.AllocateDescriptorSets(VulkanContext.Device, in allocInfo, descriptorSets) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to allocate descriptor sets.");
-
-            for (var i = 0U; i < VulkanContext.MaxFramesInFlight; i++)
-            {
-                DescriptorBufferInfo bufferInfo = new()
+            descriptorSets[i] = GraphicsContext.Device.CreateDescriptorSet(new DescriptorSetDescription(
+                _descriptorSetLayout,
+                new[]
                 {
-                    Buffer = _uniformBuffer!.Buffer.Buffer,
-                    Offset = _uniformBuffer.GetOffset(i),
-                    Range = (ulong)Marshal.SizeOf<FrameUniform>(),
-                };
-
-                WriteDescriptorSet descriptorWrite = new()
-                {
-                    SType = StructureType.WriteDescriptorSet,
-                    DstSet = descriptorSets[i],
-                    DstBinding = 0,
-                    DstArrayElement = 0,
-                    DescriptorType = DescriptorType.UniformBuffer,
-                    DescriptorCount = 1,
-                    PBufferInfo = &bufferInfo,
-                };
-
-                VulkanContext.Vk.UpdateDescriptorSets(VulkanContext.Device, 1, in descriptorWrite, 0, null);
-            }
+                    new DescriptorSetBinding(0, _uniformBuffer, _uniformStride * (uint)i, uniformSize)
+                }));
         }
+
+        _descriptorSets = descriptorSets;
     }
 
     private void CreateShaders()
@@ -256,185 +145,53 @@ internal sealed unsafe class UniformBufferScene : IVulkanTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        _vertShaderModule = VulkanTestShader.CreateVertexShader(vertSource, "uniform_buffer.vert");
-        _fragShaderModule = VulkanTestShader.CreateFragmentShader(fragSource, "uniform_buffer.frag");
+        _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+            ShaderStage.Vertex,
+            vertSource,
+            Name: "uniform_buffer.vert"));
+        _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+            ShaderStage.Fragment,
+            fragSource,
+            Name: "uniform_buffer.frag"));
     }
 
-    private void CreatePipeline(Format imageFormat)
+    private void CreatePipeline(TextureFormat colorFormat)
     {
-        PipelineShaderStageCreateInfo vertShaderStageInfo = new()
-        {
-            SType = StructureType.PipelineShaderStageCreateInfo,
-            Stage = ShaderStageFlags.VertexBit,
-            Module = _vertShaderModule,
-            PName = (byte*)SilkMarshal.StringToPtr("main"),
-        };
+        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+            new[] { _vertShader, _fragShader },
+            CreateVertexInputDescription(),
+            ColorAttachmentFormat: colorFormat,
+            DescriptorSetLayouts: new[] { _descriptorSetLayout }));
+    }
 
-        PipelineShaderStageCreateInfo fragShaderStageInfo = new()
-        {
-            SType = StructureType.PipelineShaderStageCreateInfo,
-            Stage = ShaderStageFlags.FragmentBit,
-            Module = _fragShaderModule,
-            PName = (byte*)SilkMarshal.StringToPtr("main"),
-        };
-
-        try
-        {
-            var shaderStages = stackalloc[]
+    private static VertexInputDescription CreateVertexInputDescription()
+    {
+        return new VertexInputDescription(
+            new[]
             {
-                vertShaderStageInfo,
-                fragShaderStageInfo,
-            };
-
-            VertexInputBindingDescription bindingDescription = new()
+                new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
+            },
+            new[]
             {
-                Binding = 0,
-                Stride = (uint)Marshal.SizeOf<Vertex>(),
-                InputRate = VkVertexInputRate.Vertex,
-            };
-
-            var attributeDescriptions = stackalloc VertexInputAttributeDescription[]
-            {
-                new()
-                {
-                    Binding = 0,
-                    Location = 0,
-                    Format = Format.R32G32Sfloat,
-                    Offset = 0,
-                },
-                new()
-                {
-                    Binding = 0,
-                    Location = 1,
-                    Format = Format.R32G32B32Sfloat,
-                    Offset = 8,
-                },
-            };
-
-            PipelineVertexInputStateCreateInfo vertexInputInfo = new()
-            {
-                SType = StructureType.PipelineVertexInputStateCreateInfo,
-                VertexBindingDescriptionCount = 1,
-                PVertexBindingDescriptions = &bindingDescription,
-                VertexAttributeDescriptionCount = 2,
-                PVertexAttributeDescriptions = attributeDescriptions,
-            };
-
-            PipelineInputAssemblyStateCreateInfo inputAssembly = new()
-            {
-                SType = StructureType.PipelineInputAssemblyStateCreateInfo,
-                Topology = VkPrimitiveTopology.TriangleList,
-                PrimitiveRestartEnable = false,
-            };
-
-            PipelineViewportStateCreateInfo viewportState = new()
-            {
-                SType = StructureType.PipelineViewportStateCreateInfo,
-                ViewportCount = 1,
-                ScissorCount = 1,
-            };
-
-            var dynamicStates = stackalloc[] { DynamicState.Viewport, DynamicState.Scissor };
-            PipelineDynamicStateCreateInfo dynamicState = new()
-            {
-                SType = StructureType.PipelineDynamicStateCreateInfo,
-                DynamicStateCount = 2,
-                PDynamicStates = dynamicStates,
-            };
-
-            PipelineRasterizationStateCreateInfo rasterizer = new()
-            {
-                SType = StructureType.PipelineRasterizationStateCreateInfo,
-                DepthClampEnable = false,
-                RasterizerDiscardEnable = false,
-                PolygonMode = PolygonMode.Fill,
-                LineWidth = 1,
-                CullMode = CullModeFlags.BackBit,
-                FrontFace = VkFrontFace.Clockwise,
-                DepthBiasEnable = false,
-            };
-
-            PipelineMultisampleStateCreateInfo multisampling = new()
-            {
-                SType = StructureType.PipelineMultisampleStateCreateInfo,
-                SampleShadingEnable = false,
-                RasterizationSamples = SampleCountFlags.Count1Bit,
-            };
-
-            PipelineColorBlendAttachmentState colorBlendAttachment = new()
-            {
-                ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit |
-                                 ColorComponentFlags.ABit,
-                BlendEnable = false,
-            };
-
-            PipelineColorBlendStateCreateInfo colorBlending = new()
-            {
-                SType = StructureType.PipelineColorBlendStateCreateInfo,
-                LogicOpEnable = false,
-                LogicOp = LogicOp.Copy,
-                AttachmentCount = 1,
-                PAttachments = &colorBlendAttachment,
-            };
-
-            var descriptorSetLayout = _descriptorSetLayout;
-            PipelineLayoutCreateInfo pipelineLayoutInfo = new()
-            {
-                SType = StructureType.PipelineLayoutCreateInfo,
-                SetLayoutCount = 1,
-                PSetLayouts = &descriptorSetLayout,
-                PushConstantRangeCount = 0,
-            };
-
-            if (VulkanContext.Vk.CreatePipelineLayout(VulkanContext.Device, in pipelineLayoutInfo, null,
-                    out _pipelineLayout) != Result.Success)
-                throw new InvalidOperationException("Failed to create pipeline layout.");
-
-            PipelineRenderingCreateInfo renderingCreateInfo = new()
-            {
-                SType = StructureType.PipelineRenderingCreateInfo,
-                ColorAttachmentCount = 1,
-                PColorAttachmentFormats = &imageFormat,
-            };
-
-            GraphicsPipelineCreateInfo pipelineInfo = new()
-            {
-                SType = StructureType.GraphicsPipelineCreateInfo,
-                PNext = &renderingCreateInfo,
-                StageCount = 2,
-                PStages = shaderStages,
-                PVertexInputState = &vertexInputInfo,
-                PInputAssemblyState = &inputAssembly,
-                PViewportState = &viewportState,
-                PRasterizationState = &rasterizer,
-                PMultisampleState = &multisampling,
-                PColorBlendState = &colorBlending,
-                PDynamicState = &dynamicState,
-                Layout = _pipelineLayout,
-                BasePipelineHandle = default,
-            };
-
-            if (VulkanContext.Vk.CreateGraphicsPipelines(VulkanContext.Device, default, 1, in pipelineInfo, null,
-                    out _pipeline) != Result.Success)
-                throw new InvalidOperationException("Failed to create graphics pipeline.");
-        }
-        finally
-        {
-            SilkMarshal.Free((nint)vertShaderStageInfo.PName);
-            SilkMarshal.Free((nint)fragShaderStageInfo.PName);
-        }
+                new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
+                new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 8)
+            });
     }
 
     private void WriteFrameUniform(uint frameIndex)
     {
         var time = (float)_stopwatch.Elapsed.TotalSeconds;
-        var uniform = _uniformBuffer!.GetMappedData<FrameUniform>(frameIndex);
-        uniform->TintR = 0.5f + MathF.Sin(time) * 0.5f;
-        uniform->TintG = 0.5f + MathF.Sin(time + 2.0943952f) * 0.5f;
-        uniform->TintB = 0.5f + MathF.Sin(time + 4.1887903f) * 0.5f;
-        uniform->TintA = 1;
-        uniform->OffsetX = MathF.Sin(time) * 0.25f;
-        uniform->OffsetY = 0;
+        var uniform = new FrameUniform
+        {
+            TintR = 0.5f + MathF.Sin(time) * 0.5f,
+            TintG = 0.5f + MathF.Sin(time + 2.0943952f) * 0.5f,
+            TintB = 0.5f + MathF.Sin(time + 4.1887903f) * 0.5f,
+            TintA = 1,
+            OffsetX = MathF.Sin(time) * 0.25f,
+            OffsetY = 0,
+        };
+
+        _uniformBuffer.Write(in uniform, _uniformStride * frameIndex);
     }
 
     [StructLayout(LayoutKind.Sequential)]
