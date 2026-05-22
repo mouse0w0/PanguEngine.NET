@@ -8,5 +8,10 @@ public enum DescriptorType
     /// <summary>
     /// A uniform buffer binding.
     /// </summary>
-    UniformBuffer
+    UniformBuffer,
+
+    /// <summary>
+    /// A sampled texture and sampler binding.
+    /// </summary>
+    CombinedImageSampler
 }
