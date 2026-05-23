@@ -185,6 +185,25 @@ internal sealed unsafe class VulkanCommandList : CommandList
     }
 
     /// <inheritdoc/>
+    public override void SetIndexBuffer(Buffer buffer, IndexFormat format, ulong offset = 0)
+    {
+        EnsureRecording();
+        ArgumentNullException.ThrowIfNull(buffer);
+
+        var vulkanBuffer = buffer as VulkanBuffer
+                           ?? throw new InvalidOperationException(
+                               "Graphics buffer was not created by the Vulkan backend.");
+        if (vulkanBuffer.IsDestroyed)
+            throw new ObjectDisposedException(nameof(VulkanBuffer));
+        if (!vulkanBuffer.Usage.HasFlag(BufferUsageFlags.IndexBufferBit))
+            throw new InvalidOperationException("Buffer was not created with Index usage.");
+        if (offset > vulkanBuffer.Size)
+            throw new ArgumentOutOfRangeException(nameof(offset), "Index buffer offset exceeds the buffer bounds.");
+
+        VulkanContext.Vk.CmdBindIndexBuffer(_commandBuffer, vulkanBuffer.Buffer, offset, ToVulkanIndexType(format));
+    }
+
+    /// <inheritdoc/>
     public override void SetDescriptorSet(uint slot, DescriptorSet descriptorSet)
     {
         EnsureRecording();
@@ -218,6 +237,27 @@ internal sealed unsafe class VulkanCommandList : CommandList
             throw new InvalidOperationException("Draw commands must be recorded inside an active rendering operation.");
 
         VulkanContext.Vk.CmdDraw(_commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
+    }
+
+    /// <inheritdoc/>
+    public override void DrawIndexed(
+        uint indexCount,
+        uint instanceCount = 1,
+        uint firstIndex = 0,
+        int vertexOffset = 0,
+        uint firstInstance = 0)
+    {
+        EnsureRecording();
+        if (!_rendering)
+            throw new InvalidOperationException("Draw commands must be recorded inside an active rendering operation.");
+
+        VulkanContext.Vk.CmdDrawIndexed(
+            _commandBuffer,
+            indexCount,
+            instanceCount,
+            firstIndex,
+            vertexOffset,
+            firstInstance);
     }
 
     /// <inheritdoc/>
@@ -376,6 +416,16 @@ internal sealed unsafe class VulkanCommandList : CommandList
             LoadOperation.Clear => AttachmentLoadOp.Clear,
             LoadOperation.DontCare => AttachmentLoadOp.DontCare,
             _ => throw new ArgumentOutOfRangeException(nameof(operation), "Unsupported load operation."),
+        };
+    }
+
+    private static IndexType ToVulkanIndexType(IndexFormat format)
+    {
+        return format switch
+        {
+            IndexFormat.UInt16 => IndexType.Uint16,
+            IndexFormat.UInt32 => IndexType.Uint32,
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported index format.")
         };
     }
 

@@ -49,6 +49,14 @@ public abstract class CommandList
     public abstract void SetVertexBuffer(uint slot, Buffer buffer, ulong offset = 0);
 
     /// <summary>
+    /// Binds an index buffer for indexed drawing.
+    /// </summary>
+    /// <param name="buffer">The index buffer.</param>
+    /// <param name="format">The index element format.</param>
+    /// <param name="offset">The byte offset within the index buffer.</param>
+    public abstract void SetIndexBuffer(Buffer buffer, IndexFormat format, ulong offset = 0);
+
+    /// <summary>
     /// Binds a shader-visible descriptor set to the given slot.
     /// </summary>
     /// <param name="slot">The descriptor set slot.</param>
@@ -63,6 +71,21 @@ public abstract class CommandList
     /// <param name="firstVertex">The first vertex index.</param>
     /// <param name="firstInstance">The first instance index.</param>
     public abstract void Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0);
+
+    /// <summary>
+    /// Records an indexed draw command.
+    /// </summary>
+    /// <param name="indexCount">The number of indices to draw.</param>
+    /// <param name="instanceCount">The number of instances to draw.</param>
+    /// <param name="firstIndex">The first index to draw.</param>
+    /// <param name="vertexOffset">The value added to the vertex index before vertex fetching.</param>
+    /// <param name="firstInstance">The first instance index.</param>
+    public abstract void DrawIndexed(
+        uint indexCount,
+        uint instanceCount = 1,
+        uint firstIndex = 0,
+        int vertexOffset = 0,
+        uint firstInstance = 0);
 
     /// <summary>
     /// Ends the active rendering operation.
