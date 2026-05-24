@@ -106,11 +106,11 @@ internal sealed class TextureMipUploadScene : IGraphicsTestScene
         _textureUploadHandles =
         [
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(8, 8, 0xff, 0x00, 0x00, 0xff),
-                new TextureUploadRegion(0, 0, 0, 8, 8, 1, 0, 0, 1)),
+                TextureUploadRegion.Mip2D(8, 8, 0)),
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0x00, 0xff),
-                new TextureUploadRegion(0, 0, 0, 4, 4, 1, 1, 0, 1)),
+                TextureUploadRegion.Mip2D(4, 4, 1)),
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(2, 2, 0x00, 0x00, 0xff, 0xff),
-                new TextureUploadRegion(0, 0, 0, 2, 2, 1, 2, 0, 1)),
+                TextureUploadRegion.Mip2D(2, 2, 2)),
         ];
     }
 

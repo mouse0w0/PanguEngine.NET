@@ -106,17 +106,17 @@ internal sealed class TextureCubeMapUploadScene : IGraphicsTestScene
         _textureUploadHandles =
         [
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0x00, 0x00, 0xff),
-                new TextureUploadRegion(0, 0, 0, 4, 4, 1, 0, 0, 1)),
+                TextureUploadRegion.Layer2D(4, 4, 0)),
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0x00, 0xff),
-                new TextureUploadRegion(0, 0, 0, 4, 4, 1, 0, 1, 1)),
+                TextureUploadRegion.Layer2D(4, 4, 1)),
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0x00, 0xff, 0xff),
-                new TextureUploadRegion(0, 0, 0, 4, 4, 1, 0, 2, 1)),
+                TextureUploadRegion.Layer2D(4, 4, 2)),
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0xff, 0x00, 0xff),
-                new TextureUploadRegion(0, 0, 0, 4, 4, 1, 0, 3, 1)),
+                TextureUploadRegion.Layer2D(4, 4, 3)),
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0x00, 0xff, 0xff),
-                new TextureUploadRegion(0, 0, 0, 4, 4, 1, 0, 4, 1)),
+                TextureUploadRegion.Layer2D(4, 4, 4)),
             GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0xff, 0xff),
-                new TextureUploadRegion(0, 0, 0, 4, 4, 1, 0, 5, 1)),
+                TextureUploadRegion.Layer2D(4, 4, 5)),
         ];
     }
 

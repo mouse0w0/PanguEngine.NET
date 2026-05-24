@@ -187,8 +187,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentNullException(nameof(destination));
 
         var texture = RequireVulkanTexture(destination);
-        var region = new TextureUploadRegion(0, 0, 0, texture.Width, texture.Height, texture.Depth, 0, 0,
-            texture.Dimension == TextureDimension.Type3D ? 1 : texture.ArrayLayers);
+        var region = texture.Dimension == TextureDimension.Type3D
+            ? TextureUploadRegion.Full3D(texture.Width, texture.Height, texture.Depth)
+            : TextureUploadRegion.Full2DArray(texture.Width, texture.Height, texture.ArrayLayers);
         return UploadTexture(destination, data, in region);
     }
 

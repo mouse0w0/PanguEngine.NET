@@ -110,9 +110,9 @@ internal sealed class TextureRegionUploadScene : IGraphicsTestScene
         [
             GraphicsContext.Device.UploadTexture(_texture, baseData),
             GraphicsContext.Device.UploadTexture(_texture, firstRegionData,
-                new TextureUploadRegion(2, 2, 0, 4, 4, 1, 0, 0, 1)),
+                TextureUploadRegion.Region2D(2, 2, 4, 4)),
             GraphicsContext.Device.UploadTexture(_texture, secondRegionData,
-                new TextureUploadRegion(2, 2, 0, 4, 4, 1, 0, 0, 1)),
+                TextureUploadRegion.Region2D(2, 2, 4, 4)),
         ];
     }
 
