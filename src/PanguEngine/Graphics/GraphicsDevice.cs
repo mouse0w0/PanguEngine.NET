@@ -43,6 +43,18 @@ public abstract class GraphicsDevice
         ReadOnlySpan<byte> data);
 
     /// <summary>
+    /// Queues data for upload into a texture region.
+    /// </summary>
+    /// <param name="destination">The destination texture.</param>
+    /// <param name="data">The texture data to upload.</param>
+    /// <param name="region">The destination texture region.</param>
+    /// <returns>A handle that represents the queued upload completion state.</returns>
+    public abstract UploadHandle UploadTexture(
+        Texture destination,
+        ReadOnlySpan<byte> data,
+        in TextureUploadRegion region);
+
+    /// <summary>
     /// Creates a sampler with the given description.
     /// </summary>
     /// <param name="description">The sampler description.</param>

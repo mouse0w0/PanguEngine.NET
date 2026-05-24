@@ -293,7 +293,6 @@ public static unsafe class VulkanUploader
 
         if (dst.IsDestroyed)
             throw new ObjectDisposedException(nameof(VulkanTexture));
-        ValidateTextureUploadRegion(dst, region);
 
         var dataCopy = data.ToArray();
         var handle = new VulkanUploadHandle();
@@ -480,7 +479,6 @@ public static unsafe class VulkanUploader
 
         foreach (var upload in batch.Textures)
         {
-            upload.Dst.CompleteUpload(ImageLayout.ShaderReadOnlyOptimal);
             upload.Handle.SignalSuccess();
         }
     }
@@ -540,67 +538,24 @@ public static unsafe class VulkanUploader
         return checked((offset + 3UL) & ~3UL);
     }
 
-    private static void ValidateTextureUploadRegion(VulkanTexture texture, TextureUploadRegion region)
-    {
-        if (region.X != 0)
-            throw new ArgumentOutOfRangeException(nameof(region.X), "Texture upload X must be zero.");
-        if (region.Y != 0)
-            throw new ArgumentOutOfRangeException(nameof(region.Y), "Texture upload Y must be zero.");
-        if (region.Z != 0)
-            throw new ArgumentOutOfRangeException(nameof(region.Z), "Texture upload Z must be zero.");
-        if (region.MipLevel != 0)
-            throw new ArgumentOutOfRangeException(nameof(region.MipLevel), "Texture upload mip level must be zero.");
-        if (region.ArrayLayer != 0)
-            throw new ArgumentOutOfRangeException(nameof(region.ArrayLayer),
-                "Texture upload array layer must be zero.");
-        if (region.LayerCount == 0 || region.LayerCount > texture.ArrayLayers)
-            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
-                "Texture upload layer count is out of range.");
-        if (region.Width == 0 || region.Width > texture.Width)
-            throw new ArgumentOutOfRangeException(nameof(region.Width), "Texture upload width is out of range.");
-        if (region.Height == 0 || region.Height > texture.Height)
-            throw new ArgumentOutOfRangeException(nameof(region.Height), "Texture upload height is out of range.");
-        if (region.Depth == 0 || region.Depth > texture.Depth)
-            throw new ArgumentOutOfRangeException(nameof(region.Depth), "Texture upload depth is out of range.");
-        if (texture.Dimension == TextureDimension.Type3D && region.LayerCount != 1)
-            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
-                "3D texture upload layer count must be one.");
-        if (region.Width != texture.Width || region.Height != texture.Height || region.Depth != texture.Depth ||
-            region.LayerCount != texture.ArrayLayers)
-            throw new ArgumentException("Texture upload region must cover the full base level.", nameof(region));
-    }
-
     private static void RecordTextureUpload(PendingTextureUpload upload, ulong stagingOffset)
     {
-        ImageMemoryBarrier2 toTransferBarrier = new()
+        var layerCount = upload.Dst.Dimension == TextureDimension.Type3D ? 1 : upload.Region.LayerCount;
+        var baseArrayLayer = upload.Dst.Dimension == TextureDimension.Type3D ? 0 : upload.Region.ArrayLayer;
+        for (var layer = 0u; layer < layerCount; layer++)
         {
-            SType = StructureType.ImageMemoryBarrier2,
-            SrcStageMask = PipelineStageFlags2.TopOfPipeBit,
-            SrcAccessMask = AccessFlags2.None,
-            DstStageMask = PipelineStageFlags2.TransferBit,
-            DstAccessMask = AccessFlags2.TransferWriteBit,
-            OldLayout = ImageLayout.Undefined,
-            NewLayout = ImageLayout.TransferDstOptimal,
-            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            Image = upload.Dst.Image,
-            SubresourceRange = new ImageSubresourceRange
-            {
-                AspectMask = ImageAspectFlags.ColorBit,
-                BaseMipLevel = 0,
-                LevelCount = 1,
-                BaseArrayLayer = 0,
-                LayerCount = upload.Region.LayerCount,
-            },
-        };
-
-        DependencyInfo toTransferDependency = new()
-        {
-            SType = StructureType.DependencyInfo,
-            ImageMemoryBarrierCount = 1,
-            PImageMemoryBarriers = &toTransferBarrier,
-        };
-        VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &toTransferDependency);
+            var arrayLayer = upload.Dst.Dimension == TextureDimension.Type3D ? 0 : baseArrayLayer + layer;
+            var oldLayout = upload.Dst.GetLayout(upload.Region.MipLevel, arrayLayer);
+            var srcStage = oldLayout == ImageLayout.Undefined
+                ? PipelineStageFlags2.TopOfPipeBit
+                : PipelineStageFlags2.FragmentShaderBit;
+            var srcAccess = oldLayout == ImageLayout.Undefined
+                ? AccessFlags2.None
+                : AccessFlags2.ShaderSampledReadBit;
+            RecordTextureLayoutTransition(upload.Dst, upload.Region.MipLevel, arrayLayer, 1, oldLayout,
+                ImageLayout.TransferDstOptimal, srcStage, srcAccess, PipelineStageFlags2.TransferBit,
+                AccessFlags2.TransferWriteBit);
+        }
 
         BufferImageCopy copyRegion = new()
         {
@@ -610,15 +565,15 @@ public static unsafe class VulkanUploader
             ImageSubresource = new ImageSubresourceLayers
             {
                 AspectMask = ImageAspectFlags.ColorBit,
-                MipLevel = 0,
-                BaseArrayLayer = 0,
-                LayerCount = upload.Dst.Dimension == TextureDimension.Type3D ? 1 : upload.Region.LayerCount,
+                MipLevel = upload.Region.MipLevel,
+                BaseArrayLayer = baseArrayLayer,
+                LayerCount = layerCount,
             },
             ImageOffset = new Offset3D
             {
-                X = 0,
-                Y = 0,
-                Z = 0,
+                X = checked((int)upload.Region.X),
+                Y = checked((int)upload.Region.Y),
+                Z = checked((int)upload.Region.Z),
             },
             ImageExtent = new Extent3D
             {
@@ -630,28 +585,58 @@ public static unsafe class VulkanUploader
         VulkanContext.Vk.CmdCopyBufferToImage(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Image,
             ImageLayout.TransferDstOptimal, 1, in copyRegion);
 
-        ImageMemoryBarrier2 toShaderReadBarrier = new()
+        RecordTextureLayoutTransition(upload.Dst, upload.Region.MipLevel, baseArrayLayer, layerCount,
+            ImageLayout.TransferDstOptimal, ImageLayout.ShaderReadOnlyOptimal, PipelineStageFlags2.TransferBit,
+            AccessFlags2.TransferWriteBit, PipelineStageFlags2.FragmentShaderBit, AccessFlags2.ShaderSampledReadBit);
+
+        for (var layer = 0u; layer < layerCount; layer++)
+        {
+            var arrayLayer = upload.Dst.Dimension == TextureDimension.Type3D ? 0 : baseArrayLayer + layer;
+            upload.Dst.SetLayout(upload.Region.MipLevel, arrayLayer, ImageLayout.ShaderReadOnlyOptimal);
+        }
+    }
+
+    private static void RecordTextureLayoutTransition(
+        VulkanTexture texture,
+        uint mipLevel,
+        uint baseArrayLayer,
+        uint layerCount,
+        ImageLayout oldLayout,
+        ImageLayout newLayout,
+        PipelineStageFlags2 srcStage,
+        AccessFlags2 srcAccess,
+        PipelineStageFlags2 dstStage,
+        AccessFlags2 dstAccess)
+    {
+        ImageMemoryBarrier2 barrier = new()
         {
             SType = StructureType.ImageMemoryBarrier2,
-            SrcStageMask = PipelineStageFlags2.TransferBit,
-            SrcAccessMask = AccessFlags2.TransferWriteBit,
-            DstStageMask = PipelineStageFlags2.FragmentShaderBit,
-            DstAccessMask = AccessFlags2.ShaderSampledReadBit,
-            OldLayout = ImageLayout.TransferDstOptimal,
-            NewLayout = ImageLayout.ShaderReadOnlyOptimal,
+            SrcStageMask = srcStage,
+            SrcAccessMask = srcAccess,
+            DstStageMask = dstStage,
+            DstAccessMask = dstAccess,
+            OldLayout = oldLayout,
+            NewLayout = newLayout,
             SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
             DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            Image = upload.Dst.Image,
-            SubresourceRange = toTransferBarrier.SubresourceRange,
+            Image = texture.Image,
+            SubresourceRange = new ImageSubresourceRange
+            {
+                AspectMask = ImageAspectFlags.ColorBit,
+                BaseMipLevel = mipLevel,
+                LevelCount = 1,
+                BaseArrayLayer = baseArrayLayer,
+                LayerCount = layerCount,
+            },
         };
 
-        DependencyInfo toShaderReadDependency = new()
+        DependencyInfo dependency = new()
         {
             SType = StructureType.DependencyInfo,
             ImageMemoryBarrierCount = 1,
-            PImageMemoryBarriers = &toShaderReadBarrier,
+            PImageMemoryBarriers = &barrier,
         };
-        VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &toShaderReadDependency);
+        VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &dependency);
     }
 
     private static void Grow(ulong requiredSize)

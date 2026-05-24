@@ -187,22 +187,32 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentNullException(nameof(destination));
 
         var texture = RequireVulkanTexture(destination);
+        var region = new TextureUploadRegion(0, 0, 0, texture.Width, texture.Height, texture.Depth, 0, 0,
+            texture.Dimension == TextureDimension.Type3D ? 1 : texture.ArrayLayers);
+        return UploadTexture(destination, data, in region);
+    }
+
+    public override UploadHandle UploadTexture(
+        Texture destination,
+        ReadOnlySpan<byte> data,
+        in TextureUploadRegion region)
+    {
+        if (destination == null)
+            throw new ArgumentNullException(nameof(destination));
+
+        var texture = RequireVulkanTexture(destination);
         if (texture.IsDestroyed)
             throw new ObjectDisposedException(nameof(VulkanTexture));
 
         if (!texture.Usage.HasFlag(TextureUsage.TransferDestination))
             throw new InvalidOperationException("Texture was not created with TransferDestination usage.");
 
-        var requiredSize = CalculateTextureDataSize(texture.Width, texture.Height, texture.Depth, texture.ArrayLayers,
+        ValidateTextureUploadRegion(texture, region);
+        var requiredSize = CalculateTextureDataSize(region.Width, region.Height, region.Depth, region.LayerCount,
             texture.Format);
         if ((ulong)data.Length != requiredSize)
-            throw new ArgumentException("Texture upload data size does not match the full base level size.",
-                nameof(data));
+            throw new ArgumentException("Texture upload data size does not match the region size.", nameof(data));
 
-        texture.MarkUploadQueued();
-
-        var region = new TextureUploadRegion(0, 0, 0, texture.Width, texture.Height, texture.Depth, 0, 0,
-            texture.ArrayLayers);
         return VulkanUploader.EnqueueTextureUpload(texture, data, region);
     }
 
@@ -467,9 +477,12 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         if (description.ArrayLayers == 0)
             throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
                 "Texture array layers must be greater than zero.");
-        if (description.MipLevels != 1)
+        if (description.MipLevels == 0)
             throw new ArgumentOutOfRangeException(nameof(description.MipLevels),
-                "Textures currently support exactly one mip level.");
+                "Texture mip levels must be greater than zero.");
+        if (description.MipLevels > GetMaxMipLevels(description.Width, description.Height, description.Depth))
+            throw new ArgumentOutOfRangeException(nameof(description.MipLevels),
+                "Texture mip levels exceed the maximum allowed by the texture extent.");
         if (description.Usage == TextureUsage.None)
             throw new ArgumentException("Texture usage must not be None.", nameof(description.Usage));
         if (description.ArrayLayers > VulkanContext.MaxImageArrayLayers)
@@ -534,6 +547,68 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             default:
                 throw new ArgumentOutOfRangeException(nameof(description.Dimension), "Unsupported texture dimension.");
         }
+    }
+
+    private static void ValidateTextureUploadRegion(VulkanTexture texture, in TextureUploadRegion region)
+    {
+        if (region.MipLevel >= texture.MipLevels)
+            throw new ArgumentOutOfRangeException(nameof(region.MipLevel), "Texture upload mip level is out of range.");
+        if (region.Width == 0)
+            throw new ArgumentOutOfRangeException(nameof(region.Width),
+                "Texture upload width must be greater than zero.");
+        if (region.Height == 0)
+            throw new ArgumentOutOfRangeException(nameof(region.Height),
+                "Texture upload height must be greater than zero.");
+        if (region.Depth == 0)
+            throw new ArgumentOutOfRangeException(nameof(region.Depth),
+                "Texture upload depth must be greater than zero.");
+        if (region.LayerCount == 0)
+            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
+                "Texture upload layer count must be greater than zero.");
+
+        var mipWidth = GetMipExtent(texture.Width, region.MipLevel);
+        var mipHeight = GetMipExtent(texture.Height, region.MipLevel);
+        var mipDepth = GetMipExtent(texture.Depth, region.MipLevel);
+
+        if (region.X > mipWidth || region.Width > mipWidth - region.X)
+            throw new ArgumentOutOfRangeException(nameof(region.X), "Texture upload X range exceeds the mip bounds.");
+        if (region.Y > mipHeight || region.Height > mipHeight - region.Y)
+            throw new ArgumentOutOfRangeException(nameof(region.Y), "Texture upload Y range exceeds the mip bounds.");
+        if (region.Z > mipDepth || region.Depth > mipDepth - region.Z)
+            throw new ArgumentOutOfRangeException(nameof(region.Z), "Texture upload Z range exceeds the mip bounds.");
+
+        switch (texture.Dimension)
+        {
+            case TextureDimension.Type1D:
+                if (region.Y != 0 || region.Height != 1 || region.Z != 0 || region.Depth != 1)
+                    throw new ArgumentException("1D texture uploads must target a one-dimensional region.",
+                        nameof(region));
+                ValidateTextureUploadArrayLayers(texture, region);
+                break;
+            case TextureDimension.Type2D:
+            case TextureDimension.CubeMap:
+                if (region.Z != 0 || region.Depth != 1)
+                    throw new ArgumentException("2D and cube texture uploads must target a two-dimensional region.",
+                        nameof(region));
+                ValidateTextureUploadArrayLayers(texture, region);
+                break;
+            case TextureDimension.Type3D:
+                if (region.ArrayLayer != 0 || region.LayerCount != 1)
+                    throw new ArgumentException("3D texture uploads must not target array layers.", nameof(region));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(texture.Dimension), "Unsupported texture dimension.");
+        }
+    }
+
+    private static void ValidateTextureUploadArrayLayers(VulkanTexture texture, in TextureUploadRegion region)
+    {
+        if (region.ArrayLayer >= texture.ArrayLayers)
+            throw new ArgumentOutOfRangeException(nameof(region.ArrayLayer),
+                "Texture upload array layer is out of range.");
+        if (region.LayerCount > texture.ArrayLayers - region.ArrayLayer)
+            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
+                "Texture upload layer range exceeds the texture bounds.");
     }
 
     private static ImageType ToImageType(TextureDimension dimension)
@@ -643,6 +718,24 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             TextureFormat.R8Unorm => 1,
             _ => throw new InvalidOperationException("Unsupported texture format."),
         };
+    }
+
+    private static uint GetMipExtent(uint extent, uint mipLevel)
+    {
+        return Math.Max(1u, extent >> (int)mipLevel);
+    }
+
+    private static uint GetMaxMipLevels(uint width, uint height, uint depth)
+    {
+        var maxExtent = Math.Max(width, Math.Max(height, depth));
+        uint levels = 1;
+        while (maxExtent > 1)
+        {
+            maxExtent >>= 1;
+            levels++;
+        }
+
+        return levels;
     }
 
     private static ulong CalculateTextureDataSize(uint width, uint height, uint depth, uint arrayLayers,

@@ -7,8 +7,8 @@ namespace PanguEngine.Graphics.Vulkan;
 internal sealed unsafe class VulkanTexture : Texture
 {
     private readonly Allocation* _allocation;
+    private readonly ImageLayout[] _subresourceLayouts;
     private bool _destroyed;
-    private bool _uploadQueued;
 
     public VkImage Image { get; }
 
@@ -32,8 +32,6 @@ internal sealed unsafe class VulkanTexture : Texture
 
     public override TextureUsage Usage { get; }
 
-    public ImageLayout CurrentLayout { get; private set; } = ImageLayout.Undefined;
-
     internal VulkanTexture(VkImage image, Allocation* allocation, ImageView imageView, TextureDimension dimension,
         TextureFormat format, uint width, uint height, uint depth, uint mipLevels, uint arrayLayers, TextureUsage usage)
     {
@@ -48,23 +46,40 @@ internal sealed unsafe class VulkanTexture : Texture
         MipLevels = mipLevels;
         ArrayLayers = arrayLayers;
         Usage = usage;
+
+        var trackedSubresourceCount = dimension == TextureDimension.Type3D
+            ? mipLevels
+            : checked(mipLevels * arrayLayers);
+        _subresourceLayouts = new ImageLayout[trackedSubresourceCount];
+        Array.Fill(_subresourceLayouts, ImageLayout.Undefined);
     }
 
-    public void MarkUploadQueued()
+    public ImageLayout GetLayout(uint mipLevel, uint arrayLayer)
     {
         if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
-        if (_uploadQueued)
-            throw new InvalidOperationException("Texture already has a pending upload.");
-        if (CurrentLayout != ImageLayout.Undefined)
-            throw new InvalidOperationException("Texture has already been uploaded or transitioned.");
-        _uploadQueued = true;
+        return _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)];
     }
 
-    public void CompleteUpload(ImageLayout layout)
+    public void SetLayout(uint mipLevel, uint arrayLayer, ImageLayout layout)
     {
         if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
-        CurrentLayout = layout;
-        _uploadQueued = false;
+        _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)] = layout;
+    }
+
+    private int GetLayoutIndex(uint mipLevel, uint arrayLayer)
+    {
+        if (mipLevel >= MipLevels)
+            throw new ArgumentOutOfRangeException(nameof(mipLevel), "Texture mip level is out of range.");
+        if (Dimension == TextureDimension.Type3D)
+        {
+            if (arrayLayer != 0)
+                throw new ArgumentOutOfRangeException(nameof(arrayLayer), "3D textures do not have array layers.");
+            return checked((int)mipLevel);
+        }
+
+        if (arrayLayer >= ArrayLayers)
+            throw new ArgumentOutOfRangeException(nameof(arrayLayer), "Texture array layer is out of range.");
+        return checked((int)(mipLevel * ArrayLayers + arrayLayer));
     }
 
     public override void Destroy()

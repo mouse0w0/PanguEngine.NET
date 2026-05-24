@@ -6,6 +6,11 @@
   <Project Path="test/PanguEngine.Graphics.Test.BufferUpload/PanguEngine.Graphics.Test.BufferUpload.csproj"/>
   <Project Path="test/PanguEngine.Graphics.Test.Clear/PanguEngine.Graphics.Test.Clear.csproj"/>
     <Project Path="test/PanguEngine.Graphics.Test.IndexedQuad/PanguEngine.Graphics.Test.IndexedQuad.csproj"/>
+    <Project
+            Path="test/PanguEngine.Graphics.Test.TextureCubeMapUpload/PanguEngine.Graphics.Test.TextureCubeMapUpload.csproj"/>
+    <Project Path="test/PanguEngine.Graphics.Test.TextureMipUpload/PanguEngine.Graphics.Test.TextureMipUpload.csproj"/>
+    <Project
+            Path="test/PanguEngine.Graphics.Test.TextureRegionUpload/PanguEngine.Graphics.Test.TextureRegionUpload.csproj"/>
     <Project Path="test/PanguEngine.Graphics.Test.Texture/PanguEngine.Graphics.Test.Texture.csproj"/>
   <Project Path="test/PanguEngine.Graphics.Test.Triangle/PanguEngine.Graphics.Test.Triangle.csproj"/>
   <Project Path="test/PanguEngine.Graphics.Test.UniformBuffer/PanguEngine.Graphics.Test.UniformBuffer.csproj"/>
