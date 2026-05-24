@@ -87,13 +87,16 @@ internal sealed class BufferUploadScene : IGraphicsTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
+        var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "buffer_upload.vert");
+        var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "buffer_upload.frag");
+
         _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
-            vertSource,
+            vertBytecode,
             Name: "buffer_upload.vert"));
         _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
-            fragSource,
+            fragBytecode,
             Name: "buffer_upload.frag"));
     }
 

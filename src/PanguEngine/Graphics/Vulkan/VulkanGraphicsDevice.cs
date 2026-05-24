@@ -325,13 +325,13 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     private static void ValidateShaderDescription(in ShaderDescription description)
     {
-        if (string.IsNullOrWhiteSpace(description.Source))
-            throw new ArgumentException("Shader source must not be empty.", nameof(description.Source));
+        if (description.Bytecode.IsEmpty)
+            throw new ArgumentException("Shader bytecode must not be empty.", nameof(description.Bytecode));
+        if (description.Bytecode.Length % 4 != 0)
+            throw new ArgumentException("Shader bytecode length must be a multiple of 4 bytes.",
+                nameof(description.Bytecode));
         if (string.IsNullOrWhiteSpace(description.EntryPoint))
             throw new ArgumentException("Shader entry point must not be empty.", nameof(description.EntryPoint));
-        if (description.SourceLanguage != ShaderSourceLanguage.Glsl)
-            throw new ArgumentOutOfRangeException(nameof(description.SourceLanguage),
-                "Only GLSL shader source is currently supported.");
     }
 
     internal static void ValidateGraphicsPipelineDescription(in GraphicsPipelineDescription description)

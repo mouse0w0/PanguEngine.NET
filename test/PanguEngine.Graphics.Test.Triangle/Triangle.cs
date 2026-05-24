@@ -33,13 +33,16 @@ internal sealed class TriangleScene : IGraphicsTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
+        var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "triangle.vert");
+        var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "triangle.frag");
+
         _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
-            vertSource,
+            vertBytecode,
             Name: "triangle.vert"));
         _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
-            fragSource,
+            fragBytecode,
             Name: "triangle.frag"));
 
         _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(

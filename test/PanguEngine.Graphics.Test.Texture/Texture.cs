@@ -152,13 +152,16 @@ internal sealed class TextureScene : IGraphicsTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
+        var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "texture.vert");
+        var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "texture.frag");
+
         _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
-            vertSource,
+            vertBytecode,
             Name: "texture.vert"));
         _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
-            fragSource,
+            fragBytecode,
             Name: "texture.frag"));
     }
 

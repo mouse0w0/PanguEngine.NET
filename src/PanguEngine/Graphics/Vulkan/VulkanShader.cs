@@ -1,4 +1,3 @@
-using Silk.NET.Shaderc;
 using Silk.NET.Vulkan;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -13,7 +12,7 @@ internal sealed unsafe class VulkanShader : Shader
     /// <summary>
     /// Creates a Vulkan shader from the given description.
     /// </summary>
-    /// <param name="description">The shader description.</param>
+    /// <param name="description">The shader description containing SPIR-V bytecode.</param>
     public VulkanShader(in ShaderDescription description)
     {
         Stage = description.Stage;
@@ -58,60 +57,23 @@ internal sealed unsafe class VulkanShader : Shader
 
     private static ShaderModule CreateShaderModule(in ShaderDescription description)
     {
-        var shaderc = Shaderc.GetApi();
-        var compiler = shaderc.CompilerInitialize();
+        var bytecode = description.Bytecode;
 
-        try
+        fixed (byte* ptr = bytecode.Span)
         {
-            var result = shaderc.CompileIntoSpv(compiler, description.Source, (nuint)description.Source.Length,
-                ToShaderKind(description.Stage), description.Name, description.EntryPoint, null);
-
-            try
+            ShaderModuleCreateInfo createInfo = new()
             {
-                var status = shaderc.ResultGetCompilationStatus(result);
-                if (status != CompilationStatus.Success)
-                {
-                    var errorMessage = shaderc.ResultGetErrorMessageS(result);
-                    throw new InvalidOperationException(
-                        $"Shader compilation failed ({description.Name}, {description.Stage}): {errorMessage}");
-                }
+                SType = StructureType.ShaderModuleCreateInfo,
+                CodeSize = (nuint)bytecode.Length,
+                PCode = (uint*)ptr,
+            };
 
-                var codePtr = shaderc.ResultGetBytes(result);
-                var codeSize = shaderc.ResultGetLength(result);
+            if (VulkanContext.Vk.CreateShaderModule(VulkanContext.Device, in createInfo, null, out var module) !=
+                Result.Success)
+                throw new InvalidOperationException(
+                    $"Failed to create shader module ({description.Name}, {description.Stage}).");
 
-                ShaderModuleCreateInfo createInfo = new()
-                {
-                    SType = StructureType.ShaderModuleCreateInfo,
-                    CodeSize = codeSize,
-                    PCode = (uint*)codePtr,
-                };
-
-                if (VulkanContext.Vk.CreateShaderModule(VulkanContext.Device, in createInfo, null, out var module) !=
-                    Result.Success)
-                    throw new InvalidOperationException(
-                        $"Failed to create shader module ({description.Name}, {description.Stage}).");
-
-                return module;
-            }
-            finally
-            {
-                shaderc.ResultRelease(result);
-            }
+            return module;
         }
-        finally
-        {
-            shaderc.CompilerRelease(compiler);
-            shaderc.Dispose();
-        }
-    }
-
-    private static ShaderKind ToShaderKind(ShaderStage stage)
-    {
-        return stage switch
-        {
-            ShaderStage.Vertex => ShaderKind.VertexShader,
-            ShaderStage.Fragment => ShaderKind.FragmentShader,
-            _ => throw new ArgumentOutOfRangeException(nameof(stage), "Unsupported shader stage."),
-        };
     }
 }

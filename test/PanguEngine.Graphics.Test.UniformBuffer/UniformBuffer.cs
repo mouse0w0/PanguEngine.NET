@@ -145,13 +145,16 @@ internal sealed class UniformBufferScene : IGraphicsTestScene
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
+        var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "uniform_buffer.vert");
+        var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "uniform_buffer.frag");
+
         _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
-            vertSource,
+            vertBytecode,
             Name: "uniform_buffer.vert"));
         _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
-            fragSource,
+            fragBytecode,
             Name: "uniform_buffer.frag"));
     }
 
