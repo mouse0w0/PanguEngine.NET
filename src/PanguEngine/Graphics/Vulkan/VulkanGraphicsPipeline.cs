@@ -62,19 +62,23 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         if (_destroyed)
             return;
 
-        if (Pipeline.Handle != 0)
-        {
-            VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, Pipeline, null);
-            Pipeline = default;
-        }
-
-        if (Layout.Handle != 0)
-        {
-            VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, Layout, null);
-            Layout = default;
-        }
-
+        var pipeline = Pipeline;
+        var layout = Layout;
+        Pipeline = default;
+        Layout = default;
         _destroyed = true;
+
+        if (pipeline.Handle == 0 && layout.Handle == 0)
+            return;
+
+        var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
+        VulkanDeletionQueue.Enqueue(retireValue, () =>
+        {
+            if (pipeline.Handle != 0)
+                VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, pipeline, null);
+            if (layout.Handle != 0)
+                VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, layout, null);
+        });
     }
 
     private void CreatePipeline(
