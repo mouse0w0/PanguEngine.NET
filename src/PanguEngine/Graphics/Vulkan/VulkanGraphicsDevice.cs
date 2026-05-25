@@ -217,6 +217,30 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         return VulkanUploader.EnqueueTextureUpload(texture, data, region);
     }
 
+    public override UploadHandle GenerateMipmaps(Texture texture)
+    {
+        if (texture == null)
+            throw new ArgumentNullException(nameof(texture));
+
+        var vulkanTexture = RequireVulkanTexture(texture);
+        if (vulkanTexture.IsDestroyed)
+            throw new ObjectDisposedException(nameof(VulkanTexture));
+
+        if (vulkanTexture.MipLevels == 1)
+            return CompletedUploadHandle.Instance;
+
+        if (vulkanTexture.Dimension == TextureDimension.Type3D)
+            throw new NotSupportedException("3D texture mipmap generation is not supported.");
+
+        if (!vulkanTexture.Usage.HasFlag(TextureUsage.TransferSource))
+            throw new InvalidOperationException("Texture was not created with TransferSource usage.");
+        if (!vulkanTexture.Usage.HasFlag(TextureUsage.TransferDestination))
+            throw new InvalidOperationException("Texture was not created with TransferDestination usage.");
+
+        ValidateMipmapGenerationFormat(vulkanTexture.Format);
+        return VulkanUploader.EnqueueMipmapGeneration(vulkanTexture);
+    }
+
     public override Sampler CreateSampler(in SamplerDescription description)
     {
         ValidateSamplerDescription(description);
@@ -567,9 +591,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
                 "Texture upload layer count must be greater than zero.");
 
-        var mipWidth = GetMipExtent(texture.Width, region.MipLevel);
-        var mipHeight = GetMipExtent(texture.Height, region.MipLevel);
-        var mipDepth = GetMipExtent(texture.Depth, region.MipLevel);
+        var mipWidth = VulkanTexture.GetMipExtent(texture.Width, region.MipLevel);
+        var mipHeight = VulkanTexture.GetMipExtent(texture.Height, region.MipLevel);
+        var mipDepth = VulkanTexture.GetMipExtent(texture.Depth, region.MipLevel);
 
         if (region.X > mipWidth || region.Width > mipWidth - region.X)
             throw new ArgumentOutOfRangeException(nameof(region.X), "Texture upload X range exceeds the mip bounds.");
@@ -610,6 +634,18 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         if (region.LayerCount > texture.ArrayLayers - region.ArrayLayer)
             throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
                 "Texture upload layer range exceeds the texture bounds.");
+    }
+
+    private static void ValidateMipmapGenerationFormat(TextureFormat format)
+    {
+        var vkFormat = ToVulkanFormat(format);
+        VulkanContext.Vk.GetPhysicalDeviceFormatProperties(VulkanContext.PhysicalDevice, vkFormat,
+            out var properties);
+        var required = FormatFeatureFlags.BlitSrcBit
+                       | FormatFeatureFlags.BlitDstBit
+                       | FormatFeatureFlags.SampledImageFilterLinearBit;
+        if ((properties.OptimalTilingFeatures & required) != required)
+            throw new InvalidOperationException("Texture format does not support linear blit mipmap generation.");
     }
 
     private static ImageType ToImageType(TextureDimension dimension)
@@ -719,11 +755,6 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             TextureFormat.R8Unorm => 1,
             _ => throw new InvalidOperationException("Unsupported texture format."),
         };
-    }
-
-    private static uint GetMipExtent(uint extent, uint mipLevel)
-    {
-        return Math.Max(1u, extent >> (int)mipLevel);
     }
 
     private static uint GetMaxMipLevels(uint width, uint height, uint depth)

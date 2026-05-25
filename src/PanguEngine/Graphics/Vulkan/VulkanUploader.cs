@@ -56,6 +56,13 @@ public static unsafe class VulkanUploader
         public VulkanUploadHandle Handle { get; init; } = null!;
     }
 
+    private sealed class PendingMipmapGeneration
+    {
+        public VulkanTexture Texture { get; init; } = null!;
+
+        public VulkanUploadHandle Handle { get; init; } = null!;
+    }
+
     private const ulong DefaultStagingSize = 4 * 1024 * 1024;
 
     private static bool _initialized;
@@ -64,6 +71,7 @@ public static unsafe class VulkanUploader
     private static readonly Lock LifecycleLock = new();
     private static readonly ConcurrentQueue<PendingBufferUpload> PendingUploads = new();
     private static readonly ConcurrentQueue<PendingTextureUpload> PendingTextureUploads = new();
+    private static readonly ConcurrentQueue<PendingMipmapGeneration> PendingMipmapGenerations = new();
 
     private static int _renderSubmitThreadId;
 
@@ -161,6 +169,7 @@ public static unsafe class VulkanUploader
     {
         List<PendingBufferUpload>? remainingBuffers = null;
         List<PendingTextureUpload>? remainingTextures = null;
+        List<PendingMipmapGeneration>? remainingMipmaps = null;
 
         lock (LifecycleLock)
         {
@@ -177,6 +186,12 @@ public static unsafe class VulkanUploader
             {
                 remainingTextures ??= new List<PendingTextureUpload>();
                 remainingTextures.Add(upload);
+            }
+
+            while (PendingMipmapGenerations.TryDequeue(out var generation))
+            {
+                remainingMipmaps ??= new List<PendingMipmapGeneration>();
+                remainingMipmaps.Add(generation);
             }
 
             _initialized = false;
@@ -205,6 +220,15 @@ public static unsafe class VulkanUploader
             foreach (var upload in remainingTextures)
             {
                 upload.Handle.SignalFailure(disposedEx);
+            }
+        }
+
+        if (remainingMipmaps != null)
+        {
+            var disposedEx = new ObjectDisposedException(nameof(VulkanUploader));
+            foreach (var generation in remainingMipmaps)
+            {
+                generation.Handle.SignalFailure(disposedEx);
             }
         }
     }
@@ -308,6 +332,33 @@ public static unsafe class VulkanUploader
         return handle;
     }
 
+    internal static VulkanUploadHandle EnqueueMipmapGeneration(VulkanTexture texture)
+    {
+        lock (LifecycleLock)
+        {
+            if (!_initialized)
+                throw new InvalidOperationException("VulkanUploader is not initialized.");
+
+            if (_faulted)
+                throw _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.");
+        }
+
+        if (texture == null)
+            throw new ArgumentNullException(nameof(texture));
+
+        if (texture.IsDestroyed)
+            throw new ObjectDisposedException(nameof(VulkanTexture));
+
+        var handle = new VulkanUploadHandle();
+        PendingMipmapGenerations.Enqueue(new PendingMipmapGeneration
+        {
+            Texture = texture,
+            Handle = handle,
+        });
+
+        return handle;
+    }
+
     /// <summary>
     /// Executes all pending uploads by recording copy commands, submitting to the GPU, and waiting for completion.
     /// Must only be called from a single dedicated thread (the render submit thread).
@@ -324,7 +375,7 @@ public static unsafe class VulkanUploader
         BindRenderSubmitThread();
 
         var batch = DrainPendingUploads();
-        if (batch.Buffers.Count == 0 && batch.Textures.Count == 0)
+        if (batch.Buffers.Count == 0 && batch.Textures.Count == 0 && batch.Mipmaps.Count == 0)
             return;
 
         ulong totalSize;
@@ -439,6 +490,20 @@ public static unsafe class VulkanUploader
             stagingOffset += upload.Size;
         }
 
+        try
+        {
+            foreach (var generation in batch.Mipmaps)
+            {
+                RecordMipmapGeneration(generation);
+            }
+        }
+        catch (Exception ex)
+        {
+            EnterFaulted(ex);
+            FailBatch(batch, ex);
+            return;
+        }
+
         if (VulkanContext.Vk.EndCommandBuffer(_commandBuffer) != Result.Success)
         {
             var ex = new InvalidOperationException("Failed to end staging command buffer.");
@@ -481,6 +546,11 @@ public static unsafe class VulkanUploader
         {
             upload.Handle.SignalSuccess();
         }
+
+        foreach (var generation in batch.Mipmaps)
+        {
+            generation.Handle.SignalSuccess();
+        }
     }
 
     private static void BindRenderSubmitThread()
@@ -497,7 +567,8 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures) DrainPendingUploads()
+    private static (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures,
+        List<PendingMipmapGeneration> Mipmaps) DrainPendingUploads()
     {
         var buffers = new List<PendingBufferUpload>();
         while (PendingUploads.TryDequeue(out var upload))
@@ -511,11 +582,18 @@ public static unsafe class VulkanUploader
             textures.Add(upload);
         }
 
-        return (buffers, textures);
+        var mipmaps = new List<PendingMipmapGeneration>();
+        while (PendingMipmapGenerations.TryDequeue(out var generation))
+        {
+            mipmaps.Add(generation);
+        }
+
+        return (buffers, textures, mipmaps);
     }
 
     private static ulong CalculateTotalSize(
-        (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures) batch)
+        (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures,
+            List<PendingMipmapGeneration> Mipmaps) batch)
     {
         ulong total = 0;
         foreach (var upload in batch.Buffers)
@@ -594,6 +672,113 @@ public static unsafe class VulkanUploader
             var arrayLayer = upload.Dst.Dimension == TextureDimension.Type3D ? 0 : baseArrayLayer + layer;
             upload.Dst.SetLayout(upload.Region.MipLevel, arrayLayer, ImageLayout.ShaderReadOnlyOptimal);
         }
+    }
+
+    private static void RecordMipmapGeneration(PendingMipmapGeneration generation)
+    {
+        var texture = generation.Texture;
+        var layerCount = texture.Dimension == TextureDimension.Type3D ? 1 : texture.ArrayLayers;
+
+        for (var layer = 0u; layer < layerCount; layer++)
+        {
+            RecordMipmapGenerationLayer(texture, layer);
+        }
+    }
+
+    private static void RecordMipmapGenerationLayer(VulkanTexture texture, uint arrayLayer)
+    {
+        if (texture.GetLayout(0, arrayLayer) == ImageLayout.Undefined)
+            throw new InvalidOperationException("Texture base mip has not been initialized.");
+
+        for (var srcMip = 0u; srcMip < texture.MipLevels - 1; srcMip++)
+        {
+            var dstMip = srcMip + 1;
+            TransitionTextureSubresource(texture, srcMip, arrayLayer, ImageLayout.TransferSrcOptimal,
+                PipelineStageFlags2.TransferBit, AccessFlags2.TransferReadBit);
+            TransitionTextureSubresource(texture, dstMip, arrayLayer, ImageLayout.TransferDstOptimal,
+                PipelineStageFlags2.TransferBit, AccessFlags2.TransferWriteBit);
+
+            var srcWidth = VulkanTexture.GetMipExtent(texture.Width, srcMip);
+            var srcHeight = texture.Dimension == TextureDimension.Type1D
+                ? 1
+                : VulkanTexture.GetMipExtent(texture.Height, srcMip);
+            var dstWidth = VulkanTexture.GetMipExtent(texture.Width, dstMip);
+            var dstHeight = texture.Dimension == TextureDimension.Type1D
+                ? 1
+                : VulkanTexture.GetMipExtent(texture.Height, dstMip);
+
+            ImageBlit blit = new()
+            {
+                SrcSubresource = new ImageSubresourceLayers
+                {
+                    AspectMask = ImageAspectFlags.ColorBit,
+                    MipLevel = srcMip,
+                    BaseArrayLayer = arrayLayer,
+                    LayerCount = 1,
+                },
+                DstSubresource = new ImageSubresourceLayers
+                {
+                    AspectMask = ImageAspectFlags.ColorBit,
+                    MipLevel = dstMip,
+                    BaseArrayLayer = arrayLayer,
+                    LayerCount = 1,
+                },
+            };
+            blit.SrcOffsets[0] = new Offset3D(0, 0, 0);
+            blit.SrcOffsets[1] = new Offset3D(checked((int)srcWidth), checked((int)srcHeight), 1);
+            blit.DstOffsets[0] = new Offset3D(0, 0, 0);
+            blit.DstOffsets[1] = new Offset3D(checked((int)dstWidth), checked((int)dstHeight), 1);
+
+            VulkanContext.Vk.CmdBlitImage(_commandBuffer, texture.Image, ImageLayout.TransferSrcOptimal,
+                texture.Image, ImageLayout.TransferDstOptimal, 1, in blit, Filter.Linear);
+
+            TransitionTextureSubresource(texture, srcMip, arrayLayer, ImageLayout.ShaderReadOnlyOptimal,
+                PipelineStageFlags2.FragmentShaderBit, AccessFlags2.ShaderSampledReadBit);
+        }
+
+        TransitionTextureSubresource(texture, texture.MipLevels - 1, arrayLayer, ImageLayout.ShaderReadOnlyOptimal,
+            PipelineStageFlags2.FragmentShaderBit, AccessFlags2.ShaderSampledReadBit);
+    }
+
+    private static void TransitionTextureSubresource(
+        VulkanTexture texture,
+        uint mipLevel,
+        uint arrayLayer,
+        ImageLayout newLayout,
+        PipelineStageFlags2 dstStage,
+        AccessFlags2 dstAccess)
+    {
+        var oldLayout = texture.GetLayout(mipLevel, arrayLayer);
+        if (oldLayout == newLayout)
+            return;
+
+        RecordTextureLayoutTransition(texture, mipLevel, arrayLayer, 1, oldLayout, newLayout,
+            GetStageForLayout(oldLayout), GetAccessForLayout(oldLayout), dstStage, dstAccess);
+        texture.SetLayout(mipLevel, arrayLayer, newLayout);
+    }
+
+    private static PipelineStageFlags2 GetStageForLayout(ImageLayout layout)
+    {
+        return layout switch
+        {
+            ImageLayout.Undefined => PipelineStageFlags2.TopOfPipeBit,
+            ImageLayout.ShaderReadOnlyOptimal => PipelineStageFlags2.FragmentShaderBit,
+            ImageLayout.TransferDstOptimal => PipelineStageFlags2.TransferBit,
+            ImageLayout.TransferSrcOptimal => PipelineStageFlags2.TransferBit,
+            _ => PipelineStageFlags2.AllCommandsBit,
+        };
+    }
+
+    private static AccessFlags2 GetAccessForLayout(ImageLayout layout)
+    {
+        return layout switch
+        {
+            ImageLayout.Undefined => AccessFlags2.None,
+            ImageLayout.ShaderReadOnlyOptimal => AccessFlags2.ShaderSampledReadBit,
+            ImageLayout.TransferDstOptimal => AccessFlags2.TransferWriteBit,
+            ImageLayout.TransferSrcOptimal => AccessFlags2.TransferReadBit,
+            _ => AccessFlags2.MemoryReadBit | AccessFlags2.MemoryWriteBit,
+        };
     }
 
     private static void RecordTextureLayoutTransition(
@@ -676,8 +861,9 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static void FailBatch((List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures) batch,
-        Exception exception)
+    private static void FailBatch(
+        (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures,
+            List<PendingMipmapGeneration> Mipmaps) batch, Exception exception)
     {
         foreach (var upload in batch.Buffers)
         {
@@ -687,6 +873,11 @@ public static unsafe class VulkanUploader
         foreach (var upload in batch.Textures)
         {
             upload.Handle.SignalFailure(exception);
+        }
+
+        foreach (var generation in batch.Mipmaps)
+        {
+            generation.Handle.SignalFailure(exception);
         }
     }
 

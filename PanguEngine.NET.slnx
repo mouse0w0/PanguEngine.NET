@@ -10,6 +10,8 @@
             Path="test/PanguEngine.Graphics.Test.TextureCubeMapUpload/PanguEngine.Graphics.Test.TextureCubeMapUpload.csproj"/>
     <Project Path="test/PanguEngine.Graphics.Test.TextureMipUpload/PanguEngine.Graphics.Test.TextureMipUpload.csproj"/>
     <Project
+            Path="test/PanguEngine.Graphics.Test.TextureGeneratedMipmaps/PanguEngine.Graphics.Test.TextureGeneratedMipmaps.csproj"/>
+    <Project
             Path="test/PanguEngine.Graphics.Test.TextureRegionUpload/PanguEngine.Graphics.Test.TextureRegionUpload.csproj"/>
     <Project Path="test/PanguEngine.Graphics.Test.Texture/PanguEngine.Graphics.Test.Texture.csproj"/>
   <Project Path="test/PanguEngine.Graphics.Test.Triangle/PanguEngine.Graphics.Test.Triangle.csproj"/>

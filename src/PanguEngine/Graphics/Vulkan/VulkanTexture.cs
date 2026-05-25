@@ -66,6 +66,17 @@ internal sealed unsafe class VulkanTexture : Texture
         _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)] = layout;
     }
 
+    /// <summary>
+    /// Calculates an extent at the specified mip level.
+    /// </summary>
+    /// <param name="extent">The base mip extent.</param>
+    /// <param name="mipLevel">The mip level.</param>
+    /// <returns>The mip extent, clamped to at least one.</returns>
+    internal static uint GetMipExtent(uint extent, uint mipLevel)
+    {
+        return Math.Max(1u, extent >> (int)mipLevel);
+    }
+
     private int GetLayoutIndex(uint mipLevel, uint arrayLayer)
     {
         if (mipLevel >= MipLevels)

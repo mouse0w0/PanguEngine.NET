@@ -55,6 +55,13 @@ public abstract class GraphicsDevice
         in TextureUploadRegion region);
 
     /// <summary>
+    /// Queues GPU mipmap generation for a texture.
+    /// </summary>
+    /// <param name="texture">The texture whose mip levels will be generated.</param>
+    /// <returns>A handle that represents the queued generation completion state.</returns>
+    public abstract UploadHandle GenerateMipmaps(Texture texture);
+
+    /// <summary>
     /// Creates a sampler with the given description.
     /// </summary>
     /// <param name="description">The sampler description.</param>
