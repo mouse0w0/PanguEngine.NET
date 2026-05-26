@@ -113,8 +113,8 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     {
         ValidateTextureDescription(description);
 
-        var imageType = ToImageType(description.Dimension);
-        var imageViewType = ToImageViewType(description.Dimension, description.ArrayLayers);
+        var imageType = VulkanMapping.ToVulkanImageType(description.Dimension);
+        var imageViewType = VulkanMapping.ToVulkanImageViewType(description.Dimension, description.ArrayLayers);
         var imageArrayLayers = GetImageArrayLayers(description);
         var imageCreateFlags = description.Dimension == TextureDimension.CubeMap
             ? ImageCreateFlags.CreateCubeCompatibleBit
@@ -125,7 +125,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             SType = StructureType.ImageCreateInfo,
             Flags = imageCreateFlags,
             ImageType = imageType,
-            Format = ToVulkanFormat(description.Format),
+            Format = VulkanMapping.ToVulkanFormat(description.Format),
             Extent = new Extent3D
             {
                 Width = description.Width,
@@ -136,7 +136,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             ArrayLayers = imageArrayLayers,
             Samples = SampleCountFlags.Count1Bit,
             Tiling = ImageTiling.Optimal,
-            Usage = ToImageUsage(description.Usage),
+            Usage = VulkanMapping.ToVulkanImageUsage(description.Usage),
             SharingMode = SharingMode.Exclusive,
             InitialLayout = ImageLayout.Undefined,
         };
@@ -249,12 +249,12 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         SamplerCreateInfo samplerInfo = new()
         {
             SType = StructureType.SamplerCreateInfo,
-            MinFilter = ToVulkanFilter(description.MinFilter),
-            MagFilter = ToVulkanFilter(description.MagFilter),
-            MipmapMode = ToVulkanMipmapMode(description.MipmapMode),
-            AddressModeU = ToVulkanAddressMode(description.AddressU),
-            AddressModeV = ToVulkanAddressMode(description.AddressV),
-            AddressModeW = ToVulkanAddressMode(description.AddressW),
+            MinFilter = VulkanMapping.ToVulkanFilter(description.MinFilter),
+            MagFilter = VulkanMapping.ToVulkanFilter(description.MagFilter),
+            MipmapMode = VulkanMapping.ToVulkanMipmapMode(description.MipmapMode),
+            AddressModeU = VulkanMapping.ToVulkanAddressMode(description.AddressU),
+            AddressModeV = VulkanMapping.ToVulkanAddressMode(description.AddressV),
+            AddressModeW = VulkanMapping.ToVulkanAddressMode(description.AddressW),
             MipLodBias = description.MipLodBias,
             AnisotropyEnable = anisotropyEnable,
             MaxAnisotropy = anisotropyEnable ? description.MaxAnisotropy : 1,
@@ -397,7 +397,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentException("Graphics pipeline must contain a fragment shader.",
                 nameof(description.Shaders));
 
-        _ = ToVulkanFormat(description.ColorAttachmentFormat);
+        _ = VulkanMapping.ToVulkanFormat(description.ColorAttachmentFormat);
 
         if (!float.IsFinite(description.Rasterizer.LineWidth) || description.Rasterizer.LineWidth < 0)
             throw new ArgumentOutOfRangeException(nameof(description.Rasterizer.LineWidth),
@@ -638,7 +638,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     private static void ValidateMipmapGenerationFormat(TextureFormat format)
     {
-        var vkFormat = ToVulkanFormat(format);
+        var vkFormat = VulkanMapping.ToVulkanFormat(format);
         VulkanContext.Vk.GetPhysicalDeviceFormatProperties(VulkanContext.PhysicalDevice, vkFormat,
             out var properties);
         var required = FormatFeatureFlags.BlitSrcBit
@@ -648,113 +648,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new InvalidOperationException("Texture format does not support linear blit mipmap generation.");
     }
 
-    private static ImageType ToImageType(TextureDimension dimension)
-    {
-        return dimension switch
-        {
-            TextureDimension.Type1D => ImageType.Type1D,
-            TextureDimension.Type2D => ImageType.Type2D,
-            TextureDimension.Type3D => ImageType.Type3D,
-            TextureDimension.CubeMap => ImageType.Type2D,
-            _ => throw new InvalidOperationException("Unsupported texture dimension."),
-        };
-    }
-
-    private static Filter ToVulkanFilter(FilterMode mode)
-    {
-        return mode switch
-        {
-            FilterMode.Nearest => Filter.Nearest,
-            FilterMode.Linear => Filter.Linear,
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported filter mode."),
-        };
-    }
-
-    private static SamplerMipmapMode ToVulkanMipmapMode(MipmapMode mode)
-    {
-        return mode switch
-        {
-            MipmapMode.Nearest => SamplerMipmapMode.Nearest,
-            MipmapMode.Linear => SamplerMipmapMode.Linear,
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported mipmap mode."),
-        };
-    }
-
-    private static SamplerAddressMode ToVulkanAddressMode(WrapMode mode)
-    {
-        return mode switch
-        {
-            WrapMode.Repeat => SamplerAddressMode.Repeat,
-            WrapMode.MirroredRepeat => SamplerAddressMode.MirroredRepeat,
-            WrapMode.ClampToEdge => SamplerAddressMode.ClampToEdge,
-            WrapMode.ClampToBorder => SamplerAddressMode.ClampToBorder,
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported wrap mode."),
-        };
-    }
-
-    private static ImageViewType ToImageViewType(TextureDimension dimension, uint arrayLayers)
-    {
-        return dimension switch
-        {
-            TextureDimension.Type1D => arrayLayers == 1 ? ImageViewType.Type1D : ImageViewType.Type1DArray,
-            TextureDimension.Type2D => arrayLayers == 1 ? ImageViewType.Type2D : ImageViewType.Type2DArray,
-            TextureDimension.Type3D => ImageViewType.Type3D,
-            TextureDimension.CubeMap => arrayLayers == 6 ? ImageViewType.TypeCube : ImageViewType.TypeCubeArray,
-            _ => throw new InvalidOperationException("Unsupported texture dimension."),
-        };
-    }
-
     private static uint GetImageArrayLayers(in TextureDescription description)
     {
         return description.Dimension == TextureDimension.Type3D ? 1 : description.ArrayLayers;
-    }
-
-    internal static Format ToVulkanFormat(TextureFormat format)
-    {
-        return format switch
-        {
-            TextureFormat.R8G8B8A8Unorm => Format.R8G8B8A8Unorm,
-            TextureFormat.B8G8R8A8Unorm => Format.B8G8R8A8Unorm,
-            TextureFormat.B8G8R8A8Srgb => Format.B8G8R8A8Srgb,
-            TextureFormat.R8Unorm => Format.R8Unorm,
-            _ => throw new InvalidOperationException("Unsupported texture format."),
-        };
-    }
-
-    internal static TextureFormat FromVulkanFormat(Format format)
-    {
-        return format switch
-        {
-            Format.R8G8B8A8Unorm => TextureFormat.R8G8B8A8Unorm,
-            Format.B8G8R8A8Unorm => TextureFormat.B8G8R8A8Unorm,
-            Format.B8G8R8A8Srgb => TextureFormat.B8G8R8A8Srgb,
-            Format.R8Unorm => TextureFormat.R8Unorm,
-            _ => throw new InvalidOperationException("Unsupported Vulkan texture format."),
-        };
-    }
-
-    private static ImageUsageFlags ToImageUsage(TextureUsage usage)
-    {
-        var result = ImageUsageFlags.None;
-        if (usage.HasFlag(TextureUsage.TransferSource))
-            result |= ImageUsageFlags.TransferSrcBit;
-        if (usage.HasFlag(TextureUsage.TransferDestination))
-            result |= ImageUsageFlags.TransferDstBit;
-        if (usage.HasFlag(TextureUsage.Sampled))
-            result |= ImageUsageFlags.SampledBit;
-        return result;
-    }
-
-    internal static uint GetTextureBytesPerPixel(TextureFormat format)
-    {
-        return format switch
-        {
-            TextureFormat.R8G8B8A8Unorm => 4,
-            TextureFormat.B8G8R8A8Unorm => 4,
-            TextureFormat.B8G8R8A8Srgb => 4,
-            TextureFormat.R8Unorm => 1,
-            _ => throw new InvalidOperationException("Unsupported texture format."),
-        };
     }
 
     private static uint GetMaxMipLevels(uint width, uint height, uint depth)
@@ -773,6 +669,6 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     private static ulong CalculateTextureDataSize(uint width, uint height, uint depth, uint arrayLayers,
         TextureFormat format)
     {
-        return checked((ulong)width * height * depth * arrayLayers * GetTextureBytesPerPixel(format));
+        return checked((ulong)width * height * depth * arrayLayers * VulkanMapping.GetTextureBytesPerPixel(format));
     }
 }

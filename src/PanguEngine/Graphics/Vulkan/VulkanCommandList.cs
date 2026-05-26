@@ -92,8 +92,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
             SType = StructureType.RenderingAttachmentInfo,
             ImageView = frame.ImageView,
             ImageLayout = ImageLayout.ColorAttachmentOptimal,
-            LoadOp = ToVulkanLoadOperation(description.LoadOperation),
-            StoreOp = ToVulkanStoreOperation(description.StoreOperation),
+            LoadOp = VulkanMapping.ToVulkanLoadOperation(description.LoadOperation),
+            StoreOp = VulkanMapping.ToVulkanStoreOperation(description.StoreOperation),
             ClearValue = clearColor,
         };
 
@@ -200,7 +200,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
         if (offset > vulkanBuffer.Size)
             throw new ArgumentOutOfRangeException(nameof(offset), "Index buffer offset exceeds the buffer bounds.");
 
-        VulkanContext.Vk.CmdBindIndexBuffer(_commandBuffer, vulkanBuffer.Buffer, offset, ToVulkanIndexType(format));
+        VulkanContext.Vk.CmdBindIndexBuffer(_commandBuffer, vulkanBuffer.Buffer, offset,
+            VulkanMapping.ToVulkanIndexType(format));
     }
 
     /// <inheritdoc/>
@@ -406,36 +407,5 @@ internal sealed unsafe class VulkanCommandList : CommandList
         };
 
         VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &dependency);
-    }
-
-    private static AttachmentLoadOp ToVulkanLoadOperation(LoadOperation operation)
-    {
-        return operation switch
-        {
-            LoadOperation.Load => AttachmentLoadOp.Load,
-            LoadOperation.Clear => AttachmentLoadOp.Clear,
-            LoadOperation.DontCare => AttachmentLoadOp.DontCare,
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), "Unsupported load operation."),
-        };
-    }
-
-    private static IndexType ToVulkanIndexType(IndexFormat format)
-    {
-        return format switch
-        {
-            IndexFormat.UInt16 => IndexType.Uint16,
-            IndexFormat.UInt32 => IndexType.Uint32,
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported index format.")
-        };
-    }
-
-    private static AttachmentStoreOp ToVulkanStoreOperation(StoreOperation operation)
-    {
-        return operation switch
-        {
-            StoreOperation.Store => AttachmentStoreOp.Store,
-            StoreOperation.DontCare => AttachmentStoreOp.DontCare,
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), "Unsupported store operation."),
-        };
     }
 }

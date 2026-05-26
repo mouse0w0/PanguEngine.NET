@@ -33,7 +33,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     public override uint Height => _window.Extent.Height;
 
     /// <inheritdoc/>
-    public override TextureFormat ColorFormat => VulkanGraphicsDevice.FromVulkanFormat(_window.ImageFormat);
+    public override TextureFormat ColorFormat => VulkanMapping.FromVulkanFormat(_window.ImageFormat);
 
     /// <inheritdoc/>
     public override uint MaxFramesInFlight => VulkanContext.MaxFramesInFlight;
