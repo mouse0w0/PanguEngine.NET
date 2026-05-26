@@ -377,35 +377,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         AccessFlags2 dstAccessMask)
     {
         var frame = GetFrame();
-        ImageMemoryBarrier2 barrier = new()
-        {
-            SType = StructureType.ImageMemoryBarrier2,
-            SrcStageMask = srcStageMask,
-            SrcAccessMask = srcAccessMask,
-            DstStageMask = dstStageMask,
-            DstAccessMask = dstAccessMask,
-            OldLayout = oldLayout,
-            NewLayout = newLayout,
-            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            Image = frame.Image,
-            SubresourceRange = new ImageSubresourceRange
-            {
-                AspectMask = ImageAspectFlags.ColorBit,
-                BaseMipLevel = 0,
-                LevelCount = 1,
-                BaseArrayLayer = 0,
-                LayerCount = 1,
-            },
-        };
-
-        DependencyInfo dependency = new()
-        {
-            SType = StructureType.DependencyInfo,
-            ImageMemoryBarrierCount = 1,
-            PImageMemoryBarriers = &barrier,
-        };
-
-        VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &dependency);
+        VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, frame.Image, 0, 0, 1, oldLayout, newLayout,
+            srcStageMask, srcAccessMask, dstStageMask, dstAccessMask);
     }
 }

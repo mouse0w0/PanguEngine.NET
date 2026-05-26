@@ -624,14 +624,10 @@ public static unsafe class VulkanUploader
         {
             var arrayLayer = upload.Dst.Dimension == TextureDimension.Type3D ? 0 : baseArrayLayer + layer;
             var oldLayout = upload.Dst.GetLayout(upload.Region.MipLevel, arrayLayer);
-            var srcStage = oldLayout == ImageLayout.Undefined
-                ? PipelineStageFlags2.TopOfPipeBit
-                : PipelineStageFlags2.FragmentShaderBit;
-            var srcAccess = oldLayout == ImageLayout.Undefined
-                ? AccessFlags2.None
-                : AccessFlags2.ShaderSampledReadBit;
-            RecordTextureLayoutTransition(upload.Dst, upload.Region.MipLevel, arrayLayer, 1, oldLayout,
-                ImageLayout.TransferDstOptimal, srcStage, srcAccess, PipelineStageFlags2.TransferBit,
+            VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, upload.Dst.Image, upload.Region.MipLevel,
+                arrayLayer, 1, oldLayout,
+                ImageLayout.TransferDstOptimal, VulkanBarrier.GetStageForLayout(oldLayout),
+                VulkanBarrier.GetAccessForLayout(oldLayout), PipelineStageFlags2.TransferBit,
                 AccessFlags2.TransferWriteBit);
         }
 
@@ -663,7 +659,8 @@ public static unsafe class VulkanUploader
         VulkanContext.Vk.CmdCopyBufferToImage(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Image,
             ImageLayout.TransferDstOptimal, 1, in copyRegion);
 
-        RecordTextureLayoutTransition(upload.Dst, upload.Region.MipLevel, baseArrayLayer, layerCount,
+        VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, upload.Dst.Image, upload.Region.MipLevel,
+            baseArrayLayer, layerCount,
             ImageLayout.TransferDstOptimal, ImageLayout.ShaderReadOnlyOptimal, PipelineStageFlags2.TransferBit,
             AccessFlags2.TransferWriteBit, PipelineStageFlags2.FragmentShaderBit, AccessFlags2.ShaderSampledReadBit);
 
@@ -752,77 +749,13 @@ public static unsafe class VulkanUploader
         if (oldLayout == newLayout)
             return;
 
-        RecordTextureLayoutTransition(texture, mipLevel, arrayLayer, 1, oldLayout, newLayout,
-            GetStageForLayout(oldLayout), GetAccessForLayout(oldLayout), dstStage, dstAccess);
+        VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, texture.Image, mipLevel, arrayLayer, 1, oldLayout,
+            newLayout,
+            VulkanBarrier.GetStageForLayout(oldLayout), VulkanBarrier.GetAccessForLayout(oldLayout), dstStage,
+            dstAccess);
         texture.SetLayout(mipLevel, arrayLayer, newLayout);
     }
 
-    private static PipelineStageFlags2 GetStageForLayout(ImageLayout layout)
-    {
-        return layout switch
-        {
-            ImageLayout.Undefined => PipelineStageFlags2.TopOfPipeBit,
-            ImageLayout.ShaderReadOnlyOptimal => PipelineStageFlags2.FragmentShaderBit,
-            ImageLayout.TransferDstOptimal => PipelineStageFlags2.TransferBit,
-            ImageLayout.TransferSrcOptimal => PipelineStageFlags2.TransferBit,
-            _ => PipelineStageFlags2.AllCommandsBit,
-        };
-    }
-
-    private static AccessFlags2 GetAccessForLayout(ImageLayout layout)
-    {
-        return layout switch
-        {
-            ImageLayout.Undefined => AccessFlags2.None,
-            ImageLayout.ShaderReadOnlyOptimal => AccessFlags2.ShaderSampledReadBit,
-            ImageLayout.TransferDstOptimal => AccessFlags2.TransferWriteBit,
-            ImageLayout.TransferSrcOptimal => AccessFlags2.TransferReadBit,
-            _ => AccessFlags2.MemoryReadBit | AccessFlags2.MemoryWriteBit,
-        };
-    }
-
-    private static void RecordTextureLayoutTransition(
-        VulkanTexture texture,
-        uint mipLevel,
-        uint baseArrayLayer,
-        uint layerCount,
-        ImageLayout oldLayout,
-        ImageLayout newLayout,
-        PipelineStageFlags2 srcStage,
-        AccessFlags2 srcAccess,
-        PipelineStageFlags2 dstStage,
-        AccessFlags2 dstAccess)
-    {
-        ImageMemoryBarrier2 barrier = new()
-        {
-            SType = StructureType.ImageMemoryBarrier2,
-            SrcStageMask = srcStage,
-            SrcAccessMask = srcAccess,
-            DstStageMask = dstStage,
-            DstAccessMask = dstAccess,
-            OldLayout = oldLayout,
-            NewLayout = newLayout,
-            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
-            Image = texture.Image,
-            SubresourceRange = new ImageSubresourceRange
-            {
-                AspectMask = ImageAspectFlags.ColorBit,
-                BaseMipLevel = mipLevel,
-                LevelCount = 1,
-                BaseArrayLayer = baseArrayLayer,
-                LayerCount = layerCount,
-            },
-        };
-
-        DependencyInfo dependency = new()
-        {
-            SType = StructureType.DependencyInfo,
-            ImageMemoryBarrierCount = 1,
-            PImageMemoryBarriers = &barrier,
-        };
-        VulkanContext.Vk.CmdPipelineBarrier2(_commandBuffer, &dependency);
-    }
 
     private static void Grow(ulong requiredSize)
     {
