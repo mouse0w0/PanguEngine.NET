@@ -16,8 +16,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         var layout = description.Layout as VulkanDescriptorSetLayout
                      ?? throw new InvalidOperationException(
                          "Descriptor set layout was not created by the Vulkan backend.");
-        if (layout.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanDescriptorSetLayout));
+        layout.ThrowIfDestroyed();
 
         Layout = layout;
 
@@ -209,8 +208,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         var buffer = binding.Buffer as VulkanBuffer
                      ?? throw new InvalidOperationException(
                          "Descriptor set buffer was not created by the Vulkan backend.");
-        if (buffer.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanBuffer));
+        buffer.ThrowIfDestroyed();
         if (!buffer.Usage.HasFlag(BufferUsageFlags.UniformBufferBit))
             throw new InvalidOperationException("Descriptor set buffer was not created with Uniform usage.");
         if (binding.Size == 0)
@@ -247,10 +245,8 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         var sampler = binding.Sampler as VulkanSampler
                       ?? throw new InvalidOperationException(
                           "Descriptor set sampler was not created by the Vulkan backend.");
-        if (texture.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanTexture));
-        if (sampler.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanSampler));
+        texture.ThrowIfDestroyed();
+        sampler.ThrowIfDestroyed();
         if (!texture.Usage.HasFlag(TextureUsage.Sampled))
             throw new InvalidOperationException("Descriptor set texture was not created with Sampled usage.");
 

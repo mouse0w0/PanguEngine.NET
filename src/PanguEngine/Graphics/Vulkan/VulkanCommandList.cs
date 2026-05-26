@@ -156,8 +156,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
                              ?? throw new InvalidOperationException(
                                  "Graphics pipeline was not created by the Vulkan backend.");
 
-        if (vulkanPipeline.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanGraphicsPipeline));
+        vulkanPipeline.ThrowIfDestroyed();
 
         VulkanContext.Vk.CmdBindPipeline(_commandBuffer, PipelineBindPoint.Graphics, vulkanPipeline.Pipeline);
         _graphicsPipeline = vulkanPipeline;
@@ -172,8 +171,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         var vulkanBuffer = buffer as VulkanBuffer
                            ?? throw new InvalidOperationException(
                                "Graphics buffer was not created by the Vulkan backend.");
-        if (vulkanBuffer.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanBuffer));
+        vulkanBuffer.ThrowIfDestroyed();
         if (!vulkanBuffer.Usage.HasFlag(BufferUsageFlags.VertexBufferBit))
             throw new InvalidOperationException("Buffer was not created with Vertex usage.");
         if (offset > vulkanBuffer.Size)
@@ -193,8 +191,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         var vulkanBuffer = buffer as VulkanBuffer
                            ?? throw new InvalidOperationException(
                                "Graphics buffer was not created by the Vulkan backend.");
-        if (vulkanBuffer.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanBuffer));
+        vulkanBuffer.ThrowIfDestroyed();
         if (!vulkanBuffer.Usage.HasFlag(BufferUsageFlags.IndexBufferBit))
             throw new InvalidOperationException("Buffer was not created with Index usage.");
         if (offset > vulkanBuffer.Size)
@@ -216,8 +213,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         var vulkanDescriptorSet = descriptorSet as VulkanDescriptorSet
                                   ?? throw new InvalidOperationException(
                                       "Descriptor set was not created by the Vulkan backend.");
-        if (vulkanDescriptorSet.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanDescriptorSet));
+        vulkanDescriptorSet.ThrowIfDestroyed();
         if (slot >= pipeline.DescriptorSetLayouts.Count)
             throw new ArgumentOutOfRangeException(nameof(slot),
                 "Descriptor set slot exceeds the graphics pipeline layout count.");

@@ -315,8 +315,7 @@ public static unsafe class VulkanUploader
         if (dst == null)
             throw new ArgumentNullException(nameof(dst));
 
-        if (dst.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanTexture));
+        dst.ThrowIfDestroyed();
 
         var dataCopy = data.ToArray();
         var handle = new VulkanUploadHandle();
@@ -346,8 +345,7 @@ public static unsafe class VulkanUploader
         if (texture == null)
             throw new ArgumentNullException(nameof(texture));
 
-        if (texture.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanTexture));
+        texture.ThrowIfDestroyed();
 
         var handle = new VulkanUploadHandle();
         PendingMipmapGenerations.Enqueue(new PendingMipmapGeneration

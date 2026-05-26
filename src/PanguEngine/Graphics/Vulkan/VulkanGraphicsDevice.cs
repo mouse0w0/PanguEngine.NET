@@ -91,8 +91,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
         var vulkanBuffer = RequireVulkanBuffer(destination);
 
-        if (vulkanBuffer.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanBuffer));
+        vulkanBuffer.ThrowIfDestroyed();
 
         if (destinationOffset > vulkanBuffer.Size)
             throw new ArgumentOutOfRangeException(nameof(destinationOffset),
@@ -202,8 +201,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentNullException(nameof(destination));
 
         var texture = RequireVulkanTexture(destination);
-        if (texture.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanTexture));
+        texture.ThrowIfDestroyed();
 
         if (!texture.Usage.HasFlag(TextureUsage.TransferDestination))
             throw new InvalidOperationException("Texture was not created with TransferDestination usage.");
@@ -223,8 +221,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentNullException(nameof(texture));
 
         var vulkanTexture = RequireVulkanTexture(texture);
-        if (vulkanTexture.IsDestroyed)
-            throw new ObjectDisposedException(nameof(VulkanTexture));
+        vulkanTexture.ThrowIfDestroyed();
 
         if (vulkanTexture.MipLevels == 1)
             return CompletedUploadHandle.Instance;
@@ -384,8 +381,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                     nameof(description.Shaders));
 
             var vulkanShader = RequireVulkanShader(shader);
-            if (vulkanShader.IsDestroyed)
-                throw new ObjectDisposedException(nameof(VulkanShader));
+            vulkanShader.ThrowIfDestroyed();
 
             hasVertexShader |= vulkanShader.Stage == ShaderStage.Vertex;
             hasFragmentShader |= vulkanShader.Stage == ShaderStage.Fragment;
@@ -412,8 +408,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                     nameof(description.DescriptorSetLayouts));
 
             var vulkanLayout = RequireVulkanDescriptorSetLayout(layout);
-            if (vulkanLayout.IsDestroyed)
-                throw new ObjectDisposedException(nameof(VulkanDescriptorSetLayout));
+            vulkanLayout.ThrowIfDestroyed();
         }
     }
 

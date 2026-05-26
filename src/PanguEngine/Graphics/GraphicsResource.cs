@@ -11,6 +11,15 @@ public abstract class GraphicsResource
     public abstract bool IsDestroyed { get; }
 
     /// <summary>
+    /// Throws an <see cref="ObjectDisposedException"/> if the resource has been destroyed.
+    /// </summary>
+    public void ThrowIfDestroyed()
+    {
+        if (IsDestroyed)
+            throw new ObjectDisposedException(GetType().Name);
+    }
+
+    /// <summary>
     /// Destroys the resource and releases its GPU memory.
     /// </summary>
     public abstract void Destroy();

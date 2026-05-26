@@ -130,12 +130,6 @@ internal sealed unsafe class VulkanPresenter : Presenter
         _destroyed = true;
     }
 
-    private void ThrowIfDestroyed()
-    {
-        if (_destroyed)
-            throw new ObjectDisposedException(nameof(VulkanPresenter));
-    }
-
     private void Submit(CommandBuffer commandBuffer, ulong timelineValue)
     {
         _window.ResetInFlightFence();
