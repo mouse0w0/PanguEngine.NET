@@ -3,6 +3,7 @@ using Silk.NET.Core.Native;
 using Silk.NET.Maths;
 using Silk.NET.Vulkan;
 using Silk.NET.Windowing;
+using Window = PanguEngine.Windowing.Window;
 
 namespace PanguEngine.Graphics.Test;
 
@@ -12,7 +13,7 @@ namespace PanguEngine.Graphics.Test;
 /// <param name="scene">The scene to run.</param>
 public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
 {
-    private VulkanWindow _vulkanWindow = null!;
+    private Window _window = null!;
     private VulkanPresenter _presenter = null!;
     private bool _sceneInitialized;
     private bool _presenterInitialized;
@@ -32,9 +33,9 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
         {
             Initialize();
 
-            _vulkanWindow.Window.Render += _ => DrawFrame();
+            _window.Render += (_, _) => DrawFrame();
 
-            _vulkanWindow.Window.Run();
+            _window.Run();
         }
         finally
         {
@@ -53,19 +54,19 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
             Title = scene.Name
         };
 
-        var window = Window.Create(options);
-        window.Initialize();
+        var silkWindow = Silk.NET.Windowing.Window.Create(options);
+        silkWindow.Initialize();
 
-        if (window.VkSurface is null)
+        if (silkWindow.VkSurface is null)
             throw new InvalidOperationException("Windowing platform doesn't support Vulkan.");
 
-        var glfwExtensions = window.VkSurface.GetRequiredExtensions(out var count);
+        var glfwExtensions = silkWindow.VkSurface.GetRequiredExtensions(out var count);
         var requiredExtensions = SilkMarshal.PtrToStringArray((nint)glfwExtensions, (int)count);
 
         VulkanContext.InitializeInstance(requiredExtensions);
         _contextInitialized = true;
 
-        var surface = window.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
+        var surface = silkWindow.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
             .ToSurface();
         VulkanContext.InitializeDevice(surface);
 
@@ -78,10 +79,10 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
         GraphicsContext.Initialize(new VulkanGraphicsDevice());
         _graphicsContextInitialized = true;
 
-        _vulkanWindow = new VulkanWindow(window, surface);
+        _window = new VulkanWindow(silkWindow, surface);
         _windowInitialized = true;
 
-        _presenter = new VulkanPresenter(_vulkanWindow);
+        _presenter = new VulkanPresenter((VulkanWindow)_window);
         _presenterInitialized = true;
         scene.Initialize(_presenter);
         _sceneInitialized = true;
@@ -120,7 +121,7 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
             _presenter.Destroy();
 
         if (_windowInitialized)
-            _vulkanWindow.Destroy();
+            _window.Destroy();
 
         if (_graphicsContextInitialized)
             GraphicsContext.Shutdown();

@@ -1,17 +1,33 @@
+using System.Numerics;
+using PanguEngine.Input;
+using PanguEngine.Windowing;
+using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.Vulkan;
 using Silk.NET.Windowing;
+using InputKey = PanguEngine.Input.Key;
+using InputMouseButton = PanguEngine.Input.MouseButton;
+using SilkWindow = Silk.NET.Windowing.IWindow;
+using SilkNETWindowBorder = Silk.NET.Windowing.WindowBorder;
+using SilkWindowState = Silk.NET.Windowing.WindowState;
+using SilkKey = Silk.NET.Input.Key;
+using SilkMouseButton = Silk.NET.Input.MouseButton;
 using Semaphore = Silk.NET.Vulkan.Semaphore;
+using Window = PanguEngine.Windowing.Window;
+using WindowBorder = PanguEngine.Windowing.WindowBorder;
 
 namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
 /// Manages a Vulkan swapchain surface and its associated rendering resources bound to a window.
 /// </summary>
-public sealed unsafe class VulkanWindow
+public sealed unsafe class VulkanWindow : Window
 {
     private bool _framebufferResized;
-    private bool _destroyed;
+    private bool _isDestroyed;
+    private bool _isFocused = true;
+    private IInputContext? _inputContext;
+    private ICursor? _cursor;
 
     private SwapchainKHR _swapchain;
     private Image[]? _images;
@@ -20,8 +36,7 @@ public sealed unsafe class VulkanWindow
     private Semaphore[]? _renderFinishedSemaphores;
     private Fence[]? _inFlightFences;
 
-    /// <summary>The underlying window used for presentation.</summary>
-    public IWindow Window { get; private set; }
+    private readonly SilkWindow _silkWindow;
 
     /// <summary>The Vulkan surface created from the window.</summary>
     public SurfaceKHR Surface { get; private set; }
@@ -44,28 +59,197 @@ public sealed unsafe class VulkanWindow
     /// <summary>The current frame index within the in-flight frame ring.</summary>
     public uint CurrentFrame { get; private set; }
 
-    /// <summary>Creates a <see cref="VulkanWindow"/> with default Vulkan window options.</summary>
-    internal VulkanWindow() : this(WindowOptions.DefaultVulkan)
+    /// <inheritdoc/>
+    public override bool IsDestroyed => _isDestroyed;
+
+    /// <inheritdoc/>
+    public override string Title
     {
+        get => _silkWindow.Title;
+        set => _silkWindow.Title = value;
     }
 
-    /// <summary>Creates a <see cref="VulkanWindow"/> with the specified window options.</summary>
-    internal VulkanWindow(WindowOptions options)
+    /// <inheritdoc/>
+    public override Vector2D<int> Position
     {
-        Window = Silk.NET.Windowing.Window.Create(options);
-        Window.Initialize();
-        Surface = Window.VkSurface!.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null).ToSurface();
-
-        Initialize();
+        get => _silkWindow.Position;
+        set => _silkWindow.Position = value;
     }
+
+    /// <inheritdoc/>
+    public override Vector2D<int> Size
+    {
+        get => _silkWindow.Size;
+        set => _silkWindow.Size = value;
+    }
+
+    /// <inheritdoc/>
+    public override Vector2D<int> FramebufferSize => _silkWindow.FramebufferSize;
+
+    /// <inheritdoc/>
+    public override bool IsFocused => _isFocused;
+
+    /// <inheritdoc/>
+    public override bool IsMinimized => _silkWindow.WindowState == SilkWindowState.Minimized;
+
+    /// <inheritdoc/>
+    public override bool IsMaximized => _silkWindow.WindowState == SilkWindowState.Maximized;
+
+    /// <inheritdoc/>
+    public override bool IsVisible
+    {
+        get => _silkWindow.IsVisible;
+        set => _silkWindow.IsVisible = value;
+    }
+
+    /// <inheritdoc/>
+    public override bool IsClosing => _silkWindow.IsClosing;
+
+    /// <inheritdoc/>
+    public override WindowBorder WindowBorder
+    {
+        get => _silkWindow.WindowBorder switch
+        {
+            SilkNETWindowBorder.Fixed => WindowBorder.Fixed,
+            SilkNETWindowBorder.Hidden => WindowBorder.Hidden,
+            _ => WindowBorder.Resizable
+        };
+        set => _silkWindow.WindowBorder = value switch
+        {
+            WindowBorder.Fixed => SilkNETWindowBorder.Fixed,
+            WindowBorder.Hidden => SilkNETWindowBorder.Hidden,
+            _ => SilkNETWindowBorder.Resizable
+        };
+    }
+
+    /// <inheritdoc/>
+    public override double FramesPerSecond
+    {
+        get => _silkWindow.FramesPerSecond;
+        set => _silkWindow.FramesPerSecond = value;
+    }
+
+    /// <inheritdoc/>
+    public override double UpdatesPerSecond
+    {
+        get => _silkWindow.UpdatesPerSecond;
+        set => _silkWindow.UpdatesPerSecond = value;
+    }
+
+    /// <inheritdoc/>
+    public override CursorState CursorState
+    {
+        get => _cursor?.CursorMode switch
+        {
+            CursorMode.Hidden => CursorState.Hidden,
+            CursorMode.Disabled => CursorState.Disabled,
+            CursorMode.Raw => CursorState.Raw,
+            _ => CursorState.Normal
+        };
+        set
+        {
+            if (_cursor != null)
+            {
+                _cursor.CursorMode = value switch
+                {
+                    CursorState.Hidden => CursorMode.Hidden,
+                    CursorState.Disabled => CursorMode.Disabled,
+                    CursorState.Raw => CursorMode.Raw,
+                    _ => CursorMode.Normal
+                };
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public override CursorShape CursorShape
+    {
+        get => _cursor?.StandardCursor switch
+        {
+            StandardCursor.Arrow => CursorShape.Arrow,
+            StandardCursor.IBeam => CursorShape.IBeam,
+            StandardCursor.Crosshair => CursorShape.Crosshair,
+            StandardCursor.Hand => CursorShape.Hand,
+            StandardCursor.HResize => CursorShape.HResize,
+            StandardCursor.VResize => CursorShape.VResize,
+            StandardCursor.NwseResize => CursorShape.NwseResize,
+            StandardCursor.NeswResize => CursorShape.NeswResize,
+            StandardCursor.ResizeAll => CursorShape.ResizeAll,
+            StandardCursor.NotAllowed => CursorShape.NotAllowed,
+            StandardCursor.Wait => CursorShape.Wait,
+            StandardCursor.WaitArrow => CursorShape.WaitArrow,
+            _ => CursorShape.Arrow
+        };
+        set
+        {
+            if (_cursor != null)
+            {
+                _cursor.Type = CursorType.Standard;
+                _cursor.StandardCursor = value switch
+                {
+                    CursorShape.Arrow => StandardCursor.Arrow,
+                    CursorShape.IBeam => StandardCursor.IBeam,
+                    CursorShape.Crosshair => StandardCursor.Crosshair,
+                    CursorShape.Hand => StandardCursor.Hand,
+                    CursorShape.HResize => StandardCursor.HResize,
+                    CursorShape.VResize => StandardCursor.VResize,
+                    CursorShape.NwseResize => StandardCursor.NwseResize,
+                    CursorShape.NeswResize => StandardCursor.NeswResize,
+                    CursorShape.ResizeAll => StandardCursor.ResizeAll,
+                    CursorShape.NotAllowed => StandardCursor.NotAllowed,
+                    CursorShape.Wait => StandardCursor.Wait,
+                    CursorShape.WaitArrow => StandardCursor.WaitArrow,
+                    _ => StandardCursor.Arrow
+                };
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public override event Action<Window, ResizeEventArgs>? Resize;
+
+    /// <inheritdoc/>
+    public override event Action<Window>? Close;
+
+    /// <inheritdoc/>
+    public override event Action<Window, bool>? FocusChanged;
+
+    /// <inheritdoc/>
+    public override event Action<Window, KeyEventArgs>? KeyDown;
+
+    /// <inheritdoc/>
+    public override event Action<Window, KeyEventArgs>? KeyUp;
+
+    /// <inheritdoc/>
+    public override event Action<Window, MouseMoveEventArgs>? MouseMove;
+
+    /// <inheritdoc/>
+    public override event Action<Window, MouseClickEventArgs>? MouseDown;
+
+    /// <inheritdoc/>
+    public override event Action<Window, MouseClickEventArgs>? MouseUp;
+
+    /// <inheritdoc/>
+    public override event Action<Window, ScrollEventArgs>? Scroll;
+
+    /// <inheritdoc/>
+    public override event Action<Window, char>? CharInput;
+
+    /// <inheritdoc/>
+    public override event Action<Window, double>? Render;
+
+    /// <inheritdoc/>
+    public override event Action<Window, double>? Update;
 
     /// <summary>Creates a <see cref="VulkanWindow"/> from an existing window and surface.</summary>
-    internal VulkanWindow(IWindow window, SurfaceKHR surface)
+    internal VulkanWindow(SilkWindow window, SurfaceKHR surface)
     {
-        Window = window;
+        _silkWindow = window;
         Surface = surface;
 
+        SubscribeEvents();
         Initialize();
+        InitializeInput();
     }
 
     /// <summary>Acquires the next swapchain image for rendering.</summary>
@@ -145,11 +329,26 @@ public sealed unsafe class VulkanWindow
     /// <summary>Gets a reference to the in-flight fence for the current frame.</summary>
     public ref Fence GetInFlightFence() => ref _inFlightFences![CurrentFrame];
 
-    /// <summary>Releases all Vulkan resources held by this instance.</summary>
-    public void Destroy()
+    /// <inheritdoc/>
+    public override void Run() => WindowExtensions.Run(_silkWindow);
+
+    /// <inheritdoc/>
+    public override void Show() => _silkWindow.IsVisible = true;
+
+    /// <inheritdoc/>
+    public override void Hide() => _silkWindow.IsVisible = false;
+
+    /// <inheritdoc/>
+    public override void CenterOnScreen() => WindowExtensions.Center(_silkWindow);
+
+    /// <inheritdoc/>
+    public override void CloseWindow() => _silkWindow.Close();
+
+    /// <inheritdoc/>
+    public override void Destroy()
     {
-        if (_destroyed) return;
-        _destroyed = true;
+        if (_isDestroyed) return;
+        _isDestroyed = true;
 
         for (var i = 0; i < VulkanContext.MaxFramesInFlight; i++)
         {
@@ -161,14 +360,116 @@ public sealed unsafe class VulkanWindow
         DestroyImageViews();
         DestroySwapchain();
 
+        _inputContext?.Dispose();
         VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, Surface, null);
-        Window.Dispose();
+        _silkWindow.Dispose();
+    }
+
+    private KeyModifiers GetCurrentKeyModifiers()
+    {
+        var mods = KeyModifiers.None;
+        foreach (var keyboard in _inputContext!.Keyboards)
+        {
+            if (keyboard.IsKeyPressed(SilkKey.ShiftLeft) || keyboard.IsKeyPressed(SilkKey.ShiftRight))
+                mods |= KeyModifiers.Shift;
+            if (keyboard.IsKeyPressed(SilkKey.ControlLeft) || keyboard.IsKeyPressed(SilkKey.ControlRight))
+                mods |= KeyModifiers.Control;
+            if (keyboard.IsKeyPressed(SilkKey.AltLeft) || keyboard.IsKeyPressed(SilkKey.AltRight))
+                mods |= KeyModifiers.Alt;
+            if (keyboard.IsKeyPressed(SilkKey.SuperLeft) || keyboard.IsKeyPressed(SilkKey.SuperRight))
+                mods |= KeyModifiers.Super;
+        }
+
+        return mods;
+    }
+
+    private void InitializeInput()
+    {
+        _inputContext = _silkWindow.CreateInput();
+        foreach (var keyboard in _inputContext.Keyboards)
+        {
+            keyboard.KeyDown += OnKeyDown;
+            keyboard.KeyUp += OnKeyUp;
+            keyboard.KeyChar += OnKeyChar;
+        }
+
+        foreach (var mouse in _inputContext.Mice)
+        {
+            _cursor = mouse.Cursor;
+            mouse.MouseMove += OnMouseMove;
+            mouse.MouseDown += OnMouseDown;
+            mouse.MouseUp += OnMouseUp;
+            mouse.Scroll += OnMouseScroll;
+        }
+    }
+
+    private void SubscribeEvents()
+    {
+        _silkWindow.Resize += OnResize;
+        _silkWindow.Closing += OnClosing;
+        _silkWindow.FocusChanged += OnFocusChanged;
+        _silkWindow.Render += OnRender;
+        _silkWindow.Update += OnUpdate;
+    }
+
+    private void OnResize(Vector2D<int> newSize)
+    {
+        _framebufferResized = true;
+        var framebufferSize = _silkWindow.FramebufferSize;
+        Resize?.Invoke(this, new ResizeEventArgs(newSize.X, newSize.Y, framebufferSize.X, framebufferSize.Y));
+    }
+
+    private void OnClosing() => Close?.Invoke(this);
+
+    private void OnFocusChanged(bool focused)
+    {
+        _isFocused = focused;
+        FocusChanged?.Invoke(this, focused);
+    }
+
+    private void OnRender(double dt) => Render?.Invoke(this, dt);
+
+    private void OnUpdate(double dt) => Update?.Invoke(this, dt);
+
+    private void OnKeyDown(IKeyboard keyboard, SilkKey key, int scancode)
+    {
+        KeyDown?.Invoke(this, new KeyEventArgs((InputKey)(int)key, KeyAction.Press, GetCurrentKeyModifiers()));
+    }
+
+    private void OnKeyUp(IKeyboard keyboard, SilkKey key, int scancode)
+    {
+        KeyUp?.Invoke(this, new KeyEventArgs((InputKey)(int)key, KeyAction.Release, GetCurrentKeyModifiers()));
+    }
+
+    private void OnKeyChar(IKeyboard keyboard, char c)
+    {
+        CharInput?.Invoke(this, c);
+    }
+
+    private void OnMouseMove(IMouse mouse, Vector2 position)
+    {
+        MouseMove?.Invoke(this, new MouseMoveEventArgs(position.X, position.Y));
+    }
+
+    private void OnMouseDown(IMouse mouse, SilkMouseButton button)
+    {
+        MouseDown?.Invoke(this,
+            new MouseClickEventArgs((InputMouseButton)(int)button, mouse.Position.X, mouse.Position.Y));
+    }
+
+    private void OnMouseUp(IMouse mouse, SilkMouseButton button)
+    {
+        MouseUp?.Invoke(this,
+            new MouseClickEventArgs((InputMouseButton)(int)button, mouse.Position.X, mouse.Position.Y));
+    }
+
+    private void OnMouseScroll(IMouse mouse, ScrollWheel scrollWheel)
+    {
+        Scroll?.Invoke(this, new ScrollEventArgs(scrollWheel.X, scrollWheel.Y));
     }
 
     private void Initialize()
     {
-        Window.Resize += OnFramebufferResize;
-
         CreateSwapchain();
         CreateImageViews();
         CreateSyncObjects();
@@ -176,12 +477,12 @@ public sealed unsafe class VulkanWindow
 
     private void RecreateSwapchain()
     {
-        var framebufferSize = Window.FramebufferSize;
+        var framebufferSize = _silkWindow.FramebufferSize;
 
         while (framebufferSize.X == 0 || framebufferSize.Y == 0)
         {
-            framebufferSize = Window.FramebufferSize;
-            Window.DoEvents();
+            framebufferSize = _silkWindow.FramebufferSize;
+            _silkWindow.DoEvents();
         }
 
         VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
@@ -192,8 +493,6 @@ public sealed unsafe class VulkanWindow
         CreateSwapchain();
         CreateImageViews();
     }
-
-    private void OnFramebufferResize(Vector2D<int> _) => _framebufferResized = true;
 
     private void CreateSwapchain()
     {
@@ -360,7 +659,7 @@ public sealed unsafe class VulkanWindow
         if (capabilities.CurrentExtent.Width != uint.MaxValue)
             return capabilities.CurrentExtent;
 
-        var framebufferSize = Window.FramebufferSize;
+        var framebufferSize = _silkWindow.FramebufferSize;
 
         Extent2D actualExtent = new()
         {
