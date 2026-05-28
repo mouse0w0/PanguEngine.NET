@@ -1,8 +1,10 @@
+using PanguEngine.Client;
 using PanguEngine.Graphics.Vulkan;
+using PanguEngine.Windowing;
 using Silk.NET.Core.Native;
 using Silk.NET.Maths;
 using Silk.NET.Vulkan;
-using Silk.NET.Windowing;
+using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
 using Window = PanguEngine.Windowing.Window;
 
 namespace PanguEngine.Graphics.Test;
@@ -14,10 +16,12 @@ namespace PanguEngine.Graphics.Test;
 public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
 {
     private Window _window = null!;
-    private VulkanPresenter _presenter = null!;
+    private Presenter _presenter = null!;
+    private WindowManager _windowManager = null!;
+    private ClientLoop _loop = null!;
     private bool _sceneInitialized;
-    private bool _presenterInitialized;
     private bool _windowInitialized;
+    private bool _windowManagerInitialized;
     private bool _graphicsContextInitialized;
     private bool _uploaderInitialized;
     private bool _allocatorInitialized;
@@ -35,7 +39,7 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
 
             _window.Render += (_, _) => DrawFrame();
 
-            _window.Run();
+            _loop.Run();
         }
         finally
         {
@@ -48,7 +52,7 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
         Engine.Initialize();
         _engineInitialized = true;
 
-        var options = WindowOptions.DefaultVulkan with
+        var options = SilkWindowOptions.DefaultVulkan with
         {
             Size = new Vector2D<int>(800, 600),
             Title = scene.Name
@@ -79,11 +83,13 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
         GraphicsContext.Initialize(new VulkanGraphicsDevice());
         _graphicsContextInitialized = true;
 
-        _window = new VulkanWindow(silkWindow, surface);
+        _window = new VulkanWindow(silkWindow, surface, true);
         _windowInitialized = true;
 
-        _presenter = new VulkanPresenter((VulkanWindow)_window);
-        _presenterInitialized = true;
+        _presenter = _window.Presenter;
+        _windowManager = new WindowManager(_window, VulkanWindowFactory.CreateWindow);
+        _windowManagerInitialized = true;
+        _loop = new ClientLoop(_windowManager);
         scene.Initialize(_presenter);
         _sceneInitialized = true;
     }
@@ -117,11 +123,13 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
         if (_sceneInitialized)
             scene.Destroy();
 
-        if (_presenterInitialized)
-            _presenter.Destroy();
-
-        if (_windowInitialized)
-            _window.Destroy();
+        if (_windowManagerInitialized)
+            _windowManager.Destroy();
+        else
+        {
+            if (_windowInitialized)
+                _window.Destroy();
+        }
 
         if (_graphicsContextInitialized)
             GraphicsContext.Shutdown();

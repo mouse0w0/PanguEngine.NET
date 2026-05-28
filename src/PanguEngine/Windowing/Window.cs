@@ -41,8 +41,11 @@ public abstract class Window : GraphicsResource
     /// <summary>The target frames per second for rendering.</summary>
     public abstract double FramesPerSecond { get; set; }
 
-    /// <summary>The target updates per second for logic.</summary>
-    public abstract double UpdatesPerSecond { get; set; }
+    /// <summary>Whether this window is the primary window.</summary>
+    public abstract bool IsPrimary { get; }
+
+    /// <summary>The presenter associated with this window.</summary>
+    public abstract Presenter Presenter { get; }
 
     /// <summary>The cursor visibility and behavior mode.</summary>
     public abstract CursorState CursorState { get; set; }
@@ -83,12 +86,6 @@ public abstract class Window : GraphicsResource
     /// <summary>Raised each frame for rendering.</summary>
     public abstract event Action<Window, double> Render;
 
-    /// <summary>Raised each tick for logic updates.</summary>
-    public abstract event Action<Window, double> Update;
-
-    /// <summary>Starts the window event loop.</summary>
-    public abstract void Run();
-
     /// <summary>Shows the window.</summary>
     public abstract void Show();
 
@@ -100,4 +97,11 @@ public abstract class Window : GraphicsResource
 
     /// <summary>Requests the window to close.</summary>
     public abstract void CloseWindow();
+
+    /// <summary>Processes pending platform events for the window.</summary>
+    internal abstract void DoEvents();
+
+    /// <summary>Performs a render event for this window.</summary>
+    /// <param name="deltaTime">The elapsed time since the previous render event.</param>
+    internal abstract void DoRender(double deltaTime);
 }

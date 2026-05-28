@@ -1,9 +1,10 @@
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Vulkan;
+using PanguEngine.Windowing;
 using Silk.NET.Core.Native;
 using Silk.NET.Maths;
 using Silk.NET.Vulkan;
-using Silk.NET.Windowing;
+using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
 using Window = PanguEngine.Windowing.Window;
 
 namespace PanguEngine.Client;
@@ -19,14 +20,19 @@ public unsafe class Client
     public static Client Instance { get; private set; } = null!;
 
     /// <summary>
-    /// The window.
+    /// The primary window.
     /// </summary>
-    public Window Window { get; private set; } = null!;
+    public Window PrimaryWindow { get; private set; } = null!;
 
     /// <summary>
-    /// The graphics presenter.
+    /// The window manager.
     /// </summary>
-    public Presenter Presenter { get; private set; } = null!;
+    public WindowManager WindowManager { get; private set; } = null!;
+
+    /// <summary>
+    /// The client loop.
+    /// </summary>
+    public ClientLoop Loop { get; private set; } = null!;
 
     /// <summary>
     /// The Vulkan renderer.
@@ -52,7 +58,7 @@ public unsafe class Client
     {
         Engine.Initialize();
 
-        var options = WindowOptions.DefaultVulkan with
+        var options = SilkWindowOptions.DefaultVulkan with
         {
             Size = new Vector2D<int>(800, 600),
             Title = "PanguEngine"
@@ -75,10 +81,11 @@ public unsafe class Client
         VulkanAllocator.Initialize();
         VulkanUploader.Initialize();
         GraphicsContext.Initialize(new VulkanGraphicsDevice());
-        Window = new VulkanWindow(silkWindow, surface);
-        var presenter = new VulkanPresenter((VulkanWindow)Window);
-        Presenter = presenter;
-        Renderer = new VulkanRenderer(presenter);
+
+        PrimaryWindow = new VulkanWindow(silkWindow, surface, true);
+        WindowManager = new WindowManager(PrimaryWindow, VulkanWindowFactory.CreateWindow);
+        Loop = new ClientLoop(WindowManager);
+        Renderer = new VulkanRenderer(PrimaryWindow.Presenter);
     }
 
     /// <summary>
@@ -86,8 +93,8 @@ public unsafe class Client
     /// </summary>
     private void OnRunning()
     {
-        Window.Render += (_, dt) => Renderer.DrawFrame(dt);
-        Window.Run();
+        PrimaryWindow.Render += (_, dt) => Renderer.DrawFrame(dt);
+        Loop.Run();
     }
 
     /// <summary>
@@ -96,8 +103,7 @@ public unsafe class Client
     private void OnShutdown()
     {
         Renderer.Destroy();
-        Presenter.Destroy();
-        Window.Destroy();
+        WindowManager.Destroy();
         GraphicsContext.Shutdown();
         VulkanUploader.Destroy();
         VulkanDeletionQueue.Drain();

@@ -28,6 +28,7 @@ public sealed unsafe class VulkanWindow : Window
     private bool _isFocused = true;
     private IInputContext? _inputContext;
     private ICursor? _cursor;
+    private readonly VulkanPresenter _presenter;
 
     private SwapchainKHR _swapchain;
     private Image[]? _images;
@@ -61,6 +62,12 @@ public sealed unsafe class VulkanWindow : Window
 
     /// <inheritdoc/>
     public override bool IsDestroyed => _isDestroyed;
+
+    /// <inheritdoc/>
+    public override bool IsPrimary { get; }
+
+    /// <inheritdoc/>
+    public override Presenter Presenter => _presenter;
 
     /// <inheritdoc/>
     public override string Title
@@ -123,18 +130,7 @@ public sealed unsafe class VulkanWindow : Window
     }
 
     /// <inheritdoc/>
-    public override double FramesPerSecond
-    {
-        get => _silkWindow.FramesPerSecond;
-        set => _silkWindow.FramesPerSecond = value;
-    }
-
-    /// <inheritdoc/>
-    public override double UpdatesPerSecond
-    {
-        get => _silkWindow.UpdatesPerSecond;
-        set => _silkWindow.UpdatesPerSecond = value;
-    }
+    public override double FramesPerSecond { get; set; }
 
     /// <inheritdoc/>
     public override CursorState CursorState
@@ -238,18 +234,26 @@ public sealed unsafe class VulkanWindow : Window
     /// <inheritdoc/>
     public override event Action<Window, double>? Render;
 
-    /// <inheritdoc/>
-    public override event Action<Window, double>? Update;
-
     /// <summary>Creates a <see cref="VulkanWindow"/> from an existing window and surface.</summary>
-    internal VulkanWindow(SilkWindow window, SurfaceKHR surface)
+    internal VulkanWindow(SilkWindow window, SurfaceKHR surface, bool isPrimary, double framesPerSecond = 60)
     {
         _silkWindow = window;
         Surface = surface;
+        IsPrimary = isPrimary;
+        FramesPerSecond = framesPerSecond;
 
-        SubscribeEvents();
-        Initialize();
-        InitializeInput();
+        try
+        {
+            SubscribeEvents();
+            Initialize();
+            InitializeInput();
+            _presenter = new VulkanPresenter(this);
+        }
+        catch
+        {
+            Destroy();
+            throw;
+        }
     }
 
     /// <summary>Acquires the next swapchain image for rendering.</summary>
@@ -330,25 +334,31 @@ public sealed unsafe class VulkanWindow : Window
     public ref Fence GetInFlightFence() => ref _inFlightFences![CurrentFrame];
 
     /// <inheritdoc/>
-    public override void Run() => WindowExtensions.Run(_silkWindow);
-
-    /// <inheritdoc/>
     public override void Show() => _silkWindow.IsVisible = true;
 
     /// <inheritdoc/>
     public override void Hide() => _silkWindow.IsVisible = false;
 
     /// <inheritdoc/>
-    public override void CenterOnScreen() => WindowExtensions.Center(_silkWindow);
+    public override void CenterOnScreen() => _silkWindow.Center();
 
     /// <inheritdoc/>
     public override void CloseWindow() => _silkWindow.Close();
+
+    /// <inheritdoc/>
+    internal override void DoEvents() => _silkWindow.DoEvents();
+
+    /// <inheritdoc/>
+    internal override void DoRender(double deltaTime) => Render?.Invoke(this, deltaTime);
 
     /// <inheritdoc/>
     public override void Destroy()
     {
         if (_isDestroyed) return;
         _isDestroyed = true;
+
+        if (!_presenter.IsDestroyed)
+            _presenter.Destroy();
 
         for (var i = 0; i < VulkanContext.MaxFramesInFlight; i++)
         {
@@ -408,8 +418,6 @@ public sealed unsafe class VulkanWindow : Window
         _silkWindow.Resize += OnResize;
         _silkWindow.Closing += OnClosing;
         _silkWindow.FocusChanged += OnFocusChanged;
-        _silkWindow.Render += OnRender;
-        _silkWindow.Update += OnUpdate;
     }
 
     private void OnResize(Vector2D<int> newSize)
@@ -426,10 +434,6 @@ public sealed unsafe class VulkanWindow : Window
         _isFocused = focused;
         FocusChanged?.Invoke(this, focused);
     }
-
-    private void OnRender(double dt) => Render?.Invoke(this, dt);
-
-    private void OnUpdate(double dt) => Update?.Invoke(this, dt);
 
     private void OnKeyDown(IKeyboard keyboard, SilkKey key, int scancode)
     {

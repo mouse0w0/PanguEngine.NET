@@ -3,10 +3,9 @@ namespace PanguEngine.Graphics.Vulkan;
 /// <summary>
 /// Handles Vulkan graphics pipeline creation, command recording, and frame presentation.
 /// </summary>
-internal sealed unsafe class VulkanRenderer
+internal sealed class VulkanRenderer
 {
-    private readonly VulkanPresenter _presenter;
-
+    private readonly Presenter _presenter;
     private readonly Shader _vertexShader;
     private readonly Shader _fragmentShader;
     private readonly GraphicsPipeline _pipeline;
@@ -14,8 +13,8 @@ internal sealed unsafe class VulkanRenderer
     /// <summary>
     /// Initializes the renderer by loading shaders and creating the graphics pipeline.
     /// </summary>
-    /// <param name="presenter">The Vulkan presenter used for frame presentation.</param>
-    internal VulkanRenderer(VulkanPresenter presenter)
+    /// <param name="presenter">The presenter used for frame presentation.</param>
+    internal VulkanRenderer(Presenter presenter)
     {
         _presenter = presenter;
 
