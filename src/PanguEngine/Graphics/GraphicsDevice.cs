@@ -102,4 +102,9 @@ public abstract class GraphicsDevice
     /// <param name="description">The graphics pipeline description.</param>
     /// <returns>The created graphics pipeline.</returns>
     public abstract GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description);
+
+    /// <summary>
+    /// Waits until the graphics device has completed all pending work.
+    /// </summary>
+    public abstract void WaitIdle();
 }

@@ -1,10 +1,6 @@
 using PanguEngine.Client;
-using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Windowing;
-using Silk.NET.Core.Native;
 using Silk.NET.Maths;
-using Silk.NET.Vulkan;
-using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
 using Window = PanguEngine.Windowing.Window;
 
 namespace PanguEngine.Graphics.Test;
@@ -15,17 +11,13 @@ namespace PanguEngine.Graphics.Test;
 /// <param name="scene">The scene to run.</param>
 public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
 {
+    private GraphicsBackend _graphicsBackend = null!;
     private Window _window = null!;
     private Presenter _presenter = null!;
     private WindowManager _windowManager = null!;
     private ClientLoop _loop = null!;
     private bool _sceneInitialized;
-    private bool _windowInitialized;
-    private bool _windowManagerInitialized;
-    private bool _graphicsContextInitialized;
-    private bool _uploaderInitialized;
-    private bool _allocatorInitialized;
-    private bool _contextInitialized;
+    private bool _graphicsBackendInitialized;
     private bool _engineInitialized;
 
     /// <summary>
@@ -52,43 +44,19 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
         Engine.Initialize();
         _engineInitialized = true;
 
-        var options = SilkWindowOptions.DefaultVulkan with
+        _graphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
-            Size = new Vector2D<int>(800, 600),
-            Title = scene.Name
-        };
+            PrimaryWindow = new WindowOptions
+            {
+                Size = new Vector2D<int>(800, 600),
+                Title = scene.Name
+            }
+        });
+        _graphicsBackendInitialized = true;
 
-        var silkWindow = Silk.NET.Windowing.Window.Create(options);
-        silkWindow.Initialize();
-
-        if (silkWindow.VkSurface is null)
-            throw new InvalidOperationException("Windowing platform doesn't support Vulkan.");
-
-        var glfwExtensions = silkWindow.VkSurface.GetRequiredExtensions(out var count);
-        var requiredExtensions = SilkMarshal.PtrToStringArray((nint)glfwExtensions, (int)count);
-
-        VulkanContext.InitializeInstance(requiredExtensions);
-        _contextInitialized = true;
-
-        var surface = silkWindow.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
-            .ToSurface();
-        VulkanContext.InitializeDevice(surface);
-
-        VulkanAllocator.Initialize();
-        _allocatorInitialized = true;
-
-        VulkanUploader.Initialize();
-        _uploaderInitialized = true;
-
-        GraphicsContext.Initialize(new VulkanGraphicsDevice());
-        _graphicsContextInitialized = true;
-
-        _window = new VulkanWindow(silkWindow, surface, true);
-        _windowInitialized = true;
-
+        _window = _graphicsBackend.PrimaryWindow;
         _presenter = _window.Presenter;
-        _windowManager = new WindowManager(_window, VulkanWindowFactory.CreateWindow);
-        _windowManagerInitialized = true;
+        _windowManager = _graphicsBackend.WindowManager;
         _loop = new ClientLoop(_windowManager);
         scene.Initialize(_presenter);
         _sceneInitialized = true;
@@ -117,34 +85,14 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
 
     private void Shutdown()
     {
-        if (_contextInitialized)
-            VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
+        if (_graphicsBackendInitialized)
+            _graphicsBackend.Device.WaitIdle();
 
         if (_sceneInitialized)
             scene.Destroy();
 
-        if (_windowManagerInitialized)
-            _windowManager.Destroy();
-        else
-        {
-            if (_windowInitialized)
-                _window.Destroy();
-        }
-
-        if (_graphicsContextInitialized)
-            GraphicsContext.Shutdown();
-
-        if (_uploaderInitialized)
-            VulkanUploader.Destroy();
-
-        if (_allocatorInitialized)
-        {
-            VulkanDeletionQueue.Drain();
-            VulkanAllocator.Destroy();
-        }
-
-        if (_contextInitialized)
-            VulkanContext.Destroy();
+        if (_graphicsBackendInitialized)
+            _graphicsBackend.Destroy();
 
         if (_engineInitialized)
             Engine.Shutdown();

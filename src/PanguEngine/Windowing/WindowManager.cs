@@ -67,7 +67,7 @@ public sealed class WindowManager
     }
 
     /// <summary>Destroys all managed window resources.</summary>
-    public void Destroy()
+    internal void Destroy()
     {
         if (_destroyed) return;
         _destroyed = true;

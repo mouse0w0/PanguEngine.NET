@@ -1,10 +1,7 @@
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Windowing;
-using Silk.NET.Core.Native;
 using Silk.NET.Maths;
-using Silk.NET.Vulkan;
-using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
 using Window = PanguEngine.Windowing.Window;
 
 namespace PanguEngine.Client;
@@ -12,7 +9,7 @@ namespace PanguEngine.Client;
 /// <summary>
 /// Application client.
 /// </summary>
-public unsafe class Client
+public class Client
 {
     /// <summary>
     /// The singleton instance of the client.
@@ -22,12 +19,12 @@ public unsafe class Client
     /// <summary>
     /// The primary window.
     /// </summary>
-    public Window PrimaryWindow { get; private set; } = null!;
+    public Window PrimaryWindow => GraphicsBackend.PrimaryWindow;
 
     /// <summary>
     /// The window manager.
     /// </summary>
-    public WindowManager WindowManager { get; private set; } = null!;
+    public WindowManager WindowManager => GraphicsBackend.WindowManager;
 
     /// <summary>
     /// The client loop.
@@ -40,6 +37,11 @@ public unsafe class Client
     private VulkanRenderer Renderer { get; set; } = null!;
 
     /// <summary>
+    /// The graphics backend.
+    /// </summary>
+    private GraphicsBackend GraphicsBackend { get; set; } = null!;
+
+    /// <summary>
     /// Runs the application.
     /// </summary>
     public void Run()
@@ -47,8 +49,14 @@ public unsafe class Client
         Instance = this;
 
         OnInit();
-        OnRunning();
-        OnShutdown();
+        try
+        {
+            OnRunning();
+        }
+        finally
+        {
+            OnShutdown();
+        }
     }
 
     /// <summary>
@@ -58,32 +66,11 @@ public unsafe class Client
     {
         Engine.Initialize();
 
-        var options = SilkWindowOptions.DefaultVulkan with
+        GraphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
-            Size = new Vector2D<int>(800, 600),
-            Title = "PanguEngine"
-        };
-        var silkWindow = Silk.NET.Windowing.Window.Create(options);
-        silkWindow.Initialize();
+            PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
+        });
 
-        if (silkWindow.VkSurface is null)
-            throw new InvalidOperationException("Windowing platform doesn't support Vulkan.");
-
-        var glfwExtensions = silkWindow.VkSurface.GetRequiredExtensions(out var count);
-        var requiredExtensions = SilkMarshal.PtrToStringArray((nint)glfwExtensions, (int)count);
-
-        VulkanContext.InitializeInstance(requiredExtensions);
-
-        var surface = silkWindow.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
-            .ToSurface();
-        VulkanContext.InitializeDevice(surface);
-
-        VulkanAllocator.Initialize();
-        VulkanUploader.Initialize();
-        GraphicsContext.Initialize(new VulkanGraphicsDevice());
-
-        PrimaryWindow = new VulkanWindow(silkWindow, surface, true);
-        WindowManager = new WindowManager(PrimaryWindow, VulkanWindowFactory.CreateWindow);
         Loop = new ClientLoop(WindowManager);
         Renderer = new VulkanRenderer(PrimaryWindow.Presenter);
     }
@@ -103,12 +90,7 @@ public unsafe class Client
     private void OnShutdown()
     {
         Renderer.Destroy();
-        WindowManager.Destroy();
-        GraphicsContext.Shutdown();
-        VulkanUploader.Destroy();
-        VulkanDeletionQueue.Drain();
-        VulkanAllocator.Destroy();
-        VulkanContext.Destroy();
+        GraphicsBackend.Destroy();
 
         Engine.Shutdown();
     }

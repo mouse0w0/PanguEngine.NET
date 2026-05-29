@@ -3,8 +3,13 @@ namespace PanguEngine.Graphics;
 /// <summary>
 /// Represents a presentation target and frame boundary provider.
 /// </summary>
-public abstract class Presenter : GraphicsResource
+public abstract class Presenter
 {
+    /// <summary>
+    /// Gets whether the presenter has been destroyed.
+    /// </summary>
+    public abstract bool IsDestroyed { get; }
+
     /// <summary>
     /// Gets the current presentation width.
     /// </summary>
@@ -48,4 +53,9 @@ public abstract class Presenter : GraphicsResource
     /// </summary>
     /// <param name="frame">The frame returned by <see cref="BeginFrame"/>.</param>
     public abstract void EndFrame(Frame frame);
+
+    /// <summary>
+    /// Destroys the presenter.
+    /// </summary>
+    internal abstract void Destroy();
 }

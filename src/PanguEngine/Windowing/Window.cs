@@ -6,8 +6,11 @@ namespace PanguEngine.Windowing;
 /// <summary>
 /// Abstract base class for platform windows, providing properties and events for window management, input, and rendering.
 /// </summary>
-public abstract class Window : GraphicsResource
+public abstract class Window
 {
+    /// <summary>Whether the window has been destroyed.</summary>
+    public abstract bool IsDestroyed { get; }
+
     /// <summary>The window title.</summary>
     public abstract string Title { get; set; }
 
@@ -97,6 +100,9 @@ public abstract class Window : GraphicsResource
 
     /// <summary>Requests the window to close.</summary>
     public abstract void CloseWindow();
+
+    /// <summary>Destroys the window.</summary>
+    internal abstract void Destroy();
 
     /// <summary>Processes pending platform events for the window.</summary>
     internal abstract void DoEvents();

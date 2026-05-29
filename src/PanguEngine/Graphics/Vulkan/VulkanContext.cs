@@ -157,24 +157,43 @@ public static unsafe class VulkanContext
     {
         if (_instanceInitialized)
             throw new InvalidOperationException("Vulkan instance already initialized.");
-        _instanceInitialized = true;
 
         _enableValidationLayers = enableValidationLayers;
-
         Vk = Vk.GetApi();
 
-        if (_enableValidationLayers && !CheckValidationLayerSupport())
-            throw new InvalidOperationException("Validation layers requested, but not available.");
+        try
+        {
+            if (_enableValidationLayers && !CheckValidationLayerSupport())
+                throw new InvalidOperationException("Validation layers requested, but not available.");
 
-        CreateInstance(requiredExtensions);
+            CreateInstance(requiredExtensions);
 
-        if (_enableValidationLayers)
-            SetupDebugMessenger();
+            if (_enableValidationLayers)
+                SetupDebugMessenger();
 
-        if (!Vk.TryGetInstanceExtension<KhrSurface>(VkInstance, out var khrSurface))
-            throw new NotSupportedException("VK_KHR_surface extension not found.");
+            if (!Vk.TryGetInstanceExtension<KhrSurface>(VkInstance, out var khrSurface))
+                throw new NotSupportedException("VK_KHR_surface extension not found.");
 
-        KhrSurface = khrSurface;
+            KhrSurface = khrSurface;
+            _instanceInitialized = true;
+        }
+        catch
+        {
+            if (_enableValidationLayers && _debugUtils is not null && _debugMessenger.Handle != 0)
+                _debugUtils.DestroyDebugUtilsMessenger(VkInstance, _debugMessenger, null);
+            if (VkInstance.Handle != 0)
+                Vk.DestroyInstance(VkInstance, null);
+
+            Vk.Dispose();
+            Vk = null!;
+            VkInstance = default;
+            _debugUtils = null;
+            _debugMessenger = default;
+            KhrSurface = null!;
+            _instanceInitialized = false;
+
+            throw;
+        }
     }
 
     /// <summary>
@@ -198,45 +217,77 @@ public static unsafe class VulkanContext
             throw new InvalidOperationException("Vulkan instance must be initialized first.");
         if (_deviceInitialized)
             throw new InvalidOperationException("Logical device already initialized.");
-        _deviceInitialized = true;
 
-        PickPhysicalDevice(surface);
-
-        Vk.GetPhysicalDeviceProperties(PhysicalDevice, out var props);
-        Vk.GetPhysicalDeviceFeatures(PhysicalDevice, out var physicalDeviceFeatures);
-        MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
-        MaxImageDimension1D = props.Limits.MaxImageDimension1D;
-        MaxImageDimension2D = props.Limits.MaxImageDimension2D;
-        MaxImageDimension3D = props.Limits.MaxImageDimension3D;
-        MaxImageArrayLayers = props.Limits.MaxImageArrayLayers;
-        SamplerAnisotropySupported = physicalDeviceFeatures.SamplerAnisotropy;
-        MaxSamplerAnisotropy = props.Limits.MaxSamplerAnisotropy;
-        MaxSamplerLodBias = props.Limits.MaxSamplerLodBias;
-
-        KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
-        MaxFramesInFlight = capabilities.MinImageCount + 1;
-        if (capabilities.MaxImageCount > 0 && MaxFramesInFlight > capabilities.MaxImageCount)
-            MaxFramesInFlight = capabilities.MaxImageCount;
-
-        CreateLogicalDevice(surface);
-
-        SemaphoreTypeCreateInfo timelineCreateInfo = new()
+        try
         {
-            SType = StructureType.SemaphoreTypeCreateInfo,
-            SemaphoreType = SemaphoreType.Timeline,
-            InitialValue = 0,
-        };
-        SemaphoreCreateInfo semaphoreInfo = new()
-        {
-            SType = StructureType.SemaphoreCreateInfo,
-            PNext = &timelineCreateInfo,
-        };
-        if (Vk.CreateSemaphore(Device, in semaphoreInfo, null, out _globalTimelineSemaphore) != Result.Success)
-            throw new InvalidOperationException("Failed to create global timeline semaphore.");
+            PickPhysicalDevice(surface);
 
-        if (!Vk.TryGetDeviceExtension<KhrSwapchain>(VkInstance, Device, out var khrSwapchain))
-            throw new NotSupportedException("VK_KHR_swapchain extension not found.");
-        KhrSwapchain = khrSwapchain;
+            Vk.GetPhysicalDeviceProperties(PhysicalDevice, out var props);
+            Vk.GetPhysicalDeviceFeatures(PhysicalDevice, out var physicalDeviceFeatures);
+            MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
+            MaxImageDimension1D = props.Limits.MaxImageDimension1D;
+            MaxImageDimension2D = props.Limits.MaxImageDimension2D;
+            MaxImageDimension3D = props.Limits.MaxImageDimension3D;
+            MaxImageArrayLayers = props.Limits.MaxImageArrayLayers;
+            SamplerAnisotropySupported = physicalDeviceFeatures.SamplerAnisotropy;
+            MaxSamplerAnisotropy = props.Limits.MaxSamplerAnisotropy;
+            MaxSamplerLodBias = props.Limits.MaxSamplerLodBias;
+
+            KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
+            MaxFramesInFlight = capabilities.MinImageCount + 1;
+            if (capabilities.MaxImageCount > 0 && MaxFramesInFlight > capabilities.MaxImageCount)
+                MaxFramesInFlight = capabilities.MaxImageCount;
+
+            CreateLogicalDevice(surface);
+
+            SemaphoreTypeCreateInfo timelineCreateInfo = new()
+            {
+                SType = StructureType.SemaphoreTypeCreateInfo,
+                SemaphoreType = SemaphoreType.Timeline,
+                InitialValue = 0,
+            };
+            SemaphoreCreateInfo semaphoreInfo = new()
+            {
+                SType = StructureType.SemaphoreCreateInfo,
+                PNext = &timelineCreateInfo,
+            };
+            if (Vk.CreateSemaphore(Device, in semaphoreInfo, null, out _globalTimelineSemaphore) != Result.Success)
+                throw new InvalidOperationException("Failed to create global timeline semaphore.");
+
+            if (!Vk.TryGetDeviceExtension<KhrSwapchain>(VkInstance, Device, out var khrSwapchain))
+                throw new NotSupportedException("VK_KHR_swapchain extension not found.");
+
+            KhrSwapchain = khrSwapchain;
+            _deviceInitialized = true;
+        }
+        catch
+        {
+            if (_globalTimelineSemaphore.Handle != 0)
+                Vk.DestroySemaphore(Device, _globalTimelineSemaphore, null);
+            if (Device.Handle != 0)
+                Vk.DestroyDevice(Device, null);
+
+            _globalTimelineSemaphore = default;
+            KhrSwapchain = null!;
+            Device = default;
+            GraphicsQueue = default;
+            PresentQueue = default;
+            PhysicalDevice = default;
+            GraphicsQueueFamily = 0;
+            PresentQueueFamily = 0;
+            MaxFramesInFlight = 0;
+            MinUniformBufferOffsetAlignment = 0;
+            MaxImageDimension1D = 0;
+            MaxImageDimension2D = 0;
+            MaxImageDimension3D = 0;
+            MaxImageArrayLayers = 0;
+            SamplerAnisotropySupported = false;
+            MaxSamplerAnisotropy = 0;
+            MaxSamplerLodBias = 0;
+            _deviceInitialized = false;
+
+            throw;
+        }
     }
 
     /// <summary>

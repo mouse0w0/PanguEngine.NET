@@ -1,23 +1,17 @@
 using PanguEngine.Client;
-using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Windowing;
-using Silk.NET.Core.Native;
 using Silk.NET.Maths;
-using Silk.NET.Vulkan;
-using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
 
 namespace PanguEngine.Graphics.Test.MultiWindow;
 
 internal static unsafe class MultiWindowTest
 {
+    private static GraphicsBackend? _graphicsBackend;
     private static WindowManager? _windowManager;
     private static Window? _primary;
     private static Window? _secondary;
     private static bool _engineInitialized;
-    private static bool _contextInitialized;
-    private static bool _allocatorInitialized;
-    private static bool _uploaderInitialized;
-    private static bool _graphicsContextInitialized;
+    private static bool _graphicsBackendInitialized;
 
     private static void Main()
     {
@@ -39,36 +33,18 @@ internal static unsafe class MultiWindowTest
         Engine.Initialize();
         _engineInitialized = true;
 
-        var silkOptions = SilkWindowOptions.DefaultVulkan with
+        _graphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
-            Size = new Vector2D<int>(640, 480),
-            Title = "MultiWindow Primary"
-        };
+            PrimaryWindow = new WindowOptions
+            {
+                Size = new Vector2D<int>(640, 480),
+                Title = "MultiWindow Primary"
+            }
+        });
+        _graphicsBackendInitialized = true;
 
-        var silkWindow = Silk.NET.Windowing.Window.Create(silkOptions);
-        silkWindow.Initialize();
-        if (silkWindow.VkSurface is null)
-            throw new InvalidOperationException("Windowing platform doesn't support Vulkan.");
-
-        var extensions = silkWindow.VkSurface.GetRequiredExtensions(out var count);
-        var requiredExtensions = SilkMarshal.PtrToStringArray((nint)extensions, (int)count);
-        VulkanContext.InitializeInstance(requiredExtensions);
-        _contextInitialized = true;
-
-        var surface = silkWindow.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
-            .ToSurface();
-        VulkanContext.InitializeDevice(surface);
-        VulkanAllocator.Initialize();
-        _allocatorInitialized = true;
-        VulkanUploader.Initialize();
-        _uploaderInitialized = true;
-        GraphicsContext.Initialize(new VulkanGraphicsDevice());
-        _graphicsContextInitialized = true;
-
-        var primaryWindow = new VulkanWindow(silkWindow, surface, true);
-
-        _windowManager = new WindowManager(primaryWindow, VulkanWindowFactory.CreateWindow);
-        _primary = primaryWindow;
+        _windowManager = _graphicsBackend.WindowManager;
+        _primary = _graphicsBackend.PrimaryWindow;
         _secondary = _windowManager.CreateWindow(new WindowOptions
         {
             Title = "MultiWindow Secondary",
@@ -99,25 +75,11 @@ internal static unsafe class MultiWindowTest
 
     private static void Shutdown()
     {
-        if (_contextInitialized)
-            VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
+        if (_graphicsBackendInitialized)
+            _graphicsBackend!.Device.WaitIdle();
 
-        _windowManager?.Destroy();
-
-        if (_graphicsContextInitialized)
-            GraphicsContext.Shutdown();
-
-        if (_uploaderInitialized)
-            VulkanUploader.Destroy();
-
-        if (_allocatorInitialized)
-        {
-            VulkanDeletionQueue.Drain();
-            VulkanAllocator.Destroy();
-        }
-
-        if (_contextInitialized)
-            VulkanContext.Destroy();
+        if (_graphicsBackendInitialized)
+            _graphicsBackend!.Destroy();
 
         if (_engineInitialized)
             Engine.Shutdown();

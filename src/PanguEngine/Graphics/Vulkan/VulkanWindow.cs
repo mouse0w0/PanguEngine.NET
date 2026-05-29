@@ -352,7 +352,7 @@ public sealed unsafe class VulkanWindow : Window
     internal override void DoRender(double deltaTime) => Render?.Invoke(this, deltaTime);
 
     /// <inheritdoc/>
-    public override void Destroy()
+    internal override void Destroy()
     {
         if (_isDestroyed) return;
         _isDestroyed = true;
