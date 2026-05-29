@@ -45,8 +45,8 @@ internal sealed class VulkanRenderer
     /// <summary>
     /// Records and submits a draw command for the current frame, then presents the rendered image.
     /// </summary>
-    /// <param name="delta">The time elapsed since the last frame, in seconds.</param>
-    public void DrawFrame(double delta)
+    /// <param name="alpha">The interpolation factor since the last fixed update.</param>
+    public void DrawFrame(double alpha)
     {
         var frame = _presenter.BeginFrame();
         try

@@ -20,7 +20,11 @@ internal static unsafe class MultiWindowTest
             Initialize();
             _primary!.Render += (_, _) => Draw(_primary.Presenter, new ClearColor(0.08f, 0.02f, 0.02f, 1));
             _secondary!.Render += (_, _) => Draw(_secondary.Presenter, new ClearColor(0.02f, 0.08f, 0.02f, 1));
-            new ClientLoop(_windowManager!).Run();
+            new ClientLoop(
+                () => _windowManager!.Windows.Count > 0,
+                _windowManager!.DoEvents,
+                () => { },
+                _windowManager!.RenderWindows).Run();
         }
         finally
         {

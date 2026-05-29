@@ -1,24 +1,30 @@
 using System.Diagnostics;
-using PanguEngine.Windowing;
 
 namespace PanguEngine.Client;
 
 /// <summary>
 /// Runs the client update and render loop.
 /// </summary>
-public sealed class ClientLoop(WindowManager windowManager)
+public sealed class ClientLoop(Func<bool> shouldContinue, Action pumpEvents, Action update, Action<double> render)
 {
-    private readonly Dictionary<Window, double> _lastRenderTimes = [];
     private bool _stopRequested;
 
+    private double _updatesPerSecond = 20;
+    private double _updateInterval = 1d / 20;
+
     /// <summary>The global update events per second.</summary>
-    public double UpdatesPerSecond { get; set; } = 20;
+    public double UpdatesPerSecond
+    {
+        get => _updatesPerSecond;
+        set
+        {
+            _updatesPerSecond = value;
+            _updateInterval = value > 0 ? 1d / value : 0d;
+        }
+    }
 
     /// <summary>Whether the loop is running.</summary>
     public bool IsRunning { get; private set; }
-
-    /// <summary>Raised when the global client update is due.</summary>
-    public event Action<double>? Update;
 
     /// <summary>Runs the client loop until stopped or all windows close.</summary>
     public void Run()
@@ -29,29 +35,34 @@ public sealed class ClientLoop(WindowManager windowManager)
         IsRunning = true;
         _stopRequested = false;
         var stopwatch = Stopwatch.StartNew();
-        var lastUpdateTime = stopwatch.Elapsed.TotalSeconds;
+        var previous = stopwatch.Elapsed.TotalSeconds;
+        var lag = 0d;
 
         try
         {
-            while (!_stopRequested && windowManager.Windows.Count > 0)
+            while (!_stopRequested && shouldContinue())
             {
-                windowManager.DoEvents();
-                var now = stopwatch.Elapsed.TotalSeconds;
+                pumpEvents();
 
-                if (UpdatesPerSecond > 0)
+                var current = stopwatch.Elapsed.TotalSeconds;
+                var elapsed = current - previous;
+                previous = current;
+
+                var alpha = 0d;
+                if (_updateInterval > 0)
                 {
-                    var updateInterval = 1d / UpdatesPerSecond;
-                    if (now - lastUpdateTime >= updateInterval)
+                    lag += elapsed;
+
+                    if (lag >= _updateInterval)
                     {
-                        Update?.Invoke(now - lastUpdateTime);
-                        lastUpdateTime = now;
+                        update();
+                        lag -= _updateInterval;
                     }
+
+                    alpha = Math.Min(lag * _updatesPerSecond, 1d);
                 }
 
-                foreach (var window in windowManager.Windows)
-                {
-                    RenderWindow(window, now);
-                }
+                render(alpha);
             }
         }
         finally
@@ -64,19 +75,5 @@ public sealed class ClientLoop(WindowManager windowManager)
     public void Stop()
     {
         _stopRequested = true;
-    }
-
-    private void RenderWindow(Window window, double now)
-    {
-        if (window.IsDestroyed || window.IsClosing || !window.IsVisible || window.IsMinimized)
-            return;
-
-        _lastRenderTimes.TryGetValue(window, out var lastRenderTime);
-        var interval = window.FramesPerSecond <= 0 ? 0 : 1d / window.FramesPerSecond;
-        if (interval > 0 && now - lastRenderTime < interval)
-            return;
-
-        window.DoRender(now - lastRenderTime);
-        _lastRenderTimes[window] = now;
     }
 }

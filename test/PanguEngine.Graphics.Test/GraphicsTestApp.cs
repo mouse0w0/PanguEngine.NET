@@ -9,7 +9,7 @@ namespace PanguEngine.Graphics.Test;
 /// Runs a backend-independent graphics test scene.
 /// </summary>
 /// <param name="scene">The scene to run.</param>
-public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
+public sealed class GraphicsTestApp(IGraphicsTestScene scene)
 {
     private GraphicsBackend _graphicsBackend = null!;
     private Window _window = null!;
@@ -57,7 +57,11 @@ public sealed unsafe class GraphicsTestApp(IGraphicsTestScene scene)
         _window = _graphicsBackend.PrimaryWindow;
         _presenter = _window.Presenter;
         _windowManager = _graphicsBackend.WindowManager;
-        _loop = new ClientLoop(_windowManager);
+        _loop = new ClientLoop(
+            () => _windowManager.Windows.Count > 0,
+            _windowManager.DoEvents,
+            () => { },
+            _windowManager.RenderWindows);
         scene.Initialize(_presenter);
         _sceneInitialized = true;
     }

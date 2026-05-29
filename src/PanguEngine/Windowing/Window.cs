@@ -86,7 +86,7 @@ public abstract class Window
     /// <summary>Raised when a character is typed.</summary>
     public abstract event Action<Window, char> CharInput;
 
-    /// <summary>Raised each frame for rendering.</summary>
+    /// <summary>Raised each frame for rendering with the interpolation factor since the last fixed update.</summary>
     public abstract event Action<Window, double> Render;
 
     /// <summary>Shows the window.</summary>
@@ -108,6 +108,6 @@ public abstract class Window
     internal abstract void DoEvents();
 
     /// <summary>Performs a render event for this window.</summary>
-    /// <param name="deltaTime">The elapsed time since the previous render event.</param>
-    internal abstract void DoRender(double deltaTime);
+    /// <param name="alpha">The interpolation factor since the last fixed update.</param>
+    internal abstract void DoRender(double alpha);
 }

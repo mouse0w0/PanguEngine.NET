@@ -71,7 +71,11 @@ public class Client
             PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
         });
 
-        Loop = new ClientLoop(WindowManager);
+        Loop = new ClientLoop(
+            () => WindowManager.Windows.Count > 0,
+            WindowManager.DoEvents,
+            OnUpdate,
+            WindowManager.RenderWindows);
         Renderer = new VulkanRenderer(PrimaryWindow.Presenter);
     }
 
@@ -80,8 +84,12 @@ public class Client
     /// </summary>
     private void OnRunning()
     {
-        PrimaryWindow.Render += (_, dt) => Renderer.DrawFrame(dt);
+        PrimaryWindow.Render += (_, alpha) => Renderer.DrawFrame(alpha);
         Loop.Run();
+    }
+
+    private void OnUpdate()
+    {
     }
 
     /// <summary>

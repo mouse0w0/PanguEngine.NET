@@ -349,7 +349,7 @@ public sealed unsafe class VulkanWindow : Window
     internal override void DoEvents() => _silkWindow.DoEvents();
 
     /// <inheritdoc/>
-    internal override void DoRender(double deltaTime) => Render?.Invoke(this, deltaTime);
+    internal override void DoRender(double alpha) => Render?.Invoke(this, alpha);
 
     /// <inheritdoc/>
     internal override void Destroy()

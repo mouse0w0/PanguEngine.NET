@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace PanguEngine.Windowing;
 
 /// <summary>
@@ -8,6 +10,7 @@ public sealed class WindowManager
     private readonly Func<WindowOptions, Window> _createWindow;
     private readonly List<Window> _windows = [];
     private readonly List<Window> _pendingDestroy = [];
+    private readonly Dictionary<Window, double> _lastRenderTimes = [];
     private bool _destroyed;
 
     /// <summary>
@@ -56,6 +59,26 @@ public sealed class WindowManager
         DestroyClosedWindows();
     }
 
+    /// <summary>Renders all visible windows that are due for a frame.</summary>
+    /// <param name="alpha">The interpolation factor since the last fixed update.</param>
+    public void RenderWindows(double alpha)
+    {
+        var now = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+        foreach (var window in _windows)
+        {
+            if (window.IsDestroyed || window.IsClosing || !window.IsVisible || window.IsMinimized)
+                continue;
+
+            _lastRenderTimes.TryGetValue(window, out var lastRenderTime);
+            var interval = window.FramesPerSecond <= 0 ? 0 : 1d / window.FramesPerSecond;
+            if (interval > 0 && now - lastRenderTime < interval)
+                continue;
+
+            window.DoRender(alpha);
+            _lastRenderTimes[window] = now;
+        }
+    }
+
     /// <summary>Requests all windows to close.</summary>
     public void CloseAll()
     {
@@ -79,6 +102,7 @@ public sealed class WindowManager
 
         _windows.Clear();
         _pendingDestroy.Clear();
+        _lastRenderTimes.Clear();
         PrimaryWindow = null;
     }
 
@@ -103,6 +127,7 @@ public sealed class WindowManager
         {
             DestroyWindow(window);
             _windows.Remove(window);
+            _lastRenderTimes.Remove(window);
             if (ReferenceEquals(PrimaryWindow, window))
                 PrimaryWindow = null;
         }
