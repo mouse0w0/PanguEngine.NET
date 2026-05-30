@@ -17,4 +17,5 @@
   <Project Path="test/PanguEngine.Graphics.Test.Triangle/PanguEngine.Graphics.Test.Triangle.csproj"/>
   <Project Path="test/PanguEngine.Graphics.Test.UniformBuffer/PanguEngine.Graphics.Test.UniformBuffer.csproj"/>
     <Project Path="test/PanguEngine.Graphics.Test.MultiWindow/PanguEngine.Graphics.Test.MultiWindow.csproj"/>
+  <Project Path="test/PanguEngine.Graphics.Test.WindowMode/PanguEngine.Graphics.Test.WindowMode.csproj"/>
 </Solution>
