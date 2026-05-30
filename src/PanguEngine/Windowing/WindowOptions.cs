@@ -25,6 +25,9 @@ public record struct WindowOptions
     /// <summary>The target render events per second. Values less than or equal to zero mean unlimited.</summary>
     public double FramesPerSecond { get; set; } = 60;
 
+    /// <summary>Whether the window starts in exclusive fullscreen mode.</summary>
+    public bool IsFullscreen { get; set; }
+
     /// <summary>Initializes a new instance with default values.</summary>
     public WindowOptions()
     {

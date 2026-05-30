@@ -2,7 +2,10 @@ using PanguEngine.Windowing;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using SilkWindow = Silk.NET.Windowing.IWindow;
+using SilkWindowBorder = Silk.NET.Windowing.WindowBorder;
+using SilkWindowCreator = Silk.NET.Windowing.Window;
 using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
+using SilkWindowState = Silk.NET.Windowing.WindowState;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -50,15 +53,18 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             Title = options.PrimaryWindow.Title,
             WindowBorder = options.PrimaryWindow.WindowBorder switch
             {
-                WindowBorder.Fixed => Silk.NET.Windowing.WindowBorder.Fixed,
-                WindowBorder.Hidden => Silk.NET.Windowing.WindowBorder.Hidden,
-                _ => Silk.NET.Windowing.WindowBorder.Resizable
-            }
+                WindowBorder.Fixed => SilkWindowBorder.Fixed,
+                WindowBorder.Hidden => SilkWindowBorder.Hidden,
+                _ => SilkWindowBorder.Resizable
+            },
+            WindowState = options.PrimaryWindow.IsFullscreen
+                ? SilkWindowState.Fullscreen
+                : SilkWindowState.Normal
         };
 
         try
         {
-            silkWindow = Silk.NET.Windowing.Window.Create(silkOptions);
+            silkWindow = SilkWindowCreator.Create(silkOptions);
             silkWindow.Initialize();
 
             if (silkWindow.VkSurface is null)

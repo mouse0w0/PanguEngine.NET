@@ -97,10 +97,29 @@ public sealed unsafe class VulkanWindow : Window
     public override bool IsFocused => _isFocused;
 
     /// <inheritdoc/>
-    public override bool IsMinimized => _silkWindow.WindowState == SilkWindowState.Minimized;
+    public override bool IsMinimized
+    {
+        get => _silkWindow.WindowState == SilkWindowState.Minimized;
+        set => _silkWindow.WindowState = value ? SilkWindowState.Minimized : SilkWindowState.Normal;
+    }
 
     /// <inheritdoc/>
-    public override bool IsMaximized => _silkWindow.WindowState == SilkWindowState.Maximized;
+    public override bool IsMaximized
+    {
+        get => _silkWindow.WindowState == SilkWindowState.Maximized;
+        set => _silkWindow.WindowState = value ? SilkWindowState.Maximized : SilkWindowState.Normal;
+    }
+
+    /// <inheritdoc/>
+    public override bool IsFullscreen
+    {
+        get => _silkWindow.WindowState == SilkWindowState.Fullscreen;
+        set => _silkWindow.WindowState = value ? SilkWindowState.Fullscreen : SilkWindowState.Normal;
+    }
+
+    /// <inheritdoc/>
+    public override Vector2D<int> MonitorSize =>
+        _silkWindow.Monitor?.VideoMode.Resolution ?? new Vector2D<int>(0, 0);
 
     /// <inheritdoc/>
     public override bool IsVisible

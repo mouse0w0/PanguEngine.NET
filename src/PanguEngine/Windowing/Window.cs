@@ -26,11 +26,17 @@ public abstract class Window
     /// <summary>Whether the window has input focus.</summary>
     public abstract bool IsFocused { get; }
 
-    /// <summary>Whether the window is minimized.</summary>
-    public abstract bool IsMinimized { get; }
+    /// <summary>Whether the window is minimized. Setting to true minimizes the window; setting to false restores it.</summary>
+    public abstract bool IsMinimized { get; set; }
 
-    /// <summary>Whether the window is maximized.</summary>
-    public abstract bool IsMaximized { get; }
+    /// <summary>Whether the window is maximized. Setting to true maximizes the window; setting to false restores it.</summary>
+    public abstract bool IsMaximized { get; set; }
+
+    /// <summary>Whether the window is in exclusive fullscreen mode. Setting to true enters fullscreen; setting to false returns to windowed mode.</summary>
+    public abstract bool IsFullscreen { get; set; }
+
+    /// <summary>The resolution of the monitor this window is currently on.</summary>
+    public abstract Vector2D<int> MonitorSize { get; }
 
     /// <summary>Whether the window is visible.</summary>
     public abstract bool IsVisible { get; set; }
