@@ -12,7 +12,7 @@ internal static class BufferUpload
 {
     private static void Main()
     {
-        new ClientTestApp(new BufferUploadScene()).Run();
+        ClientTestApp.Run(new BufferUploadScene());
     }
 }
 
@@ -33,6 +33,7 @@ internal sealed class BufferUploadScene : IClientTestScene
     private GraphicsPipeline _pipeline = null!;
     private GraphicsBuffer _vertexBuffer = null!;
     private UploadHandle _uploadHandle = null!;
+    private Presenter _presenter = null!;
 
     /// <inheritdoc/>
     public string Name => "BufferUpload";
@@ -40,25 +41,11 @@ internal sealed class BufferUploadScene : IClientTestScene
     /// <inheritdoc/>
     public void Initialize(Window window)
     {
+        _presenter = window.Presenter;
         CreateVertexBuffer();
         CreateShaders();
-        CreatePipeline(window.Presenter.ColorFormat);
-    }
-
-    /// <inheritdoc/>
-    public void Record(Frame frame, CommandList commands)
-    {
-        if (!_uploadHandle.IsCompleted)
-            throw new InvalidOperationException(
-                "Vertex buffer upload did not complete after flushing pending uploads.");
-
-        commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.01f, 0.015f, 1)));
-        commands.SetGraphicsPipeline(_pipeline);
-        commands.SetViewport(0, 0, frame.Width, frame.Height);
-        commands.SetScissor(0, 0, frame.Width, frame.Height);
-        commands.SetVertexBuffer(0, _vertexBuffer);
-        commands.Draw((uint)_vertices.Length);
-        commands.EndRendering();
+        CreatePipeline(_presenter.ColorFormat);
+        window.Render += (_, _) => DrawFrame();
     }
 
     /// <inheritdoc/>
@@ -68,6 +55,35 @@ internal sealed class BufferUploadScene : IClientTestScene
         _pipeline.Destroy();
         _fragShader.Destroy();
         _vertShader.Destroy();
+    }
+
+    private void DrawFrame()
+    {
+        if (!_uploadHandle.IsCompleted)
+            throw new InvalidOperationException(
+                "Vertex buffer upload did not complete after flushing pending uploads.");
+
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
+        var activeFrame = frame!;
+        try
+        {
+            var commands = activeFrame.CommandList;
+            commands.Begin();
+            commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.01f, 0.015f, 1)));
+            commands.SetGraphicsPipeline(_pipeline);
+            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetVertexBuffer(0, _vertexBuffer);
+            commands.Draw((uint)_vertices.Length);
+            commands.EndRendering();
+            commands.End();
+        }
+        finally
+        {
+            _presenter.EndFrame(activeFrame);
+        }
     }
 
     private void CreateVertexBuffer()

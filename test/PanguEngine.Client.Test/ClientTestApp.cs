@@ -9,27 +9,50 @@ namespace PanguEngine.Client.Test;
 /// Runs a backend-independent graphics test scene.
 /// </summary>
 /// <param name="scene">The scene to run.</param>
-public sealed class ClientTestApp(IClientTestScene scene)
+public sealed class ClientTestApp
 {
+    /// <summary>
+    /// Gets the current running instance.
+    /// </summary>
+    public static ClientTestApp Instance { get; private set; } = null!;
+
+    private readonly IClientTestScene _scene;
+
+    /// <summary>
+    /// Gets the primary window.
+    /// </summary>
+    public Window Window { get; private set; } = null!;
+
+    /// <summary>
+    /// Gets the window manager.
+    /// </summary>
+    public WindowManager WindowManager { get; private set; } = null!;
+
     private GraphicsBackend _graphicsBackend = null!;
-    private Window _window = null!;
-    private Presenter _presenter = null!;
-    private WindowManager _windowManager = null!;
     private ClientLoop _loop = null!;
     private bool _sceneInitialized;
     private bool _graphicsBackendInitialized;
     private bool _engineInitialized;
 
+    private ClientTestApp(IClientTestScene scene)
+    {
+        _scene = scene;
+    }
+
     /// <summary>
-    /// Initializes, runs, and shuts down the test application.
+    /// Initializes, runs, and shuts down the test application with the given scene.
     /// </summary>
-    public void Run()
+    public static void Run(IClientTestScene scene)
+    {
+        Instance = new ClientTestApp(scene);
+        Instance.RunInternal();
+    }
+
+    private void RunInternal()
     {
         try
         {
             Initialize();
-
-            _window.Render += (_, _) => DrawFrame();
 
             _loop.Run();
         }
@@ -49,42 +72,20 @@ public sealed class ClientTestApp(IClientTestScene scene)
             PrimaryWindow = new WindowOptions
             {
                 Size = new Vector2D<int>(800, 600),
-                Title = scene.Name
+                Title = _scene.Name
             }
         });
         _graphicsBackendInitialized = true;
 
-        _window = _graphicsBackend.PrimaryWindow;
-        _presenter = _window.Presenter;
-        _windowManager = _graphicsBackend.WindowManager;
+        Window = _graphicsBackend.PrimaryWindow;
+        WindowManager = _graphicsBackend.WindowManager;
         _loop = new ClientLoop(
-            () => _windowManager.Windows.Count > 0,
-            _windowManager.DoEvents,
+            () => WindowManager.Windows.Count > 0,
+            WindowManager.DoEvents,
             () => { },
-            _windowManager.RenderWindows);
-        scene.Initialize(_window);
+            WindowManager.RenderWindows);
+        _scene.Initialize(Window);
         _sceneInitialized = true;
-    }
-
-    private void DrawFrame()
-    {
-        scene.PrepareFrame();
-
-        if (!_presenter.TryBeginFrame(out var frame))
-            return;
-
-        var activeFrame = frame!;
-        try
-        {
-            var commands = activeFrame.CommandList;
-            commands.Begin();
-            scene.Record(activeFrame, commands);
-            commands.End();
-        }
-        finally
-        {
-            _presenter.EndFrame(activeFrame);
-        }
     }
 
     private void Shutdown()
@@ -93,7 +94,7 @@ public sealed class ClientTestApp(IClientTestScene scene)
             _graphicsBackend.Device.WaitIdle();
 
         if (_sceneInitialized)
-            scene.Destroy();
+            _scene.Destroy();
 
         if (_graphicsBackendInitialized)
             _graphicsBackend.Destroy();

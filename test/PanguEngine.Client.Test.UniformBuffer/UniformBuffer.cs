@@ -13,7 +13,7 @@ internal static class UniformBuffer
 {
     private static void Main()
     {
-        new ClientTestApp(new UniformBufferScene()).Run();
+        ClientTestApp.Run(new UniformBufferScene());
     }
 }
 
@@ -54,27 +54,7 @@ internal sealed class UniformBufferScene : IClientTestScene
         CreateDescriptorSets(_presenter.MaxFramesInFlight);
         CreateShaders();
         CreatePipeline(_presenter.ColorFormat);
-    }
-
-    /// <inheritdoc/>
-    public void Record(Frame frame, CommandList commands)
-    {
-        if (!_uploadHandle.IsCompleted)
-            throw new InvalidOperationException(
-                "Vertex buffer upload did not complete after flushing pending uploads.");
-
-        var frameIndex = _presenter.CurrentFrameIndex;
-        var descriptorIndex = checked((int)frameIndex);
-        WriteFrameUniform(frameIndex);
-
-        commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.012f, 0.018f, 1)));
-        commands.SetGraphicsPipeline(_pipeline);
-        commands.SetViewport(0, 0, frame.Width, frame.Height);
-        commands.SetScissor(0, 0, frame.Width, frame.Height);
-        commands.SetVertexBuffer(0, _vertexBuffer);
-        commands.SetDescriptorSet(0, _descriptorSets[descriptorIndex]);
-        commands.Draw((uint)_vertices.Length);
-        commands.EndRendering();
+        window.Render += (_, _) => DrawFrame();
     }
 
     /// <inheritdoc/>
@@ -89,6 +69,40 @@ internal sealed class UniformBufferScene : IClientTestScene
         _vertShader.Destroy();
         _uniformBuffer.Destroy();
         _vertexBuffer.Destroy();
+    }
+
+    private void DrawFrame()
+    {
+        if (!_uploadHandle.IsCompleted)
+            throw new InvalidOperationException(
+                "Vertex buffer upload did not complete after flushing pending uploads.");
+
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
+        var activeFrame = frame!;
+        try
+        {
+            var frameIndex = _presenter.CurrentFrameIndex;
+            var descriptorIndex = checked((int)frameIndex);
+            WriteFrameUniform(frameIndex);
+
+            var commands = activeFrame.CommandList;
+            commands.Begin();
+            commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.012f, 0.018f, 1)));
+            commands.SetGraphicsPipeline(_pipeline);
+            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetVertexBuffer(0, _vertexBuffer);
+            commands.SetDescriptorSet(0, _descriptorSets[descriptorIndex]);
+            commands.Draw((uint)_vertices.Length);
+            commands.EndRendering();
+            commands.End();
+        }
+        finally
+        {
+            _presenter.EndFrame(activeFrame);
+        }
     }
 
     private void CreateVertexBuffer()

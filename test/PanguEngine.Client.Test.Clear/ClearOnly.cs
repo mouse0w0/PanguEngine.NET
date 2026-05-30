@@ -10,7 +10,7 @@ internal static class ClearOnly
 {
     private static void Main()
     {
-        new ClientTestApp(new ClearOnlyScene()).Run();
+        ClientTestApp.Run(new ClearOnlyScene());
     }
 }
 
@@ -19,23 +19,40 @@ internal static class ClearOnly
 /// </summary>
 internal sealed class ClearOnlyScene : IClientTestScene
 {
+    private Presenter _presenter = null!;
+
     /// <inheritdoc/>
     public string Name => "ClearOnly";
 
     /// <inheritdoc/>
     public void Initialize(Window window)
     {
-    }
-
-    /// <inheritdoc/>
-    public void Record(Frame frame, CommandList commands)
-    {
-        commands.BeginRendering(new RenderingDescription(new ClearColor(0.02f, 0.04f, 0.08f, 1)));
-        commands.EndRendering();
+        _presenter = window.Presenter;
+        window.Render += (_, _) => DrawFrame();
     }
 
     /// <inheritdoc/>
     public void Destroy()
     {
+    }
+
+    private void DrawFrame()
+    {
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
+        var activeFrame = frame!;
+        try
+        {
+            var commands = activeFrame.CommandList;
+            commands.Begin();
+            commands.BeginRendering(new RenderingDescription(new ClearColor(0.02f, 0.04f, 0.08f, 1)));
+            commands.EndRendering();
+            commands.End();
+        }
+        finally
+        {
+            _presenter.EndFrame(activeFrame);
+        }
     }
 }

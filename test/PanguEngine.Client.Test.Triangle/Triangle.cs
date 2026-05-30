@@ -10,7 +10,7 @@ internal static class Triangle
 {
     private static void Main()
     {
-        new ClientTestApp(new TriangleScene()).Run();
+        ClientTestApp.Run(new TriangleScene());
     }
 }
 
@@ -22,6 +22,7 @@ internal sealed class TriangleScene : IClientTestScene
     private Shader _vertShader = null!;
     private Shader _fragShader = null!;
     private GraphicsPipeline _pipeline = null!;
+    private Presenter _presenter = null!;
 
     /// <inheritdoc/>
     public string Name => "Triangle";
@@ -29,6 +30,8 @@ internal sealed class TriangleScene : IClientTestScene
     /// <inheritdoc/>
     public void Initialize(Window window)
     {
+        _presenter = window.Presenter;
+
         var basePath = AppContext.BaseDirectory;
         var vertPath = Path.Combine(basePath, "Shaders", "triangle.vert");
         var fragPath = Path.Combine(basePath, "Shaders", "triangle.frag");
@@ -51,18 +54,9 @@ internal sealed class TriangleScene : IClientTestScene
         _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             VertexInputDescription.Empty,
-            ColorAttachmentFormat: window.Presenter.ColorFormat));
-    }
+            ColorAttachmentFormat: _presenter.ColorFormat));
 
-    /// <inheritdoc/>
-    public void Record(Frame frame, CommandList commands)
-    {
-        commands.BeginRendering(new RenderingDescription(new ClearColor(0, 0, 0, 1)));
-        commands.SetGraphicsPipeline(_pipeline);
-        commands.SetViewport(0, 0, frame.Width, frame.Height);
-        commands.SetScissor(0, 0, frame.Width, frame.Height);
-        commands.Draw(3);
-        commands.EndRendering();
+        window.Render += (_, _) => DrawFrame();
     }
 
     /// <inheritdoc/>
@@ -71,5 +65,29 @@ internal sealed class TriangleScene : IClientTestScene
         _pipeline.Destroy();
         _fragShader.Destroy();
         _vertShader.Destroy();
+    }
+
+    private void DrawFrame()
+    {
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
+        var activeFrame = frame!;
+        try
+        {
+            var commands = activeFrame.CommandList;
+            commands.Begin();
+            commands.BeginRendering(new RenderingDescription(new ClearColor(0, 0, 0, 1)));
+            commands.SetGraphicsPipeline(_pipeline);
+            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.Draw(3);
+            commands.EndRendering();
+            commands.End();
+        }
+        finally
+        {
+            _presenter.EndFrame(activeFrame);
+        }
     }
 }

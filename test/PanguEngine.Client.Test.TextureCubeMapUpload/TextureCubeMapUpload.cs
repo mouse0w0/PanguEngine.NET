@@ -9,7 +9,7 @@ internal static class TextureCubeMapUpload
 {
     private static void Main()
     {
-        new ClientTestApp(new TextureCubeMapUploadScene()).Run();
+        ClientTestApp.Run(new TextureCubeMapUploadScene());
     }
 }
 
@@ -35,40 +35,21 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
     private Sampler _sampler = null!;
     private UploadHandle _vertexUploadHandle = null!;
     private UploadHandle[] _textureUploadHandles = [];
+    private Presenter _presenter = null!;
 
     public string Name => "TextureCubeMapUpload";
 
     public void Initialize(Window window)
     {
+        _presenter = window.Presenter;
         CreateVertexBuffer();
         CreateTexture();
         CreateSampler();
         CreateDescriptorSetLayout();
         CreateDescriptorSet();
         CreateShaders();
-        CreatePipeline(window.Presenter.ColorFormat);
-    }
-
-    public void Record(Frame frame, CommandList commands)
-    {
-        if (!_vertexUploadHandle.IsCompleted)
-            throw new InvalidOperationException(
-                "Vertex buffer upload did not complete after flushing pending uploads.");
-        foreach (var uploadHandle in _textureUploadHandles)
-        {
-            if (!uploadHandle.IsCompleted)
-                throw new InvalidOperationException(
-                    "Texture upload did not complete after flushing pending uploads.");
-        }
-
-        commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.01f, 0.015f, 1)));
-        commands.SetGraphicsPipeline(_pipeline);
-        commands.SetViewport(0, 0, frame.Width, frame.Height);
-        commands.SetScissor(0, 0, frame.Width, frame.Height);
-        commands.SetVertexBuffer(0, _vertexBuffer);
-        commands.SetDescriptorSet(0, _descriptorSet);
-        commands.Draw((uint)_vertices.Length);
-        commands.EndRendering();
+        CreatePipeline(_presenter.ColorFormat);
+        window.Render += (_, _) => DrawFrame();
     }
 
     public void Destroy()
@@ -81,6 +62,42 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
         _fragShader.Destroy();
         _vertShader.Destroy();
         _vertexBuffer.Destroy();
+    }
+
+    private void DrawFrame()
+    {
+        if (!_vertexUploadHandle.IsCompleted)
+            throw new InvalidOperationException(
+                "Vertex buffer upload did not complete after flushing pending uploads.");
+        foreach (var uploadHandle in _textureUploadHandles)
+        {
+            if (!uploadHandle.IsCompleted)
+                throw new InvalidOperationException(
+                    "Texture upload did not complete after flushing pending uploads.");
+        }
+
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
+        var activeFrame = frame!;
+        try
+        {
+            var commands = activeFrame.CommandList;
+            commands.Begin();
+            commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.01f, 0.015f, 1)));
+            commands.SetGraphicsPipeline(_pipeline);
+            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetVertexBuffer(0, _vertexBuffer);
+            commands.SetDescriptorSet(0, _descriptorSet);
+            commands.Draw((uint)_vertices.Length);
+            commands.EndRendering();
+            commands.End();
+        }
+        finally
+        {
+            _presenter.EndFrame(activeFrame);
+        }
     }
 
     private void CreateVertexBuffer()

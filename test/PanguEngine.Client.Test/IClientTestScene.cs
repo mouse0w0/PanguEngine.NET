@@ -1,4 +1,3 @@
-using PanguEngine.Graphics;
 using PanguEngine.Windowing;
 
 namespace PanguEngine.Client.Test;
@@ -14,24 +13,10 @@ public interface IClientTestScene
     string Name { get; }
 
     /// <summary>
-    /// Initializes resources owned by the scene.
+    /// Initializes resources owned by the scene and subscribes to the window's render event.
     /// </summary>
-    /// <param name="window">The window used by the test application.</param>
+    /// <param name="window">The primary window used by the test application.</param>
     void Initialize(Window window);
-
-    /// <summary>
-    /// Prepares CPU-side state before the frame begins.
-    /// </summary>
-    void PrepareFrame()
-    {
-    }
-
-    /// <summary>
-    /// Records the scene rendering commands for a frame.
-    /// </summary>
-    /// <param name="frame">The active graphics frame.</param>
-    /// <param name="commands">The command list for the active frame.</param>
-    void Record(Frame frame, CommandList commands);
 
     /// <summary>
     /// Destroys resources owned by the scene.

@@ -18,6 +18,7 @@ internal sealed class WindowModeScene : IClientTestScene
     private Vector2D<int> _savedSize = new(800, 600);
     private Vector2D<int> _savedPosition = new(50, 50);
     private WindowBorder _savedBorder = WindowBorder.Resizable;
+    private Presenter _presenter = null!;
 
     /// <inheritdoc/>
     public string Name => "WindowMode Test (F11 to cycle)";
@@ -25,19 +26,34 @@ internal sealed class WindowModeScene : IClientTestScene
     /// <inheritdoc/>
     public void Initialize(Window window)
     {
+        _presenter = window.Presenter;
         window.KeyDown += OnKeyDown;
-    }
-
-    /// <inheritdoc/>
-    public void Record(Frame frame, CommandList commands)
-    {
-        commands.BeginRendering(new RenderingDescription(new ClearColor(0.02f, 0.04f, 0.08f, 1)));
-        commands.EndRendering();
+        window.Render += (_, _) => DrawFrame();
     }
 
     /// <inheritdoc/>
     public void Destroy()
     {
+    }
+
+    private void DrawFrame()
+    {
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
+        var activeFrame = frame!;
+        try
+        {
+            var commands = activeFrame.CommandList;
+            commands.Begin();
+            commands.BeginRendering(new RenderingDescription(new ClearColor(0.02f, 0.04f, 0.08f, 1)));
+            commands.EndRendering();
+            commands.End();
+        }
+        finally
+        {
+            _presenter.EndFrame(activeFrame);
+        }
     }
 
     private void OnKeyDown(Window window, KeyEventArgs e)
@@ -88,6 +104,6 @@ internal static class WindowModeTest
 {
     private static void Main()
     {
-        new ClientTestApp(new WindowModeScene()).Run();
+        ClientTestApp.Run(new WindowModeScene());
     }
 }

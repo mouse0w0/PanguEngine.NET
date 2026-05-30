@@ -13,7 +13,7 @@ internal static class BufferLifecycle
 {
     private static void Main()
     {
-        new ClientTestApp(new BufferLifecycleScene()).Run();
+        ClientTestApp.Run(new BufferLifecycleScene());
     }
 }
 
@@ -28,6 +28,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
     private Shader _fragShader = null!;
     private GraphicsPipeline _pipeline = null!;
     private Mesh _mesh = null!;
+    private Presenter _presenter = null!;
 
     /// <inheritdoc/>
     public string Name => "BufferLifecycle";
@@ -35,32 +36,10 @@ internal sealed class BufferLifecycleScene : IClientTestScene
     /// <inheritdoc/>
     public void Initialize(Window window)
     {
+        _presenter = window.Presenter;
         CreateShaders();
-        CreatePipeline(window.Presenter.ColorFormat);
-    }
-
-    /// <inheritdoc/>
-    public void PrepareFrame()
-    {
-        _mesh = CreateMesh();
-    }
-
-    /// <inheritdoc/>
-    public void Record(Frame frame, CommandList commands)
-    {
-        commands.BeginRendering(new RenderingDescription(new ClearColor(0.008f, 0.01f, 0.016f, 1)));
-        commands.SetGraphicsPipeline(_pipeline);
-        commands.SetViewport(0, 0, frame.Width, frame.Height);
-        commands.SetScissor(0, 0, frame.Width, frame.Height);
-
-        if (!_mesh.UploadHandle.IsCompleted)
-            throw new InvalidOperationException("Mesh buffer upload did not complete after flushing pending uploads.");
-
-        commands.SetVertexBuffer(0, _mesh.Buffer);
-        commands.Draw(_mesh.VertexCount);
-        commands.EndRendering();
-
-        _mesh.Buffer.Destroy();
+        CreatePipeline(_presenter.ColorFormat);
+        window.Render += (_, _) => DrawFrame();
     }
 
     /// <inheritdoc/>
@@ -69,6 +48,40 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         _pipeline.Destroy();
         _fragShader.Destroy();
         _vertShader.Destroy();
+    }
+
+    private void DrawFrame()
+    {
+        _mesh = CreateMesh();
+
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
+        var activeFrame = frame!;
+        try
+        {
+            var commands = activeFrame.CommandList;
+            commands.Begin();
+            commands.BeginRendering(new RenderingDescription(new ClearColor(0.008f, 0.01f, 0.016f, 1)));
+            commands.SetGraphicsPipeline(_pipeline);
+            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+
+            if (!_mesh.UploadHandle.IsCompleted)
+                throw new InvalidOperationException(
+                    "Mesh buffer upload did not complete after flushing pending uploads.");
+
+            commands.SetVertexBuffer(0, _mesh.Buffer);
+            commands.Draw(_mesh.VertexCount);
+            commands.EndRendering();
+            commands.End();
+
+            _mesh.Buffer.Destroy();
+        }
+        finally
+        {
+            _presenter.EndFrame(activeFrame);
+        }
     }
 
     private Mesh CreateMesh()
