@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PanguEngine.Windowing;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.TextureCubeMapUpload;
@@ -36,7 +37,7 @@ internal sealed class TextureCubeMapUploadScene : IGraphicsTestScene
 
     public string Name => "TextureCubeMapUpload";
 
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
         CreateVertexBuffer();
         CreateTexture();
@@ -44,7 +45,7 @@ internal sealed class TextureCubeMapUploadScene : IGraphicsTestScene
         CreateDescriptorSetLayout();
         CreateDescriptorSet();
         CreateShaders();
-        CreatePipeline(presenter.ColorFormat);
+        CreatePipeline(window.Presenter.ColorFormat);
     }
 
     public void Record(Frame frame, CommandList commands)

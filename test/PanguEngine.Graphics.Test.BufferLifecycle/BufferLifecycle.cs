@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using PanguEngine.Windowing;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.BufferLifecycle;
@@ -31,10 +32,10 @@ internal sealed class BufferLifecycleScene : IGraphicsTestScene
     public string Name => "BufferLifecycle";
 
     /// <inheritdoc/>
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
         CreateShaders();
-        CreatePipeline(presenter.ColorFormat);
+        CreatePipeline(window.Presenter.ColorFormat);
     }
 
     /// <inheritdoc/>

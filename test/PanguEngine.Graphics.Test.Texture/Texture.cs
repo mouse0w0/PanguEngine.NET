@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PanguEngine.Windowing;
 using StbImageSharp;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
@@ -37,7 +38,7 @@ internal sealed class TextureScene : IGraphicsTestScene
 
     public string Name => "Texture";
 
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
         CreateVertexBuffer();
         CreateTexture();
@@ -45,7 +46,7 @@ internal sealed class TextureScene : IGraphicsTestScene
         CreateDescriptorSetLayout();
         CreateDescriptorSet();
         CreateShaders();
-        CreatePipeline(presenter.ColorFormat);
+        CreatePipeline(window.Presenter.ColorFormat);
     }
 
     public void Record(Frame frame, CommandList commands)

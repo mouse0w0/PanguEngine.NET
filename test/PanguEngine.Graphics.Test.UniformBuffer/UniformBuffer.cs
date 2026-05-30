@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using PanguEngine.Windowing;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.UniformBuffer;
@@ -43,15 +44,15 @@ internal sealed class UniformBufferScene : IGraphicsTestScene
     public string Name => "UniformBuffer";
 
     /// <inheritdoc/>
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
-        _presenter = presenter;
+        _presenter = window.Presenter;
         CreateVertexBuffer();
-        CreateUniformBuffer(presenter.MaxFramesInFlight);
+        CreateUniformBuffer(_presenter.MaxFramesInFlight);
         CreateDescriptorSetLayout();
-        CreateDescriptorSets(presenter.MaxFramesInFlight);
+        CreateDescriptorSets(_presenter.MaxFramesInFlight);
         CreateShaders();
-        CreatePipeline(presenter.ColorFormat);
+        CreatePipeline(_presenter.ColorFormat);
     }
 
     /// <inheritdoc/>

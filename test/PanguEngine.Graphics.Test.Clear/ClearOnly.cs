@@ -1,3 +1,5 @@
+using PanguEngine.Windowing;
+
 namespace PanguEngine.Graphics.Test.Clear;
 
 /// <summary>
@@ -20,7 +22,7 @@ internal sealed class ClearOnlyScene : IGraphicsTestScene
     public string Name => "ClearOnly";
 
     /// <inheritdoc/>
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
     }
 

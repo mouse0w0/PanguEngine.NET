@@ -62,7 +62,7 @@ public sealed class GraphicsTestApp(IGraphicsTestScene scene)
             _windowManager.DoEvents,
             () => { },
             _windowManager.RenderWindows);
-        scene.Initialize(_presenter);
+        scene.Initialize(_window);
         _sceneInitialized = true;
     }
 

@@ -1,3 +1,5 @@
+using PanguEngine.Windowing;
+
 namespace PanguEngine.Graphics.Test;
 
 /// <summary>
@@ -13,8 +15,8 @@ public interface IGraphicsTestScene
     /// <summary>
     /// Initializes resources owned by the scene.
     /// </summary>
-    /// <param name="presenter">The presenter used by the test application.</param>
-    void Initialize(Presenter presenter);
+    /// <param name="window">The window used by the test application.</param>
+    void Initialize(Window window);
 
     /// <summary>
     /// Prepares CPU-side state before the frame begins.

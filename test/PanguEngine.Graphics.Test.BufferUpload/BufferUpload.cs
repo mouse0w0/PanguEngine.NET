@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PanguEngine.Windowing;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.BufferUpload;
@@ -36,11 +37,11 @@ internal sealed class BufferUploadScene : IGraphicsTestScene
     public string Name => "BufferUpload";
 
     /// <inheritdoc/>
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
         CreateVertexBuffer();
         CreateShaders();
-        CreatePipeline(presenter.ColorFormat);
+        CreatePipeline(window.Presenter.ColorFormat);
     }
 
     /// <inheritdoc/>

@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PanguEngine.Windowing;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.IndexedQuad;
@@ -41,11 +42,11 @@ internal sealed class IndexedQuadScene : IGraphicsTestScene
     public string Name => "IndexedQuad";
 
     /// <inheritdoc/>
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
         CreateBuffers();
         CreateShaders();
-        CreatePipeline(presenter.ColorFormat);
+        CreatePipeline(window.Presenter.ColorFormat);
     }
 
     /// <inheritdoc/>

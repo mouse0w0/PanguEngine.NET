@@ -1,3 +1,5 @@
+using PanguEngine.Windowing;
+
 namespace PanguEngine.Graphics.Test.Triangle;
 
 /// <summary>
@@ -24,7 +26,7 @@ internal sealed class TriangleScene : IGraphicsTestScene
     public string Name => "Triangle";
 
     /// <inheritdoc/>
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
         var basePath = AppContext.BaseDirectory;
         var vertPath = Path.Combine(basePath, "Shaders", "triangle.vert");
@@ -48,7 +50,7 @@ internal sealed class TriangleScene : IGraphicsTestScene
         _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             VertexInputDescription.Empty,
-            ColorAttachmentFormat: presenter.ColorFormat));
+            ColorAttachmentFormat: window.Presenter.ColorFormat));
     }
 
     /// <inheritdoc/>

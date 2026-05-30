@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PanguEngine.Windowing;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Graphics.Test.TextureMipUpload;
@@ -36,7 +37,7 @@ internal sealed class TextureMipUploadScene : IGraphicsTestScene
 
     public string Name => "TextureMipUpload";
 
-    public void Initialize(Presenter presenter)
+    public void Initialize(Window window)
     {
         CreateVertexBuffer();
         CreateTexture();
@@ -44,7 +45,7 @@ internal sealed class TextureMipUploadScene : IGraphicsTestScene
         CreateDescriptorSetLayout();
         CreateDescriptorSet();
         CreateShaders();
-        CreatePipeline(presenter.ColorFormat);
+        CreatePipeline(window.Presenter.ColorFormat);
     }
 
     public void Record(Frame frame, CommandList commands)
