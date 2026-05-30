@@ -102,16 +102,16 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
     private void CreateVertexBuffer()
     {
         var size = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
-        _vertexBuffer = GraphicsContext.Device.CreateBuffer(new BufferDescription(
+        _vertexBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
             size,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        _vertexUploadHandle = GraphicsContext.Device.UploadBuffer(_vertexBuffer, _vertices);
+        _vertexUploadHandle = ClientTestApp.Instance.Device.UploadBuffer(_vertexBuffer, _vertices);
     }
 
     private void CreateTexture()
     {
-        _texture = GraphicsContext.Device.CreateTexture(new TextureDescription(
+        _texture = ClientTestApp.Instance.Device.CreateTexture(new TextureDescription(
             TextureDimension.Type2D,
             TextureFormat.R8G8B8A8Unorm,
             4,
@@ -121,16 +121,16 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
             1,
             TextureUsage.TransferSource | TextureUsage.TransferDestination | TextureUsage.Sampled));
 
-        _textureUploadHandle = GraphicsContext.Device.UploadTexture(
+        _textureUploadHandle = ClientTestApp.Instance.Device.UploadTexture(
             _texture,
             CreateBlockTextureData(4, 4),
             TextureUploadRegion.Mip2D(4, 4, 0));
-        _mipmapUploadHandle = GraphicsContext.Device.GenerateMipmaps(_texture);
+        _mipmapUploadHandle = ClientTestApp.Instance.Device.GenerateMipmaps(_texture);
     }
 
     private void CreateSampler()
     {
-        _sampler = GraphicsContext.Device.CreateSampler(new SamplerDescription(
+        _sampler = ClientTestApp.Instance.Device.CreateSampler(new SamplerDescription(
             FilterMode.Nearest,
             FilterMode.Nearest,
             MipmapMode.Nearest,
@@ -145,16 +145,17 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
 
     private void CreateDescriptorSetLayout()
     {
-        _descriptorSetLayout = GraphicsContext.Device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
-            new[]
-            {
-                new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStage.Fragment)
-            }));
+        _descriptorSetLayout = ClientTestApp.Instance.Device.CreateDescriptorSetLayout(
+            new DescriptorSetLayoutDescription(
+                new[]
+                {
+                    new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStage.Fragment)
+                }));
     }
 
     private void CreateDescriptorSet()
     {
-        _descriptorSet = GraphicsContext.Device.CreateDescriptorSet(new DescriptorSetDescription(
+        _descriptorSet = ClientTestApp.Instance.Device.CreateDescriptorSet(new DescriptorSetDescription(
             _descriptorSetLayout,
             new[]
             {
@@ -173,11 +174,11 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, File.ReadAllText(fragPath),
             name: "texture_generated_mipmaps.frag");
 
-        _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "texture_generated_mipmaps.vert"));
-        _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "texture_generated_mipmaps.frag"));
@@ -185,7 +186,7 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
             ColorAttachmentFormat: colorFormat,

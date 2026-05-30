@@ -42,16 +42,16 @@ internal sealed class TriangleScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "triangle.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "triangle.frag");
 
-        _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "triangle.vert"));
-        _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "triangle.frag"));
 
-        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             VertexInputDescription.Empty,
             ColorAttachmentFormat: _presenter.ColorFormat));

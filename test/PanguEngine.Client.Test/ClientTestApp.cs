@@ -28,6 +28,11 @@ public sealed class ClientTestApp
     /// </summary>
     public WindowManager WindowManager { get; private set; } = null!;
 
+    /// <summary>
+    /// Gets the graphics device.
+    /// </summary>
+    public GraphicsDevice Device => _graphicsBackend.Device;
+
     private GraphicsBackend _graphicsBackend = null!;
     private ClientLoop _loop = null!;
     private bool _sceneInitialized;
@@ -91,7 +96,7 @@ public sealed class ClientTestApp
     private void Shutdown()
     {
         if (_graphicsBackendInitialized)
-            _graphicsBackend.Device.WaitIdle();
+            Device.WaitIdle();
 
         if (_sceneInitialized)
             _scene.Destroy();

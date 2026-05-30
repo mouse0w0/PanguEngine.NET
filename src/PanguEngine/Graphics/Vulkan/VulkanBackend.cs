@@ -43,8 +43,6 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         var instanceInitialized = false;
         var allocatorInitialized = false;
         var uploaderInitialized = false;
-        var graphicsContextInitialized = false;
-
         var silkOptions = SilkWindowOptions.DefaultVulkan with
         {
             IsVisible = options.PrimaryWindow.IsVisible,
@@ -87,8 +85,6 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             uploaderInitialized = true;
 
             var device = new VulkanGraphicsDevice();
-            GraphicsContext.Initialize(device);
-            graphicsContextInitialized = true;
 
             primaryWindow = new VulkanWindow(silkWindow, surface, true, options.PrimaryWindow.FramesPerSecond);
             var windowManager = new WindowManager(primaryWindow, VulkanWindowFactory.CreateWindow);
@@ -102,8 +98,6 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             if (primaryWindow is not null)
                 primaryWindow?.Destroy();
 
-            if (graphicsContextInitialized)
-                GraphicsContext.Shutdown();
             if (uploaderInitialized)
                 VulkanUploader.Destroy();
             if (allocatorInitialized)
@@ -130,7 +124,6 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         _isDestroyed = true;
 
         WindowManager.Destroy();
-        GraphicsContext.Shutdown();
         VulkanUploader.Destroy();
         VulkanDeletionQueue.Drain();
         VulkanAllocator.Destroy();

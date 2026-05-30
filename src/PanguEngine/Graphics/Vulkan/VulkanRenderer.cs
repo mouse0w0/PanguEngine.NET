@@ -5,6 +5,7 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed class VulkanRenderer
 {
+    private readonly GraphicsDevice _device;
     private readonly Presenter _presenter;
     private readonly Shader _vertexShader;
     private readonly Shader _fragmentShader;
@@ -13,9 +14,11 @@ internal sealed class VulkanRenderer
     /// <summary>
     /// Initializes the renderer by loading shaders and creating the graphics pipeline.
     /// </summary>
+    /// <param name="device">The graphics device used to create GPU resources.</param>
     /// <param name="presenter">The presenter used for frame presentation.</param>
-    internal VulkanRenderer(Presenter presenter)
+    internal VulkanRenderer(GraphicsDevice device, Presenter presenter)
     {
+        _device = device;
         _presenter = presenter;
 
         var basePath = AppContext.BaseDirectory;
@@ -28,15 +31,15 @@ internal sealed class VulkanRenderer
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "triangle.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "triangle.frag");
 
-        _vertexShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _vertexShader = _device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "triangle.vert"));
-        _fragmentShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _fragmentShader = _device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "triangle.frag"));
-        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = _device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertexShader, _fragmentShader },
             VertexInputDescription.Empty,
             ColorAttachmentFormat: _presenter.ColorFormat));

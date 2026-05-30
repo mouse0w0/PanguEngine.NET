@@ -89,11 +89,11 @@ internal sealed class BufferUploadScene : IClientTestScene
     private void CreateVertexBuffer()
     {
         var size = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
-        _vertexBuffer = GraphicsContext.Device.CreateBuffer(new BufferDescription(
+        _vertexBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
             size,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        _uploadHandle = GraphicsContext.Device.UploadBuffer(_vertexBuffer, _vertices);
+        _uploadHandle = ClientTestApp.Instance.Device.UploadBuffer(_vertexBuffer, _vertices);
     }
 
     private void CreateShaders()
@@ -108,11 +108,11 @@ internal sealed class BufferUploadScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "buffer_upload.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "buffer_upload.frag");
 
-        _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "buffer_upload.vert"));
-        _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "buffer_upload.frag"));
@@ -120,7 +120,7 @@ internal sealed class BufferUploadScene : IClientTestScene
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
             ColorAttachmentFormat: colorFormat));

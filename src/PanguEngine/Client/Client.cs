@@ -27,6 +27,11 @@ public class Client
     public WindowManager WindowManager => GraphicsBackend.WindowManager;
 
     /// <summary>
+    /// The graphics device.
+    /// </summary>
+    public GraphicsDevice Device => GraphicsBackend.Device;
+
+    /// <summary>
     /// The client loop.
     /// </summary>
     public ClientLoop Loop { get; private set; } = null!;
@@ -76,7 +81,7 @@ public class Client
             WindowManager.DoEvents,
             OnUpdate,
             WindowManager.RenderWindows);
-        Renderer = new VulkanRenderer(PrimaryWindow.Presenter);
+        Renderer = new VulkanRenderer(GraphicsBackend.Device, PrimaryWindow.Presenter);
     }
 
     /// <summary>

@@ -103,16 +103,16 @@ internal sealed class TextureMipUploadScene : IClientTestScene
     private void CreateVertexBuffer()
     {
         var size = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
-        _vertexBuffer = GraphicsContext.Device.CreateBuffer(new BufferDescription(
+        _vertexBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
             size,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        _vertexUploadHandle = GraphicsContext.Device.UploadBuffer(_vertexBuffer, _vertices);
+        _vertexUploadHandle = ClientTestApp.Instance.Device.UploadBuffer(_vertexBuffer, _vertices);
     }
 
     private void CreateTexture()
     {
-        _texture = GraphicsContext.Device.CreateTexture(new TextureDescription(
+        _texture = ClientTestApp.Instance.Device.CreateTexture(new TextureDescription(
             TextureDimension.Type2D,
             TextureFormat.R8G8B8A8Unorm,
             8,
@@ -124,18 +124,18 @@ internal sealed class TextureMipUploadScene : IClientTestScene
 
         _textureUploadHandles =
         [
-            GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(8, 8, 0xff, 0x00, 0x00, 0xff),
+            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(8, 8, 0xff, 0x00, 0x00, 0xff),
                 TextureUploadRegion.Mip2D(8, 8, 0)),
-            GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0x00, 0xff),
+            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0x00, 0xff),
                 TextureUploadRegion.Mip2D(4, 4, 1)),
-            GraphicsContext.Device.UploadTexture(_texture, CreateSolidTextureData(2, 2, 0x00, 0x00, 0xff, 0xff),
+            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(2, 2, 0x00, 0x00, 0xff, 0xff),
                 TextureUploadRegion.Mip2D(2, 2, 2)),
         ];
     }
 
     private void CreateSampler()
     {
-        _sampler = GraphicsContext.Device.CreateSampler(new SamplerDescription(
+        _sampler = ClientTestApp.Instance.Device.CreateSampler(new SamplerDescription(
             FilterMode.Nearest,
             FilterMode.Nearest,
             MipmapMode.Nearest,
@@ -150,16 +150,17 @@ internal sealed class TextureMipUploadScene : IClientTestScene
 
     private void CreateDescriptorSetLayout()
     {
-        _descriptorSetLayout = GraphicsContext.Device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
-            new[]
-            {
-                new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStage.Fragment)
-            }));
+        _descriptorSetLayout = ClientTestApp.Instance.Device.CreateDescriptorSetLayout(
+            new DescriptorSetLayoutDescription(
+                new[]
+                {
+                    new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStage.Fragment)
+                }));
     }
 
     private void CreateDescriptorSet()
     {
-        _descriptorSet = GraphicsContext.Device.CreateDescriptorSet(new DescriptorSetDescription(
+        _descriptorSet = ClientTestApp.Instance.Device.CreateDescriptorSet(new DescriptorSetDescription(
             _descriptorSetLayout,
             new[]
             {
@@ -178,11 +179,11 @@ internal sealed class TextureMipUploadScene : IClientTestScene
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, File.ReadAllText(fragPath),
             name: "texture_mip_upload.frag");
 
-        _vertShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "texture_mip_upload.vert"));
-        _fragShader = GraphicsContext.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "texture_mip_upload.frag"));
@@ -190,7 +191,7 @@ internal sealed class TextureMipUploadScene : IClientTestScene
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = GraphicsContext.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
             ColorAttachmentFormat: colorFormat,
