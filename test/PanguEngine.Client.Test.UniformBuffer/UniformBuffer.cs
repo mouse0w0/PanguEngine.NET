@@ -13,14 +13,14 @@ internal static class UniformBuffer
 {
     private static void Main()
     {
-        new GraphicsTestApp(new UniformBufferScene()).Run();
+        new ClientTestApp(new UniformBufferScene()).Run();
     }
 }
 
 /// <summary>
 /// Renders a triangle with per-frame uniform buffer bindings.
 /// </summary>
-internal sealed class UniformBufferScene : IGraphicsTestScene
+internal sealed class UniformBufferScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [

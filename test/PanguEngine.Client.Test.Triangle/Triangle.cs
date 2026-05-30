@@ -10,14 +10,14 @@ internal static class Triangle
 {
     private static void Main()
     {
-        new GraphicsTestApp(new TriangleScene()).Run();
+        new ClientTestApp(new TriangleScene()).Run();
     }
 }
 
 /// <summary>
 /// Renders a static triangle without vertex buffers.
 /// </summary>
-internal sealed class TriangleScene : IGraphicsTestScene
+internal sealed class TriangleScene : IClientTestScene
 {
     private Shader _vertShader = null!;
     private Shader _fragShader = null!;

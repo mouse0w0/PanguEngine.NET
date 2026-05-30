@@ -9,11 +9,11 @@ internal static class TextureCubeMapUpload
 {
     private static void Main()
     {
-        new GraphicsTestApp(new TextureCubeMapUploadScene()).Run();
+        new ClientTestApp(new TextureCubeMapUploadScene()).Run();
     }
 }
 
-internal sealed class TextureCubeMapUploadScene : IGraphicsTestScene
+internal sealed class TextureCubeMapUploadScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [

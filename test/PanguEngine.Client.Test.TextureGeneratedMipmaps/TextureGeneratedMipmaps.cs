@@ -9,11 +9,11 @@ internal static class TextureGeneratedMipmaps
 {
     private static void Main()
     {
-        new GraphicsTestApp(new TextureGeneratedMipmapsScene()).Run();
+        new ClientTestApp(new TextureGeneratedMipmapsScene()).Run();
     }
 }
 
-internal sealed class TextureGeneratedMipmapsScene : IGraphicsTestScene
+internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [

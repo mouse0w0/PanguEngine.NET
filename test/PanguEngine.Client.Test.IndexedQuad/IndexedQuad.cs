@@ -12,14 +12,14 @@ internal static class IndexedQuad
 {
     private static void Main()
     {
-        new GraphicsTestApp(new IndexedQuadScene()).Run();
+        new ClientTestApp(new IndexedQuadScene()).Run();
     }
 }
 
 /// <summary>
 /// Renders a quad with an index buffer.
 /// </summary>
-internal sealed class IndexedQuadScene : IGraphicsTestScene
+internal sealed class IndexedQuadScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [

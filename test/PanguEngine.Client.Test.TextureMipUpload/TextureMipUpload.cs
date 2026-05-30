@@ -9,11 +9,11 @@ internal static class TextureMipUpload
 {
     private static void Main()
     {
-        new GraphicsTestApp(new TextureMipUploadScene()).Run();
+        new ClientTestApp(new TextureMipUploadScene()).Run();
     }
 }
 
-internal sealed class TextureMipUploadScene : IGraphicsTestScene
+internal sealed class TextureMipUploadScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [

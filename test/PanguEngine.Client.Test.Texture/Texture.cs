@@ -10,11 +10,11 @@ internal static class Texture
 {
     private static void Main()
     {
-        new GraphicsTestApp(new TextureScene()).Run();
+        new ClientTestApp(new TextureScene()).Run();
     }
 }
 
-internal sealed class TextureScene : IGraphicsTestScene
+internal sealed class TextureScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [

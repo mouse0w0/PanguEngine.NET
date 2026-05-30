@@ -9,7 +9,7 @@ namespace PanguEngine.Client.Test;
 /// Runs a backend-independent graphics test scene.
 /// </summary>
 /// <param name="scene">The scene to run.</param>
-public sealed class GraphicsTestApp(IGraphicsTestScene scene)
+public sealed class ClientTestApp(IClientTestScene scene)
 {
     private GraphicsBackend _graphicsBackend = null!;
     private Window _window = null!;

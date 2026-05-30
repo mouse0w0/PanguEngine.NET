@@ -9,11 +9,11 @@ internal static class TextureRegionUpload
 {
     private static void Main()
     {
-        new GraphicsTestApp(new TextureRegionUploadScene()).Run();
+        new ClientTestApp(new TextureRegionUploadScene()).Run();
     }
 }
 
-internal sealed class TextureRegionUploadScene : IGraphicsTestScene
+internal sealed class TextureRegionUploadScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [

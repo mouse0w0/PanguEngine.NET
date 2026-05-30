@@ -10,14 +10,14 @@ internal static class ClearOnly
 {
     private static void Main()
     {
-        new GraphicsTestApp(new ClearOnlyScene()).Run();
+        new ClientTestApp(new ClearOnlyScene()).Run();
     }
 }
 
 /// <summary>
 /// Renders a frame that only clears the presentation target.
 /// </summary>
-internal sealed class ClearOnlyScene : IGraphicsTestScene
+internal sealed class ClearOnlyScene : IClientTestScene
 {
     /// <inheritdoc/>
     public string Name => "ClearOnly";

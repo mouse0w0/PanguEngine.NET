@@ -6,7 +6,7 @@ namespace PanguEngine.Client.Test;
 /// <summary>
 /// Represents a backend-independent graphics test scene.
 /// </summary>
-public interface IGraphicsTestScene
+public interface IClientTestScene
 {
     /// <summary>
     /// Gets the display name of the test scene.

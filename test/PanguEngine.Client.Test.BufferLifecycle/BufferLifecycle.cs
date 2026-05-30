@@ -13,14 +13,14 @@ internal static class BufferLifecycle
 {
     private static void Main()
     {
-        new GraphicsTestApp(new BufferLifecycleScene()).Run();
+        new ClientTestApp(new BufferLifecycleScene()).Run();
     }
 }
 
 /// <summary>
 /// Renders a triangle from a per-frame vertex buffer and destroys it after recording.
 /// </summary>
-internal sealed class BufferLifecycleScene : IGraphicsTestScene
+internal sealed class BufferLifecycleScene : IClientTestScene
 {
     private readonly Stopwatch _stopwatch = Stopwatch.StartNew();
 

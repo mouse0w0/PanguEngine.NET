@@ -12,7 +12,7 @@ internal enum DisplayMode
     BorderlessFullscreen
 }
 
-internal sealed class WindowModeScene : IGraphicsTestScene
+internal sealed class WindowModeScene : IClientTestScene
 {
     private DisplayMode _mode = DisplayMode.Windowed;
     private Vector2D<int> _savedSize = new(800, 600);
@@ -88,6 +88,6 @@ internal static class WindowModeTest
 {
     private static void Main()
     {
-        new GraphicsTestApp(new WindowModeScene()).Run();
+        new ClientTestApp(new WindowModeScene()).Run();
     }
 }

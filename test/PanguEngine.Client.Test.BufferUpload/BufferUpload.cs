@@ -12,14 +12,14 @@ internal static class BufferUpload
 {
     private static void Main()
     {
-        new GraphicsTestApp(new BufferUploadScene()).Run();
+        new ClientTestApp(new BufferUploadScene()).Run();
     }
 }
 
 /// <summary>
 /// Renders a triangle from an uploaded vertex buffer.
 /// </summary>
-internal sealed class BufferUploadScene : IGraphicsTestScene
+internal sealed class BufferUploadScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [
