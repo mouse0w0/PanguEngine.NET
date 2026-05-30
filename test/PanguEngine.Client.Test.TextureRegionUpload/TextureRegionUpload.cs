@@ -66,6 +66,9 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
 
     private void DrawFrame()
     {
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
         if (!_vertexUploadHandle.IsCompleted)
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
@@ -75,9 +78,6 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
                 throw new InvalidOperationException(
                     "Texture upload did not complete after flushing pending uploads.");
         }
-
-        if (!_presenter.TryBeginFrame(out var frame))
-            return;
 
         var activeFrame = frame!;
         try

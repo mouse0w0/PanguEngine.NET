@@ -65,15 +65,15 @@ internal sealed class IndexedQuadScene : IClientTestScene
 
     private void DrawFrame()
     {
+        if (!_presenter.TryBeginFrame(out var frame))
+            return;
+
         if (!_vertexUploadHandle.IsCompleted)
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
         if (!_indexUploadHandle.IsCompleted)
             throw new InvalidOperationException(
                 "Index buffer upload did not complete after flushing pending uploads.");
-
-        if (!_presenter.TryBeginFrame(out var frame))
-            return;
 
         var activeFrame = frame!;
         try
