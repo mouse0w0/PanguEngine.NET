@@ -2,21 +2,21 @@
     <Project Path="src/PanguEngine.Launcher/PanguEngine.Launcher.csproj"/>
     <Project Path="src/PanguEngine/PanguEngine.csproj"/>
     <Project Path="test/PanguEngine.Tests/PanguEngine.Tests.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test/PanguEngine.Client.Test.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.BufferLifecycle/PanguEngine.Client.Test.BufferLifecycle.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.BufferUpload/PanguEngine.Client.Test.BufferUpload.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.Clear/PanguEngine.Client.Test.Clear.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.IndexedQuad/PanguEngine.Client.Test.IndexedQuad.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests/PanguEngine.Client.Tests.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.BufferLifecycle/PanguEngine.Client.Tests.BufferLifecycle.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.BufferUpload/PanguEngine.Client.Tests.BufferUpload.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.Clear/PanguEngine.Client.Tests.Clear.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.IndexedQuad/PanguEngine.Client.Tests.IndexedQuad.csproj"/>
     <Project
-            Path="test/PanguEngine.Client.Test.TextureCubeMapUpload/PanguEngine.Client.Test.TextureCubeMapUpload.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.TextureMipUpload/PanguEngine.Client.Test.TextureMipUpload.csproj"/>
+            Path="test/PanguEngine.Client.Tests.TextureCubeMapUpload/PanguEngine.Client.Tests.TextureCubeMapUpload.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.TextureMipUpload/PanguEngine.Client.Tests.TextureMipUpload.csproj"/>
     <Project
-            Path="test/PanguEngine.Client.Test.TextureGeneratedMipmaps/PanguEngine.Client.Test.TextureGeneratedMipmaps.csproj"/>
+            Path="test/PanguEngine.Client.Tests.TextureGeneratedMipmaps/PanguEngine.Client.Tests.TextureGeneratedMipmaps.csproj"/>
     <Project
-            Path="test/PanguEngine.Client.Test.TextureRegionUpload/PanguEngine.Client.Test.TextureRegionUpload.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.Texture/PanguEngine.Client.Test.Texture.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.Triangle/PanguEngine.Client.Test.Triangle.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.UniformBuffer/PanguEngine.Client.Test.UniformBuffer.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.MultiWindow/PanguEngine.Client.Test.MultiWindow.csproj"/>
-    <Project Path="test/PanguEngine.Client.Test.WindowMode/PanguEngine.Client.Test.WindowMode.csproj"/>
+            Path="test/PanguEngine.Client.Tests.TextureRegionUpload/PanguEngine.Client.Tests.TextureRegionUpload.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.Texture/PanguEngine.Client.Tests.Texture.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.Triangle/PanguEngine.Client.Tests.Triangle.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.UniformBuffer/PanguEngine.Client.Tests.UniformBuffer.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.MultiWindow/PanguEngine.Client.Tests.MultiWindow.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.WindowMode/PanguEngine.Client.Tests.WindowMode.csproj"/>
 </Solution>

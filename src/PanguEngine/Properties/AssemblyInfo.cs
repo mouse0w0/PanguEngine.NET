@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("PanguEngine.Client.Test")]
-[assembly: InternalsVisibleTo("PanguEngine.Client.Test.Common")]
-[assembly: InternalsVisibleTo("PanguEngine.Client.Test.MultiWindow")]
+[assembly: InternalsVisibleTo("PanguEngine.Client.Tests")]
+[assembly: InternalsVisibleTo("PanguEngine.Client.Tests.Common")]
+[assembly: InternalsVisibleTo("PanguEngine.Client.Tests.MultiWindow")]
