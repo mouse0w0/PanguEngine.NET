@@ -1,6 +1,7 @@
 <Solution>
     <Project Path="src/PanguEngine.Launcher/PanguEngine.Launcher.csproj"/>
     <Project Path="src/PanguEngine/PanguEngine.csproj"/>
+    <Project Path="test/PanguEngine.Tests/PanguEngine.Tests.csproj"/>
     <Project Path="test/PanguEngine.Client.Test/PanguEngine.Client.Test.csproj"/>
     <Project Path="test/PanguEngine.Client.Test.BufferLifecycle/PanguEngine.Client.Test.BufferLifecycle.csproj"/>
     <Project Path="test/PanguEngine.Client.Test.BufferUpload/PanguEngine.Client.Test.BufferUpload.csproj"/>
