@@ -41,9 +41,93 @@ public sealed class RegistryTests
     [Fact]
     public void RegisterRejectsNullValue()
     {
-        var registry = new Registry<object?>(ResourceKey.Parse("pangu:test"));
+        var registry = CreateRegistry();
 
-        Assert.Throws<ArgumentNullException>(() => registry.Register(ResourceKey.Parse("pangu:null"), null));
+        Assert.Throws<ArgumentNullException>(() => registry.Register(ResourceKey.Parse("pangu:null"), null!));
+    }
+
+    [Fact]
+    public void GetKeyAndGetIdReturnRegisteredIdentity()
+    {
+        var registry = CreateRegistry();
+        var key = ResourceKey.Parse("pangu:stone");
+        var value = new object();
+        var entry = registry.Register(key, value);
+
+        Assert.Equal(key, registry.GetKey(value));
+        Assert.Equal(entry.Id, registry.GetId(value));
+    }
+
+    [Fact]
+    public void TryGetKeyAndTryGetIdReturnRegisteredIdentity()
+    {
+        var registry = CreateRegistry();
+        var key = ResourceKey.Parse("pangu:stone");
+        var value = new object();
+        var entry = registry.Register(key, value);
+
+        Assert.True(registry.TryGetKey(value, out var actualKey));
+        Assert.Equal(key, actualKey);
+        Assert.True(registry.TryGetId(value, out var actualId));
+        Assert.Equal(entry.Id, actualId);
+    }
+
+    [Fact]
+    public void ReverseLookupUsesReferenceEquality()
+    {
+        var registry = new Registry<ValueEqualResource>(ResourceKey.Parse("pangu:test"));
+        var registered = new ValueEqualResource(7);
+        var equalButDifferent = new ValueEqualResource(7);
+        var key = ResourceKey.Parse("pangu:stone");
+        registry.Register(key, registered);
+
+        Assert.Equal(key, registry.GetKey(registered));
+        Assert.False(registry.TryGetKey(equalButDifferent, out var actualKey));
+        Assert.Equal(default, actualKey);
+    }
+
+    [Fact]
+    public void RegisterRejectsDuplicateValueInstance()
+    {
+        var registry = CreateRegistry();
+        var value = new object();
+        registry.Register(ResourceKey.Parse("pangu:first"), value);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            registry.Register(ResourceKey.Parse("pangu:second"), value));
+    }
+
+    [Fact]
+    public void GetKeyAndGetIdRejectNullValue()
+    {
+        var registry = CreateRegistry();
+
+        Assert.Throws<ArgumentNullException>(() => registry.GetKey(null!));
+        Assert.Throws<ArgumentNullException>(() => registry.GetId(null!));
+    }
+
+    [Fact]
+    public void GetKeyAndGetIdRejectUnregisteredValue()
+    {
+        var registry = CreateRegistry();
+
+        Assert.Throws<KeyNotFoundException>(() => registry.GetKey(new object()));
+        Assert.Throws<KeyNotFoundException>(() => registry.GetId(new object()));
+    }
+
+    [Fact]
+    public void TryGetKeyAndTryGetIdRejectNullAndUnregisteredValues()
+    {
+        var registry = CreateRegistry();
+
+        Assert.False(registry.TryGetKey(null!, out var nullKey));
+        Assert.Equal(default, nullKey);
+        Assert.False(registry.TryGetId(null!, out var nullId));
+        Assert.Equal(-1, nullId);
+        Assert.False(registry.TryGetKey(new object(), out var missingKey));
+        Assert.Equal(default, missingKey);
+        Assert.False(registry.TryGetId(new object(), out var missingId));
+        Assert.Equal(-1, missingId);
     }
 
     [Fact]
@@ -87,6 +171,15 @@ public sealed class RegistryTests
 
         Assert.Equal(ResourceKey.Parse("pangu:test"), managed.Key);
         Assert.Equal(typeof(object), managed.ValueType);
+    }
+
+    private sealed class ValueEqualResource(int value)
+    {
+        private int Value { get; } = value;
+
+        public override bool Equals(object? obj) => obj is ValueEqualResource other && Value == other.Value;
+
+        public override int GetHashCode() => Value;
     }
 
     private static Registry<object> CreateRegistry() => new(ResourceKey.Parse("pangu:test"));

@@ -7,9 +7,10 @@ namespace PanguEngine.Registry;
 /// Stores values by resource key and registry-local numeric identifier.
 /// </summary>
 /// <typeparam name="T">The registered value type.</typeparam>
-public class Registry<T> : IRegistry<T>
+public class Registry<T> : IRegistry<T> where T : class
 {
     private readonly Dictionary<ResourceKey, RegistryEntry<T>> _keyToEntry = [];
+    private readonly Dictionary<T, RegistryEntry<T>> _valueToEntry = new(ReferenceEqualityComparer.Instance);
     private readonly List<RegistryEntry<T>> _entries = [];
     private readonly ReadOnlyCollection<RegistryEntry<T>> _readOnlyEntries;
 
@@ -52,10 +53,13 @@ public class Registry<T> : IRegistry<T>
             throw new ArgumentNullException(nameof(value));
         if (_keyToEntry.ContainsKey(key))
             throw new InvalidOperationException($"Resource key '{key}' is already registered.");
+        if (_valueToEntry.ContainsKey(value))
+            throw new InvalidOperationException("Value instance is already registered.");
 
         var entry = new RegistryEntry<T>(_entries.Count, key, value);
         _entries.Add(entry);
         _keyToEntry.Add(key, entry);
+        _valueToEntry.Add(value, entry);
         return entry;
     }
 
@@ -74,7 +78,7 @@ public class Registry<T> : IRegistry<T>
             return true;
         }
 
-        value = default;
+        value = null;
         return false;
     }
 
@@ -87,7 +91,51 @@ public class Registry<T> : IRegistry<T>
             return true;
         }
 
-        value = default;
+        value = null;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public ResourceKey GetKey(T value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return TryGetEntry(value, out var entry)
+            ? entry.Key
+            : throw new KeyNotFoundException("Value instance is not registered.");
+    }
+
+    /// <inheritdoc/>
+    public int GetId(T value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        return TryGetEntry(value, out var entry)
+            ? entry.Id
+            : throw new KeyNotFoundException("Value instance is not registered.");
+    }
+
+    /// <inheritdoc/>
+    public bool TryGetKey(T value, out ResourceKey key)
+    {
+        if (TryGetEntry(value, out var entry))
+        {
+            key = entry.Key;
+            return true;
+        }
+
+        key = default;
+        return false;
+    }
+
+    /// <inheritdoc/>
+    public bool TryGetId(T value, out int id)
+    {
+        if (TryGetEntry(value, out var entry))
+        {
+            id = entry.Id;
+            return true;
+        }
+
+        id = -1;
         return false;
     }
 
@@ -132,6 +180,17 @@ public class Registry<T> : IRegistry<T>
 
         entry = _entries[id];
         return true;
+    }
+
+    private bool TryGetEntry(T? value, [NotNullWhen(true)] out RegistryEntry<T>? entry)
+    {
+        if (value is null)
+        {
+            entry = null;
+            return false;
+        }
+
+        return _valueToEntry.TryGetValue(value, out entry);
     }
 
     /// <inheritdoc/>

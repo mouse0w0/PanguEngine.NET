@@ -153,5 +153,26 @@ public sealed class DefaultedRegistryTests
         Assert.False(registry.ContainsId(99));
     }
 
+    [Fact]
+    public void ReverseLookupDoesNotFallBackToDefaultValue()
+    {
+        var registry = CreateRegistry();
+        var defaultValue = new object();
+        var missingValue = new object();
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var defaultEntry = registry.Register(defaultKey, defaultValue);
+        registry.SetDefault(defaultKey);
+        registry.Freeze();
+
+        Assert.Equal(defaultKey, registry.GetKey(defaultValue));
+        Assert.Equal(defaultEntry.Id, registry.GetId(defaultValue));
+        Assert.False(registry.TryGetKey(missingValue, out var missingKey));
+        Assert.Equal(default, missingKey);
+        Assert.False(registry.TryGetId(missingValue, out var missingId));
+        Assert.Equal(-1, missingId);
+        Assert.Throws<KeyNotFoundException>(() => registry.GetKey(missingValue));
+        Assert.Throws<KeyNotFoundException>(() => registry.GetId(missingValue));
+    }
+
     private static DefaultedRegistry<object> CreateRegistry() => new(ResourceKey.Parse("pangu:test"));
 }

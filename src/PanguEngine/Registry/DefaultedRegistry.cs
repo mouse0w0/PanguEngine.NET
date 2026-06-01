@@ -1,12 +1,10 @@
-using System.Diagnostics.CodeAnalysis;
-
 namespace PanguEngine.Registry;
 
 /// <summary>
 /// Stores values by resource key and falls back to a default value after freezing.
 /// </summary>
 /// <typeparam name="T">The registered value type.</typeparam>
-public class DefaultedRegistry<T> : Registry<T>
+public class DefaultedRegistry<T> : Registry<T> where T : class
 {
     private RegistryEntry<T>? _defaultEntry;
     private T _defaultValue = default!;
@@ -27,8 +25,7 @@ public class DefaultedRegistry<T> : Registry<T>
     public int DefaultId { get; private set; } = -1;
 
     /// <summary>The cached default value.</summary>
-    [MaybeNull]
-    public T DefaultValue => _defaultEntry is null ? default : _defaultValue;
+    public T? DefaultValue => _defaultEntry is null ? null : _defaultValue;
 
     /// <summary>
     /// Sets the key that will be resolved as the default entry when the registry is frozen.

@@ -7,4 +7,4 @@ namespace PanguEngine.Registry;
 /// <param name="Id">The registry-local numeric identifier.</param>
 /// <param name="Key">The stable resource key.</param>
 /// <param name="Value">The registered value.</param>
-public record class RegistryEntry<T>(int Id, ResourceKey Key, T Value);
+public record RegistryEntry<T>(int Id, ResourceKey Key, T Value) where T : class;

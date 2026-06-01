@@ -27,7 +27,7 @@ public interface IRegistry
 /// Provides typed access to a registry.
 /// </summary>
 /// <typeparam name="T">The registered value type.</typeparam>
-public interface IRegistry<T> : IRegistry
+public interface IRegistry<T> : IRegistry where T : class
 {
     /// <summary>The registered entries ordered by their registry-local identifiers.</summary>
     IReadOnlyList<RegistryEntry<T>> Entries { get; }
@@ -99,6 +99,36 @@ public interface IRegistry<T> : IRegistry
     /// <param name="entry">The registry entry when found.</param>
     /// <returns>Whether the entry was found.</returns>
     bool TryGetEntry(int id, [NotNullWhen(true)] out RegistryEntry<T>? entry);
+
+    /// <summary>
+    /// Gets the key of a registered value instance.
+    /// </summary>
+    /// <param name="value">The registered value instance.</param>
+    /// <returns>The key of the registered value.</returns>
+    ResourceKey GetKey(T value);
+
+    /// <summary>
+    /// Gets the registry-local identifier of a registered value instance.
+    /// </summary>
+    /// <param name="value">The registered value instance.</param>
+    /// <returns>The registry-local identifier of the registered value.</returns>
+    int GetId(T value);
+
+    /// <summary>
+    /// Attempts to get the key of a registered value instance.
+    /// </summary>
+    /// <param name="value">The registered value instance.</param>
+    /// <param name="key">The key when the value instance was found.</param>
+    /// <returns>Whether the value instance was found.</returns>
+    bool TryGetKey(T value, out ResourceKey key);
+
+    /// <summary>
+    /// Attempts to get the registry-local identifier of a registered value instance.
+    /// </summary>
+    /// <param name="value">The registered value instance.</param>
+    /// <param name="id">The registry-local identifier when the value instance was found.</param>
+    /// <returns>Whether the value instance was found.</returns>
+    bool TryGetId(T value, out int id);
 
     /// <summary>
     /// Gets whether a resource key has been registered.
