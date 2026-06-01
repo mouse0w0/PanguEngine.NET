@@ -114,7 +114,7 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     }
 
     /// <inheritdoc/>
-    public bool TryGetKey(T value, out ResourceKey key)
+    public bool TryGetKey(T value, [NotNullWhen(true)] out ResourceKey? key)
     {
         if (TryGetEntry(value, out var entry))
         {
@@ -122,7 +122,7 @@ public class Registry<T> : IWritableRegistry<T> where T : class
             return true;
         }
 
-        key = default;
+        key = null;
         return false;
     }
 

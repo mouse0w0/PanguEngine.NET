@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace PanguEngine.Registry;
 
 /// <summary>
 /// Identifies a named engine resource using a namespace and path.
 /// </summary>
-public readonly record struct ResourceKey
+public sealed record ResourceKey
 {
     /// <summary>The namespace portion of the key.</summary>
     public string Namespace { get; }
@@ -16,12 +18,23 @@ public readonly record struct ResourceKey
     /// </summary>
     /// <param name="namespace">The namespace portion of the key.</param>
     /// <param name="path">The path portion of the key.</param>
-    public ResourceKey(string @namespace, string path)
+    private ResourceKey(string @namespace, string path)
+    {
+        Namespace = @namespace;
+        Path = path;
+    }
+
+    /// <summary>
+    /// Creates a resource key from a namespace and path.
+    /// </summary>
+    /// <param name="namespace">The namespace portion of the key.</param>
+    /// <param name="path">The path portion of the key.</param>
+    /// <returns>The created resource key.</returns>
+    public static ResourceKey Create(string @namespace, string path)
     {
         ValidateNamespace(@namespace);
         ValidatePath(path);
-        Namespace = @namespace;
-        Path = path;
+        return new ResourceKey(@namespace, path);
     }
 
     /// <summary>
@@ -42,9 +55,9 @@ public readonly record struct ResourceKey
     /// <param name="text">The text to parse.</param>
     /// <param name="key">The parsed resource key when parsing succeeds.</param>
     /// <returns>Whether parsing succeeded.</returns>
-    public static bool TryParse(string? text, out ResourceKey key)
+    public static bool TryParse(string? text, [NotNullWhen(true)] out ResourceKey? key)
     {
-        key = default;
+        key = null;
         if (string.IsNullOrEmpty(text)) return false;
 
         var separator = text.IndexOf(':');
@@ -68,8 +81,8 @@ public readonly record struct ResourceKey
     /// </summary>
     /// <param name="key">The key to inspect.</param>
     /// <returns>Whether the key is valid.</returns>
-    internal static bool IsValid(ResourceKey key) =>
-        IsValidNamespace(key.Namespace) && IsValidPath(key.Path);
+    internal static bool IsValid([NotNullWhen(true)] ResourceKey? key) =>
+        key is not null && IsValidNamespace(key.Namespace) && IsValidPath(key.Path);
 
     private static void ValidateNamespace(string value)
     {

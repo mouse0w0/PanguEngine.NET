@@ -118,7 +118,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="value">The registered value instance.</param>
     /// <param name="key">The key when the value instance was found.</param>
     /// <returns>Whether the value instance was found.</returns>
-    bool TryGetKey(T value, out ResourceKey key);
+    bool TryGetKey(T value, [NotNullWhen(true)] out ResourceKey? key);
 
     /// <summary>
     /// Attempts to get the registry-local identifier of a registered value instance.

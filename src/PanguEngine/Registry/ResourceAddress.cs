@@ -3,7 +3,7 @@ namespace PanguEngine.Registry;
 /// <summary>
 /// Identifies an entry inside a registry.
 /// </summary>
-public readonly record struct ResourceAddress
+public sealed record ResourceAddress
 {
     /// <summary>The key of the registry that contains the entry.</summary>
     public ResourceKey RegistryKey { get; }

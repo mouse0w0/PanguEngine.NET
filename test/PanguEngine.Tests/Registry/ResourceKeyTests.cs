@@ -43,11 +43,11 @@ public sealed class ResourceKeyTests
     }
 
     [Fact]
-    public void ConstructorRejectsInvalidParts()
+    public void CreateRejectsInvalidParts()
     {
-        Assert.Throws<ArgumentException>(() => new ResourceKey("", "stone"));
-        Assert.Throws<ArgumentException>(() => new ResourceKey("pangu", ""));
-        Assert.Throws<ArgumentException>(() => new ResourceKey("pan-gu", "stone"));
-        Assert.Throws<ArgumentException>(() => new ResourceKey("pangu", "stone-brick"));
+        Assert.Throws<ArgumentException>(() => ResourceKey.Create("", "stone"));
+        Assert.Throws<ArgumentException>(() => ResourceKey.Create("pangu", ""));
+        Assert.Throws<ArgumentException>(() => ResourceKey.Create("pan-gu", "stone"));
+        Assert.Throws<ArgumentException>(() => ResourceKey.Create("pangu", "stone-brick"));
     }
 }
