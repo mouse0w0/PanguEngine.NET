@@ -60,10 +60,10 @@ public class Registry<T> : IRegistry<T>
     }
 
     /// <inheritdoc/>
-    public T Get(ResourceKey key) => GetEntry(key).Value;
+    public virtual T Get(ResourceKey key) => GetEntry(key).Value;
 
     /// <inheritdoc/>
-    public T Get(int id) => GetEntry(id).Value;
+    public virtual T Get(int id) => GetEntry(id).Value;
 
     /// <inheritdoc/>
     public bool TryGet(ResourceKey key, [MaybeNullWhen(false)] out T value)
@@ -141,7 +141,7 @@ public class Registry<T> : IRegistry<T>
     public bool ContainsId(int id) => (uint)id < (uint)_entries.Count;
 
     /// <inheritdoc/>
-    public void Freeze()
+    public virtual void Freeze()
     {
         IsFrozen = true;
     }
