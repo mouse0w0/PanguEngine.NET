@@ -18,7 +18,13 @@ public interface IRegistry
 
     /// <summary>Whether the registry no longer accepts new entries.</summary>
     bool IsFrozen { get; }
+}
 
+/// <summary>
+/// Provides non-generic write access to a registry.
+/// </summary>
+public interface IWritableRegistry : IRegistry
+{
     /// <summary>Prevents further entries from being registered.</summary>
     void Freeze();
 }
@@ -31,14 +37,6 @@ public interface IRegistry<T> : IRegistry where T : class
 {
     /// <summary>The registered entries ordered by their registry-local identifiers.</summary>
     IReadOnlyList<RegistryEntry<T>> Entries { get; }
-
-    /// <summary>
-    /// Registers a value with a resource key.
-    /// </summary>
-    /// <param name="key">The key that identifies the value.</param>
-    /// <param name="value">The value to register.</param>
-    /// <returns>The created registry entry.</returns>
-    RegistryEntry<T> Register(ResourceKey key, T value);
 
     /// <summary>
     /// Gets a registered value by resource key.
@@ -143,4 +141,19 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="id">The registry-local identifier to inspect.</param>
     /// <returns>Whether the identifier has been registered.</returns>
     bool ContainsId(int id);
+}
+
+/// <summary>
+/// Provides typed write access to a registry.
+/// </summary>
+/// <typeparam name="T">The registered value type.</typeparam>
+public interface IWritableRegistry<T> : IRegistry<T>, IWritableRegistry where T : class
+{
+    /// <summary>
+    /// Registers a value with a resource key.
+    /// </summary>
+    /// <param name="key">The key that identifies the value.</param>
+    /// <param name="value">The value to register.</param>
+    /// <returns>The created registry entry.</returns>
+    RegistryEntry<T> Register(ResourceKey key, T value);
 }

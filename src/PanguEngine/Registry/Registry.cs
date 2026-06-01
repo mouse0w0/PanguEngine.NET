@@ -7,7 +7,7 @@ namespace PanguEngine.Registry;
 /// Stores values by resource key and registry-local numeric identifier.
 /// </summary>
 /// <typeparam name="T">The registered value type.</typeparam>
-public class Registry<T> : IRegistry<T> where T : class
+public class Registry<T> : IWritableRegistry<T> where T : class
 {
     private readonly Dictionary<ResourceKey, RegistryEntry<T>> _keyToEntry = [];
     private readonly Dictionary<T, RegistryEntry<T>> _valueToEntry = new(ReferenceEqualityComparer.Instance);
