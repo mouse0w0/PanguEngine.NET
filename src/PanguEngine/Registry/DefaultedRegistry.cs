@@ -7,14 +7,12 @@ namespace PanguEngine.Registry;
 public class DefaultedRegistry<T> : Registry<T> where T : class
 {
     private RegistryEntry<T>? _defaultEntry;
-    private T _defaultValue = default!;
 
     /// <summary>
     /// Creates a defaulted registry with the specified key.
     /// </summary>
     /// <param name="key">The key that identifies this registry.</param>
-    public DefaultedRegistry(ResourceKey key)
-        : base(key)
+    public DefaultedRegistry(ResourceKey key) : base(key)
     {
     }
 
@@ -22,10 +20,10 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
     public ResourceKey? DefaultKey { get; private set; }
 
     /// <summary>The registry-local identifier of the default entry, or -1 when no default entry is cached.</summary>
-    public int DefaultId { get; private set; } = -1;
+    public int DefaultId => _defaultEntry?.Id ?? -1;
 
     /// <summary>The cached default value.</summary>
-    public T? DefaultValue => _defaultEntry is null ? null : _defaultValue;
+    public T? DefaultValue => _defaultEntry?.Value;
 
     /// <summary>
     /// Sets the key that will be resolved as the default entry when the registry is frozen.
@@ -39,9 +37,7 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
             throw new ArgumentException("Invalid registry key.", nameof(key));
 
         DefaultKey = key;
-        DefaultId = -1;
         _defaultEntry = null;
-        _defaultValue = default!;
     }
 
     /// <inheritdoc/>
@@ -51,7 +47,7 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
             return value;
 
         if (_defaultEntry is not null)
-            return _defaultValue;
+            return _defaultEntry.Value;
 
         return base.Get(key);
     }
@@ -63,7 +59,7 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
             return value;
 
         if (_defaultEntry is not null)
-            return _defaultValue;
+            return _defaultEntry.Value;
 
         return base.Get(id);
     }
@@ -72,11 +68,7 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
     public override void Freeze()
     {
         if (DefaultKey is { } defaultKey)
-        {
             _defaultEntry = GetEntry(defaultKey);
-            DefaultId = _defaultEntry.Id;
-            _defaultValue = _defaultEntry.Value;
-        }
 
         base.Freeze();
     }
