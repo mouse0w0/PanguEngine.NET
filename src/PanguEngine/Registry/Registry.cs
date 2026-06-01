@@ -142,19 +142,17 @@ public class Registry<T> : IRegistry<T> where T : class
     /// <inheritdoc/>
     public RegistryEntry<T> GetEntry(ResourceKey key)
     {
-        if (TryGetEntry(key, out var entry))
-            return entry;
-
-        throw new KeyNotFoundException($"Resource key '{key}' is not registered.");
+        return TryGetEntry(key, out var entry)
+            ? entry
+            : throw new KeyNotFoundException($"Resource key '{key}' is not registered.");
     }
 
     /// <inheritdoc/>
     public RegistryEntry<T> GetEntry(int id)
     {
-        if (TryGetEntry(id, out var entry))
-            return entry;
-
-        throw new KeyNotFoundException($"Registry id '{id}' is not registered.");
+        return TryGetEntry(id, out var entry)
+            ? entry
+            : throw new KeyNotFoundException($"Registry id '{id}' is not registered.");
     }
 
     /// <inheritdoc/>
