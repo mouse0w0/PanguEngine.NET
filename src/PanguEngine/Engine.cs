@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using PanguEngine.Mod;
 
 namespace PanguEngine;
 
@@ -12,6 +13,8 @@ public static class Engine
     /// </summary>
     public static ILogger Logger { get; private set; } = null!;
 
+    public static ModManager ModManager { get; private set; } = null!;
+
     /// <summary>
     /// Initializes the engine.
     /// </summary>
@@ -19,6 +22,8 @@ public static class Engine
     {
         Log.Initialize();
         Logger = Log.CreateLogger("Engine");
+        ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "Mods"), Log.CreateLogger("Mods"));
+        ModManager.Load();
     }
 
     /// <summary>
@@ -26,6 +31,7 @@ public static class Engine
     /// </summary>
     internal static void Shutdown()
     {
+        ModManager.Shutdown();
         Log.Shutdown();
     }
 }
