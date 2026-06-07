@@ -191,9 +191,9 @@ public sealed class ModManagerTests
     }
 }
 
-public sealed class TestModEntry
+public sealed class TestModEntry : IMod
 {
-    public TestModEntry(ModContext context)
+    public void Configure(ModContext context)
     {
         if (context.Info.Id != "test_mod")
             throw new InvalidOperationException("Unexpected mod id.");

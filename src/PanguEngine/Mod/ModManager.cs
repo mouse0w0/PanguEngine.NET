@@ -165,8 +165,21 @@ public sealed partial class ModManager(string modsDirectory, ILogger logger)
             var assets = new ModAssetProvider(source);
             var info = new ModInfo(id, version);
             var context = new ModContext(info, logger, assets);
-            var entry = Activator.CreateInstance(entryType, context)
+            if (!typeof(IMod).IsAssignableFrom(entryType))
+                throw new ModLoadException($"Mod '{id}' entry '{entryName}' must implement {nameof(IMod)}.");
+
+            var entry = Activator.CreateInstance(entryType) as IMod
                         ?? throw new ModLoadException($"Mod '{id}' entry '{entryName}' could not be created.");
+            try
+            {
+                entry.Configure(context);
+            }
+            catch
+            {
+                ModContainer.DestroyInstance(entry);
+                throw;
+            }
+
             _containers.Add(new ModContainer(info, source, loadContext, context, entry));
             source = null;
             LogModLoaded(logger, id, version, descriptor.Candidate.SourcePath);
