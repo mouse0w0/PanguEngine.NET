@@ -19,6 +19,34 @@ public sealed class ModManagerTests
     }
 
     [Fact]
+    public void LoadUsesExplicitModWhenModsDirectoryIsMissing()
+    {
+        using var directory = TestDirectory.Create();
+        var modsDirectory = Path.Combine(directory.Path, "MissingMods");
+        var assemblyPath = typeof(TestModEntry).Assembly.Location;
+        var assemblyFile = Path.GetFileName(assemblyPath);
+        var modDirectory = CreateModDirectory(directory.Path, "explicit_mod", "test_mod", assemblyFile,
+            typeof(TestModEntry).FullName!);
+        File.Copy(assemblyPath, Path.Combine(modDirectory, assemblyFile), overwrite: true);
+        Directory.CreateDirectory(Path.Combine(modDirectory, "assets", "textures"));
+        File.WriteAllText(Path.Combine(modDirectory, "assets", "textures", "stone.txt"), "stone");
+
+        var manager = new ModManager(modsDirectory, NullLogger.Instance, [modDirectory]);
+        try
+        {
+            manager.Load();
+
+            var mod = Assert.Single(manager.LoadedMods);
+            Assert.Equal("test_mod", mod.Id);
+            Assert.Equal("0.1.0", mod.Version);
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
     public void LoadReportsAllDuplicateIdsBeforeLoadingAssemblies()
     {
         using var directory = TestDirectory.Create();
@@ -27,6 +55,27 @@ public sealed class ModManagerTests
         CreateModZip(directory.Path, "c.zip", "other_mod", "C.dll", "C.Entry");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("same_mod", exception.Message);
+        Assert.Contains("a.zip", exception.Message);
+        Assert.Contains("b.zip", exception.Message);
+    }
+
+    [Fact]
+    public void LoadReportsDuplicateIdsAcrossDefaultAndExplicitMods()
+    {
+        using var directory = TestDirectory.Create();
+        var modsDirectory = Path.Combine(directory.Path, "Mods");
+        var explicitDirectory = Path.Combine(directory.Path, "Explicit");
+        Directory.CreateDirectory(modsDirectory);
+        Directory.CreateDirectory(explicitDirectory);
+        CreateModZip(modsDirectory, "a.zip", "same_mod", "A.dll", "A.Entry");
+        CreateModZip(explicitDirectory, "b.zip", "same_mod", "B.dll", "B.Entry");
+
+        var manager = new ModManager(modsDirectory, NullLogger.Instance,
+            [Path.Combine(explicitDirectory, "b.zip")]);
 
         var exception = Assert.Throws<ModLoadException>(() => manager.Load());
 

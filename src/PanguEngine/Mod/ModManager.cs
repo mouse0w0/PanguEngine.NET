@@ -4,22 +4,37 @@ using Microsoft.Extensions.Logging;
 
 namespace PanguEngine.Mod;
 
-public sealed partial class ModManager(string modsDirectory, ILogger logger)
+/// <summary>
+/// Discovers, validates, loads, and unloads mods.
+/// </summary>
+/// <param name="modsDirectory">The default mods directory.</param>
+/// <param name="logger">The logger used for mod loading.</param>
+/// <param name="explicitModPaths">Additional mod paths to load.</param>
+public sealed partial class ModManager(
+    string modsDirectory,
+    ILogger logger,
+    IReadOnlyList<string>? explicitModPaths = null)
 {
     private readonly List<ModContainer> _containers = [];
 
+    /// <summary>
+    /// The loaded mods.
+    /// </summary>
     public IReadOnlyList<ModInfo> LoadedMods => _containers.Select(container => container.Info).ToArray();
 
+    /// <summary>
+    /// Loads all discovered mods.
+    /// </summary>
     public void Load()
     {
-        if (!Directory.Exists(modsDirectory))
-            return;
-
         var candidates = DiscoverCandidates();
         var descriptors = ReadManifests(candidates);
         LoadDescriptors(descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal).ToArray());
     }
 
+    /// <summary>
+    /// Shuts down loaded mods and clears the loaded mod list.
+    /// </summary>
     public void Shutdown()
     {
         foreach (var container in _containers)
@@ -31,11 +46,18 @@ public sealed partial class ModManager(string modsDirectory, ILogger logger)
     private List<ModCandidate> DiscoverCandidates()
     {
         var candidates = new List<ModCandidate>();
-        candidates.AddRange(Directory.EnumerateFiles(modsDirectory, "*.zip", SearchOption.TopDirectoryOnly)
-            .Select(path => new ModCandidate(path, ModSourceKind.Zip)));
-        candidates.AddRange(Directory.EnumerateDirectories(modsDirectory, "*", SearchOption.TopDirectoryOnly)
-            .Where(path => File.Exists(Path.Combine(path, "mod.json")))
-            .Select(path => new ModCandidate(path, ModSourceKind.Directory)));
+        if (Directory.Exists(modsDirectory))
+        {
+            candidates.AddRange(Directory.EnumerateFiles(modsDirectory, "*.zip", SearchOption.TopDirectoryOnly)
+                .Select(path => new ModCandidate(path, ModSourceKind.Zip)));
+            candidates.AddRange(Directory.EnumerateDirectories(modsDirectory, "*", SearchOption.TopDirectoryOnly)
+                .Where(path => File.Exists(Path.Combine(path, "mod.json")))
+                .Select(path => new ModCandidate(path, ModSourceKind.Directory)));
+        }
+
+        if (explicitModPaths is not null)
+            candidates.AddRange(explicitModPaths.Select(CreateExplicitCandidate));
+
         return candidates;
     }
 
@@ -199,6 +221,14 @@ public sealed partial class ModManager(string modsDirectory, ILogger logger)
             ModSourceKind.Directory => new DirectoryModSource(candidate.SourcePath),
             _ => throw new ArgumentOutOfRangeException(nameof(candidate))
         };
+    }
+
+    private static ModCandidate CreateExplicitCandidate(string sourcePath)
+    {
+        var kind = Path.GetExtension(sourcePath).Equals(".zip", StringComparison.OrdinalIgnoreCase)
+            ? ModSourceKind.Zip
+            : ModSourceKind.Directory;
+        return new ModCandidate(sourcePath, kind);
     }
 
     private sealed record ModCandidate(string SourcePath, ModSourceKind Kind)

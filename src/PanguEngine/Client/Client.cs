@@ -16,6 +16,25 @@ public class Client
     /// </summary>
     public static Client Instance { get; private set; } = null!;
 
+    private readonly LaunchOptions _launchOptions;
+
+    /// <summary>
+    /// Creates a client with default launch options.
+    /// </summary>
+    public Client() : this(LaunchOptions.Empty)
+    {
+    }
+
+    /// <summary>
+    /// Creates a client with the specified launch options.
+    /// </summary>
+    /// <param name="launchOptions">The launch options.</param>
+    public Client(LaunchOptions launchOptions)
+    {
+        ArgumentNullException.ThrowIfNull(launchOptions);
+        _launchOptions = launchOptions;
+    }
+
     /// <summary>
     /// The primary window.
     /// </summary>
@@ -69,7 +88,7 @@ public class Client
     /// </summary>
     private void OnInit()
     {
-        Engine.Initialize();
+        Engine.Initialize(_launchOptions);
 
         GraphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {

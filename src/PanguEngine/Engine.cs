@@ -20,9 +20,21 @@ public static class Engine
     /// </summary>
     internal static void Initialize()
     {
+        Initialize(LaunchOptions.Empty);
+    }
+
+    /// <summary>
+    /// Initializes the engine with launch options.
+    /// </summary>
+    /// <param name="options">The launch options.</param>
+    internal static void Initialize(LaunchOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+
         Log.Initialize();
         Logger = Log.CreateLogger("Engine");
-        ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "Mods"), Log.CreateLogger("Mods"));
+        ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "Mods"), Log.CreateLogger("Mods"),
+            options.ModPaths);
         ModManager.Load();
     }
 
