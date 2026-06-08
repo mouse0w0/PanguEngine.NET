@@ -1,5 +1,5 @@
 <Solution>
-    <Project Path="src/PanguEngine.Launcher/PanguEngine.Launcher.csproj"/>
+    <Project Path="src/PanguEngine.App/PanguEngine.App.csproj"/>
     <Project Path="src/PanguEngine/PanguEngine.csproj"/>
     <Project Path="test/PanguEngine.Tests/PanguEngine.Tests.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests/PanguEngine.Client.Tests.csproj"/>

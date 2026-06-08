@@ -1,4 +1,4 @@
-﻿namespace PanguEngine.Launcher;
+﻿namespace PanguEngine.App;
 
 internal static class Program
 {

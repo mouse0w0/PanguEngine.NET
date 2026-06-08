@@ -8,7 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\PanguEngine\PanguEngine.csproj" />
+        <ProjectReference Include="..\PanguEngine\PanguEngine.csproj"/>
     </ItemGroup>
 
 </Project>
