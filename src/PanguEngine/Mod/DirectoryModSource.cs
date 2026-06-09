@@ -13,6 +13,12 @@ internal sealed class DirectoryModSource(string path) : ModSource(path)
             .OfType<string>();
     }
 
+    public override bool TryGetFilePath(string path, out string? filePath)
+    {
+        filePath = GetFullPath(path);
+        return File.Exists(filePath);
+    }
+
     private string GetFullPath(string path)
     {
         var fullPath = Path.GetFullPath(Path.Combine(SourcePath, path.Replace('/', Path.DirectorySeparatorChar)));

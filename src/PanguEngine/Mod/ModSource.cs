@@ -10,6 +10,12 @@ internal abstract class ModSource(string sourcePath) : IDisposable
 
     public abstract IEnumerable<string> GetAssemblyFileNames();
 
+    public virtual bool TryGetFilePath(string path, out string? filePath)
+    {
+        filePath = null;
+        return false;
+    }
+
     public virtual void Dispose()
     {
     }

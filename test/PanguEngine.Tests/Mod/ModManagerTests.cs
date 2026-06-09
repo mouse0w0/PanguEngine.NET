@@ -178,6 +178,25 @@ public sealed class ModManagerTests
         }
     }
 
+    [Fact]
+    public void DirectoryModAssemblyLoadsFromFilePath()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(TestModEntry).Assembly.Location;
+        var assemblyFile = Path.GetFileName(assemblyPath);
+        var modDirectory = CreateModDirectory(directory.Path, "test_mod", "test_mod", assemblyFile,
+            typeof(TestModEntry).FullName!);
+        var modAssemblyPath = Path.Combine(modDirectory, assemblyFile);
+        File.Copy(assemblyPath, modAssemblyPath, overwrite: true);
+
+        using var source = new DirectoryModSource(modDirectory);
+        var loadContext = new ModAssemblyLoadContext("test_mod", source);
+
+        var assembly = loadContext.LoadMainAssembly(assemblyFile);
+
+        Assert.Equal(Path.GetFullPath(modAssemblyPath), Path.GetFullPath(assembly.Location));
+    }
+
     private static void WriteEntry(ZipArchive archive, string name, string content)
     {
         var entry = archive.CreateEntry(name);

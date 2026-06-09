@@ -28,6 +28,9 @@ internal sealed class ModAssemblyLoadContext(string modId, ModSource source)
 
     private Assembly LoadAssembly(string fileName)
     {
+        if (source.TryGetFilePath(fileName, out var filePath))
+            return LoadFromAssemblyPath(filePath);
+
         using var assemblyStream = source.Open(fileName);
         using var assemblyCopy = new MemoryStream();
         assemblyStream.CopyTo(assemblyCopy);

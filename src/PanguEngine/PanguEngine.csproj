@@ -5,6 +5,15 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+        <PackageId>PanguEngine</PackageId>
+        <Version>0.1.0</Version>
+        <Description>PanguEngine voxel game engine</Description>
+        <Authors>PanguEngine</Authors>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+        <DebugType>embedded</DebugType>
+        <EmbedAllSources>true</EmbedAllSources>
     </PropertyGroup>
 
     <ItemGroup>
