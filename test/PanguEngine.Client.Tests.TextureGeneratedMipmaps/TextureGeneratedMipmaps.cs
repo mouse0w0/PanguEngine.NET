@@ -166,8 +166,8 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "texture_generated_mipmaps.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "texture_generated_mipmaps.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "texture_generated_mipmaps.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "texture_generated_mipmaps.frag");
 
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, File.ReadAllText(vertPath),
             name: "texture_generated_mipmaps.vert");

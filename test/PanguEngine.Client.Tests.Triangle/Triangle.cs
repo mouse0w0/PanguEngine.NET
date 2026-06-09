@@ -33,8 +33,8 @@ internal sealed class TriangleScene : IClientTestScene
         _presenter = window.Presenter;
 
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "triangle.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "triangle.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "triangle.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "triangle.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);

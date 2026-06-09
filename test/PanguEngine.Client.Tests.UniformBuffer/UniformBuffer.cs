@@ -156,8 +156,8 @@ internal sealed class UniformBufferScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "uniform_buffer.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "uniform_buffer.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "uniform_buffer.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "uniform_buffer.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);

@@ -116,8 +116,8 @@ internal sealed class IndexedQuadScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "indexed_quad.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "indexed_quad.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "indexed_quad.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "indexed_quad.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);

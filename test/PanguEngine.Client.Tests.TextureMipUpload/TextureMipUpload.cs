@@ -171,8 +171,8 @@ internal sealed class TextureMipUploadScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "texture_mip_upload.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "texture_mip_upload.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "texture_mip_upload.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "texture_mip_upload.frag");
 
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, File.ReadAllText(vertPath),
             name: "texture_mip_upload.vert");

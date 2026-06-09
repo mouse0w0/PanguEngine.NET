@@ -117,8 +117,8 @@ internal sealed class BufferLifecycleScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "buffer_lifecycle.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "buffer_lifecycle.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "buffer_lifecycle.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "buffer_lifecycle.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);

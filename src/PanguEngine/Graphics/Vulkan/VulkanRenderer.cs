@@ -22,8 +22,8 @@ internal sealed class VulkanRenderer
         _presenter = presenter;
 
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Assets", "Shaders", "triangle.vert");
-        var fragPath = Path.Combine(basePath, "Assets", "Shaders", "triangle.frag");
+        var vertPath = Path.Combine(basePath, "assets", "shaders", "triangle.vert");
+        var fragPath = Path.Combine(basePath, "assets", "shaders", "triangle.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);

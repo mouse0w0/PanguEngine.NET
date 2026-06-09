@@ -13,7 +13,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="Shaders\**\*">
+        <Content Include="shaders\**\*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
     </ItemGroup>

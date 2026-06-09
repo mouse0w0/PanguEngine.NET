@@ -166,8 +166,8 @@ internal sealed class TextureScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "texture.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "texture.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "texture.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "texture.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);

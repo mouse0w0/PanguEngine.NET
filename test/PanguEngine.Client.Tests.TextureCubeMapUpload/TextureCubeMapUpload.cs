@@ -177,8 +177,8 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "texture_cube_map_upload.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "texture_cube_map_upload.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "texture_cube_map_upload.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "texture_cube_map_upload.frag");
 
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, File.ReadAllText(vertPath),
             name: "texture_cube_map_upload.vert");

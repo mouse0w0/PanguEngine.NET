@@ -99,8 +99,8 @@ internal sealed class BufferUploadScene : IClientTestScene
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "Shaders", "buffer_upload.vert");
-        var fragPath = Path.Combine(basePath, "Shaders", "buffer_upload.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "buffer_upload.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "buffer_upload.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
