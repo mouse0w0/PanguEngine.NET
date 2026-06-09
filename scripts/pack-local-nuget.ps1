@@ -5,6 +5,7 @@ $version = "0.1.0-dev.$timestamp"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $projectPath = Join-Path $repoRoot "src\PanguEngine\PanguEngine.csproj"
+$appProjectPath = Join-Path $repoRoot "src\PanguEngine.App\PanguEngine.App.csproj"
 $outputPath = Join-Path $repoRoot "LocalNuGet"
 
 if (-not (Test-Path $outputPath))
@@ -14,6 +15,15 @@ if (-not (Test-Path $outputPath))
 
 Get-ChildItem -LiteralPath $outputPath -Filter "PanguEngine.*.nupkg" | Remove-Item -Force
 Get-ChildItem -LiteralPath $outputPath -Filter "PanguEngine.*.snupkg" | Remove-Item -Force
+
+Write-Host "Building local Debug output..."
+dotnet build $appProjectPath -c Debug --nologo
+
+if ($LASTEXITCODE -ne 0)
+{
+    Write-Error "Debug build failed."
+    exit 1
+}
 
 Write-Host "Packing PanguEngine $version..."
 dotnet pack $projectPath -c Debug -p:PackageVersion=$version -o $outputPath --nologo

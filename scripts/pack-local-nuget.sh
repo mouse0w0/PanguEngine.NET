@@ -9,12 +9,16 @@ timestamp="$(date +%Y%m%d%H%M%S)"
 version="0.1.0-dev.$timestamp"
 
 project_path="$repo_root/src/PanguEngine/PanguEngine.csproj"
+app_project_path="$repo_root/src/PanguEngine.App/PanguEngine.App.csproj"
 output_path="$repo_root/LocalNuGet"
 
 mkdir -p "$output_path"
 
 rm -f "$output_path"/PanguEngine.*.nupkg
 rm -f "$output_path"/PanguEngine.*.snupkg
+
+printf 'Building local Debug output...\n'
+dotnet build "$app_project_path" -c Debug --nologo
 
 printf 'Packing PanguEngine %s...\n' "$version"
 dotnet pack "$project_path" -c Debug -p:PackageVersion="$version" -o "$output_path" --nologo
