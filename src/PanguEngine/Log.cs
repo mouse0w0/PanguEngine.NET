@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NLog;
 using NLog.Config;
 using NLog.Extensions.Logging;
@@ -15,7 +16,7 @@ namespace PanguEngine;
 public static class Log
 {
     /// <summary>The logger factory for creating loggers.</summary>
-    public static ILoggerFactory Factory { get; private set; } = null!;
+    public static ILoggerFactory Factory { get; private set; } = NullLoggerFactory.Instance;
 
     /// <summary>Get a logger for the specified type.</summary>
     public static ILogger<T> CreateLogger<T>() => Factory.CreateLogger<T>();
@@ -73,6 +74,7 @@ public static class Log
     internal static void Shutdown()
     {
         Factory.Dispose();
+        Factory = NullLoggerFactory.Instance;
         LogManager.Shutdown();
     }
 }
