@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace PanguEngine.Mod;
 
 internal sealed class ModContainer(
@@ -5,6 +7,7 @@ internal sealed class ModContainer(
     ModSource source,
     ModAssemblyLoadContext loadContext,
     ModContext context,
+    ILogger logger,
     object instance)
 {
     public ModInfo Info { get; } = info;
@@ -14,6 +17,8 @@ internal sealed class ModContainer(
     public ModAssemblyLoadContext LoadContext { get; } = loadContext;
 
     public ModContext Context { get; } = context;
+
+    public ILogger Logger { get; } = logger;
 
     public object Instance { get; } = instance;
 

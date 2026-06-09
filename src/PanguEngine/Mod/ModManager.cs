@@ -186,7 +186,8 @@ public sealed partial class ModManager(
             var entryType = assembly.GetType(entryName, throwOnError: true)!;
             var assets = new ModAssetProvider(source);
             var info = new ModInfo(id, version);
-            var context = new ModContext(info, logger, assets);
+            var modLogger = CreateModLogger(id);
+            var context = new ModContext(info, modLogger, assets);
             if (!typeof(IMod).IsAssignableFrom(entryType))
                 throw new ModLoadException($"Mod '{id}' entry '{entryName}' must implement {nameof(IMod)}.");
 
@@ -202,7 +203,7 @@ public sealed partial class ModManager(
                 throw;
             }
 
-            _containers.Add(new ModContainer(info, source, loadContext, context, entry));
+            _containers.Add(new ModContainer(info, source, loadContext, context, modLogger, entry));
             source = null;
             LogModLoaded(logger, id, version, descriptor.Candidate.SourcePath);
         }
@@ -222,6 +223,8 @@ public sealed partial class ModManager(
             _ => throw new ArgumentOutOfRangeException(nameof(candidate))
         };
     }
+
+    private static ILogger CreateModLogger(string modId) => Log.CreateLogger(modId);
 
     private static ModCandidate CreateExplicitCandidate(string sourcePath)
     {
