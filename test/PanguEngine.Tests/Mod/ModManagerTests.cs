@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Mod;
+using PanguEngine.Versioning;
 
 namespace PanguEngine.Tests.Mod;
 
@@ -38,7 +39,8 @@ public sealed class ModManagerTests
 
             var mod = Assert.Single(manager.LoadedMods);
             Assert.Equal("test_mod", mod.Id);
-            Assert.Equal("0.1.0", mod.Version);
+            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Version);
+            Assert.True(mod.Version >= SemVersion.Parse("0.1.0"));
         }
         finally
         {
@@ -143,7 +145,8 @@ public sealed class ModManagerTests
 
             var mod = Assert.Single(manager.LoadedMods);
             Assert.Equal("test_mod", mod.Id);
-            Assert.Equal("0.1.0", mod.Version);
+            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Version);
+            Assert.True(mod.Version >= SemVersion.Parse("0.1.0"));
         }
         finally
         {
@@ -170,7 +173,8 @@ public sealed class ModManagerTests
 
             var mod = Assert.Single(manager.LoadedMods);
             Assert.Equal("test_mod", mod.Id);
-            Assert.Equal("0.1.0", mod.Version);
+            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Version);
+            Assert.True(mod.Version >= SemVersion.Parse("0.1.0"));
         }
         finally
         {

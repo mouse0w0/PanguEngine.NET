@@ -1,6 +1,6 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
+using PanguEngine.Versioning;
 
 namespace PanguEngine.Mod;
 
@@ -135,14 +135,10 @@ public sealed partial class ModManager(
     }
 
     private static bool IsValidVersion(string? value) =>
-        !string.IsNullOrWhiteSpace(value) && SemVerRegex().IsMatch(value);
+        SemVersion.TryParse(value, out _);
 
     private static bool IsFileName(string value) =>
         value == Path.GetFileName(value) && !value.Contains('/') && !value.Contains('\\');
-
-    [GeneratedRegex(@"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$",
-        RegexOptions.CultureInvariant)]
-    private static partial Regex SemVerRegex();
 
     [LoggerMessage(EventId = 0, Level = LogLevel.Information,
         Message = "Loaded mod {ModId} {Version} from {SourcePath}")]
@@ -173,7 +169,7 @@ public sealed partial class ModManager(
     private void LoadDescriptor(ModDescriptor descriptor)
     {
         var id = descriptor.Manifest.Id!;
-        var version = descriptor.Manifest.Version!;
+        var version = SemVersion.Parse(descriptor.Manifest.Version!);
         var assemblyName = descriptor.Manifest.Assembly!;
         var entryName = descriptor.Manifest.Entry!;
         ModSource? source = null;
@@ -205,7 +201,7 @@ public sealed partial class ModManager(
 
             _containers.Add(new ModContainer(info, source, loadContext, context, modLogger, entry));
             source = null;
-            LogModLoaded(logger, id, version, descriptor.Candidate.SourcePath);
+            LogModLoaded(logger, id, version.ToString(), descriptor.Candidate.SourcePath);
         }
         catch (Exception ex)
         {
