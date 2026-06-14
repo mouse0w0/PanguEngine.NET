@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace PanguEngine.Mod;
 
 internal sealed class DirectoryModSource(string path) : ModSource(path)
@@ -13,7 +15,7 @@ internal sealed class DirectoryModSource(string path) : ModSource(path)
             .OfType<string>();
     }
 
-    public override bool TryGetFilePath(string path, out string? filePath)
+    public override bool TryGetFilePath(string path, [NotNullWhen(true)] out string? filePath)
     {
         filePath = GetFullPath(path);
         return File.Exists(filePath);
