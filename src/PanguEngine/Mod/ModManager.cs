@@ -189,15 +189,7 @@ public sealed partial class ModManager(
 
             var entry = Activator.CreateInstance(entryType) as IMod
                         ?? throw new ModLoadException($"Mod '{id}' entry '{entryName}' could not be created.");
-            try
-            {
-                entry.Configure(context);
-            }
-            catch
-            {
-                ModContainer.DestroyInstance(entry);
-                throw;
-            }
+            entry.Configure(context);
 
             _containers.Add(new ModContainer(info, source, loadContext, context, modLogger, entry));
             source = null;
