@@ -259,11 +259,13 @@ public sealed partial class ModManager(
     private void LoadDescriptors(IReadOnlyList<ModDescriptor> descriptors)
     {
         var errors = new List<string>();
+        var loadedContexts = new Dictionary<string, ModAssemblyLoadContext>(StringComparer.Ordinal);
         foreach (var descriptor in descriptors)
         {
             try
             {
-                LoadDescriptor(descriptor);
+                var container = LoadDescriptor(descriptor, loadedContexts);
+                loadedContexts[container.Info.Id] = container.LoadContext;
             }
             catch (ModLoadException ex)
             {
@@ -271,14 +273,12 @@ public sealed partial class ModManager(
             }
         }
 
-        if (errors.Count <= 0)
-            return;
-
-        Shutdown();
-        throw new ModLoadException(string.Join(Environment.NewLine, errors));
+        if (errors.Count > 0)
+            throw new ModLoadException(string.Join(Environment.NewLine, errors));
     }
 
-    private void LoadDescriptor(ModDescriptor descriptor)
+    private ModContainer LoadDescriptor(ModDescriptor descriptor,
+        Dictionary<string, ModAssemblyLoadContext> loadedContexts)
     {
         var id = descriptor.Manifest.Id!;
         var version = SemVersion.Parse(descriptor.Manifest.Version!);
@@ -289,8 +289,16 @@ public sealed partial class ModManager(
         try
         {
             source = OpenSource(descriptor.Candidate);
-            var loadContext = new ModAssemblyLoadContext(id, source);
-            var assembly = loadContext.LoadMainAssembly(assemblyName);
+            var dependencies = new List<ModAssemblyLoadContext>();
+            foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
+            {
+                if (IsValidModId(dependency.Id) &&
+                    loadedContexts.TryGetValue(dependency.Id!, out var dependencyContext))
+                    dependencies.Add(dependencyContext);
+            }
+
+            var loadContext = new ModAssemblyLoadContext(id, source, dependencies);
+            var assembly = loadContext.LoadOwnAssembly(assemblyName);
             var entryType = assembly.GetType(entryName, throwOnError: true)!;
             var assets = new ModAssetProvider(source);
             var info = new ModInfo(id, version);
@@ -303,9 +311,11 @@ public sealed partial class ModManager(
                         ?? throw new ModLoadException($"Mod '{id}' entry '{entryName}' could not be created.");
             entry.Configure(context);
 
-            _containers.Add(new ModContainer(info, source, loadContext, context, modLogger, entry));
+            var container = new ModContainer(info, source, loadContext, context, modLogger, entry);
+            _containers.Add(container);
             source = null;
             LogModLoaded(logger, id, version, descriptor.Candidate.SourcePath);
+            return container;
         }
         catch (Exception ex)
         {

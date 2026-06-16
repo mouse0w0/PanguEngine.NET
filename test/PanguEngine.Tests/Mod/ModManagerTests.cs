@@ -1,4 +1,7 @@
 using System.IO.Compression;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.Loader;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Mod;
@@ -369,6 +372,141 @@ public sealed class ModManagerTests
     }
 
     [Fact]
+    public void LoadAllowsModToUseAssemblyFromDirectDependency()
+    {
+        using var directory = TestDirectory.Create();
+        var dependencyAssembly =
+            CreateMarkerModAssembly(directory.Path, "DirectDependencyLibrary", ("Value", "direct"));
+        var callerAssembly = CreateCallerModAssembly(directory.Path, "DirectCallerMod", dependencyAssembly, "Value");
+
+        CreateGeneratedModZip(directory.Path, "dependency.zip", "dependency_mod", dependencyAssembly,
+            "Generated.ModEntry");
+        CreateGeneratedModZip(directory.Path, "caller.zip", "caller_mod", callerAssembly, "Generated.CallerMod",
+            ",\n  \"dependencies\": [{ \"id\": \"dependency_mod\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Id));
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void LoadAllowsModToUseAssemblyFromTransitiveDependency()
+    {
+        using var directory = TestDirectory.Create();
+        var leafAssembly = CreateMarkerModAssembly(directory.Path, "TransitiveLeafLibrary", ("Value", "leaf"));
+        var middleAssembly = CreateMarkerModAssembly(directory.Path, "TransitiveMiddleMod");
+        var callerAssembly = CreateCallerModAssembly(directory.Path, "TransitiveCallerMod", leafAssembly, "Value");
+
+        CreateGeneratedModZip(directory.Path, "leaf.zip", "leaf_mod", leafAssembly, "Generated.ModEntry");
+        CreateGeneratedModZip(directory.Path, "middle.zip", "middle_mod", middleAssembly, "Generated.ModEntry",
+            ",\n  \"dependencies\": [{ \"id\": \"leaf_mod\" }]");
+        CreateGeneratedModZip(directory.Path, "caller.zip", "caller_mod", callerAssembly, "Generated.CallerMod",
+            ",\n  \"dependencies\": [{ \"id\": \"middle_mod\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            Assert.Equal(new[] { "leaf_mod", "middle_mod", "caller_mod" },
+                manager.LoadedMods.Select(mod => mod.Id));
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void LoadPrefersCurrentModAssemblyBeforeDependencyAssembly()
+    {
+        using var directory = TestDirectory.Create();
+        var dependencyDirectory = Directory.CreateDirectory(Path.Combine(directory.Path, "dependency")).FullName;
+        var callerDirectory = Directory.CreateDirectory(Path.Combine(directory.Path, "caller")).FullName;
+        var dependencySharedAssembly = CreateMarkerModAssembly(dependencyDirectory, "OwnPrioritySharedLibrary");
+        var callerSharedAssembly =
+            CreateMarkerModAssembly(callerDirectory, "OwnPrioritySharedLibrary", ("LocalOnly", "local"));
+        var callerAssembly = CreateCallerModAssembly(directory.Path, "OwnPriorityCallerMod", callerSharedAssembly,
+            "LocalOnly");
+
+        CreateGeneratedModZip(directory.Path, "dependency.zip", "dependency_mod", dependencySharedAssembly,
+            "Generated.ModEntry");
+        CreateGeneratedModZip(directory.Path, "caller.zip", "caller_mod", callerAssembly, "Generated.CallerMod",
+            ",\n  \"dependencies\": [{ \"id\": \"dependency_mod\" }]", callerSharedAssembly);
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Id));
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void LoadUsesDependencyOrderWhenAssembliesHaveSameName()
+    {
+        using var directory = TestDirectory.Create();
+        var firstDirectory = Directory.CreateDirectory(Path.Combine(directory.Path, "first")).FullName;
+        var secondDirectory = Directory.CreateDirectory(Path.Combine(directory.Path, "second")).FullName;
+        var firstSharedAssembly =
+            CreateMarkerModAssembly(firstDirectory, "DependencyOrderSharedLibrary", ("FirstOnly", "first"));
+        var secondSharedAssembly = CreateMarkerModAssembly(secondDirectory, "DependencyOrderSharedLibrary");
+        var callerAssembly = CreateCallerModAssembly(directory.Path, "DependencyOrderCallerMod", firstSharedAssembly,
+            "FirstOnly");
+
+        CreateGeneratedModZip(directory.Path, "first.zip", "first_mod", firstSharedAssembly, "Generated.ModEntry");
+        CreateGeneratedModZip(directory.Path, "second.zip", "second_mod", secondSharedAssembly, "Generated.ModEntry");
+        CreateGeneratedModZip(directory.Path, "caller.zip", "caller_mod", callerAssembly, "Generated.CallerMod",
+            ",\n  \"dependencies\": [{ \"id\": \"first_mod\" }, { \"id\": \"second_mod\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            Assert.Equal(new[] { "first_mod", "second_mod", "caller_mod" },
+                manager.LoadedMods.Select(mod => mod.Id));
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void LoadDoesNotDelegateToMissingOptionalDependency()
+    {
+        using var directory = TestDirectory.Create();
+        var missingOptionalAssembly =
+            CreateMarkerModAssembly(directory.Path, "MissingOptionalLibrary", ("Value", "missing"));
+        var callerAssembly = CreateCallerModAssembly(directory.Path, "MissingOptionalCallerMod",
+            missingOptionalAssembly,
+            "Value");
+        CreateGeneratedModZip(directory.Path, "caller.zip", "caller_mod", callerAssembly, "Generated.CallerMod",
+            ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"optional\": true }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("caller_mod", exception.Message);
+        Assert.DoesNotContain("optional_mod", exception.Message);
+    }
+
+    [Fact]
     public void LoadCreatesEntryAndExposesModInfo()
     {
         using var directory = TestDirectory.Create();
@@ -445,8 +583,8 @@ public sealed class ModManagerTests
         File.Copy(assemblyPath, modAssemblyPath, overwrite: true);
 
         using var source = new DirectoryModSource(modDirectory);
-        var loadContext = new ModAssemblyLoadContext("test_mod", source);
-        var assembly = loadContext.LoadMainAssembly(assemblyFile);
+        var loadContext = new ModAssemblyLoadContext("test_mod", source, []);
+        var assembly = loadContext.LoadOwnAssembly(assemblyFile);
 
         Assert.Equal(Path.GetFullPath(modAssemblyPath), Path.GetFullPath(assembly.Location));
     }
@@ -457,6 +595,103 @@ public sealed class ModManagerTests
         using var stream = entry.Open();
         using var writer = new StreamWriter(stream, Encoding.UTF8);
         writer.Write(content);
+    }
+
+    private static void WriteFile(ZipArchive archive, string entryName, string path)
+    {
+        archive.CreateEntryFromFile(path, entryName);
+    }
+
+    private static string CreateMarkerModAssembly(string directory, string assemblyName,
+        params (string Name, string Value)[] methods)
+    {
+        var assemblyPath = Path.Combine(directory, assemblyName + ".dll");
+        var assemblyBuilder = new PersistedAssemblyBuilder(new AssemblyName(assemblyName), typeof(object).Assembly);
+        var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName);
+
+        var entryBuilder =
+            moduleBuilder.DefineType("Generated.ModEntry", TypeAttributes.Public | TypeAttributes.Sealed);
+        entryBuilder.AddInterfaceImplementation(typeof(IMod));
+        var configureBuilder = entryBuilder.DefineMethod(nameof(IMod.Configure),
+            MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
+            typeof(void),
+            [typeof(ModContext)]);
+        var configureIl = configureBuilder.GetILGenerator();
+        configureIl.Emit(OpCodes.Ret);
+        entryBuilder.DefineMethodOverride(configureBuilder, typeof(IMod).GetMethod(nameof(IMod.Configure))!);
+        entryBuilder.CreateType();
+
+        var markerBuilder = moduleBuilder.DefineType("Generated.Marker",
+            TypeAttributes.Public | TypeAttributes.Abstract | TypeAttributes.Sealed);
+        foreach (var method in methods)
+        {
+            var methodBuilder = markerBuilder.DefineMethod(method.Name,
+                MethodAttributes.Public | MethodAttributes.Static,
+                typeof(string),
+                Type.EmptyTypes);
+            var il = methodBuilder.GetILGenerator();
+            il.Emit(OpCodes.Ldstr, method.Value);
+            il.Emit(OpCodes.Ret);
+        }
+
+        markerBuilder.CreateType();
+        using var stream = File.Create(assemblyPath);
+        assemblyBuilder.Save(stream);
+        return assemblyPath;
+    }
+
+    private static string CreateCallerModAssembly(string directory, string assemblyName, string dependencyAssemblyPath,
+        string dependencyMethodName)
+    {
+        var assemblyPath = Path.Combine(directory, assemblyName + ".dll");
+        var dependencyLoadContext = new AssemblyLoadContext($"DependencyMetadata:{assemblyName}", isCollectible: true);
+        try
+        {
+            using var dependencyStream = File.OpenRead(dependencyAssemblyPath);
+            var dependencyAssembly = dependencyLoadContext.LoadFromStream(dependencyStream);
+            var dependencyMethod = dependencyAssembly.GetType("Generated.Marker")!.GetMethod(dependencyMethodName)!;
+            var assemblyBuilder = new PersistedAssemblyBuilder(new AssemblyName(assemblyName), typeof(object).Assembly);
+            var moduleBuilder = assemblyBuilder.DefineDynamicModule(assemblyName);
+            var typeBuilder =
+                moduleBuilder.DefineType("Generated.CallerMod", TypeAttributes.Public | TypeAttributes.Sealed);
+            typeBuilder.AddInterfaceImplementation(typeof(IMod));
+            var methodBuilder = typeBuilder.DefineMethod(nameof(IMod.Configure),
+                MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
+                typeof(void),
+                [typeof(ModContext)]);
+            var il = methodBuilder.GetILGenerator();
+            il.EmitCall(OpCodes.Call, dependencyMethod, null);
+            il.Emit(OpCodes.Pop);
+            il.Emit(OpCodes.Ret);
+            typeBuilder.DefineMethodOverride(methodBuilder, typeof(IMod).GetMethod(nameof(IMod.Configure))!);
+            typeBuilder.CreateType();
+            using var stream = File.Create(assemblyPath);
+            assemblyBuilder.Save(stream);
+            return assemblyPath;
+        }
+        finally
+        {
+            dependencyLoadContext.Unload();
+        }
+    }
+
+    private static void CreateGeneratedModZip(string directory, string fileName, string id, string assemblyPath,
+        string entry, string dependencies = "", params string[] additionalAssemblyPaths)
+    {
+        using var file = File.Create(Path.Combine(directory, fileName));
+        using var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false);
+        var assemblyFileName = Path.GetFileName(assemblyPath);
+        WriteEntry(archive, "mod.json", $$"""
+                                          {
+                                            "id": "{{id}}",
+                                            "version": "0.1.0",
+                                            "assembly": "{{assemblyFileName}}",
+                                            "entry": "{{entry}}"{{dependencies}}
+                                          }
+                                          """);
+        WriteFile(archive, assemblyFileName, assemblyPath);
+        foreach (var additionalAssemblyPath in additionalAssemblyPaths)
+            WriteFile(archive, Path.GetFileName(additionalAssemblyPath), additionalAssemblyPath);
     }
 
     private static void CreateModZip(string directory, string fileName, string id, string assembly, string entry,

@@ -3,12 +3,15 @@ using System.Runtime.Loader;
 
 namespace PanguEngine.Mod;
 
-internal sealed class ModAssemblyLoadContext(string modId, ModSource source)
+internal sealed class ModAssemblyLoadContext(
+    string modId,
+    ModSource source,
+    IReadOnlyList<AssemblyLoadContext> dependencies)
     : AssemblyLoadContext($"Mod:{modId}", isCollectible: false)
 {
     private readonly Dictionary<string, string> _assemblies = BuildAssemblyIndex(source);
 
-    public Assembly LoadMainAssembly(string assemblyFileName)
+    public Assembly LoadOwnAssembly(string assemblyFileName)
     {
         if (!_assemblies.TryGetValue(Path.GetFileNameWithoutExtension(assemblyFileName), out var fileName))
             throw new FileNotFoundException($"Mod assembly '{assemblyFileName}' was not found.", assemblyFileName);
@@ -23,7 +26,26 @@ internal sealed class ModAssemblyLoadContext(string modId, ModSource source)
 
         return _assemblies.TryGetValue(assemblyName.Name ?? string.Empty, out var fileName)
             ? LoadAssembly(fileName)
-            : null;
+            : LoadFromDependencies(assemblyName);
+    }
+
+    private Assembly? LoadFromDependencies(AssemblyName assemblyName)
+    {
+        foreach (var dependency in dependencies)
+        {
+            try
+            {
+                return dependency.LoadFromAssemblyName(assemblyName);
+            }
+            catch (FileNotFoundException)
+            {
+            }
+            catch (FileLoadException)
+            {
+            }
+        }
+
+        return null;
     }
 
     private Assembly LoadAssembly(string fileName)
