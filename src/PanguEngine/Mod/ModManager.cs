@@ -29,7 +29,8 @@ public sealed partial class ModManager(
     {
         var candidates = DiscoverCandidates();
         var descriptors = ReadManifests(candidates);
-        LoadDescriptors(descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal).ToArray());
+        ValidateDependencies(descriptors);
+        LoadDescriptors(SortByDependencies(descriptors));
     }
 
     /// <summary>
@@ -121,6 +122,117 @@ public sealed partial class ModManager(
         }
     }
 
+    private static void ValidateDependencies(IReadOnlyList<ModDescriptor> descriptors)
+    {
+        var errors = new List<string>();
+        var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, StringComparer.Ordinal);
+
+        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal))
+        {
+            var modId = descriptor.Manifest.Id!;
+            var dependencyIds = new HashSet<string>(StringComparer.Ordinal);
+
+            foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
+            {
+                var dependencyId = dependency.Id;
+                var dependencyIdIsValid = IsValidModId(dependencyId);
+                if (!dependencyIdIsValid)
+                    errors.Add($"{modId}: dependency id '{dependencyId}' is invalid.");
+
+                var hasVersionRange = !string.IsNullOrWhiteSpace(dependency.Version);
+                SemVersionRange? range = null;
+                if (hasVersionRange && !SemVersionRange.TryParse(dependency.Version, out range))
+                    errors.Add($"{modId}: dependency '{dependencyId}' version '{dependency.Version}' is invalid.");
+
+                if (!dependencyIdIsValid)
+                    continue;
+
+                var normalizedDependencyId = dependencyId!;
+                if (!dependencyIds.Add(normalizedDependencyId))
+                    errors.Add($"{modId}: duplicate dependency '{normalizedDependencyId}'.");
+
+                if (string.Equals(modId, normalizedDependencyId, StringComparison.Ordinal))
+                    errors.Add($"{modId}: mod '{modId}' cannot depend on itself.");
+
+                if (hasVersionRange && range is null)
+                    continue;
+
+                if (!descriptorsById.TryGetValue(normalizedDependencyId, out var target))
+                {
+                    if (!dependency.Optional)
+                        errors.Add($"{modId}: dependency '{normalizedDependencyId}' is missing.");
+
+                    continue;
+                }
+
+                if (range is null)
+                    continue;
+
+                var targetVersion = SemVersion.Parse(target.Manifest.Version!);
+                if (!range.Contains(targetVersion))
+                    errors.Add(
+                        $"{modId}: dependency '{normalizedDependencyId}' version {targetVersion} does not satisfy {range}.");
+            }
+        }
+
+        if (errors.Count > 0)
+            throw new ModLoadException(string.Join(Environment.NewLine, errors));
+    }
+
+    private static ModDescriptor[] SortByDependencies(IReadOnlyList<ModDescriptor> descriptors)
+    {
+        var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, StringComparer.Ordinal);
+        var incomingEdges =
+            descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, _ => 0, StringComparer.Ordinal);
+        var outgoingEdges = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, _ => new List<string>(),
+            StringComparer.Ordinal);
+
+        foreach (var descriptor in descriptors)
+        {
+            var modId = descriptor.Manifest.Id!;
+            foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
+            {
+                if (!IsValidModId(dependency.Id))
+                    continue;
+
+                var dependencyId = dependency.Id!;
+                if (!descriptorsById.ContainsKey(dependencyId))
+                    continue;
+
+                incomingEdges[modId]++;
+                outgoingEdges[dependencyId].Add(modId);
+            }
+        }
+
+        var ready = new SortedSet<string>(incomingEdges.Where(pair => pair.Value == 0).Select(pair => pair.Key),
+            StringComparer.Ordinal);
+        var sorted = new List<ModDescriptor>(descriptors.Count);
+
+        while (ready.Count > 0)
+        {
+            var modId = ready.Min!;
+            ready.Remove(modId);
+            sorted.Add(descriptorsById[modId]);
+
+            foreach (var dependentId in outgoingEdges[modId])
+            {
+                incomingEdges[dependentId]--;
+                if (incomingEdges[dependentId] == 0)
+                    ready.Add(dependentId);
+            }
+        }
+
+        if (sorted.Count != descriptors.Count)
+        {
+            var cycle = string.Join(", ", incomingEdges.Where(pair => pair.Value > 0)
+                .Select(pair => pair.Key)
+                .OrderBy(value => value, StringComparer.Ordinal));
+            throw new ModLoadException($"Dependency cycle detected: {cycle}");
+        }
+
+        return sorted.ToArray();
+    }
+
     private static bool IsValidModId(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return false;
@@ -142,7 +254,7 @@ public sealed partial class ModManager(
 
     [LoggerMessage(EventId = 0, Level = LogLevel.Information,
         Message = "Loaded mod {ModId} {Version} from {SourcePath}")]
-    private static partial void LogModLoaded(ILogger logger, string modId, string version, string sourcePath);
+    private static partial void LogModLoaded(ILogger logger, string modId, SemVersion version, string sourcePath);
 
     private void LoadDescriptors(IReadOnlyList<ModDescriptor> descriptors)
     {
@@ -193,7 +305,7 @@ public sealed partial class ModManager(
 
             _containers.Add(new ModContainer(info, source, loadContext, context, modLogger, entry));
             source = null;
-            LogModLoaded(logger, id, version.ToString(), descriptor.Candidate.SourcePath);
+            LogModLoaded(logger, id, version, descriptor.Candidate.SourcePath);
         }
         catch (Exception ex)
         {

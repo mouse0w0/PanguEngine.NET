@@ -118,6 +118,257 @@ public sealed class ModManagerTests
     }
 
     [Fact]
+    public void LoadReportsMissingRequiredDependencyBeforeLoadingAssemblies()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("dependent_mod", exception.Message);
+        Assert.Contains("base_mod", exception.Message);
+        Assert.DoesNotContain("Failed to load mod", exception.Message);
+    }
+
+    [Fact]
+    public void LoadReportsDependencyVersionMismatch()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "base.zip", "base_mod", "Base.dll", "Base.Entry");
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version\": \"[1.0.0,)\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("dependent_mod", exception.Message);
+        Assert.Contains("base_mod", exception.Message);
+        Assert.Contains("[1.0.0,)", exception.Message);
+    }
+
+    [Fact]
+    public void LoadTreatsBlankDependencyVersionAsNoVersionRange()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "base.zip", "base_mod", "Base.dll", "Base.Entry");
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version\": \" \" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("dependent_mod", exception.Message);
+        Assert.Contains("base_mod", exception.Message);
+        Assert.DoesNotContain("version is invalid", exception.Message);
+    }
+
+    [Fact]
+    public void LoadIgnoresMissingOptionalDependency()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"optional\": true }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("dependent_mod", exception.Message);
+        Assert.DoesNotContain("optional_mod", exception.Message);
+    }
+
+    [Fact]
+    public void LoadReportsOptionalDependencyVersionMismatchWhenDependencyExists()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "optional.zip", "optional_mod", "Optional.dll", "Optional.Entry");
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"version\": \"[1.0.0,)\", \"optional\": true }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("dependent_mod", exception.Message);
+        Assert.Contains("optional_mod", exception.Message);
+        Assert.Contains("[1.0.0,)", exception.Message);
+    }
+
+    [Fact]
+    public void LoadReportsInvalidDependencyManifestFields()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"Invalid-Id\", \"version\": \"not-a-range\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("Invalid-Id", exception.Message);
+        Assert.Contains("version", exception.Message);
+    }
+
+    [Fact]
+    public void LoadReportsDuplicateDependencyAndSelfDependency()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [" +
+            "{ \"id\": \"base_mod\" }," +
+            "{ \"id\": \"base_mod\" }," +
+            "{ \"id\": \"dependent_mod\" }]"
+        );
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("base_mod", exception.Message);
+        Assert.True(exception.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        Assert.True(exception.Message.Contains("depend on itself", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void LoadUsesSemVersionRangeForMultipleRangeSegments()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "base.zip", "base_mod", "Base.dll", "Base.Entry");
+        CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version\": \"(,0.1.0],[1.0.0,)\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("dependent_mod", exception.Message);
+        Assert.Contains("base_mod", exception.Message);
+        Assert.DoesNotContain("version is invalid", exception.Message);
+    }
+
+    [Fact]
+    public void LoadOrdersModsByDependenciesBeforeIdOrder()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(TestModEntry).Assembly.Location;
+        var assemblyFile = Path.GetFileName(assemblyPath);
+
+        using (var file = File.Create(Path.Combine(directory.Path, "a_dependent.zip")))
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false))
+        {
+            WriteEntry(archive, "mod.json", $$"""
+                                              {
+                                                "id": "a_dependent",
+                                                "version": "0.1.0",
+                                                "assembly": "{{assemblyFile}}",
+                                                "entry": "{{typeof(AnyModEntry).FullName}}",
+                                                "dependencies": [{ "id": "z_base" }]
+                                              }
+                                              """);
+            archive.CreateEntryFromFile(assemblyPath, assemblyFile);
+        }
+
+        using (var file = File.Create(Path.Combine(directory.Path, "z_base.zip")))
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false))
+        {
+            WriteEntry(archive, "mod.json", $$"""
+                                              {
+                                                "id": "z_base",
+                                                "version": "0.1.0",
+                                                "assembly": "{{assemblyFile}}",
+                                                "entry": "{{typeof(AnyModEntry).FullName}}"
+                                              }
+                                              """);
+            archive.CreateEntryFromFile(assemblyPath, assemblyFile);
+        }
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            Assert.Equal(new[] { "z_base", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Id));
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void LoadOrdersExistingOptionalDependenciesBeforeDependents()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(TestModEntry).Assembly.Location;
+        var assemblyFile = Path.GetFileName(assemblyPath);
+
+        using (var file = File.Create(Path.Combine(directory.Path, "a_dependent.zip")))
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false))
+        {
+            WriteEntry(archive, "mod.json", $$"""
+                                              {
+                                                "id": "a_dependent",
+                                                "version": "0.1.0",
+                                                "assembly": "{{assemblyFile}}",
+                                                "entry": "{{typeof(AnyModEntry).FullName}}",
+                                                "dependencies": [{ "id": "z_optional", "optional": true }]
+                                              }
+                                              """);
+            archive.CreateEntryFromFile(assemblyPath, assemblyFile);
+        }
+
+        using (var file = File.Create(Path.Combine(directory.Path, "z_optional.zip")))
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false))
+        {
+            WriteEntry(archive, "mod.json", $$"""
+                                              {
+                                                "id": "z_optional",
+                                                "version": "0.1.0",
+                                                "assembly": "{{assemblyFile}}",
+                                                "entry": "{{typeof(AnyModEntry).FullName}}"
+                                              }
+                                              """);
+            archive.CreateEntryFromFile(assemblyPath, assemblyFile);
+        }
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            Assert.Equal(new[] { "z_optional", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Id));
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void LoadReportsDependencyCyclesBeforeLoadingAssemblies()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "a.zip", "a_mod", "A.dll", "A.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"b_mod\" }]");
+        CreateModZip(directory.Path, "b.zip", "b_mod", "B.dll", "B.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"a_mod\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.True(exception.Message.Contains("cycle", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("a_mod", exception.Message);
+        Assert.Contains("b_mod", exception.Message);
+        Assert.DoesNotContain("Failed to load mod", exception.Message);
+    }
+
+    [Fact]
     public void LoadCreatesEntryAndExposesModInfo()
     {
         using var directory = TestDirectory.Create();
@@ -208,7 +459,8 @@ public sealed class ModManagerTests
         writer.Write(content);
     }
 
-    private static void CreateModZip(string directory, string fileName, string id, string assembly, string entry)
+    private static void CreateModZip(string directory, string fileName, string id, string assembly, string entry,
+        string dependencies = "")
     {
         using var file = File.Create(Path.Combine(directory, fileName));
         using var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false);
@@ -217,7 +469,7 @@ public sealed class ModManagerTests
                                             "id": "{{id}}",
                                             "version": "0.1.0",
                                             "assembly": "{{assembly}}",
-                                            "entry": "{{entry}}"
+                                            "entry": "{{entry}}"{{dependencies}}
                                           }
                                           """);
         WriteEntry(archive, assembly, string.Empty);
@@ -273,5 +525,12 @@ public sealed class TestModEntry : IMod
         using var reader = new StreamReader(stream, Encoding.UTF8);
         if (reader.ReadToEnd() != "stone")
             throw new InvalidOperationException("Unexpected asset content.");
+    }
+}
+
+public sealed class AnyModEntry : IMod
+{
+    public void Configure(ModContext context)
+    {
     }
 }
