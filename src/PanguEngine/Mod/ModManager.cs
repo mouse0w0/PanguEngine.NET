@@ -234,10 +234,6 @@ public sealed partial class ModManager(
     private static bool IsFileName(string value) =>
         value == Path.GetFileName(value) && !value.Contains('/') && !value.Contains('\\');
 
-    [LoggerMessage(EventId = 0, Level = LogLevel.Information,
-        Message = "Loaded mod {ModId} {Version} from {SourcePath}")]
-    private static partial void LogModLoaded(ILogger logger, string modId, SemVersion version, string sourcePath);
-
     private void LoadDescriptors(IReadOnlyList<ModDescriptor> descriptors)
     {
         var errors = new List<string>();
@@ -267,7 +263,6 @@ public sealed partial class ModManager(
             try
             {
                 container.Instance.Configure(container);
-                LogModLoaded(logger, container.Info.Id, container.Info.Version, container.SourcePath);
             }
             catch (Exception ex)
             {
