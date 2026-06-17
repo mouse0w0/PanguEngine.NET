@@ -41,9 +41,9 @@ public sealed class ModManagerTests
             manager.Load();
 
             var mod = Assert.Single(manager.LoadedMods);
-            Assert.Equal("test_mod", mod.Id);
-            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Version);
-            Assert.True(mod.Version >= SemVersion.Parse("0.1.0"));
+            Assert.Equal("test_mod", mod.Info.Id);
+            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Info.Version);
+            Assert.True(mod.Info.Version >= SemVersion.Parse("0.1.0"));
         }
         finally
         {
@@ -295,7 +295,7 @@ public sealed class ModManagerTests
         {
             manager.Load();
 
-            Assert.Equal(new[] { "z_base", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Id));
+            Assert.Equal(new[] { "z_base", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Info.Id));
         }
         finally
         {
@@ -344,7 +344,7 @@ public sealed class ModManagerTests
         {
             manager.Load();
 
-            Assert.Equal(new[] { "z_optional", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Id));
+            Assert.Equal(new[] { "z_optional", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Info.Id));
         }
         finally
         {
@@ -389,7 +389,7 @@ public sealed class ModManagerTests
         {
             manager.Load();
 
-            Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Id));
+            Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Info.Id));
         }
         finally
         {
@@ -417,7 +417,7 @@ public sealed class ModManagerTests
             manager.Load();
 
             Assert.Equal(new[] { "leaf_mod", "middle_mod", "caller_mod" },
-                manager.LoadedMods.Select(mod => mod.Id));
+                manager.LoadedMods.Select(mod => mod.Info.Id));
         }
         finally
         {
@@ -447,7 +447,7 @@ public sealed class ModManagerTests
         {
             manager.Load();
 
-            Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Id));
+            Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Info.Id));
         }
         finally
         {
@@ -478,7 +478,7 @@ public sealed class ModManagerTests
             manager.Load();
 
             Assert.Equal(new[] { "first_mod", "second_mod", "caller_mod" },
-                manager.LoadedMods.Select(mod => mod.Id));
+                manager.LoadedMods.Select(mod => mod.Info.Id));
         }
         finally
         {
@@ -499,11 +499,17 @@ public sealed class ModManagerTests
             ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"optional\": true }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            var exception = Assert.Throws<ModLoadException>(() => manager.Load());
 
-        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
-
-        Assert.Contains("caller_mod", exception.Message);
-        Assert.DoesNotContain("optional_mod", exception.Message);
+            Assert.Contains("caller_mod", exception.Message);
+            Assert.DoesNotContain("optional_mod", exception.Message);
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
     }
 
     [Fact]
@@ -533,9 +539,9 @@ public sealed class ModManagerTests
             manager.Load();
 
             var mod = Assert.Single(manager.LoadedMods);
-            Assert.Equal("test_mod", mod.Id);
-            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Version);
-            Assert.True(mod.Version >= SemVersion.Parse("0.1.0"));
+            Assert.Equal("test_mod", mod.Info.Id);
+            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Info.Version);
+            Assert.True(mod.Info.Version >= SemVersion.Parse("0.1.0"));
         }
         finally
         {
@@ -561,9 +567,9 @@ public sealed class ModManagerTests
             manager.Load();
 
             var mod = Assert.Single(manager.LoadedMods);
-            Assert.Equal("test_mod", mod.Id);
-            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Version);
-            Assert.True(mod.Version >= SemVersion.Parse("0.1.0"));
+            Assert.Equal("test_mod", mod.Info.Id);
+            Assert.Equal(SemVersion.Parse("0.1.0"), mod.Info.Version);
+            Assert.True(mod.Info.Version >= SemVersion.Parse("0.1.0"));
         }
         finally
         {
@@ -615,7 +621,7 @@ public sealed class ModManagerTests
         var configureBuilder = entryBuilder.DefineMethod(nameof(IMod.Configure),
             MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
             typeof(void),
-            [typeof(ModContext)]);
+            [typeof(ModContainer)]);
         var configureIl = configureBuilder.GetILGenerator();
         configureIl.Emit(OpCodes.Ret);
         entryBuilder.DefineMethodOverride(configureBuilder, typeof(IMod).GetMethod(nameof(IMod.Configure))!);
@@ -658,7 +664,7 @@ public sealed class ModManagerTests
             var methodBuilder = typeBuilder.DefineMethod(nameof(IMod.Configure),
                 MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
                 typeof(void),
-                [typeof(ModContext)]);
+                [typeof(ModContainer)]);
             var il = methodBuilder.GetILGenerator();
             il.EmitCall(OpCodes.Call, dependencyMethod, null);
             il.Emit(OpCodes.Pop);
@@ -751,12 +757,12 @@ public sealed class ModManagerTests
 
 public sealed class TestModEntry : IMod
 {
-    public void Configure(ModContext context)
+    public void Configure(ModContainer container)
     {
-        if (context.Info.Id != "test_mod")
+        if (container.Info.Id != "test_mod")
             throw new InvalidOperationException("Unexpected mod id.");
 
-        using var stream = context.Assets.Open("textures/stone.txt");
+        using var stream = container.Assets.Open("textures/stone.txt");
         using var reader = new StreamReader(stream, Encoding.UTF8);
         if (reader.ReadToEnd() != "stone")
             throw new InvalidOperationException("Unexpected asset content.");
@@ -765,7 +771,7 @@ public sealed class TestModEntry : IMod
 
 public sealed class AnyModEntry : IMod
 {
-    public void Configure(ModContext context)
+    public void Configure(ModContainer container)
     {
     }
 }

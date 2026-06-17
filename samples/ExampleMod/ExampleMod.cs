@@ -5,8 +5,8 @@ namespace ExampleMod;
 
 public sealed class ExampleModEntry : IMod
 {
-    public void Configure(ModContext context)
+    public void Configure(ModContainer container)
     {
-        context.Logger.LogInformation("ExampleMod {Id} {Version} loaded successfully!", context.Info.Id, context.Info.Version);
+        container.Logger.LogInformation("ExampleMod {Id} {Version} loaded successfully!", container.Info.Id, container.Info.Version);
     }
 }

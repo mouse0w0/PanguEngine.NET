@@ -20,7 +20,7 @@ public sealed partial class ModManager(
     /// <summary>
     /// The loaded mods.
     /// </summary>
-    public IReadOnlyList<ModInfo> LoadedMods => _containers.Select(container => container.Info).ToArray();
+    public IReadOnlyList<ModContainer> LoadedMods => _containers.ToArray();
 
     /// <summary>
     /// Loads all discovered mods.
@@ -31,6 +31,7 @@ public sealed partial class ModManager(
         var descriptors = ReadManifests(candidates);
         ValidateDependencies(descriptors);
         LoadDescriptors(SortByDependencies(descriptors));
+        ConfigureLoadedMods();
     }
 
     /// <summary>
@@ -277,6 +278,27 @@ public sealed partial class ModManager(
             throw new ModLoadException(string.Join(Environment.NewLine, errors));
     }
 
+    private void ConfigureLoadedMods()
+    {
+        var errors = new List<string>();
+        foreach (var container in _containers)
+        {
+            try
+            {
+                container.Instance.Configure(container);
+                LogModLoaded(logger, container.Info.Id, container.Info.Version, container.SourcePath);
+            }
+            catch (Exception ex)
+            {
+                errors.Add(new ModLoadException(
+                    $"Failed to configure mod '{container.Info.Id}' from '{container.SourcePath}'.", ex).Message);
+            }
+        }
+
+        if (errors.Count > 0)
+            throw new ModLoadException(string.Join(Environment.NewLine, errors));
+    }
+
     private ModContainer LoadDescriptor(ModDescriptor descriptor,
         Dictionary<string, ModAssemblyLoadContext> loadedContexts)
     {
@@ -303,18 +325,16 @@ public sealed partial class ModManager(
             var assets = new ModAssetProvider(source);
             var info = new ModInfo(id, version);
             var modLogger = CreateModLogger(id);
-            var context = new ModContext(info, modLogger, assets);
             if (!typeof(IMod).IsAssignableFrom(entryType))
                 throw new ModLoadException($"Mod '{id}' entry '{entryName}' must implement {nameof(IMod)}.");
 
             var entry = Activator.CreateInstance(entryType) as IMod
                         ?? throw new ModLoadException($"Mod '{id}' entry '{entryName}' could not be created.");
-            entry.Configure(context);
 
-            var container = new ModContainer(info, source, loadContext, context, modLogger, entry);
+            var container = new ModContainer(info, source, loadContext, modLogger, assets, entry,
+                descriptor.Candidate.SourcePath);
             _containers.Add(container);
             source = null;
-            LogModLoaded(logger, id, version, descriptor.Candidate.SourcePath);
             return container;
         }
         catch (Exception ex)
