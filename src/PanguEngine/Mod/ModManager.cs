@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using PanguEngine.Collections;
 using PanguEngine.Versioning;
 
 namespace PanguEngine.Mod;
@@ -30,7 +31,8 @@ public sealed partial class ModManager(
         var candidates = DiscoverCandidates();
         var descriptors = ReadManifests(candidates);
         ValidateDependencies(descriptors);
-        LoadDescriptors(SortByDependencies(descriptors));
+        var sortedDescriptors = SortByDependencies(descriptors);
+        LoadDescriptors(sortedDescriptors);
         ConfigureLoadedMods();
     }
 
@@ -180,15 +182,15 @@ public sealed partial class ModManager(
             throw new ModLoadException(string.Join(Environment.NewLine, errors));
     }
 
-    private static ModDescriptor[] SortByDependencies(IReadOnlyList<ModDescriptor> descriptors)
+    private static IReadOnlyList<ModDescriptor> SortByDependencies(IReadOnlyList<ModDescriptor> descriptors)
     {
         var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, StringComparer.Ordinal);
-        var incomingEdges =
-            descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, _ => 0, StringComparer.Ordinal);
-        var outgoingEdges = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, _ => new List<string>(),
-            StringComparer.Ordinal);
+        var graph = new DirectedGraph<string>(StringComparer.Ordinal);
 
-        foreach (var descriptor in descriptors)
+        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal))
+            graph.AddNode(descriptor.Manifest.Id!);
+
+        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal))
         {
             var modId = descriptor.Manifest.Id!;
             foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
@@ -200,38 +202,17 @@ public sealed partial class ModManager(
                 if (!descriptorsById.ContainsKey(dependencyId))
                     continue;
 
-                incomingEdges[modId]++;
-                outgoingEdges[dependencyId].Add(modId);
+                graph.AddEdge(dependencyId, modId);
             }
         }
 
-        var ready = new SortedSet<string>(incomingEdges.Where(pair => pair.Value == 0).Select(pair => pair.Key),
-            StringComparer.Ordinal);
-        var sorted = new List<ModDescriptor>(descriptors.Count);
-
-        while (ready.Count > 0)
+        if (!graph.TryTopologicalSort(out var result))
         {
-            var modId = ready.Min!;
-            ready.Remove(modId);
-            sorted.Add(descriptorsById[modId]);
-
-            foreach (var dependentId in outgoingEdges[modId])
-            {
-                incomingEdges[dependentId]--;
-                if (incomingEdges[dependentId] == 0)
-                    ready.Add(dependentId);
-            }
-        }
-
-        if (sorted.Count != descriptors.Count)
-        {
-            var cycle = string.Join(", ", incomingEdges.Where(pair => pair.Value > 0)
-                .Select(pair => pair.Key)
-                .OrderBy(value => value, StringComparer.Ordinal));
+            var cycle = string.Join(", ", result.RemainingNodes);
             throw new ModLoadException($"Dependency cycle detected: {cycle}");
         }
 
-        return sorted.ToArray();
+        return result.OrderedNodes.Select(modId => descriptorsById[modId]).ToArray();
     }
 
     private static bool IsValidModId(string? value)
