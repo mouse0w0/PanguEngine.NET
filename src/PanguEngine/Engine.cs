@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using PanguEngine.Event;
 using PanguEngine.Mod;
 
 namespace PanguEngine;
@@ -12,6 +13,11 @@ public static class Engine
     /// The engine-level logger.
     /// </summary>
     public static ILogger Logger { get; private set; } = null!;
+
+    /// <summary>
+    /// The runtime event bus.
+    /// </summary>
+    public static IEventBus EventBus { get; private set; } = null!;
 
     public static ModManager ModManager { get; private set; } = null!;
 
@@ -33,6 +39,7 @@ public static class Engine
 
         Log.Initialize();
         Logger = Log.CreateLogger("Engine");
+        EventBus = new EventBus(ThrowingEventExceptionHandler.Instance);
         ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "Mods"), Log.CreateLogger("Mods"),
             options.ModPaths);
         ModManager.Load();
