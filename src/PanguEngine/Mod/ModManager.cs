@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PanguEngine.Collections;
+using PanguEngine.Resources;
 using PanguEngine.Versioning;
 
 namespace PanguEngine.Mod;
@@ -298,7 +299,7 @@ public sealed partial class ModManager(
             var loadContext = new ModAssemblyLoadContext(id, source, dependencies);
             var assembly = loadContext.LoadOwnAssembly(assemblyName);
             var entryType = assembly.GetType(entryName, throwOnError: true)!;
-            var assets = new ModAssetProvider(source);
+            var resources = CreateResourceSource(source);
             var info = new ModInfo(id, version);
             var modLogger = CreateModLogger(id);
             if (!typeof(IMod).IsAssignableFrom(entryType))
@@ -307,7 +308,7 @@ public sealed partial class ModManager(
             var entry = Activator.CreateInstance(entryType) as IMod
                         ?? throw new ModLoadException($"Mod '{id}' entry '{entryName}' could not be created.");
 
-            var container = new ModContainer(info, source, loadContext, modLogger, assets, entry,
+            var container = new ModContainer(info, source, loadContext, modLogger, resources, entry,
                 descriptor.Candidate.SourcePath);
             _containers.Add(container);
             source = null;
@@ -329,6 +330,13 @@ public sealed partial class ModManager(
             _ => throw new ArgumentOutOfRangeException(nameof(candidate))
         };
     }
+
+    private static IResourceSource CreateResourceSource(ModSource source) => source switch
+    {
+        DirectoryModSource directorySource => new DirectoryResourceSource(directorySource.SourcePath),
+        ZipModSource zipSource => new ZipResourceSource(zipSource.Archive),
+        _ => throw new NotSupportedException($"Unsupported mod source type '{source.GetType().Name}'.")
+    };
 
     private static ILogger CreateModLogger(string modId) => Log.CreateLogger(modId);
 

@@ -23,13 +23,6 @@ internal sealed class DirectoryModSource(string path) : ModSource(path)
 
     private string GetFullPath(string path)
     {
-        var fullPath = Path.GetFullPath(Path.Combine(SourcePath, path.Replace('/', Path.DirectorySeparatorChar)));
-        var rootPath = Path.GetFullPath(SourcePath);
-        var relativePath = Path.GetRelativePath(rootPath, fullPath);
-        if (Path.IsPathRooted(relativePath) || relativePath == ".." ||
-            relativePath.StartsWith($"..{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
-            throw new ArgumentException("Path must stay within the mod directory.", nameof(path));
-
-        return fullPath;
+        return Path.GetFullPath(Path.Combine(SourcePath, path));
     }
 }

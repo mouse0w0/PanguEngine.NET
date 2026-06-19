@@ -4,7 +4,7 @@ namespace PanguEngine.Mod;
 
 internal abstract class ModSource(string sourcePath) : IDisposable
 {
-    protected string SourcePath { get; } = sourcePath;
+    public string SourcePath { get; } = sourcePath;
 
     public abstract bool Exists(string path);
 

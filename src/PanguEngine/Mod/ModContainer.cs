@@ -1,26 +1,39 @@
 using Microsoft.Extensions.Logging;
+using PanguEngine.Resources;
 
 namespace PanguEngine.Mod;
 
+/// <summary>
+/// Contains a loaded mod and its runtime services.
+/// </summary>
 public sealed class ModContainer
 {
     internal ModContainer(ModInfo info, ModSource source, ModAssemblyLoadContext loadContext, ILogger logger,
-        ModAssetProvider assets, IMod instance, string sourcePath)
+        IResourceSource resources, IMod instance, string sourcePath)
     {
         Info = info;
         Source = source;
         LoadContext = loadContext;
         Logger = logger;
-        Assets = assets;
+        Resources = resources;
         Instance = instance;
         SourcePath = sourcePath;
     }
 
+    /// <summary>
+    /// Gets the mod metadata.
+    /// </summary>
     public ModInfo Info { get; }
 
+    /// <summary>
+    /// Gets the logger for the mod.
+    /// </summary>
     public ILogger Logger { get; }
 
-    public ModAssetProvider Assets { get; }
+    /// <summary>
+    /// Gets the resources provided by the mod.
+    /// </summary>
+    public IResourceSource Resources { get; }
 
     internal ModSource Source { get; }
 

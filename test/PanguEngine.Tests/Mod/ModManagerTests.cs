@@ -5,6 +5,7 @@ using System.Runtime.Loader;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Mod;
+using PanguEngine.Resources;
 using PanguEngine.Versioning;
 
 namespace PanguEngine.Tests.Mod;
@@ -529,7 +530,7 @@ public sealed class ModManagerTests
                                                 "entry": "{{typeof(TestModEntry).FullName}}"
                                               }
                                               """);
-            WriteEntry(archive, "assets/textures/stone.txt", "stone");
+            WriteEntry(archive, "assets/test_mod/textures/stone.txt", "stone");
             archive.CreateEntryFromFile(assemblyPath, assemblyFile);
         }
 
@@ -549,6 +550,49 @@ public sealed class ModManagerTests
         }
     }
 
+    [Fact]
+    public void LoadExposesZipResourceSourceForZipMods()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(AnyModEntry).Assembly.Location;
+        var assemblyFile = Path.GetFileName(assemblyPath);
+        using (var file = File.Create(Path.Combine(directory.Path, "test_mod.zip")))
+        using (var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false))
+        {
+            WriteEntry(archive, "mod.json", $$"""
+                                              {
+                                                "id": "test_mod",
+                                                "version": "0.1.0",
+                                                "assembly": "{{assemblyFile}}",
+                                                "entry": "{{typeof(AnyModEntry).FullName}}"
+                                              }
+                                              """);
+            WriteEntry(archive, "assets/test_mod/textures/stone.txt", "stone");
+            WriteEntry(archive, "assets/test_mod/textures/nested/dirt.txt", "dirt");
+            archive.CreateEntryFromFile(assemblyPath, assemblyFile);
+        }
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            var mod = Assert.Single(manager.LoadedMods);
+            Assert.IsType<ZipResourceSource>(mod.Resources);
+            Assert.Equal("stone", ReadText(mod.Resources.Open("test_mod/textures/stone.txt")));
+            Assert.Equal(
+                ["test_mod/textures/nested/dirt.txt", "test_mod/textures/stone.txt"],
+                mod.Resources.List("test_mod/textures", recursive: true)
+                    .Select(resource => resource.Path)
+                    .Order(StringComparer.Ordinal)
+                    .ToArray());
+        }
+        finally
+        {
+            manager.Shutdown();
+        }
+    }
+
     [Fact(Skip = "Directory mod assemblies loaded from file paths remain locked until process exit.")]
     public void LoadCreatesEntryFromDirectoryMod()
     {
@@ -558,8 +602,8 @@ public sealed class ModManagerTests
         var modDirectory = CreateModDirectory(directory.Path, "test_mod", "test_mod", assemblyFile,
             typeof(TestModEntry).FullName!);
         File.Copy(assemblyPath, Path.Combine(modDirectory, assemblyFile), overwrite: true);
-        Directory.CreateDirectory(Path.Combine(modDirectory, "assets", "textures"));
-        File.WriteAllText(Path.Combine(modDirectory, "assets", "textures", "stone.txt"), "stone");
+        Directory.CreateDirectory(Path.Combine(modDirectory, "assets", "test_mod", "textures"));
+        File.WriteAllText(Path.Combine(modDirectory, "assets", "test_mod", "textures", "stone.txt"), "stone");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
         try
@@ -734,6 +778,13 @@ public sealed class ModManagerTests
         return modDirectory;
     }
 
+    private static string ReadText(Stream stream)
+    {
+        using var owned = stream;
+        using var reader = new StreamReader(owned, Encoding.UTF8);
+        return reader.ReadToEnd();
+    }
+
     private sealed class TestDirectory : IDisposable
     {
         private TestDirectory(string path)
@@ -762,7 +813,7 @@ public sealed class TestModEntry : IMod
         if (container.Info.Id != "test_mod")
             throw new InvalidOperationException("Unexpected mod id.");
 
-        using var stream = container.Assets.Open("textures/stone.txt");
+        using var stream = container.Resources.Open($"{container.Info.Id}/textures/stone.txt");
         using var reader = new StreamReader(stream, Encoding.UTF8);
         if (reader.ReadToEnd() != "stone")
             throw new InvalidOperationException("Unexpected asset content.");

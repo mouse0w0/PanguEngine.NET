@@ -33,7 +33,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="assets\**\*">
+        <Content Include="assets\**\*" Link="assets\%(RecursiveDir)%(Filename)%(Extension)">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
     </ItemGroup>

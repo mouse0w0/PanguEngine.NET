@@ -21,12 +21,8 @@ internal sealed class VulkanRenderer
         _device = device;
         _presenter = presenter;
 
-        var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "assets", "shaders", "triangle.vert");
-        var fragPath = Path.Combine(basePath, "assets", "shaders", "triangle.frag");
-
-        var vertSource = File.ReadAllText(vertPath);
-        var fragSource = File.ReadAllText(fragPath);
+        var vertSource = Engine.Resources.ReadAllText("pangu/shaders/triangle.vert");
+        var fragSource = Engine.Resources.ReadAllText("pangu/shaders/triangle.frag");
 
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "triangle.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "triangle.frag");
