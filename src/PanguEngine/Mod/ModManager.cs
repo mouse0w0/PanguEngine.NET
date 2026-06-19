@@ -12,7 +12,7 @@ namespace PanguEngine.Mod;
 /// <param name="modsDirectory">The default mods directory.</param>
 /// <param name="logger">The logger used for mod loading.</param>
 /// <param name="explicitModPaths">Additional mod paths to load.</param>
-public sealed partial class ModManager(
+public sealed class ModManager(
     string modsDirectory,
     ILogger logger,
     IReadOnlyList<string>? explicitModPaths = null)
