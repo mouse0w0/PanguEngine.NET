@@ -73,7 +73,7 @@ public sealed class ModManagerTests
     public void LoadReportsDuplicateIdsAcrossDefaultAndExplicitMods()
     {
         using var directory = TestDirectory.Create();
-        var modsDirectory = Path.Combine(directory.Path, "Mods");
+        var modsDirectory = Path.Combine(directory.Path, "mods");
         var explicitDirectory = Path.Combine(directory.Path, "Explicit");
         Directory.CreateDirectory(modsDirectory);
         Directory.CreateDirectory(explicitDirectory);

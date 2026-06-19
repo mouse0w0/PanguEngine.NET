@@ -49,7 +49,7 @@ public static class Engine
         Log.Initialize();
         Logger = Log.CreateLogger("Engine");
         EventBus = new EventBus(ThrowingEventExceptionHandler.Instance);
-        ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "Mods"), Log.CreateLogger("Mods"),
+        ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "mods"), Log.CreateLogger("Mods"),
             options.ModPaths);
         ModManager.Load();
         Resources = CreateResourceManager();
