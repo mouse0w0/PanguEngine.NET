@@ -3,6 +3,12 @@ using System.Runtime.Loader;
 
 namespace PanguEngine.Mod;
 
+/// <summary>
+/// Resolves and loads assemblies for a mod.
+/// </summary>
+/// <param name="modId">The mod identifier.</param>
+/// <param name="source">The mod source.</param>
+/// <param name="dependencies">The dependency load contexts available to the mod.</param>
 internal sealed class ModAssemblyLoadContext(
     string modId,
     ModSource source,
@@ -11,6 +17,11 @@ internal sealed class ModAssemblyLoadContext(
 {
     private readonly Dictionary<string, string> _assemblies = BuildAssemblyIndex(source);
 
+    /// <summary>
+    /// Loads an assembly that belongs to this mod.
+    /// </summary>
+    /// <param name="assemblyFileName">The assembly file name.</param>
+    /// <returns>The loaded assembly.</returns>
     public Assembly LoadOwnAssembly(string assemblyFileName)
     {
         if (!_assemblies.TryGetValue(Path.GetFileNameWithoutExtension(assemblyFileName), out var fileName))
@@ -19,6 +30,11 @@ internal sealed class ModAssemblyLoadContext(
         return LoadAssembly(fileName);
     }
 
+    /// <summary>
+    /// Loads an assembly by name for this mod context.
+    /// </summary>
+    /// <param name="assemblyName">The assembly name to load.</param>
+    /// <returns>The loaded assembly, or <see langword="null" /> to use default resolution.</returns>
     protected override Assembly? Load(AssemblyName assemblyName)
     {
         if (ShouldShareDefaultAssembly(assemblyName.Name))

@@ -358,6 +358,7 @@ public sealed partial class ModManager(
     private enum ModSourceKind
     {
         Zip,
+
         Directory
     }
 }
