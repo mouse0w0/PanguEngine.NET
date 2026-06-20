@@ -2,60 +2,76 @@ namespace PanguEngine.Events;
 
 internal sealed class EventListenerList
 {
-    private readonly HashSet<EventListenerList> _children = new(ReferenceEqualityComparer.Instance);
-    private readonly List<EventListener> _localListeners = [];
-    private readonly List<EventListener> _listeners = [];
+    private static readonly Order[] Orders = Enum.GetValues<Order>();
 
-    internal IReadOnlyList<EventListener> Listeners => _listeners;
+    private readonly EventListenerList? _parent;
+    private readonly List<EventListenerList> _children = [];
+    private readonly List<EventListener>?[] _buckets = new List<EventListener>?[Orders.Length];
+    private EventListener[] _snapshot = [];
+    private bool _dirty = true;
+
+    internal EventListenerList(EventListenerList? parent = null)
+    {
+        _parent = parent;
+        _parent?.AddChild(this);
+    }
+
+    internal IReadOnlyList<EventListener> Listeners => EnsureSnapshot();
 
     internal void AddChild(EventListenerList child)
     {
-        if (_children.Add(child))
-        {
-            foreach (var listener in _localListeners)
-                child.InsertLocalListener(listener);
-        }
+        _children.Add(child);
     }
 
     internal void AddListener(EventListener listener)
     {
-        _localListeners.Add(listener);
-        InsertLocalListener(listener);
-        foreach (var child in _children)
-            child.InsertLocalListener(listener);
+        var bucketIndex = (int)listener.Order;
+        _buckets[bucketIndex] ??= [];
+        _buckets[bucketIndex]!.Add(listener);
+        MarkDirty();
     }
 
     internal void RemoveListener(EventListener listener)
     {
-        _localListeners.Remove(listener);
-        RemoveLocalListener(listener);
-        foreach (var child in _children)
-            child.RemoveLocalListener(listener);
+        var bucket = _buckets[(int)listener.Order];
+        if (bucket is null || !bucket.Remove(listener))
+            return;
+
+        MarkDirty();
     }
 
-    private void InsertLocalListener(EventListener listener)
+    private EventListener[] EnsureSnapshot()
     {
-        var left = 0;
-        var right = _listeners.Count;
-        while (left < right)
+        if (_dirty)
+            RebuildSnapshot();
+
+        return _snapshot;
+    }
+
+    private void RebuildSnapshot()
+    {
+        var listeners = new List<EventListener>();
+        foreach (var order in Orders)
+            CollectListeners(order, listeners);
+
+        _snapshot = listeners.ToArray();
+        _dirty = false;
+    }
+
+    private void CollectListeners(Order order, List<EventListener> listeners)
+    {
+        for (var node = this; node is not null; node = node._parent)
         {
-            var middle = (left + right) / 2;
-            if (CompareListeners(listener, _listeners[middle]) < 0)
-                right = middle;
-            else
-                left = middle + 1;
+            var bucket = node._buckets[(int)order];
+            if (bucket is not null)
+                listeners.AddRange(bucket);
         }
-
-        _listeners.Insert(left, listener);
     }
 
-    private void RemoveLocalListener(EventListener listener)
+    private void MarkDirty()
     {
-        _listeners.Remove(listener);
-    }
-
-    private static int CompareListeners(EventListener left, EventListener right)
-    {
-        return left.Order.CompareTo(right.Order);
+        _dirty = true;
+        foreach (var child in _children)
+            child.MarkDirty();
     }
 }

@@ -7,6 +7,8 @@ namespace PanguEngine.Events;
 /// </summary>
 public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBus
 {
+    private readonly Lock _lock = new();
+
     private readonly IEventExceptionHandler _exceptionHandler =
         exceptionHandler ?? throw new ArgumentNullException(nameof(exceptionHandler));
 
@@ -25,24 +27,28 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
             return;
         }
 
-        if (_registrations.ContainsKey(listener))
-            throw new InvalidOperationException($"Listener instance '{listener.GetType()}' is already registered.");
-
         var registrations = CreateMethodRegistrations(listener.GetType(), listener, false);
-        _registrations.Add(listener, registrations);
-        RegisterRegistrations(registrations);
+        lock (_lock)
+        {
+            if (!_registrations.TryAdd(listener, registrations))
+                throw new InvalidOperationException($"Listener instance '{listener.GetType()}' is already registered.");
+
+            RegisterRegistrations(registrations);
+        }
     }
 
     /// <inheritdoc />
     public void Register(Type listenerType)
     {
         ArgumentNullException.ThrowIfNull(listenerType);
-        if (_registrations.ContainsKey(listenerType))
-            throw new InvalidOperationException($"Listener type '{listenerType}' is already registered.");
-
         var registrations = CreateMethodRegistrations(listenerType, null, true);
-        _registrations.Add(listenerType, registrations);
-        RegisterRegistrations(registrations);
+        lock (_lock)
+        {
+            if (!_registrations.TryAdd(listenerType, registrations))
+                throw new InvalidOperationException($"Listener type '{listenerType}' is already registered.");
+
+            RegisterRegistrations(registrations);
+        }
     }
 
     /// <inheritdoc />
@@ -50,9 +56,6 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
         where TEvent : Event
     {
         ArgumentNullException.ThrowIfNull(listener);
-        if (_registrations.ContainsKey(listener))
-            throw new InvalidOperationException($"Listener delegate '{listener.Method}' is already registered.");
-
         var registration = new EventListener(
             typeof(TEvent),
             listener.Method.DeclaringType ?? listener.GetType(),
@@ -61,8 +64,13 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
             order,
             receiveCanceled);
 
-        _registrations.Add(listener, [registration]);
-        RegisterRegistrations([registration]);
+        lock (_lock)
+        {
+            if (!_registrations.TryAdd(listener, [registration]))
+                throw new InvalidOperationException($"Listener delegate '{listener.Method}' is already registered.");
+
+            RegisterRegistrations([registration]);
+        }
     }
 
     /// <inheritdoc />
@@ -70,20 +78,26 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
     {
         ArgumentNullException.ThrowIfNull(listener);
 
-        if (!_registrations.Remove(listener, out var registrations))
-            return;
+        lock (_lock)
+        {
+            if (!_registrations.Remove(listener, out var registrations))
+                return;
 
-        UnregisterRegistrations(registrations);
+            UnregisterRegistrations(registrations);
+        }
     }
 
     /// <inheritdoc />
     public void Unregister(Type listenerType)
     {
         ArgumentNullException.ThrowIfNull(listenerType);
-        if (!_registrations.Remove(listenerType, out var registrations))
-            return;
+        lock (_lock)
+        {
+            if (!_registrations.Remove(listenerType, out var registrations))
+                return;
 
-        UnregisterRegistrations(registrations);
+            UnregisterRegistrations(registrations);
+        }
     }
 
     /// <inheritdoc />
@@ -97,8 +111,12 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
     {
         ArgumentNullException.ThrowIfNull(eventInstance);
 
-        var listenerList = GetListenerList(eventInstance.GetType());
-        var listeners = listenerList.Listeners;
+        IReadOnlyList<EventListener> listeners;
+        lock (_lock)
+        {
+            listeners = GetListenerList(eventInstance.GetType()).Listeners;
+        }
+
         for (var index = 0; index < listeners.Count; index++)
         {
             var listener = listeners[index];
@@ -188,21 +206,13 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
         if (_listenerLists.TryGetValue(eventType, out var listenerList))
             return listenerList;
 
-        var existingLists = _listenerLists.ToArray();
-        listenerList = new EventListenerList();
+        var baseType = eventType.BaseType;
+        var parent = baseType is not null && typeof(Event).IsAssignableFrom(baseType)
+            ? GetListenerList(baseType)
+            : null;
+
+        listenerList = new EventListenerList(parent);
         _listenerLists.Add(eventType, listenerList);
-
-        foreach (var (existingType, existingListenerList) in existingLists)
-        {
-            if (existingType.IsAssignableFrom(eventType))
-            {
-                existingListenerList.AddChild(listenerList);
-                continue;
-            }
-
-            if (eventType.IsAssignableFrom(existingType))
-                listenerList.AddChild(existingListenerList);
-        }
 
         return listenerList;
     }

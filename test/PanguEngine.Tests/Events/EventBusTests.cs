@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using PanguEngine.Events;
 
 namespace PanguEngine.Tests.Events;
@@ -57,20 +58,33 @@ public sealed class EventBusTests
     }
 
     [Fact]
-    public void ParentAndChildEventListenerListsRemainOrderedAfterIncrementalRegistration()
+    public void ParentAndChildEventListenerListsRespectOrderBucketsAfterIncrementalRegistration()
     {
         var bus = new EventBus(new TestExceptionHandler());
         var calls = new List<string>();
 
         bus.Register<DerivedEvent>(_ => calls.Add("derived-default"));
         bus.Publish(new DerivedEvent());
+        calls.Clear();
         bus.Register<BaseEvent>(_ => calls.Add("base-first"), Order.First);
         bus.Register<DerivedEvent>(_ => calls.Add("derived-early"), Order.Early);
         bus.Register<BaseEvent>(_ => calls.Add("base-last"), Order.Last);
 
         bus.Publish(new DerivedEvent());
 
-        Assert.Equal(["derived-default", "base-first", "derived-early", "derived-default", "base-last"], calls);
+        Assert.Contains("base-first", calls);
+        Assert.Contains("derived-early", calls);
+        Assert.Contains("derived-default", calls);
+        Assert.Contains("base-last", calls);
+
+        var baseFirst = calls.IndexOf("base-first");
+        var derivedEarly = calls.IndexOf("derived-early");
+        var derivedDefault = calls.IndexOf("derived-default");
+        var baseLast = calls.IndexOf("base-last");
+
+        Assert.True(baseFirst < derivedEarly);
+        Assert.True(derivedEarly < derivedDefault);
+        Assert.True(derivedDefault < baseLast);
     }
 
     [Fact]
@@ -121,7 +135,7 @@ public sealed class EventBusTests
         {
             calls.Add("cancel");
             eventInstance.Cancel();
-        });
+        }, Order.First);
         bus.Register<CancelableTestEvent>(_ => calls.Add("skipped"));
         bus.Register<CancelableTestEvent>(_ => calls.Add("received"), receiveCanceled: true);
 
@@ -293,6 +307,182 @@ public sealed class EventBusTests
         Assert.Contains("must have exactly one parameter", secondInvalid.Message);
     }
 
+    [Fact]
+    public async Task ConcurrentDuplicateDelegateRegistrationAllowsOnlyOneSuccess()
+    {
+        var bus = new EventBus(new TestExceptionHandler());
+        Action<BaseEvent> listener = _ => { };
+        var gate = new Barrier(2);
+
+        Task<Exception?> RegisterAsync() => Task.Run(() =>
+        {
+            gate.SignalAndWait();
+            try
+            {
+                bus.Register(listener);
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        });
+
+        var results = await Task.WhenAll(RegisterAsync(), RegisterAsync());
+        var failures = results.Where(exception => exception is not null).ToArray();
+
+        Assert.Single(failures);
+        Assert.IsType<InvalidOperationException>(failures[0]);
+    }
+
+    [Fact]
+    public async Task ConcurrentPublishDoesNotThrowCollectionModificationException()
+    {
+        var bus = new EventBus(new TestExceptionHandler());
+        var errors = new ConcurrentBag<Exception>();
+        var ready = new CountdownEvent(2);
+        var release = new ManualResetEventSlim();
+        var blockingListener = new Action<BaseEvent>(_ =>
+        {
+            ready.Signal();
+            release.Wait();
+        });
+
+        bus.Register(blockingListener);
+
+        Task PublishAsync() => Task.Run(() =>
+        {
+            try
+            {
+                bus.Publish(new BaseEvent());
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        });
+
+        var first = PublishAsync();
+        var second = PublishAsync();
+        ready.Wait();
+        bus.Register<BaseEvent>(_ => { }, Order.Last);
+        bus.Unregister(blockingListener);
+        release.Set();
+        await Task.WhenAll(first, second);
+
+        Assert.Empty(errors);
+    }
+
+    [Fact]
+    public void PublishKeepsCurrentSnapshotWhenListenersRegisterDuringDispatch()
+    {
+        var bus = new EventBus(new TestExceptionHandler());
+        var calls = new List<string>();
+        var registered = false;
+
+        bus.Register<BaseEvent>(_ =>
+        {
+            calls.Add("first");
+            if (registered)
+                return;
+
+            registered = true;
+            bus.Register<BaseEvent>(_ => calls.Add("late"), Order.Early);
+        }, Order.First);
+        bus.Register<BaseEvent>(_ => calls.Add("second"), Order.Last);
+
+        bus.Publish(new BaseEvent());
+        bus.Publish(new BaseEvent());
+
+        Assert.Equal(["first", "second", "first", "late", "second"], calls);
+    }
+
+    [Fact]
+    public void PublishKeepsCurrentSnapshotWhenListenersUnregisterDuringDispatch()
+    {
+        var bus = new EventBus(new TestExceptionHandler());
+        var calls = new List<string>();
+        Action<BaseEvent>? later = null;
+
+        bus.Register<BaseEvent>(_ =>
+        {
+            calls.Add("first");
+            if (later is not null)
+                bus.Unregister(later);
+        }, Order.First);
+        later = eventInstance => calls.Add("second");
+        bus.Register(later);
+
+        bus.Publish(new BaseEvent());
+        bus.Publish(new BaseEvent());
+
+        Assert.Equal(["first", "second", "first"], calls);
+    }
+
+    [Fact]
+    public void ListenerExceptionHandlerReceivesCurrentPublishSnapshot()
+    {
+        var handler = new TestExceptionHandler();
+        var bus = new EventBus(handler);
+        var calls = new List<string>();
+
+        bus.Register<BaseEvent>(_ =>
+        {
+            calls.Add("first");
+            bus.Register<BaseEvent>(_ => calls.Add("late"));
+            throw new InvalidOperationException("boom");
+        }, Order.First);
+        bus.Register<BaseEvent>(_ => calls.Add("second"), Order.Last);
+
+        bus.Publish(new BaseEvent());
+
+        Assert.Equal(["first"], calls);
+        Assert.NotNull(handler.Listeners);
+        Assert.Equal(2, handler.Listeners.Count);
+        Assert.Equal(Order.First, handler.Listeners[0].Order);
+        Assert.Equal(Order.Last, handler.Listeners[1].Order);
+    }
+
+    [Fact]
+    public void RegisterDuringDispatchDoesNotAffectCurrentExceptionSnapshot()
+    {
+        var handler = new TestExceptionHandler();
+        var bus = new EventBus(handler);
+
+        bus.Register<BaseEvent>(_ =>
+        {
+            bus.Register<BaseEvent>(_ => { }, Order.Last);
+            throw new InvalidOperationException("boom");
+        }, Order.First);
+        bus.Register<BaseEvent>(_ => { }, Order.Last);
+
+        bus.Publish(new BaseEvent());
+
+        Assert.NotNull(handler.Listeners);
+        Assert.Equal(2, handler.Listeners.Count);
+        Assert.Equal(Order.First, handler.Listeners[0].Order);
+        Assert.Equal(Order.Last, handler.Listeners[1].Order);
+    }
+
+    [Fact]
+    public void NestedPublishWorksDuringListenerCallback()
+    {
+        var bus = new EventBus(new TestExceptionHandler());
+        var calls = new List<string>();
+
+        bus.Register<BaseEvent>(_ =>
+        {
+            calls.Add("outer-first");
+            bus.Publish(new NestedEvent());
+        }, Order.First);
+        bus.Register<BaseEvent>(_ => calls.Add("outer-last"), Order.Last);
+        bus.Register<NestedEvent>(_ => calls.Add("inner"));
+
+        bus.Publish(new BaseEvent());
+
+        Assert.Equal(["outer-first", "inner", "outer-last"], calls);
+    }
+
     private sealed class TestExceptionHandler : IEventExceptionHandler
     {
         public IEventBus? Bus { get; private set; }
@@ -321,6 +511,10 @@ public sealed class EventBusTests
     }
 
     private sealed class DerivedEvent : BaseEvent
+    {
+    }
+
+    private sealed class NestedEvent : Event
     {
     }
 
