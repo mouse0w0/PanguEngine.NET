@@ -1,4 +1,4 @@
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Dispatches runtime events to registered listeners.
@@ -25,7 +25,7 @@ public interface IEventBus
     /// <param name="order">The listener order.</param>
     /// <param name="receiveCanceled">Whether the listener receives canceled events.</param>
     void Register<TEvent>(Action<TEvent> listener, Order order = Order.Default, bool receiveCanceled = false)
-        where TEvent : class, IEvent;
+        where TEvent : Event;
 
     /// <summary>
     /// Unregisters all listener methods for an object.
@@ -44,12 +44,12 @@ public interface IEventBus
     /// </summary>
     /// <typeparam name="TEvent">The event type.</typeparam>
     /// <param name="listener">The listener delegate.</param>
-    void Unregister<TEvent>(Action<TEvent> listener) where TEvent : class, IEvent;
+    void Unregister<TEvent>(Action<TEvent> listener) where TEvent : Event;
 
     /// <summary>
     /// Publishes an event.
     /// </summary>
     /// <typeparam name="TEvent">The event type.</typeparam>
     /// <param name="eventInstance">The event instance.</param>
-    void Publish<TEvent>(TEvent eventInstance) where TEvent : class, IEvent;
+    void Publish<TEvent>(TEvent eventInstance) where TEvent : Event;
 }

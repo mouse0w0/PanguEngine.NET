@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using PanguEngine.Event;
+using PanguEngine.Events;
 using PanguEngine.Mod;
 using PanguEngine.Resources;
 

@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Describes an event listener.

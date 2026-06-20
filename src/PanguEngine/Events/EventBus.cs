@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Default event bus implementation.
@@ -47,7 +47,7 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
 
     /// <inheritdoc />
     public void Register<TEvent>(Action<TEvent> listener, Order order = Order.Default, bool receiveCanceled = false)
-        where TEvent : class, IEvent
+        where TEvent : Event
     {
         ArgumentNullException.ThrowIfNull(listener);
         if (_registrations.ContainsKey(listener))
@@ -87,17 +87,15 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
     }
 
     /// <inheritdoc />
-    public void Unregister<TEvent>(Action<TEvent> listener) where TEvent : class, IEvent
+    public void Unregister<TEvent>(Action<TEvent> listener) where TEvent : Event
     {
         Unregister((object)listener);
     }
 
     /// <inheritdoc />
-    public void Publish<TEvent>(TEvent eventInstance) where TEvent : class, IEvent
+    public void Publish<TEvent>(TEvent eventInstance) where TEvent : Event
     {
         ArgumentNullException.ThrowIfNull(eventInstance);
-        if (eventInstance.GetType().IsValueType)
-            throw new ArgumentException("Event instances must be reference types.", nameof(eventInstance));
 
         var listenerList = GetListenerList(eventInstance.GetType());
         var listeners = listenerList.Listeners;
@@ -169,7 +167,7 @@ public sealed class EventBus(IEventExceptionHandler exceptionHandler) : IEventBu
                     $"Listener method '{listenerType}.{method.Name}' must have exactly one parameter.");
 
             var eventType = parameters[0].ParameterType;
-            if (eventType.IsValueType || !typeof(IEvent).IsAssignableFrom(eventType))
+            if (!typeof(Event).IsAssignableFrom(eventType))
                 throw new InvalidOperationException(
                     $"Listener method '{listenerType}.{method.Name}' parameter must be an event reference type.");
 

@@ -1,4 +1,4 @@
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Defines event listener execution order.

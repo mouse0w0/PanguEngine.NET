@@ -1,4 +1,4 @@
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Marks a method as an event listener.

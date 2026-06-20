@@ -1,4 +1,4 @@
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Rethrows exceptions thrown by event listeners.
@@ -15,7 +15,7 @@ public sealed class ThrowingEventExceptionHandler : IEventExceptionHandler
     }
 
     /// <inheritdoc />
-    public void Handle(IEventBus bus, IEvent eventInstance, IReadOnlyList<IEventListener> listeners, int index,
+    public void Handle(IEventBus bus, Event eventInstance, IReadOnlyList<IEventListener> listeners, int index,
         Exception exception)
     {
         throw exception;

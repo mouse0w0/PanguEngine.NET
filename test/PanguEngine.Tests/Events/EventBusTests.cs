@@ -1,31 +1,23 @@
-using PanguEngine.Event;
+using PanguEngine.Events;
 
-namespace PanguEngine.Tests.Event;
+namespace PanguEngine.Tests.Events;
 
 public sealed class EventBusTests
 {
     [Fact]
-    public void PublishDispatchesToMatchingEventBaseTypesAndInterfaces()
+    public void PublishDispatchesToMatchingEventBaseTypes()
     {
         var bus = new EventBus(new TestExceptionHandler());
         var calls = new List<string>();
 
         bus.Register<DerivedEvent>(_ => calls.Add("derived"));
         bus.Register<BaseEvent>(_ => calls.Add("base"));
-        bus.Register<ITestEvent>(_ => calls.Add("interface"));
-        bus.Register<IEvent>(_ => calls.Add("event"));
+        bus.Register<Event>(_ => calls.Add("event"));
 
         bus.Publish(new DerivedEvent());
         Assert.Equal(3, calls.Count);
         Assert.Contains("derived", calls);
         Assert.Contains("base", calls);
-        Assert.Contains("event", calls);
-
-        calls.Clear();
-        bus.Publish(new InterfaceEvent());
-
-        Assert.Equal(2, calls.Count);
-        Assert.Contains("interface", calls);
         Assert.Contains("event", calls);
     }
 
@@ -117,15 +109,6 @@ public sealed class EventBusTests
 
         Assert.Equal([nameof(DerivedEvent)], listener.Calls);
         Assert.Equal(["derived", "derived"], calls);
-    }
-
-    [Fact]
-    public void PublishRejectsBoxedValueTypeEvents()
-    {
-        var bus = new EventBus(new TestExceptionHandler());
-        IEvent eventInstance = new ValueTypeEvent();
-
-        Assert.Throws<ArgumentException>(() => bus.Publish(eventInstance));
     }
 
     [Fact]
@@ -314,7 +297,7 @@ public sealed class EventBusTests
     {
         public IEventBus? Bus { get; private set; }
 
-        public IEvent? Event { get; private set; }
+        public Event? Event { get; private set; }
 
         public IReadOnlyList<IEventListener>? Listeners { get; private set; }
 
@@ -322,7 +305,7 @@ public sealed class EventBusTests
 
         public Exception? Exception { get; private set; }
 
-        public void Handle(IEventBus bus, IEvent eventInstance, IReadOnlyList<IEventListener> listeners, int index,
+        public void Handle(IEventBus bus, Event eventInstance, IReadOnlyList<IEventListener> listeners, int index,
             Exception exception)
         {
             Bus = bus;
@@ -333,7 +316,7 @@ public sealed class EventBusTests
         }
     }
 
-    private class BaseEvent : IEvent
+    private class BaseEvent : Event
     {
     }
 
@@ -341,19 +324,7 @@ public sealed class EventBusTests
     {
     }
 
-    private interface ITestEvent : IEvent
-    {
-    }
-
-    private sealed class InterfaceEvent : ITestEvent
-    {
-    }
-
-    private readonly struct ValueTypeEvent : IEvent
-    {
-    }
-
-    private sealed class CancelableTestEvent : ICancelableEvent
+    private sealed class CancelableTestEvent : Event, ICancelableEvent
     {
         public bool IsCanceled { get; private set; }
 

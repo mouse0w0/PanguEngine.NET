@@ -1,4 +1,4 @@
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Handles exceptions thrown by event listeners.
@@ -13,6 +13,6 @@ public interface IEventExceptionHandler
     /// <param name="listeners">The listener list used for the current dispatch.</param>
     /// <param name="index">The index of the listener that threw.</param>
     /// <param name="exception">The captured exception.</param>
-    void Handle(IEventBus bus, IEvent eventInstance, IReadOnlyList<IEventListener> listeners, int index,
+    void Handle(IEventBus bus, Event eventInstance, IReadOnlyList<IEventListener> listeners, int index,
         Exception exception);
 }

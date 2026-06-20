@@ -1,12 +1,12 @@
 using System.Reflection;
 
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 internal sealed class EventListener(
     Type eventType,
     Type ownerType,
     MethodInfo method,
-    Action<IEvent> invoke,
+    Action<Event> invoke,
     Order order,
     bool receiveCanceled) : IEventListener
 {
@@ -16,7 +16,7 @@ internal sealed class EventListener(
 
     public Type EventType { get; } = eventType;
 
-    public Action<IEvent> Invoke { get; } = invoke;
+    public Action<Event> Invoke { get; } = invoke;
 
     public Order Order { get; } = order;
 

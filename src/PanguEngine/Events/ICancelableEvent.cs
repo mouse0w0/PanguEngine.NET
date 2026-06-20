@@ -1,9 +1,9 @@
-namespace PanguEngine.Event;
+namespace PanguEngine.Events;
 
 /// <summary>
 /// Represents an event that can be canceled.
 /// </summary>
-public interface ICancelableEvent : IEvent
+public interface ICancelableEvent
 {
     /// <summary>
     /// Whether the event has been canceled.
