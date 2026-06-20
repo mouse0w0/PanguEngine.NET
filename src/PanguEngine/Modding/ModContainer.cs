@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PanguEngine.Resources;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Contains a loaded mod and its runtime services.

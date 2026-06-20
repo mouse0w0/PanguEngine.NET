@@ -1,4 +1,4 @@
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Defines a mod entry point.

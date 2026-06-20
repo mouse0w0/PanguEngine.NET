@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using PanguEngine.Events;
-using PanguEngine.Mod;
+using PanguEngine.Modding;
 using PanguEngine.Resources;
 
 namespace PanguEngine;

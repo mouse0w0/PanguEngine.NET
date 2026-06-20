@@ -1,6 +1,6 @@
 using System.IO.Compression;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Reads mod files from a zip archive.

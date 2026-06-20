@@ -1,7 +1,7 @@
 using System.Reflection;
 using System.Runtime.Loader;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Resolves and loads assemblies for a mod.

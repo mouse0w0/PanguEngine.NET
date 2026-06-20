@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Provides file access for a mod source.

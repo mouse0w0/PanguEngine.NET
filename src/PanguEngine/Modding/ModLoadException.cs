@@ -1,4 +1,4 @@
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Represents an error raised while loading or configuring mods.

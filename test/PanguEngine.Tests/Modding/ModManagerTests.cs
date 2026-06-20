@@ -4,11 +4,11 @@ using System.Reflection.Emit;
 using System.Runtime.Loader;
 using System.Text;
 using Microsoft.Extensions.Logging.Abstractions;
-using PanguEngine.Mod;
+using PanguEngine.Modding;
 using PanguEngine.Resources;
 using PanguEngine.Versioning;
 
-namespace PanguEngine.Tests.Mod;
+namespace PanguEngine.Tests.Modding;
 
 public sealed class ModManagerTests
 {

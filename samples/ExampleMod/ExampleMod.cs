@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using PanguEngine.Mod;
+using PanguEngine.Modding;
 
 namespace ExampleMod;
 

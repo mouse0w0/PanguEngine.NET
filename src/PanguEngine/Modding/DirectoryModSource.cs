@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Reads mod files from a directory.

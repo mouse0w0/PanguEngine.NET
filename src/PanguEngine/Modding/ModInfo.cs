@@ -1,6 +1,6 @@
 using PanguEngine.Versioning;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Describes a loaded mod.

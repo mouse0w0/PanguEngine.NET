@@ -4,7 +4,7 @@ using PanguEngine.Collections;
 using PanguEngine.Resources;
 using PanguEngine.Versioning;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Discovers, validates, loads, and unloads mods.

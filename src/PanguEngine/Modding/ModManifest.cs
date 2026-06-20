@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace PanguEngine.Mod;
+namespace PanguEngine.Modding;
 
 /// <summary>
 /// Represents the serialized metadata for a mod package.
