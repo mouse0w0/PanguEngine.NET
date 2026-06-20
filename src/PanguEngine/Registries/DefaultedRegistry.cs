@@ -1,4 +1,4 @@
-namespace PanguEngine.Registry;
+namespace PanguEngine.Registries;
 
 /// <summary>
 /// Stores values by resource key and falls back to a default value after freezing.

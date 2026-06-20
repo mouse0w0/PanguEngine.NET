@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace PanguEngine.Registry;
+namespace PanguEngine.Registries;
 
 public sealed class RegistryManager
 {

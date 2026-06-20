@@ -1,4 +1,4 @@
-namespace PanguEngine.Registry;
+namespace PanguEngine.Registries;
 
 /// <summary>
 /// Represents a value registered in a registry.

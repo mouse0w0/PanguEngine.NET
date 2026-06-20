@@ -1,6 +1,6 @@
 using System.IO.Compression;
 using System.Text;
-using PanguEngine.Registry;
+using PanguEngine.Registries;
 using PanguEngine.Resources;
 
 namespace PanguEngine.Tests.Resources;

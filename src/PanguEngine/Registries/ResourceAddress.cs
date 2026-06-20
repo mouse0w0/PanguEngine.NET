@@ -1,4 +1,4 @@
-namespace PanguEngine.Registry;
+namespace PanguEngine.Registries;
 
 /// <summary>
 /// Identifies an entry inside a registry.

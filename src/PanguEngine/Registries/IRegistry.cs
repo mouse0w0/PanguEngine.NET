@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace PanguEngine.Registry;
+namespace PanguEngine.Registries;
 
 /// <summary>
 /// Provides non-generic access to a registry.

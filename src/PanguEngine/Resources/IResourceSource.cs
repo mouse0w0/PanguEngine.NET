@@ -1,4 +1,4 @@
-using PanguEngine.Registry;
+using PanguEngine.Registries;
 
 namespace PanguEngine.Resources;
 

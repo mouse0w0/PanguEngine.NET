@@ -1,6 +1,6 @@
-using PanguEngine.Registry;
+using PanguEngine.Registries;
 
-namespace PanguEngine.Tests.Registry;
+namespace PanguEngine.Tests.Registries;
 
 public sealed class DefaultedRegistryTests
 {

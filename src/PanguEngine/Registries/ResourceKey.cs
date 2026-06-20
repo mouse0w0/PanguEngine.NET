@@ -1,6 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace PanguEngine.Registry;
+namespace PanguEngine.Registries;
 
 /// <summary>
 /// Identifies a named engine resource using a namespace and path.
