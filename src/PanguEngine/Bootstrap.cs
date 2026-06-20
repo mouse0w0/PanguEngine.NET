@@ -1,4 +1,6 @@
-﻿namespace PanguEngine;
+﻿using PanguEngine.Client;
+
+namespace PanguEngine;
 
 /// <summary>
 /// Starts the engine from command-line arguments.
@@ -12,7 +14,7 @@ public static class Bootstrap
     public static void Launch(string[] args)
     {
         var options = ParseOptions(args);
-        new Client.Client(options).Run();
+        new EngineClient(options).Run();
     }
 
     /// <summary>

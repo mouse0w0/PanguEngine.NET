@@ -9,19 +9,19 @@ namespace PanguEngine.Client;
 /// <summary>
 /// Application client.
 /// </summary>
-public class Client
+public class EngineClient
 {
     /// <summary>
     /// The singleton instance of the client.
     /// </summary>
-    public static Client Instance { get; private set; } = null!;
+    public static EngineClient Instance { get; private set; } = null!;
 
     private readonly LaunchOptions _launchOptions;
 
     /// <summary>
     /// Creates a client with default launch options.
     /// </summary>
-    public Client() : this(LaunchOptions.Empty)
+    public EngineClient() : this(LaunchOptions.Empty)
     {
     }
 
@@ -29,7 +29,7 @@ public class Client
     /// Creates a client with the specified launch options.
     /// </summary>
     /// <param name="launchOptions">The launch options.</param>
-    public Client(LaunchOptions launchOptions)
+    public EngineClient(LaunchOptions launchOptions)
     {
         ArgumentNullException.ThrowIfNull(launchOptions);
         _launchOptions = launchOptions;
