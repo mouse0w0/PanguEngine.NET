@@ -101,6 +101,9 @@ public class EngineClient
             OnUpdate,
             WindowManager.RenderWindows);
         Renderer = new VulkanRenderer(GraphicsBackend.Device, PrimaryWindow.Presenter);
+
+        Engine.ModManager.RunClientSetup();
+        Engine.ModManager.RunReady();
     }
 
     /// <summary>

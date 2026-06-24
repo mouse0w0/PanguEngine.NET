@@ -272,7 +272,7 @@ public sealed class ModManagerTests
                                                 "version": "0.1.0",
                                                 "assembly": "{{assemblyFile}}",
                                                 "entry": "{{typeof(AnyModEntry).FullName}}",
-                                                "dependencies": [{ "id": "z_base" }]
+                                                "dependencies": [{ "id": "z_base", "version_range": "[0.1.0,)" }]
                                               }
                                               """);
             archive.CreateEntryFromFile(assemblyPath, assemblyFile);
@@ -298,6 +298,11 @@ public sealed class ModManagerTests
             manager.Load();
 
             Assert.Equal(new[] { "z_base", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Info.Id));
+            var dependent = manager.LoadedMods.Single(mod => mod.Info.Id == "a_dependent");
+            var dependency = Assert.Single(dependent.Info.Dependencies);
+            Assert.Equal("z_base", dependency.Id);
+            Assert.Equal("[0.1.0,)", dependency.VersionRange?.ToString());
+            Assert.False(dependency.Optional);
         }
         finally
         {
@@ -346,16 +351,209 @@ public sealed class ModManagerTests
         {
             manager.Load();
 
-            var loadedMods = manager.LoadedMods.ToArray();
-            Assert.Equal(new[] { "z_optional", "a_dependent" }, loadedMods.Select(mod => mod.Info.Id));
-
-            var dependency = Assert.Single(loadedMods[1].Info.Dependencies);
+            Assert.Equal(new[] { "z_optional", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Info.Id));
+            var dependent = manager.LoadedMods.Single(mod => mod.Info.Id == "a_dependent");
+            var dependency = Assert.Single(dependent.Info.Dependencies);
             Assert.Equal("z_optional", dependency.Id);
             Assert.Equal("[0.1.0,)", dependency.VersionRange?.ToString());
             Assert.True(dependency.Optional);
         }
         finally
         {
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void RunConfigureWaitsForDependencyStageBeforeDependentStage()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(OrderedLifecycleModEntry).Assembly.Location;
+        var logPath = Path.Combine(directory.Path, "lifecycle.log");
+        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
+        SetLifecycleRecorderEnvironment(logPath, mutexName);
+
+        CreateGeneratedModZip(directory.Path, "base.zip", "base_mod", assemblyPath,
+            typeof(OrderedLifecycleModEntry).FullName!);
+        CreateGeneratedModZip(directory.Path, "dependent.zip", "dependent_mod", assemblyPath,
+            typeof(OrderedLifecycleModEntry).FullName!,
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+            manager.RunConfigure();
+
+            Assert.Equal(new[] { "base_mod", "dependent_mod" }, File.ReadAllLines(logPath));
+        }
+        finally
+        {
+            ClearLifecycleRecorderEnvironment();
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void RunConfigureRunsIndependentModsConcurrently()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(ParallelLifecycleModEntry).Assembly.Location;
+        var logPath = Path.Combine(directory.Path, "lifecycle.log");
+        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
+        var eventPrefix = $"PanguEngineLifecycleParallel{Guid.NewGuid():N}";
+        using var firstReached = new EventWaitHandle(false, EventResetMode.ManualReset, eventPrefix + "_a");
+        using var secondReached = new EventWaitHandle(false, EventResetMode.ManualReset, eventPrefix + "_b");
+        SetLifecycleRecorderEnvironment(logPath, mutexName);
+        Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_EVENT_PREFIX", eventPrefix);
+
+        CreateGeneratedModZip(directory.Path, "a.zip", "parallel_a", assemblyPath,
+            typeof(ParallelLifecycleModEntry).FullName!);
+        CreateGeneratedModZip(directory.Path, "b.zip", "parallel_b", assemblyPath,
+            typeof(ParallelLifecycleModEntry).FullName!);
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+            manager.RunConfigure();
+
+            Assert.Equal(new[] { "parallel_a", "parallel_b" },
+                File.ReadAllLines(logPath).Order(StringComparer.Ordinal));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_EVENT_PREFIX", null);
+            ClearLifecycleRecorderEnvironment();
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void RunConfigureDrainsQueuedWorkAfterAllStageTasksComplete()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(SerialQueueLifecycleModEntry).Assembly.Location;
+        var logPath = Path.Combine(directory.Path, "lifecycle.log");
+        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
+        SetLifecycleRecorderEnvironment(logPath, mutexName);
+
+        CreateGeneratedModZip(directory.Path, "a.zip", "queue_a", assemblyPath,
+            typeof(SerialQueueLifecycleModEntry).FullName!);
+        CreateGeneratedModZip(directory.Path, "b.zip", "queue_b", assemblyPath,
+            typeof(SerialQueueLifecycleModEntry).FullName!);
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+            manager.RunConfigure();
+
+            var lines = File.ReadAllLines(logPath);
+            var firstSerialIndex = Array.FindIndex(lines, line => line.StartsWith("serial:", StringComparison.Ordinal));
+            var lastParallelIndex =
+                Array.FindLastIndex(lines, line => line.StartsWith("parallel:", StringComparison.Ordinal));
+            Assert.True(firstSerialIndex > lastParallelIndex);
+            Assert.Equal(2, lines.Count(line => line.StartsWith("parallel:", StringComparison.Ordinal)));
+            Assert.Equal(2, lines.Count(line => line.StartsWith("serial:", StringComparison.Ordinal)));
+        }
+        finally
+        {
+            ClearLifecycleRecorderEnvironment();
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void RunConfigureContinuesDrainingWorkQueuedDuringDrain()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(ReentrantSerialQueueLifecycleModEntry).Assembly.Location;
+        var logPath = Path.Combine(directory.Path, "lifecycle.log");
+        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
+        SetLifecycleRecorderEnvironment(logPath, mutexName);
+
+        CreateGeneratedModZip(directory.Path, "reentrant.zip", "reentrant_mod", assemblyPath,
+            typeof(ReentrantSerialQueueLifecycleModEntry).FullName!);
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+            manager.RunConfigure();
+
+            Assert.Equal(new[] { "serial:first", "serial:second" }, File.ReadAllLines(logPath));
+        }
+        finally
+        {
+            ClearLifecycleRecorderEnvironment();
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void RunConfigureDrainsQueuedWorkAndAggregatesQueueFailures()
+    {
+        using var directory = TestDirectory.Create();
+        var assemblyPath = typeof(FailingSerialQueueLifecycleModEntry).Assembly.Location;
+        var logPath = Path.Combine(directory.Path, "lifecycle.log");
+        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
+        SetLifecycleRecorderEnvironment(logPath, mutexName);
+
+        CreateGeneratedModZip(directory.Path, "failing.zip", "failing_mod", assemblyPath,
+            typeof(FailingSerialQueueLifecycleModEntry).FullName!);
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            var exception = Assert.Throws<ModLoadException>(() => manager.RunConfigure());
+            var aggregate = Assert.IsType<AggregateException>(exception.InnerException);
+            Assert.Equal(2, aggregate.InnerExceptions.Count);
+            Assert.Equal(new[] { "success" }, File.ReadAllLines(logPath));
+        }
+        finally
+        {
+            ClearLifecycleRecorderEnvironment();
+            manager.Shutdown();
+        }
+    }
+
+    [Fact]
+    public void RunConfigureSkipsDependentWhenDependencyStageFails()
+    {
+        using var directory = TestDirectory.Create();
+        var failingAssemblyPath = typeof(ThrowingLifecycleModEntry).Assembly.Location;
+        var recordingAssemblyPath = typeof(RecordingLifecycleModEntry).Assembly.Location;
+        var logPath = Path.Combine(directory.Path, "lifecycle.log");
+        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
+        SetLifecycleRecorderEnvironment(logPath, mutexName);
+
+        CreateGeneratedModZip(directory.Path, "base.zip", "base_mod", failingAssemblyPath,
+            typeof(ThrowingLifecycleModEntry).FullName!);
+        CreateGeneratedModZip(directory.Path, "dependent.zip", "dependent_mod", recordingAssemblyPath,
+            typeof(RecordingLifecycleModEntry).FullName!,
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\" }]");
+        CreateGeneratedModZip(directory.Path, "transitive.zip", "transitive_mod", recordingAssemblyPath,
+            typeof(RecordingLifecycleModEntry).FullName!,
+            ",\n  \"dependencies\": [{ \"id\": \"dependent_mod\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        try
+        {
+            manager.Load();
+
+            var exception = Assert.Throws<ModLoadException>(() => manager.RunConfigure());
+
+            Assert.Contains("base_mod", exception.Message);
+            Assert.DoesNotContain("dependent_mod", exception.Message);
+            Assert.DoesNotContain("transitive_mod", exception.Message);
+            Assert.False(File.Exists(logPath));
+        }
+        finally
+        {
+            ClearLifecycleRecorderEnvironment();
             manager.Shutdown();
         }
     }
@@ -396,6 +594,7 @@ public sealed class ModManagerTests
         try
         {
             manager.Load();
+            manager.RunConfigure();
 
             Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Info.Id));
         }
@@ -423,6 +622,7 @@ public sealed class ModManagerTests
         try
         {
             manager.Load();
+            manager.RunConfigure();
 
             Assert.Equal(new[] { "leaf_mod", "middle_mod", "caller_mod" },
                 manager.LoadedMods.Select(mod => mod.Info.Id));
@@ -454,6 +654,7 @@ public sealed class ModManagerTests
         try
         {
             manager.Load();
+            manager.RunConfigure();
 
             Assert.Equal(new[] { "dependency_mod", "caller_mod" }, manager.LoadedMods.Select(mod => mod.Info.Id));
         }
@@ -484,6 +685,7 @@ public sealed class ModManagerTests
         try
         {
             manager.Load();
+            manager.RunConfigure();
 
             Assert.Equal(new[] { "first_mod", "second_mod", "caller_mod" },
                 manager.LoadedMods.Select(mod => mod.Info.Id));
@@ -495,7 +697,7 @@ public sealed class ModManagerTests
     }
 
     [Fact]
-    public void LoadDoesNotDelegateToMissingOptionalDependency()
+    public void RunConfigureDoesNotDelegateToMissingOptionalDependency()
     {
         using var directory = TestDirectory.Create();
         var missingOptionalAssembly =
@@ -509,7 +711,9 @@ public sealed class ModManagerTests
         var manager = new ModManager(directory.Path, NullLogger.Instance);
         try
         {
-            var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+            manager.Load();
+
+            var exception = Assert.Throws<ModLoadException>(() => manager.RunConfigure());
 
             Assert.Contains("caller_mod", exception.Message);
             Assert.DoesNotContain("optional_mod", exception.Message);
@@ -550,6 +754,7 @@ public sealed class ModManagerTests
             Assert.Equal("test_mod", mod.Info.Id);
             Assert.Equal(SemVersion.Parse("0.1.0"), mod.Info.Version);
             Assert.True(mod.Info.Version >= SemVersion.Parse("0.1.0"));
+            Assert.Empty(mod.Info.Dependencies);
         }
         finally
         {
@@ -659,6 +864,18 @@ public sealed class ModManagerTests
         archive.CreateEntryFromFile(path, entryName);
     }
 
+    private static void SetLifecycleRecorderEnvironment(string logPath, string mutexName)
+    {
+        Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_LOG", logPath);
+        Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_MUTEX", mutexName);
+    }
+
+    private static void ClearLifecycleRecorderEnvironment()
+    {
+        Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_LOG", null);
+        Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_MUTEX", null);
+    }
+
     private static string CreateMarkerModAssembly(string directory, string assemblyName,
         params (string Name, string Value)[] methods)
     {
@@ -672,7 +889,7 @@ public sealed class ModManagerTests
         var configureBuilder = entryBuilder.DefineMethod(nameof(IMod.Configure),
             MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
             typeof(void),
-            [typeof(ModContainer)]);
+            [typeof(ModConfigureContext)]);
         var configureIl = configureBuilder.GetILGenerator();
         configureIl.Emit(OpCodes.Ret);
         entryBuilder.DefineMethodOverride(configureBuilder, typeof(IMod).GetMethod(nameof(IMod.Configure))!);
@@ -715,7 +932,7 @@ public sealed class ModManagerTests
             var methodBuilder = typeBuilder.DefineMethod(nameof(IMod.Configure),
                 MethodAttributes.Public | MethodAttributes.Final | MethodAttributes.Virtual,
                 typeof(void),
-                [typeof(ModContainer)]);
+                [typeof(ModConfigureContext)]);
             var il = methodBuilder.GetILGenerator();
             il.EmitCall(OpCodes.Call, dependencyMethod, null);
             il.Emit(OpCodes.Pop);
@@ -815,8 +1032,9 @@ public sealed class ModManagerTests
 
 public sealed class TestModEntry : IMod
 {
-    public void Configure(ModContainer container)
+    public void Configure(ModConfigureContext context)
     {
+        var container = context.Mod;
         if (container.Info.Id != "test_mod")
             throw new InvalidOperationException("Unexpected mod id.");
 
@@ -829,7 +1047,109 @@ public sealed class TestModEntry : IMod
 
 public sealed class AnyModEntry : IMod
 {
-    public void Configure(ModContainer container)
+}
+
+public sealed class RecordingLifecycleModEntry : IMod
+{
+    public void Configure(ModConfigureContext context)
     {
+        LifecycleTestFile.Append(context.Mod.Info.Id);
+    }
+}
+
+public sealed class OrderedLifecycleModEntry : IMod
+{
+    public void Configure(ModConfigureContext context)
+    {
+        if (context.Mod.Info.Id == "base_mod")
+            Thread.Sleep(TimeSpan.FromMilliseconds(200));
+
+        LifecycleTestFile.Append(context.Mod.Info.Id);
+    }
+}
+
+public sealed class ParallelLifecycleModEntry : IMod
+{
+    public void Configure(ModConfigureContext context)
+    {
+        var eventPrefix = Environment.GetEnvironmentVariable("PANGU_TEST_LIFECYCLE_EVENT_PREFIX")
+                          ?? throw new InvalidOperationException("Lifecycle event prefix is missing.");
+        var suffix = context.Mod.Info.Id switch
+        {
+            "parallel_a" => "a",
+            "parallel_b" => "b",
+            _ => throw new InvalidOperationException("Unexpected parallel mod id.")
+        };
+        var otherSuffix = suffix == "a" ? "b" : "a";
+        using var reached = EventWaitHandle.OpenExisting(eventPrefix + "_" + suffix);
+        using var otherReached = EventWaitHandle.OpenExisting(eventPrefix + "_" + otherSuffix);
+        reached.Set();
+        if (!otherReached.WaitOne(TimeSpan.FromSeconds(5)))
+            throw new InvalidOperationException("Independent lifecycle stages did not run concurrently.");
+
+        LifecycleTestFile.Append(context.Mod.Info.Id);
+    }
+}
+
+public sealed class SerialQueueLifecycleModEntry : IMod
+{
+    public void Configure(ModConfigureContext context)
+    {
+        var id = context.Mod.Info.Id;
+        LifecycleTestFile.Append("parallel:" + id);
+        context.Enqueue(() => LifecycleTestFile.Append("serial:" + id));
+    }
+}
+
+public sealed class ReentrantSerialQueueLifecycleModEntry : IMod
+{
+    public void Configure(ModConfigureContext context)
+    {
+        context.Enqueue(() =>
+        {
+            LifecycleTestFile.Append("serial:first");
+            context.Enqueue(() => LifecycleTestFile.Append("serial:second"));
+        });
+    }
+}
+
+public sealed class FailingSerialQueueLifecycleModEntry : IMod
+{
+    public void Configure(ModConfigureContext context)
+    {
+        context.Enqueue(() => throw new InvalidOperationException("first queued failure"));
+        context.Enqueue(() => LifecycleTestFile.Append("success"));
+        context.Enqueue(() => throw new InvalidOperationException("second queued failure"));
+    }
+}
+
+public sealed class ThrowingLifecycleModEntry : IMod
+{
+    public void Configure(ModConfigureContext context)
+    {
+        throw new InvalidOperationException("configure failed");
+    }
+}
+
+public static class LifecycleTestFile
+{
+    public static void Append(string value)
+    {
+        var logPath = Environment.GetEnvironmentVariable("PANGU_TEST_LIFECYCLE_LOG")
+                      ?? throw new InvalidOperationException("Lifecycle log path is missing.");
+        var mutexName = Environment.GetEnvironmentVariable("PANGU_TEST_LIFECYCLE_MUTEX")
+                        ?? throw new InvalidOperationException("Lifecycle mutex name is missing.");
+        using var mutex = new Mutex(false, mutexName);
+        if (!mutex.WaitOne(TimeSpan.FromSeconds(5)))
+            throw new InvalidOperationException("Lifecycle log lock timed out.");
+
+        try
+        {
+            File.AppendAllText(logPath, value + Environment.NewLine, Encoding.UTF8);
+        }
+        finally
+        {
+            mutex.ReleaseMutex();
+        }
     }
 }

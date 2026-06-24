@@ -52,7 +52,9 @@ public static class Engine
         ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "mods"), Log.CreateLogger("Mods"),
             options.ModPaths);
         ModManager.Load();
+        ModManager.RunConfigure();
         Resources = CreateResourceManager();
+        ModManager.RunCommonSetup();
     }
 
     /// <summary>

@@ -34,7 +34,41 @@ public sealed class ModManager(
         ValidateDependencies(descriptors);
         var sortedDescriptors = SortByDependencies(descriptors);
         LoadDescriptors(sortedDescriptors);
-        ConfigureLoadedMods();
+    }
+
+    internal void RunConfigure()
+    {
+        RunLifecycleStage(nameof(IMod.Configure),
+            (mod, queue) => new ModConfigureContext(mod, queue),
+            static (mod, context) => mod.Configure(context));
+    }
+
+    internal void RunCommonSetup()
+    {
+        RunLifecycleStage(nameof(IMod.CommonSetup),
+            (mod, queue) => new ModCommonSetupContext(mod, queue),
+            static (mod, context) => mod.CommonSetup(context));
+    }
+
+    internal void RunClientSetup()
+    {
+        RunLifecycleStage(nameof(IMod.ClientSetup),
+            (mod, queue) => new ModClientSetupContext(mod, queue),
+            static (mod, context) => mod.ClientSetup(context));
+    }
+
+    internal void RunDedicatedServerSetup()
+    {
+        RunLifecycleStage(nameof(IMod.DedicatedServerSetup),
+            (mod, queue) => new ModDedicatedServerSetupContext(mod, queue),
+            static (mod, context) => mod.DedicatedServerSetup(context));
+    }
+
+    internal void RunReady()
+    {
+        RunLifecycleStage(nameof(IMod.Ready),
+            (mod, queue) => new ModReadyContext(mod, queue),
+            static (mod, context) => mod.Ready(context));
     }
 
     /// <summary>
@@ -257,24 +291,130 @@ public sealed class ModManager(
             throw new ModLoadException(string.Join(Environment.NewLine, errors));
     }
 
-    private void ConfigureLoadedMods()
+    private void RunLifecycleStage<TContext>(
+        string stageName,
+        Func<ModContainer, ModLifecycleTaskQueue, TContext> createContext,
+        Action<IMod, TContext> invoke)
+        where TContext : ModLifecycleContext
     {
-        var errors = new List<string>();
-        foreach (var container in _containers)
+        var taskQueue = new ModLifecycleTaskQueue();
+        var tasksById = new Dictionary<string, Task<bool>>(StringComparer.Ordinal);
+        var executions = new List<LifecycleStageExecution>();
+
+        foreach (var mod in _containers)
+        {
+            var dependencyTasks = GetLifecycleStageDependencyTasks(mod, tasksById);
+            var context = createContext(mod, taskQueue);
+            var task = new Task<bool>(() => RunModLifecycleStage(mod, dependencyTasks, context, invoke));
+            tasksById.Add(mod.Info.Id, task);
+            executions.Add(new LifecycleStageExecution(mod, task));
+        }
+
+        foreach (var execution in executions)
+            execution.Task.Start(TaskScheduler.Default);
+
+        try
+        {
+            Task.WaitAll(executions.Select(execution => execution.Task).ToArray());
+        }
+        catch (AggregateException)
+        {
+        }
+
+        var lifecycleErrors = CollectLifecycleStageErrors(stageName, executions);
+        if (lifecycleErrors.Count > 0)
+            throw CreateAggregateLifecycleStageException(stageName, lifecycleErrors);
+
+        var serialErrors = new List<Exception>();
+        taskQueue.Drain((mod, ex) => serialErrors.Add(CreateLifecycleStageException(stageName, mod, ex)));
+        if (serialErrors.Count > 0)
+            throw CreateAggregateLifecycleStageException(stageName, serialErrors);
+    }
+
+    private static bool RunModLifecycleStage<TContext>(
+        ModContainer mod,
+        IReadOnlyList<Task<bool>> dependencyTasks,
+        TContext context,
+        Action<IMod, TContext> invoke)
+        where TContext : ModLifecycleContext
+    {
+        foreach (var dependencyTask in dependencyTasks)
         {
             try
             {
-                container.Instance.Configure(container);
+                dependencyTask.Wait();
             }
-            catch (Exception ex)
+            catch (AggregateException)
             {
-                errors.Add(new ModLoadException(
-                    $"Failed to configure mod '{container.Info.Id}' from '{container.SourcePath}'.", ex).Message);
+                return false;
             }
+
+            if (!dependencyTask.Result)
+                return false;
         }
 
-        if (errors.Count > 0)
-            throw new ModLoadException(string.Join(Environment.NewLine, errors));
+        invoke(mod.Instance, context);
+        return true;
+    }
+
+    private static IReadOnlyList<Task<bool>> GetLifecycleStageDependencyTasks(
+        ModContainer mod,
+        IReadOnlyDictionary<string, Task<bool>> tasksById)
+    {
+        var dependencyTasks = new List<Task<bool>>();
+        foreach (var dependency in mod.Info.Dependencies)
+        {
+            if (tasksById.TryGetValue(dependency.Id, out var task))
+            {
+                dependencyTasks.Add(task);
+                continue;
+            }
+
+            if (dependency.Optional)
+                continue;
+
+            throw new ModLoadException(
+                $"Loaded mod '{mod.Info.Id}' appears before dependency '{dependency.Id}' in lifecycle order.");
+        }
+
+        return dependencyTasks;
+    }
+
+    private static List<Exception> CollectLifecycleStageErrors(
+        string stageName,
+        IReadOnlyList<LifecycleStageExecution> executions)
+    {
+        var errors = new List<Exception>();
+        foreach (var execution in executions)
+        {
+            if (execution.Task.Exception is null)
+                continue;
+
+            foreach (var ex in execution.Task.Exception.Flatten().InnerExceptions)
+                errors.Add(CreateLifecycleStageException(stageName, execution.Mod, ex));
+        }
+
+        return errors;
+    }
+
+    private static ModLoadException CreateLifecycleStageException(
+        string stageName,
+        ModContainer mod,
+        Exception innerException)
+    {
+        return new ModLoadException(
+            $"Failed to run {stageName} for mod '{mod.Info.Id}' from '{mod.SourcePath}'.",
+            innerException);
+    }
+
+    private static ModLoadException CreateAggregateLifecycleStageException(
+        string stageName,
+        IReadOnlyList<Exception> errors)
+    {
+        var message = string.Join(Environment.NewLine, errors.Select(error => error.Message));
+        return new ModLoadException(
+            $"Failed to run mod lifecycle stage '{stageName}'.{Environment.NewLine}{message}",
+            new AggregateException(errors));
     }
 
     private ModContainer LoadDescriptor(ModDescriptor descriptor,
@@ -293,13 +433,14 @@ public sealed class ModManager(
             var dependencyInfos = new List<ModDependencyInfo>();
             foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
             {
+                if (!IsValidModId(dependency.Id))
+                    continue;
+
                 var dependencyId = dependency.Id!;
                 var versionRange = string.IsNullOrWhiteSpace(dependency.VersionRange)
                     ? null
                     : SemVersionRange.Parse(dependency.VersionRange);
-
                 dependencyInfos.Add(new ModDependencyInfo(dependencyId, versionRange, dependency.Optional));
-
                 if (loadedContexts.TryGetValue(dependencyId, out var dependencyContext))
                     dependencies.Add(dependencyContext);
             }
@@ -308,7 +449,7 @@ public sealed class ModManager(
             var assembly = loadContext.LoadOwnAssembly(assemblyName);
             var entryType = assembly.GetType(entryName, throwOnError: true)!;
             var resources = CreateResourceSource(source);
-            var info = new ModInfo(id, version, dependencyInfos.ToArray());
+            var info = new ModInfo(id, version, Array.AsReadOnly(dependencyInfos.ToArray()));
             var modLogger = CreateModLogger(id);
             if (!typeof(IMod).IsAssignableFrom(entryType))
                 throw new ModLoadException($"Mod '{id}' entry '{entryName}' must implement {nameof(IMod)}.");
@@ -363,10 +504,11 @@ public sealed class ModManager(
 
     private sealed record ModDescriptor(ModCandidate Candidate, ModManifest Manifest);
 
+    private sealed record LifecycleStageExecution(ModContainer Mod, Task<bool> Task);
+
     private enum ModSourceKind
     {
         Zip,
-
         Directory
     }
 }
