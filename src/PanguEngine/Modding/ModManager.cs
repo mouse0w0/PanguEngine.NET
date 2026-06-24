@@ -290,10 +290,17 @@ public sealed class ModManager(
         {
             source = OpenSource(descriptor.Candidate);
             var dependencies = new List<ModAssemblyLoadContext>();
+            var dependencyInfos = new List<ModDependencyInfo>();
             foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
             {
-                if (IsValidModId(dependency.Id) &&
-                    loadedContexts.TryGetValue(dependency.Id!, out var dependencyContext))
+                var dependencyId = dependency.Id!;
+                var versionRange = string.IsNullOrWhiteSpace(dependency.VersionRange)
+                    ? null
+                    : SemVersionRange.Parse(dependency.VersionRange);
+
+                dependencyInfos.Add(new ModDependencyInfo(dependencyId, versionRange, dependency.Optional));
+
+                if (loadedContexts.TryGetValue(dependencyId, out var dependencyContext))
                     dependencies.Add(dependencyContext);
             }
 
@@ -301,7 +308,7 @@ public sealed class ModManager(
             var assembly = loadContext.LoadOwnAssembly(assemblyName);
             var entryType = assembly.GetType(entryName, throwOnError: true)!;
             var resources = CreateResourceSource(source);
-            var info = new ModInfo(id, version);
+            var info = new ModInfo(id, version, dependencyInfos.ToArray());
             var modLogger = CreateModLogger(id);
             if (!typeof(IMod).IsAssignableFrom(entryType))
                 throw new ModLoadException($"Mod '{id}' entry '{entryName}' must implement {nameof(IMod)}.");

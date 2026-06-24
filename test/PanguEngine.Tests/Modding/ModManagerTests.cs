@@ -45,6 +45,7 @@ public sealed class ModManagerTests
             Assert.Equal("test_mod", mod.Info.Id);
             Assert.Equal(SemVersion.Parse("0.1.0"), mod.Info.Version);
             Assert.True(mod.Info.Version >= SemVersion.Parse("0.1.0"));
+            Assert.Empty(mod.Info.Dependencies);
         }
         finally
         {
@@ -320,7 +321,7 @@ public sealed class ModManagerTests
                                                 "version": "0.1.0",
                                                 "assembly": "{{assemblyFile}}",
                                                 "entry": "{{typeof(AnyModEntry).FullName}}",
-                                                "dependencies": [{ "id": "z_optional", "optional": true }]
+                                                "dependencies": [{ "id": "z_optional", "version_range": "[0.1.0,)", "optional": true }]
                                               }
                                               """);
             archive.CreateEntryFromFile(assemblyPath, assemblyFile);
@@ -345,7 +346,13 @@ public sealed class ModManagerTests
         {
             manager.Load();
 
-            Assert.Equal(new[] { "z_optional", "a_dependent" }, manager.LoadedMods.Select(mod => mod.Info.Id));
+            var loadedMods = manager.LoadedMods.ToArray();
+            Assert.Equal(new[] { "z_optional", "a_dependent" }, loadedMods.Select(mod => mod.Info.Id));
+
+            var dependency = Assert.Single(loadedMods[1].Info.Dependencies);
+            Assert.Equal("z_optional", dependency.Id);
+            Assert.Equal("[0.1.0,)", dependency.VersionRange?.ToString());
+            Assert.True(dependency.Optional);
         }
         finally
         {
