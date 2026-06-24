@@ -143,10 +143,11 @@ public sealed class ModManager(
                 if (!dependencyIdIsValid)
                     errors.Add($"{modId}: dependency id '{dependencyId}' is invalid.");
 
-                var hasVersionRange = !string.IsNullOrWhiteSpace(dependency.Version);
+                var hasVersionRange = !string.IsNullOrWhiteSpace(dependency.VersionRange);
                 SemVersionRange? range = null;
-                if (hasVersionRange && !SemVersionRange.TryParse(dependency.Version, out range))
-                    errors.Add($"{modId}: dependency '{dependencyId}' version '{dependency.Version}' is invalid.");
+                if (hasVersionRange && !SemVersionRange.TryParse(dependency.VersionRange, out range))
+                    errors.Add(
+                        $"{modId}: dependency '{dependencyId}' version_range '{dependency.VersionRange}' is invalid.");
 
                 if (!dependencyIdIsValid)
                     continue;

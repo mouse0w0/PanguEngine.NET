@@ -52,8 +52,8 @@ internal sealed record ModDependencyManifest
     /// <summary>
     /// Gets the accepted dependency version range.
     /// </summary>
-    [JsonPropertyName("version")]
-    public string? Version { get; init; }
+    [JsonPropertyName("version_range")]
+    public string? VersionRange { get; init; }
 
     /// <summary>
     /// Gets a value indicating whether the dependency is optional.

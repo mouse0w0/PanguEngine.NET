@@ -143,7 +143,7 @@ public sealed class ModManagerTests
         using var directory = TestDirectory.Create();
         CreateModZip(directory.Path, "base.zip", "base_mod", "Base.dll", "Base.Entry");
         CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
-            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version\": \"[1.0.0,)\" }]");
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version_range\": \"[1.0.0,)\" }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
 
@@ -160,7 +160,7 @@ public sealed class ModManagerTests
         using var directory = TestDirectory.Create();
         CreateModZip(directory.Path, "base.zip", "base_mod", "Base.dll", "Base.Entry");
         CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
-            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version\": \" \" }]");
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version_range\": \" \" }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
 
@@ -168,7 +168,7 @@ public sealed class ModManagerTests
 
         Assert.Contains("dependent_mod", exception.Message);
         Assert.Contains("base_mod", exception.Message);
-        Assert.DoesNotContain("version is invalid", exception.Message);
+        Assert.DoesNotContain("version_range", exception.Message);
     }
 
     [Fact]
@@ -192,7 +192,7 @@ public sealed class ModManagerTests
         using var directory = TestDirectory.Create();
         CreateModZip(directory.Path, "optional.zip", "optional_mod", "Optional.dll", "Optional.Entry");
         CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
-            ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"version\": \"[1.0.0,)\", \"optional\": true }]");
+            ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"version_range\": \"[1.0.0,)\", \"optional\": true }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
 
@@ -208,14 +208,14 @@ public sealed class ModManagerTests
     {
         using var directory = TestDirectory.Create();
         CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
-            ",\n  \"dependencies\": [{ \"id\": \"Invalid-Id\", \"version\": \"not-a-range\" }]");
+            ",\n  \"dependencies\": [{ \"id\": \"Invalid-Id\", \"version_range\": \"not-a-range\" }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
 
         var exception = Assert.Throws<ModLoadException>(() => manager.Load());
 
         Assert.Contains("Invalid-Id", exception.Message);
-        Assert.Contains("version", exception.Message);
+        Assert.Contains("version_range", exception.Message);
     }
 
     [Fact]
@@ -244,7 +244,7 @@ public sealed class ModManagerTests
         using var directory = TestDirectory.Create();
         CreateModZip(directory.Path, "base.zip", "base_mod", "Base.dll", "Base.Entry");
         CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
-            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version\": \"(,0.1.0],[1.0.0,)\" }]");
+            ",\n  \"dependencies\": [{ \"id\": \"base_mod\", \"version_range\": \"(,0.1.0],[1.0.0,)\" }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
 
@@ -252,7 +252,7 @@ public sealed class ModManagerTests
 
         Assert.Contains("dependent_mod", exception.Message);
         Assert.Contains("base_mod", exception.Message);
-        Assert.DoesNotContain("version is invalid", exception.Message);
+        Assert.DoesNotContain("version_range", exception.Message);
     }
 
     [Fact]
