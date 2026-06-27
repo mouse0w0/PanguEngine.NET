@@ -109,10 +109,8 @@ public sealed class RegistryManager
     public IRegistry<T> Get<T>(ResourceKey key) where T : class
     {
         var registry = Get(key);
-        return registry is IRegistry<T> typed
-            ? typed
-            : throw new InvalidOperationException(
-                $"Registry key '{key}' stores '{registry.ValueType}' values, not '{typeof(T)}'.");
+        return registry as IRegistry<T> ?? throw new InvalidOperationException(
+            $"Registry key '{key}' stores '{registry.ValueType}' values, not '{typeof(T)}'.");
     }
 
     /// <summary>
@@ -143,10 +141,8 @@ public sealed class RegistryManager
     public IWritableRegistry<T> GetWritable<T>(ResourceKey key) where T : class
     {
         var registry = _registries.Get(key);
-        return registry is IWritableRegistry<T> typed
-            ? typed
-            : throw new InvalidOperationException(
-                $"Registry key '{key}' stores '{registry.ValueType}' values, not '{typeof(T)}'.");
+        return registry as IWritableRegistry<T> ?? throw new InvalidOperationException(
+            $"Registry key '{key}' stores '{registry.ValueType}' values, not '{typeof(T)}'.");
     }
 
     /// <summary>
