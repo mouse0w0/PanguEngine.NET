@@ -5,95 +5,68 @@ namespace PanguEngine.Tests.Registries;
 public sealed class DefaultedRegistryTests
 {
     [Fact]
-    public void DefaultStateUsesUnsetValues()
+    public void ConstructorStoresDefaultKey()
     {
-        var registry = CreateRegistry();
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
 
-        Assert.Null(registry.DefaultKey);
-        Assert.Equal(-1, registry.DefaultId);
-        Assert.Null(registry.DefaultValue);
+        Assert.Equal(defaultKey, registry.DefaultKey);
     }
 
     [Fact]
-    public void SetDefaultStoresKeyBeforeFreeze()
+    public void ConstructorRejectsInvalidDefaultKey()
     {
-        var registry = CreateRegistry();
-        var key = ResourceKey.Parse("pangu:air");
-
-        registry.SetDefault(key);
-
-        Assert.Equal(key, registry.DefaultKey);
-        Assert.Equal(-1, registry.DefaultId);
-        Assert.Null(registry.DefaultValue);
+        Assert.Throws<ArgumentException>(() =>
+            new DefaultedRegistry<object>(ResourceKey.Parse("pangu:test"), default!));
     }
 
     [Fact]
-    public void SetDefaultRejectsInvalidKey()
+    public void DefaultAccessorsThrowBeforeFreeze()
     {
-        var registry = CreateRegistry();
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
+        registry.Register(defaultKey, new object());
 
-        Assert.Throws<ArgumentException>(() => registry.SetDefault(default));
+        Assert.Throws<InvalidOperationException>(() => registry.DefaultEntry);
+        Assert.Throws<InvalidOperationException>(() => registry.DefaultValue);
+        Assert.Throws<InvalidOperationException>(() => registry.DefaultId);
     }
 
     [Fact]
-    public void SetDefaultRejectsFrozenRegistry()
+    public void FreezeCachesDefaultEntryValueAndId()
     {
-        var registry = CreateRegistry();
-        registry.Freeze();
-
-        Assert.Throws<InvalidOperationException>(() => registry.SetDefault(ResourceKey.Parse("pangu:air")));
-    }
-
-    [Fact]
-    public void SetDefaultUsesLastKeyBeforeFreeze()
-    {
-        var registry = CreateRegistry();
-        var first = ResourceKey.Parse("pangu:first");
-        var second = ResourceKey.Parse("pangu:second");
-        registry.Register(first, new object());
-        var expected = registry.Register(second, new object());
-
-        registry.SetDefault(first);
-        registry.SetDefault(second);
-        registry.Freeze();
-
-        Assert.Equal(second, registry.DefaultKey);
-        Assert.Equal(expected.Id, registry.DefaultId);
-        Assert.Same(expected.Value, registry.DefaultValue);
-    }
-
-    [Fact]
-    public void FreezeCachesDefaultIdAndValue()
-    {
-        var registry = CreateRegistry();
-        var key = ResourceKey.Parse("pangu:air");
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
         var value = new object();
-        var entry = registry.Register(key, value);
-        registry.SetDefault(key);
+        var entry = registry.Register(defaultKey, value);
 
         registry.Freeze();
 
         Assert.True(registry.IsFrozen);
-        Assert.Equal(entry.Id, registry.DefaultId);
+        Assert.Same(entry, registry.DefaultEntry);
         Assert.Same(value, registry.DefaultValue);
+        Assert.Equal(entry.Id, registry.DefaultId);
     }
 
     [Fact]
     public void FreezeRejectsUnregisteredDefaultKey()
     {
-        var registry = CreateRegistry();
-        registry.SetDefault(ResourceKey.Parse("pangu:missing"));
+        var registry = CreateRegistry(ResourceKey.Parse("pangu:missing"));
 
         Assert.Throws<KeyNotFoundException>(() => registry.Freeze());
+        Assert.False(registry.IsFrozen);
+        Assert.Throws<InvalidOperationException>(() => registry.DefaultEntry);
+        Assert.Throws<InvalidOperationException>(() => registry.DefaultValue);
+        Assert.Throws<InvalidOperationException>(() => registry.DefaultId);
     }
 
     [Fact]
     public void GetFallsBackToDefaultValueAfterFreeze()
     {
-        var registry = CreateRegistry();
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
         var defaultValue = new object();
-        registry.Register(ResourceKey.Parse("pangu:air"), defaultValue);
-        registry.SetDefault(ResourceKey.Parse("pangu:air"));
+        registry.Register(defaultKey, defaultValue);
         registry.Freeze();
 
         Assert.Same(defaultValue, registry.Get(ResourceKey.Parse("pangu:missing")));
@@ -103,32 +76,53 @@ public sealed class DefaultedRegistryTests
     [Fact]
     public void GetDoesNotFallBackBeforeFreeze()
     {
-        var registry = CreateRegistry();
-        registry.Register(ResourceKey.Parse("pangu:air"), new object());
-        registry.SetDefault(ResourceKey.Parse("pangu:air"));
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
+        registry.Register(defaultKey, new object());
 
         Assert.Throws<KeyNotFoundException>(() => registry.Get(ResourceKey.Parse("pangu:missing")));
         Assert.Throws<KeyNotFoundException>(() => registry.Get(99));
-    }
-
-    [Fact]
-    public void GetEntryDoesNotFallBackToDefaultEntry()
-    {
-        var registry = CreateRegistry();
-        registry.Register(ResourceKey.Parse("pangu:air"), new object());
-        registry.SetDefault(ResourceKey.Parse("pangu:air"));
-        registry.Freeze();
-
         Assert.Throws<KeyNotFoundException>(() => registry.GetEntry(ResourceKey.Parse("pangu:missing")));
         Assert.Throws<KeyNotFoundException>(() => registry.GetEntry(99));
     }
 
     [Fact]
+    public void GetEntryFallsBackToDefaultEntryAfterFreeze()
+    {
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
+        var defaultEntry = registry.Register(defaultKey, new object());
+        registry.Freeze();
+
+        Assert.Same(defaultEntry, registry.GetEntry(ResourceKey.Parse("pangu:missing")));
+        Assert.Same(defaultEntry, registry.GetEntry(99));
+    }
+
+    [Fact]
+    public void GetAndGetEntryReturnRegisteredNonDefaultEntryAfterFreeze()
+    {
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var otherKey = ResourceKey.Parse("pangu:stone");
+        var registry = CreateRegistry(defaultKey);
+        var defaultEntry = registry.Register(defaultKey, new object());
+        var otherEntry = registry.Register(otherKey, new object());
+        registry.Freeze();
+
+        Assert.Same(otherEntry.Value, registry.Get(otherKey));
+        Assert.Same(otherEntry.Value, registry.Get(otherEntry.Id));
+        Assert.Same(otherEntry, registry.GetEntry(otherKey));
+        Assert.Same(otherEntry, registry.GetEntry(otherEntry.Id));
+        Assert.Same(defaultEntry.Value, registry.Get(ResourceKey.Parse("pangu:missing")));
+        Assert.Same(defaultEntry, registry.GetEntry(ResourceKey.Parse("pangu:missing")));
+        Assert.Same(defaultEntry, registry.GetEntry(99));
+    }
+
+    [Fact]
     public void TryGetAndTryGetEntryDoNotFallBack()
     {
-        var registry = CreateRegistry();
-        registry.Register(ResourceKey.Parse("pangu:air"), new object());
-        registry.SetDefault(ResourceKey.Parse("pangu:air"));
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
+        registry.Register(defaultKey, new object());
         registry.Freeze();
 
         Assert.False(registry.TryGet(ResourceKey.Parse("pangu:missing"), out var value));
@@ -144,9 +138,9 @@ public sealed class DefaultedRegistryTests
     [Fact]
     public void ContainsDoesNotFallBack()
     {
-        var registry = CreateRegistry();
-        registry.Register(ResourceKey.Parse("pangu:air"), new object());
-        registry.SetDefault(ResourceKey.Parse("pangu:air"));
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
+        registry.Register(defaultKey, new object());
         registry.Freeze();
 
         Assert.False(registry.ContainsKey(ResourceKey.Parse("pangu:missing")));
@@ -156,12 +150,11 @@ public sealed class DefaultedRegistryTests
     [Fact]
     public void ReverseLookupDoesNotFallBackToDefaultValue()
     {
-        var registry = CreateRegistry();
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var registry = CreateRegistry(defaultKey);
         var defaultValue = new object();
         var missingValue = new object();
-        var defaultKey = ResourceKey.Parse("pangu:air");
         var defaultEntry = registry.Register(defaultKey, defaultValue);
-        registry.SetDefault(defaultKey);
         registry.Freeze();
 
         Assert.Equal(defaultKey, registry.GetKey(defaultValue));
@@ -174,5 +167,6 @@ public sealed class DefaultedRegistryTests
         Assert.Throws<KeyNotFoundException>(() => registry.GetId(missingValue));
     }
 
-    private static DefaultedRegistry<object> CreateRegistry() => new(ResourceKey.Parse("pangu:test"));
+    private static DefaultedRegistry<object> CreateRegistry(ResourceKey defaultKey) =>
+        new(ResourceKey.Parse("pangu:test"), defaultKey);
 }

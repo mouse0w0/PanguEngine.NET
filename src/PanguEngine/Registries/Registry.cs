@@ -140,7 +140,7 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     }
 
     /// <inheritdoc/>
-    public RegistryEntry<T> GetEntry(ResourceKey key)
+    public virtual RegistryEntry<T> GetEntry(ResourceKey key)
     {
         return TryGetEntry(key, out var entry)
             ? entry
@@ -148,7 +148,7 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     }
 
     /// <inheritdoc/>
-    public RegistryEntry<T> GetEntry(int id)
+    public virtual RegistryEntry<T> GetEntry(int id)
     {
         return TryGetEntry(id, out var entry)
             ? entry

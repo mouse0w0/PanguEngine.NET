@@ -1,7 +1,7 @@
 namespace PanguEngine.Registries;
 
 /// <summary>
-/// Stores values by resource key and falls back to a default value after freezing.
+/// Stores values by resource key and falls back to a default entry after freezing.
 /// </summary>
 /// <typeparam name="T">The registered value type.</typeparam>
 public class DefaultedRegistry<T> : Registry<T> where T : class
@@ -9,36 +9,33 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
     private RegistryEntry<T>? _defaultEntry;
 
     /// <summary>
-    /// Creates a defaulted registry with the specified key.
+    /// Creates a defaulted registry with the specified key and default entry key.
     /// </summary>
     /// <param name="key">The key that identifies this registry.</param>
-    public DefaultedRegistry(ResourceKey key) : base(key)
+    /// <param name="defaultKey">The key of the default entry.</param>
+    public DefaultedRegistry(ResourceKey key, ResourceKey defaultKey) : base(key)
     {
+        if (!ResourceKey.IsValid(defaultKey))
+            throw new ArgumentException("Invalid registry key.", nameof(defaultKey));
+
+        DefaultKey = defaultKey;
     }
 
     /// <summary>The key of the default entry.</summary>
-    public ResourceKey? DefaultKey { get; private set; }
+    public ResourceKey DefaultKey { get; }
 
-    /// <summary>The registry-local identifier of the default entry, or -1 when no default entry is cached.</summary>
-    public int DefaultId => _defaultEntry?.Id ?? -1;
+    /// <summary>The cached default entry.</summary>
+    /// <exception cref="InvalidOperationException">The default entry is not available.</exception>
+    public RegistryEntry<T> DefaultEntry =>
+        _defaultEntry ?? throw new InvalidOperationException("Default entry is not available.");
 
     /// <summary>The cached default value.</summary>
-    public T? DefaultValue => _defaultEntry?.Value;
+    /// <exception cref="InvalidOperationException">The default entry is not available.</exception>
+    public T DefaultValue => DefaultEntry.Value;
 
-    /// <summary>
-    /// Sets the key that will be resolved as the default entry when the registry is frozen.
-    /// </summary>
-    /// <param name="key">The key of the default entry.</param>
-    public void SetDefault(ResourceKey key)
-    {
-        if (IsFrozen)
-            throw new InvalidOperationException("Registry is frozen.");
-        if (!ResourceKey.IsValid(key))
-            throw new ArgumentException("Invalid registry key.", nameof(key));
-
-        DefaultKey = key;
-        _defaultEntry = null;
-    }
+    /// <summary>The registry-local identifier of the default entry.</summary>
+    /// <exception cref="InvalidOperationException">The default entry is not available.</exception>
+    public int DefaultId => DefaultEntry.Id;
 
     /// <inheritdoc/>
     public override T Get(ResourceKey key)
@@ -49,7 +46,7 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
         if (_defaultEntry is not null)
             return _defaultEntry.Value;
 
-        return base.Get(key);
+        throw new KeyNotFoundException($"Resource key '{key}' is not registered.");
     }
 
     /// <inheritdoc/>
@@ -61,14 +58,37 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
         if (_defaultEntry is not null)
             return _defaultEntry.Value;
 
-        return base.Get(id);
+        throw new KeyNotFoundException($"Registry id '{id}' is not registered.");
+    }
+
+    /// <inheritdoc/>
+    public override RegistryEntry<T> GetEntry(ResourceKey key)
+    {
+        if (TryGetEntry(key, out var entry))
+            return entry;
+
+        if (_defaultEntry is not null)
+            return _defaultEntry;
+
+        throw new KeyNotFoundException($"Resource key '{key}' is not registered.");
+    }
+
+    /// <inheritdoc/>
+    public override RegistryEntry<T> GetEntry(int id)
+    {
+        if (TryGetEntry(id, out var entry))
+            return entry;
+
+        if (_defaultEntry is not null)
+            return _defaultEntry;
+
+        throw new KeyNotFoundException($"Registry id '{id}' is not registered.");
     }
 
     /// <inheritdoc/>
     public override void Freeze()
     {
-        if (DefaultKey is { } defaultKey)
-            _defaultEntry = GetEntry(defaultKey);
+        _defaultEntry = base.GetEntry(DefaultKey);
 
         base.Freeze();
     }

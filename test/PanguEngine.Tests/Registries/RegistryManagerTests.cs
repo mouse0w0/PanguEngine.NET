@@ -39,9 +39,8 @@ public sealed class RegistryManagerTests
         var registryKey = ResourceKey.Parse("pangu:test");
         var defaultKey = ResourceKey.Parse("pangu:air");
         var missingKey = ResourceKey.Parse("pangu:missing");
-        var registry = new DefaultedRegistry<object>(registryKey);
+        var registry = new DefaultedRegistry<object>(registryKey, defaultKey);
         registry.Register(defaultKey, new object());
-        registry.SetDefault(defaultKey);
         manager.Register(registry);
         var holder = manager.CreateHolder<object>(registryKey, missingKey);
 

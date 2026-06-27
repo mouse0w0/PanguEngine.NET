@@ -43,6 +43,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// </summary>
     /// <param name="key">The key of the value.</param>
     /// <returns>The registered value.</returns>
+    /// <remarks><see cref="DefaultedRegistry{T}"/> falls back to its default value after freezing.</remarks>
     T Get(ResourceKey key);
 
     /// <summary>
@@ -50,6 +51,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// </summary>
     /// <param name="id">The registry-local identifier.</param>
     /// <returns>The registered value.</returns>
+    /// <remarks><see cref="DefaultedRegistry{T}"/> falls back to its default value after freezing.</remarks>
     T Get(int id);
 
     /// <summary>
@@ -58,6 +60,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="key">The key of the value.</param>
     /// <param name="value">The registered value when found.</param>
     /// <returns>Whether the value was found.</returns>
+    /// <remarks>This method does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     bool TryGet(ResourceKey key, [MaybeNullWhen(false)] out T value);
 
     /// <summary>
@@ -66,6 +69,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="id">The registry-local identifier.</param>
     /// <param name="value">The registered value when found.</param>
     /// <returns>Whether the value was found.</returns>
+    /// <remarks>This method does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     bool TryGet(int id, [MaybeNullWhen(false)] out T value);
 
     /// <summary>
@@ -73,6 +77,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// </summary>
     /// <param name="key">The key of the entry.</param>
     /// <returns>The registry entry.</returns>
+    /// <remarks><see cref="DefaultedRegistry{T}"/> falls back to its default entry after freezing.</remarks>
     RegistryEntry<T> GetEntry(ResourceKey key);
 
     /// <summary>
@@ -80,6 +85,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// </summary>
     /// <param name="id">The registry-local identifier.</param>
     /// <returns>The registry entry.</returns>
+    /// <remarks><see cref="DefaultedRegistry{T}"/> falls back to its default entry after freezing.</remarks>
     RegistryEntry<T> GetEntry(int id);
 
     /// <summary>
@@ -88,6 +94,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="key">The key of the entry.</param>
     /// <param name="entry">The registry entry when found.</param>
     /// <returns>Whether the entry was found.</returns>
+    /// <remarks>This method does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     bool TryGetEntry(ResourceKey key, [NotNullWhen(true)] out RegistryEntry<T>? entry);
 
     /// <summary>
@@ -96,6 +103,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="id">The registry-local identifier.</param>
     /// <param name="entry">The registry entry when found.</param>
     /// <returns>Whether the entry was found.</returns>
+    /// <remarks>This method does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     bool TryGetEntry(int id, [NotNullWhen(true)] out RegistryEntry<T>? entry);
 
     /// <summary>
@@ -103,6 +111,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// </summary>
     /// <param name="value">The registered value instance.</param>
     /// <returns>The key of the registered value.</returns>
+    /// <remarks>This reverse lookup does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     ResourceKey GetKey(T value);
 
     /// <summary>
@@ -110,6 +119,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// </summary>
     /// <param name="value">The registered value instance.</param>
     /// <returns>The registry-local identifier of the registered value.</returns>
+    /// <remarks>This reverse lookup does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     int GetId(T value);
 
     /// <summary>
@@ -118,6 +128,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="value">The registered value instance.</param>
     /// <param name="key">The key when the value instance was found.</param>
     /// <returns>Whether the value instance was found.</returns>
+    /// <remarks>This method does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     bool TryGetKey(T value, [NotNullWhen(true)] out ResourceKey? key);
 
     /// <summary>
@@ -126,6 +137,7 @@ public interface IRegistry<T> : IRegistry where T : class
     /// <param name="value">The registered value instance.</param>
     /// <param name="id">The registry-local identifier when the value instance was found.</param>
     /// <returns>Whether the value instance was found.</returns>
+    /// <remarks>This method does not use <see cref="DefaultedRegistry{T}"/> default fallback.</remarks>
     bool TryGetId(T value, out int id);
 
     /// <summary>
