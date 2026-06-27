@@ -5,6 +5,7 @@ namespace PanguEngine.Registries;
 public sealed class RegistryManager
 {
     private readonly Registry<IWritableRegistry> _registries;
+    private readonly List<IHolder> _pendingHolders = [];
 
     public RegistryManager()
     {
@@ -20,6 +21,41 @@ public sealed class RegistryManager
     {
         ArgumentNullException.ThrowIfNull(registry);
         _registries.Register(registry.Key, registry);
+    }
+
+    /// <summary>
+    /// Creates a holder for a registry entry address.
+    /// </summary>
+    /// <typeparam name="T">The referenced value type.</typeparam>
+    /// <param name="address">The registry entry address.</param>
+    /// <returns>The created holder.</returns>
+    public Holder<T> CreateHolder<T>(ResourceAddress address) where T : class
+    {
+        ArgumentNullException.ThrowIfNull(address);
+
+        var holder = Holder<T>.Reference(address);
+        var pending = (IHolder)holder;
+
+        if (IsFrozen)
+        {
+            pending.Resolve(this);
+            return holder;
+        }
+
+        _pendingHolders.Add(pending);
+        return holder;
+    }
+
+    /// <summary>
+    /// Creates a holder for a registry entry key.
+    /// </summary>
+    /// <typeparam name="T">The referenced value type.</typeparam>
+    /// <param name="registryKey">The key of the registry that contains the entry.</param>
+    /// <param name="entryKey">The key of the referenced entry.</param>
+    /// <returns>The created holder.</returns>
+    public Holder<T> CreateHolder<T>(ResourceKey registryKey, ResourceKey entryKey) where T : class
+    {
+        return CreateHolder<T>(new ResourceAddress(registryKey, entryKey));
     }
 
     public IRegistry Get(ResourceKey key)
@@ -97,5 +133,15 @@ public sealed class RegistryManager
 
             registry.Freeze();
         }
+
+        ResolvePendingHolders();
+    }
+
+    private void ResolvePendingHolders()
+    {
+        foreach (var holder in _pendingHolders)
+            holder.Resolve(this);
+
+        _pendingHolders.Clear();
     }
 }
