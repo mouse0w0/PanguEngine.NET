@@ -4,12 +4,11 @@ namespace PanguEngine.Registries;
 
 public sealed class RegistryManager
 {
-    private static readonly ResourceKey RootKey = ResourceKey.Create("pangu", "registries");
     private readonly Registry<IWritableRegistry> _registries;
 
     public RegistryManager()
     {
-        _registries = new Registry<IWritableRegistry>(RootKey);
+        _registries = new Registry<IWritableRegistry>(RegistryKeys.Registries);
         _registries.Register(_registries.Key, _registries);
     }
 
