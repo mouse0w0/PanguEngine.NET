@@ -16,7 +16,6 @@ public sealed class RegistryManager
     public RegistryManager()
     {
         _registries = new Registry<IWritableRegistry>(RegistryKeys.Registries);
-        _registries.Register(_registries.Key, _registries);
     }
 
     /// <summary>The registry catalog that stores all registered registries.</summary>
@@ -32,6 +31,10 @@ public sealed class RegistryManager
     public void Register(IWritableRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(registry);
+
+        if (registry.Key == RegistryKeys.Registries)
+            throw new InvalidOperationException("Registry catalog key is reserved.");
+
         _registries.Register(registry.Key, registry);
     }
 
@@ -170,16 +173,11 @@ public sealed class RegistryManager
     /// </summary>
     public void FreezeAll()
     {
-        if (!_registries.IsFrozen)
-            _registries.Freeze();
+        _registries.Freeze();
 
         foreach (var entry in _registries.Entries)
         {
-            var registry = entry.Value;
-            if (ReferenceEquals(registry, _registries) || registry.IsFrozen)
-                continue;
-
-            registry.Freeze();
+            entry.Value.Freeze();
         }
 
         ResolvePendingHolders();
