@@ -21,8 +21,8 @@ public sealed class ResourceAddressTests
     {
         var valid = ResourceKey.Parse("pangu:block");
 
-        Assert.Throws<ArgumentException>(() => new ResourceAddress(default, valid));
-        Assert.Throws<ArgumentException>(() => new ResourceAddress(valid, default));
+        Assert.Throws<ArgumentException>(() => new ResourceAddress(null!, valid));
+        Assert.Throws<ArgumentException>(() => new ResourceAddress(valid, null!));
     }
 
     [Fact]
