@@ -3,7 +3,7 @@ using PanguEngine.Versioning;
 namespace PanguEngine.Modding;
 
 /// <summary>
-/// Describes a dependency declared by a loaded mod.
+/// Describes a mod dependency declaration.
 /// </summary>
 /// <param name="Id">The dependency mod identifier.</param>
 /// <param name="VersionRange">The accepted dependency version range.</param>
