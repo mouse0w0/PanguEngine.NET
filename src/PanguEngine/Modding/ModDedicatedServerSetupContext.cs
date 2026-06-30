@@ -9,8 +9,7 @@ public sealed class ModDedicatedServerSetupContext : ModLifecycleContext
     /// Initializes a dedicated server setup lifecycle context.
     /// </summary>
     /// <param name="mod">The loaded mod container.</param>
-    /// <param name="taskQueue">The lifecycle task queue.</param>
-    internal ModDedicatedServerSetupContext(ModContainer mod, ModLifecycleTaskQueue taskQueue) : base(mod, taskQueue)
+    internal ModDedicatedServerSetupContext(ModContainer mod) : base(mod)
     {
     }
 }

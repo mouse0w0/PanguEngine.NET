@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.Loader;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Modding;
 using PanguEngine.Resources;
@@ -365,7 +366,7 @@ public sealed class ModManagerTests
     }
 
     [Fact]
-    public void RunConfigureWaitsForDependencyStageBeforeDependentStage()
+    public void RunConfigureRunsIndependentModsSeriallyInLoadedOrder()
     {
         using var directory = TestDirectory.Create();
         var assemblyPath = typeof(OrderedLifecycleModEntry).Assembly.Location;
@@ -373,11 +374,10 @@ public sealed class ModManagerTests
         var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
         SetLifecycleRecorderEnvironment(logPath, mutexName);
 
+        CreateGeneratedModZip(directory.Path, "dependent.zip", "dependent_mod", assemblyPath,
+            typeof(OrderedLifecycleModEntry).FullName!);
         CreateGeneratedModZip(directory.Path, "base.zip", "base_mod", assemblyPath,
             typeof(OrderedLifecycleModEntry).FullName!);
-        CreateGeneratedModZip(directory.Path, "dependent.zip", "dependent_mod", assemblyPath,
-            typeof(OrderedLifecycleModEntry).FullName!,
-            ",\n  \"dependencies\": [{ \"id\": \"base_mod\" }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
         try
@@ -395,149 +395,45 @@ public sealed class ModManagerTests
     }
 
     [Fact]
-    public void RunConfigureRunsIndependentModsConcurrently()
+    public void RunConfigureLogsWarningWhenSingleModStageExceedsOneSecond()
     {
         using var directory = TestDirectory.Create();
-        var assemblyPath = typeof(ParallelLifecycleModEntry).Assembly.Location;
-        var logPath = Path.Combine(directory.Path, "lifecycle.log");
-        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
-        var eventPrefix = $"PanguEngineLifecycleParallel{Guid.NewGuid():N}";
-        using var firstReached = new EventWaitHandle(false, EventResetMode.ManualReset, eventPrefix + "_a");
-        using var secondReached = new EventWaitHandle(false, EventResetMode.ManualReset, eventPrefix + "_b");
-        SetLifecycleRecorderEnvironment(logPath, mutexName);
-        Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_EVENT_PREFIX", eventPrefix);
+        var assemblyPath = typeof(SlowLifecycleModEntry).Assembly.Location;
+        var logger = new CapturingLogger();
 
-        CreateGeneratedModZip(directory.Path, "a.zip", "parallel_a", assemblyPath,
-            typeof(ParallelLifecycleModEntry).FullName!);
-        CreateGeneratedModZip(directory.Path, "b.zip", "parallel_b", assemblyPath,
-            typeof(ParallelLifecycleModEntry).FullName!);
+        CreateGeneratedModZip(directory.Path, "slow.zip", "slow_mod", assemblyPath,
+            typeof(SlowLifecycleModEntry).FullName!);
 
-        var manager = new ModManager(directory.Path, NullLogger.Instance);
+        var manager = new ModManager(directory.Path, logger);
         try
         {
             manager.Load();
             manager.RunConfigure();
 
-            Assert.Equal(new[] { "parallel_a", "parallel_b" },
-                File.ReadAllLines(logPath).Order(StringComparer.Ordinal));
+            var entry = Assert.Single(logger.Entries.Where(entry => entry.Level == LogLevel.Warning));
+            Assert.Contains(nameof(IMod.Configure), entry.Message);
+            Assert.Contains("slow_mod", entry.Message);
         }
         finally
         {
-            Environment.SetEnvironmentVariable("PANGU_TEST_LIFECYCLE_EVENT_PREFIX", null);
-            ClearLifecycleRecorderEnvironment();
             manager.Shutdown();
         }
     }
 
     [Fact]
-    public void RunConfigureDrainsQueuedWorkAfterAllStageTasksComplete()
-    {
-        using var directory = TestDirectory.Create();
-        var assemblyPath = typeof(SerialQueueLifecycleModEntry).Assembly.Location;
-        var logPath = Path.Combine(directory.Path, "lifecycle.log");
-        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
-        SetLifecycleRecorderEnvironment(logPath, mutexName);
-
-        CreateGeneratedModZip(directory.Path, "a.zip", "queue_a", assemblyPath,
-            typeof(SerialQueueLifecycleModEntry).FullName!);
-        CreateGeneratedModZip(directory.Path, "b.zip", "queue_b", assemblyPath,
-            typeof(SerialQueueLifecycleModEntry).FullName!);
-
-        var manager = new ModManager(directory.Path, NullLogger.Instance);
-        try
-        {
-            manager.Load();
-            manager.RunConfigure();
-
-            var lines = File.ReadAllLines(logPath);
-            var firstSerialIndex = Array.FindIndex(lines, line => line.StartsWith("serial:", StringComparison.Ordinal));
-            var lastParallelIndex =
-                Array.FindLastIndex(lines, line => line.StartsWith("parallel:", StringComparison.Ordinal));
-            Assert.True(firstSerialIndex > lastParallelIndex);
-            Assert.Equal(2, lines.Count(line => line.StartsWith("parallel:", StringComparison.Ordinal)));
-            Assert.Equal(2, lines.Count(line => line.StartsWith("serial:", StringComparison.Ordinal)));
-        }
-        finally
-        {
-            ClearLifecycleRecorderEnvironment();
-            manager.Shutdown();
-        }
-    }
-
-    [Fact]
-    public void RunConfigureContinuesDrainingWorkQueuedDuringDrain()
-    {
-        using var directory = TestDirectory.Create();
-        var assemblyPath = typeof(ReentrantSerialQueueLifecycleModEntry).Assembly.Location;
-        var logPath = Path.Combine(directory.Path, "lifecycle.log");
-        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
-        SetLifecycleRecorderEnvironment(logPath, mutexName);
-
-        CreateGeneratedModZip(directory.Path, "reentrant.zip", "reentrant_mod", assemblyPath,
-            typeof(ReentrantSerialQueueLifecycleModEntry).FullName!);
-
-        var manager = new ModManager(directory.Path, NullLogger.Instance);
-        try
-        {
-            manager.Load();
-            manager.RunConfigure();
-
-            Assert.Equal(new[] { "serial:first", "serial:second" }, File.ReadAllLines(logPath));
-        }
-        finally
-        {
-            ClearLifecycleRecorderEnvironment();
-            manager.Shutdown();
-        }
-    }
-
-    [Fact]
-    public void RunConfigureDrainsQueuedWorkAndAggregatesQueueFailures()
-    {
-        using var directory = TestDirectory.Create();
-        var assemblyPath = typeof(FailingSerialQueueLifecycleModEntry).Assembly.Location;
-        var logPath = Path.Combine(directory.Path, "lifecycle.log");
-        var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
-        SetLifecycleRecorderEnvironment(logPath, mutexName);
-
-        CreateGeneratedModZip(directory.Path, "failing.zip", "failing_mod", assemblyPath,
-            typeof(FailingSerialQueueLifecycleModEntry).FullName!);
-
-        var manager = new ModManager(directory.Path, NullLogger.Instance);
-        try
-        {
-            manager.Load();
-
-            var exception = Assert.Throws<ModLoadException>(() => manager.RunConfigure());
-            var aggregate = Assert.IsType<AggregateException>(exception.InnerException);
-            Assert.Equal(2, aggregate.InnerExceptions.Count);
-            Assert.Equal(new[] { "success" }, File.ReadAllLines(logPath));
-        }
-        finally
-        {
-            ClearLifecycleRecorderEnvironment();
-            manager.Shutdown();
-        }
-    }
-
-    [Fact]
-    public void RunConfigureSkipsDependentWhenDependencyStageFails()
+    public void RunConfigureStopsAtFirstStageFailure()
     {
         using var directory = TestDirectory.Create();
         var failingAssemblyPath = typeof(ThrowingLifecycleModEntry).Assembly.Location;
-        var recordingAssemblyPath = typeof(RecordingLifecycleModEntry).Assembly.Location;
+        var orderedAssemblyPath = typeof(OrderedLifecycleModEntry).Assembly.Location;
         var logPath = Path.Combine(directory.Path, "lifecycle.log");
         var mutexName = $"PanguEngineLifecycleLog{Guid.NewGuid():N}";
         SetLifecycleRecorderEnvironment(logPath, mutexName);
 
-        CreateGeneratedModZip(directory.Path, "base.zip", "base_mod", failingAssemblyPath,
+        CreateGeneratedModZip(directory.Path, "failing.zip", "a_failing_mod", failingAssemblyPath,
             typeof(ThrowingLifecycleModEntry).FullName!);
-        CreateGeneratedModZip(directory.Path, "dependent.zip", "dependent_mod", recordingAssemblyPath,
-            typeof(RecordingLifecycleModEntry).FullName!,
-            ",\n  \"dependencies\": [{ \"id\": \"base_mod\" }]");
-        CreateGeneratedModZip(directory.Path, "transitive.zip", "transitive_mod", recordingAssemblyPath,
-            typeof(RecordingLifecycleModEntry).FullName!,
-            ",\n  \"dependencies\": [{ \"id\": \"dependent_mod\" }]");
+        CreateGeneratedModZip(directory.Path, "independent.zip", "b_independent_mod", orderedAssemblyPath,
+            typeof(OrderedLifecycleModEntry).FullName!);
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
         try
@@ -546,9 +442,8 @@ public sealed class ModManagerTests
 
             var exception = Assert.Throws<ModLoadException>(() => manager.RunConfigure());
 
-            Assert.Contains("base_mod", exception.Message);
-            Assert.DoesNotContain("dependent_mod", exception.Message);
-            Assert.DoesNotContain("transitive_mod", exception.Message);
+            Assert.Contains("a_failing_mod", exception.Message);
+            Assert.DoesNotContain("b_independent_mod", exception.Message);
             Assert.False(File.Exists(logPath));
         }
         finally
@@ -1028,6 +923,27 @@ public sealed class ModManagerTests
                 Directory.Delete(Path, recursive: true);
         }
     }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        private readonly List<(LogLevel Level, string Message)> _entries = [];
+
+        public IReadOnlyList<(LogLevel Level, string Message)> Entries => _entries;
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            _entries.Add((logLevel, formatter(state, exception)));
+        }
+    }
 }
 
 public sealed class TestModEntry : IMod
@@ -1049,14 +965,6 @@ public sealed class AnyModEntry : IMod
 {
 }
 
-public sealed class RecordingLifecycleModEntry : IMod
-{
-    public void Configure(ModConfigureContext context)
-    {
-        LifecycleTestFile.Append(context.Mod.Info.Id);
-    }
-}
-
 public sealed class OrderedLifecycleModEntry : IMod
 {
     public void Configure(ModConfigureContext context)
@@ -1068,58 +976,11 @@ public sealed class OrderedLifecycleModEntry : IMod
     }
 }
 
-public sealed class ParallelLifecycleModEntry : IMod
+public sealed class SlowLifecycleModEntry : IMod
 {
     public void Configure(ModConfigureContext context)
     {
-        var eventPrefix = Environment.GetEnvironmentVariable("PANGU_TEST_LIFECYCLE_EVENT_PREFIX")
-                          ?? throw new InvalidOperationException("Lifecycle event prefix is missing.");
-        var suffix = context.Mod.Info.Id switch
-        {
-            "parallel_a" => "a",
-            "parallel_b" => "b",
-            _ => throw new InvalidOperationException("Unexpected parallel mod id.")
-        };
-        var otherSuffix = suffix == "a" ? "b" : "a";
-        using var reached = EventWaitHandle.OpenExisting(eventPrefix + "_" + suffix);
-        using var otherReached = EventWaitHandle.OpenExisting(eventPrefix + "_" + otherSuffix);
-        reached.Set();
-        if (!otherReached.WaitOne(TimeSpan.FromSeconds(5)))
-            throw new InvalidOperationException("Independent lifecycle stages did not run concurrently.");
-
-        LifecycleTestFile.Append(context.Mod.Info.Id);
-    }
-}
-
-public sealed class SerialQueueLifecycleModEntry : IMod
-{
-    public void Configure(ModConfigureContext context)
-    {
-        var id = context.Mod.Info.Id;
-        LifecycleTestFile.Append("parallel:" + id);
-        context.Enqueue(() => LifecycleTestFile.Append("serial:" + id));
-    }
-}
-
-public sealed class ReentrantSerialQueueLifecycleModEntry : IMod
-{
-    public void Configure(ModConfigureContext context)
-    {
-        context.Enqueue(() =>
-        {
-            LifecycleTestFile.Append("serial:first");
-            context.Enqueue(() => LifecycleTestFile.Append("serial:second"));
-        });
-    }
-}
-
-public sealed class FailingSerialQueueLifecycleModEntry : IMod
-{
-    public void Configure(ModConfigureContext context)
-    {
-        context.Enqueue(() => throw new InvalidOperationException("first queued failure"));
-        context.Enqueue(() => LifecycleTestFile.Append("success"));
-        context.Enqueue(() => throw new InvalidOperationException("second queued failure"));
+        Thread.Sleep(TimeSpan.FromMilliseconds(1100));
     }
 }
 

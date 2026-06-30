@@ -9,8 +9,7 @@ public sealed class ModReadyContext : ModLifecycleContext
     /// Initializes a ready lifecycle context.
     /// </summary>
     /// <param name="mod">The loaded mod container.</param>
-    /// <param name="taskQueue">The lifecycle task queue.</param>
-    internal ModReadyContext(ModContainer mod, ModLifecycleTaskQueue taskQueue) : base(mod, taskQueue)
+    internal ModReadyContext(ModContainer mod) : base(mod)
     {
     }
 }

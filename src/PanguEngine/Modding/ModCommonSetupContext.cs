@@ -9,8 +9,7 @@ public sealed class ModCommonSetupContext : ModLifecycleContext
     /// Initializes a common setup lifecycle context.
     /// </summary>
     /// <param name="mod">The loaded mod container.</param>
-    /// <param name="taskQueue">The lifecycle task queue.</param>
-    internal ModCommonSetupContext(ModContainer mod, ModLifecycleTaskQueue taskQueue) : base(mod, taskQueue)
+    internal ModCommonSetupContext(ModContainer mod) : base(mod)
     {
     }
 }
