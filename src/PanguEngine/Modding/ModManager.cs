@@ -221,7 +221,7 @@ public sealed class ModManager(
             throw new ModLoadException(string.Join(Environment.NewLine, errors));
     }
 
-    private static IReadOnlyList<ModDescriptor> SortByDependencies(IReadOnlyList<ModDescriptor> descriptors)
+    private static ModDescriptor[] SortByDependencies(IReadOnlyList<ModDescriptor> descriptors)
     {
         var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, StringComparer.Ordinal);
         var graph = new DirectedGraph<string>(StringComparer.Ordinal);
