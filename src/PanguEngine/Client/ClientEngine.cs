@@ -9,7 +9,7 @@ namespace PanguEngine.Client;
 /// <summary>
 /// Client engine.
 /// </summary>
-public class ClientEngine
+public sealed class ClientEngine
 {
     /// <summary>
     /// The current client engine.
@@ -18,20 +18,8 @@ public class ClientEngine
 
     private readonly LaunchOptions _launchOptions;
 
-    /// <summary>
-    /// Creates a client with default launch options.
-    /// </summary>
-    public ClientEngine() : this(LaunchOptions.Empty)
+    private ClientEngine(LaunchOptions launchOptions)
     {
-    }
-
-    /// <summary>
-    /// Creates a client with the specified launch options.
-    /// </summary>
-    /// <param name="launchOptions">The launch options.</param>
-    public ClientEngine(LaunchOptions launchOptions)
-    {
-        ArgumentNullException.ThrowIfNull(launchOptions);
         _launchOptions = launchOptions;
     }
 
@@ -55,23 +43,24 @@ public class ClientEngine
     /// </summary>
     public ClientLoop Loop { get; private set; } = null!;
 
-    /// <summary>
-    /// The Vulkan renderer.
-    /// </summary>
     private VulkanRenderer Renderer { get; set; } = null!;
 
-    /// <summary>
-    /// The graphics backend.
-    /// </summary>
     private GraphicsBackend GraphicsBackend { get; set; } = null!;
 
     /// <summary>
-    /// Runs the application.
+    /// Starts the client engine.
     /// </summary>
-    public void Run()
+    internal static void Start(LaunchOptions launchOptions)
     {
-        Current = this;
+        if (Current is not null)
+            throw new InvalidOperationException("Client engine is already running.");
 
+        Current = new ClientEngine(launchOptions);
+        Current.Run();
+    }
+
+    private void Run()
+    {
         OnInit();
         try
         {
@@ -83,9 +72,6 @@ public class ClientEngine
         }
     }
 
-    /// <summary>
-    /// Initializes the client.
-    /// </summary>
     private void OnInit()
     {
         Engine.Initialize(_launchOptions);
@@ -106,9 +92,6 @@ public class ClientEngine
         Engine.ModManager.RunReady();
     }
 
-    /// <summary>
-    /// Enters the main loop.
-    /// </summary>
     private void OnRunning()
     {
         PrimaryWindow.Render += (_, alpha) => Renderer.DrawFrame(alpha);
@@ -119,9 +102,6 @@ public class ClientEngine
     {
     }
 
-    /// <summary>
-    /// Shuts down the client.
-    /// </summary>
     private void OnShutdown()
     {
         Renderer.Destroy();
