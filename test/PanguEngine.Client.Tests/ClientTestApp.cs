@@ -12,9 +12,9 @@ namespace PanguEngine.Client.Tests;
 public sealed class ClientTestApp
 {
     /// <summary>
-    /// Gets the current running instance.
+    /// Gets the current running test application.
     /// </summary>
-    public static ClientTestApp Instance { get; private set; } = null!;
+    public static ClientTestApp Current { get; private set; } = null!;
 
     private readonly IClientTestScene _scene;
 
@@ -49,8 +49,8 @@ public sealed class ClientTestApp
     /// </summary>
     public static void Run(IClientTestScene scene)
     {
-        Instance = new ClientTestApp(scene);
-        Instance.RunInternal();
+        Current = new ClientTestApp(scene);
+        Current.RunInternal();
     }
 
     private void RunInternal()

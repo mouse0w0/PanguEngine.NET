@@ -14,7 +14,7 @@ public static class Bootstrap
     public static void Launch(string[] args)
     {
         var options = ParseOptions(args);
-        new EngineClient(options).Run();
+        new ClientEngine(options).Run();
     }
 
     /// <summary>

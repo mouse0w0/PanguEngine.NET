@@ -16,7 +16,7 @@ internal sealed class MultiWindowScene : IClientTestScene
         _primaryPresenter = window.Presenter;
         window.Render += (_, _) => Draw(_primaryPresenter, new ClearColor(0.08f, 0.02f, 0.02f, 1));
 
-        var secondary = ClientTestApp.Instance.WindowManager.CreateWindow(new WindowOptions
+        var secondary = ClientTestApp.Current.WindowManager.CreateWindow(new WindowOptions
         {
             Title = "MultiWindow Secondary",
             Size = new Vector2D<int>(640, 480),

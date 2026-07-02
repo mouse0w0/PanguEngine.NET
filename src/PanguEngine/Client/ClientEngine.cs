@@ -7,21 +7,21 @@ using Window = PanguEngine.Windowing.Window;
 namespace PanguEngine.Client;
 
 /// <summary>
-/// Application client.
+/// Client engine.
 /// </summary>
-public class EngineClient
+public class ClientEngine
 {
     /// <summary>
-    /// The singleton instance of the client.
+    /// The current client engine.
     /// </summary>
-    public static EngineClient Instance { get; private set; } = null!;
+    public static ClientEngine Current { get; private set; } = null!;
 
     private readonly LaunchOptions _launchOptions;
 
     /// <summary>
     /// Creates a client with default launch options.
     /// </summary>
-    public EngineClient() : this(LaunchOptions.Empty)
+    public ClientEngine() : this(LaunchOptions.Empty)
     {
     }
 
@@ -29,7 +29,7 @@ public class EngineClient
     /// Creates a client with the specified launch options.
     /// </summary>
     /// <param name="launchOptions">The launch options.</param>
-    public EngineClient(LaunchOptions launchOptions)
+    public ClientEngine(LaunchOptions launchOptions)
     {
         ArgumentNullException.ThrowIfNull(launchOptions);
         _launchOptions = launchOptions;
@@ -70,7 +70,7 @@ public class EngineClient
     /// </summary>
     public void Run()
     {
-        Instance = this;
+        Current = this;
 
         OnInit();
         try

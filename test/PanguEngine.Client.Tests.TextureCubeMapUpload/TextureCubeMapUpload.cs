@@ -103,16 +103,16 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
     private void CreateVertexBuffer()
     {
         var size = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
-        _vertexBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
+        _vertexBuffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
             size,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        _vertexUploadHandle = ClientTestApp.Instance.Device.UploadBuffer(_vertexBuffer, _vertices);
+        _vertexUploadHandle = ClientTestApp.Current.Device.UploadBuffer(_vertexBuffer, _vertices);
     }
 
     private void CreateTexture()
     {
-        _texture = ClientTestApp.Instance.Device.CreateTexture(new TextureDescription(
+        _texture = ClientTestApp.Current.Device.CreateTexture(new TextureDescription(
             TextureDimension.CubeMap,
             TextureFormat.R8G8B8A8Unorm,
             4,
@@ -124,24 +124,24 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
 
         _textureUploadHandles =
         [
-            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0x00, 0x00, 0xff),
+            ClientTestApp.Current.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0x00, 0x00, 0xff),
                 TextureUploadRegion.Layer2D(4, 4, 0)),
-            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0x00, 0xff),
+            ClientTestApp.Current.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0x00, 0xff),
                 TextureUploadRegion.Layer2D(4, 4, 1)),
-            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0x00, 0xff, 0xff),
+            ClientTestApp.Current.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0x00, 0xff, 0xff),
                 TextureUploadRegion.Layer2D(4, 4, 2)),
-            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0xff, 0x00, 0xff),
+            ClientTestApp.Current.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0xff, 0x00, 0xff),
                 TextureUploadRegion.Layer2D(4, 4, 3)),
-            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0x00, 0xff, 0xff),
+            ClientTestApp.Current.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0xff, 0x00, 0xff, 0xff),
                 TextureUploadRegion.Layer2D(4, 4, 4)),
-            ClientTestApp.Instance.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0xff, 0xff),
+            ClientTestApp.Current.Device.UploadTexture(_texture, CreateSolidTextureData(4, 4, 0x00, 0xff, 0xff, 0xff),
                 TextureUploadRegion.Layer2D(4, 4, 5)),
         ];
     }
 
     private void CreateSampler()
     {
-        _sampler = ClientTestApp.Instance.Device.CreateSampler(new SamplerDescription(
+        _sampler = ClientTestApp.Current.Device.CreateSampler(new SamplerDescription(
             FilterMode.Nearest,
             FilterMode.Nearest,
             MipmapMode.Nearest,
@@ -156,7 +156,7 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
 
     private void CreateDescriptorSetLayout()
     {
-        _descriptorSetLayout = ClientTestApp.Instance.Device.CreateDescriptorSetLayout(
+        _descriptorSetLayout = ClientTestApp.Current.Device.CreateDescriptorSetLayout(
             new DescriptorSetLayoutDescription(
                 new[]
                 {
@@ -166,7 +166,7 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
 
     private void CreateDescriptorSet()
     {
-        _descriptorSet = ClientTestApp.Instance.Device.CreateDescriptorSet(new DescriptorSetDescription(
+        _descriptorSet = ClientTestApp.Current.Device.CreateDescriptorSet(new DescriptorSetDescription(
             _descriptorSetLayout,
             new[]
             {
@@ -185,11 +185,11 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, File.ReadAllText(fragPath),
             name: "texture_cube_map_upload.frag");
 
-        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "texture_cube_map_upload.vert"));
-        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "texture_cube_map_upload.frag"));
@@ -197,7 +197,7 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
             ColorAttachmentFormat: colorFormat,

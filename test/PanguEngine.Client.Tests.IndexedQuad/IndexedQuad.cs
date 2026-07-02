@@ -99,18 +99,18 @@ internal sealed class IndexedQuadScene : IClientTestScene
     private void CreateBuffers()
     {
         var vertexBufferSize = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
-        _vertexBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
+        _vertexBuffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
             vertexBufferSize,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        _vertexUploadHandle = ClientTestApp.Instance.Device.UploadBuffer(_vertexBuffer, _vertices);
+        _vertexUploadHandle = ClientTestApp.Current.Device.UploadBuffer(_vertexBuffer, _vertices);
 
         var indexBufferSize = (ulong)(sizeof(ushort) * _indices.Length);
-        _indexBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
+        _indexBuffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
             indexBufferSize,
             BufferUsage.TransferDestination | BufferUsage.Index,
             MemoryUsage.GpuOnly));
-        _indexUploadHandle = ClientTestApp.Instance.Device.UploadBuffer(_indexBuffer, _indices);
+        _indexUploadHandle = ClientTestApp.Current.Device.UploadBuffer(_indexBuffer, _indices);
     }
 
     private void CreateShaders()
@@ -125,11 +125,11 @@ internal sealed class IndexedQuadScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "indexed_quad.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "indexed_quad.frag");
 
-        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "indexed_quad.vert"));
-        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "indexed_quad.frag"));
@@ -137,7 +137,7 @@ internal sealed class IndexedQuadScene : IClientTestScene
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
             ColorAttachmentFormat: colorFormat));

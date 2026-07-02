@@ -88,11 +88,11 @@ internal sealed class BufferLifecycleScene : IClientTestScene
     {
         var vertices = CreateVertices();
         var size = (ulong)(Marshal.SizeOf<Vertex>() * vertices.Length);
-        var buffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
+        var buffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
             size,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        var uploadHandle = ClientTestApp.Instance.Device.UploadBuffer(buffer, vertices);
+        var uploadHandle = ClientTestApp.Current.Device.UploadBuffer(buffer, vertices);
         return new Mesh(buffer, uploadHandle, (uint)vertices.Length);
     }
 
@@ -126,11 +126,11 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "buffer_lifecycle.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "buffer_lifecycle.frag");
 
-        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "buffer_lifecycle.vert"));
-        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "buffer_lifecycle.frag"));
@@ -138,7 +138,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
             ColorAttachmentFormat: colorFormat));

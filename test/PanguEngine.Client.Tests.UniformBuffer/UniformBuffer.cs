@@ -108,18 +108,18 @@ internal sealed class UniformBufferScene : IClientTestScene
     private void CreateVertexBuffer()
     {
         var size = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
-        _vertexBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
+        _vertexBuffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
             size,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        _uploadHandle = ClientTestApp.Instance.Device.UploadBuffer(_vertexBuffer, _vertices);
+        _uploadHandle = ClientTestApp.Current.Device.UploadBuffer(_vertexBuffer, _vertices);
     }
 
     private void CreateUniformBuffer(uint frameCount)
     {
         var uniformSize = (ulong)Marshal.SizeOf<FrameUniform>();
-        _uniformStride = ClientTestApp.Instance.Device.GetAlignedUniformSize(uniformSize);
-        _uniformBuffer = ClientTestApp.Instance.Device.CreateBuffer(new BufferDescription(
+        _uniformStride = ClientTestApp.Current.Device.GetAlignedUniformSize(uniformSize);
+        _uniformBuffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
             _uniformStride * frameCount,
             BufferUsage.Uniform,
             MemoryUsage.CpuToGpu));
@@ -127,7 +127,7 @@ internal sealed class UniformBufferScene : IClientTestScene
 
     private void CreateDescriptorSetLayout()
     {
-        _descriptorSetLayout = ClientTestApp.Instance.Device.CreateDescriptorSetLayout(
+        _descriptorSetLayout = ClientTestApp.Current.Device.CreateDescriptorSetLayout(
             new DescriptorSetLayoutDescription(
                 new[]
                 {
@@ -142,7 +142,7 @@ internal sealed class UniformBufferScene : IClientTestScene
 
         for (var i = 0; i < descriptorSets.Length; i++)
         {
-            descriptorSets[i] = ClientTestApp.Instance.Device.CreateDescriptorSet(new DescriptorSetDescription(
+            descriptorSets[i] = ClientTestApp.Current.Device.CreateDescriptorSet(new DescriptorSetDescription(
                 _descriptorSetLayout,
                 new[]
                 {
@@ -165,11 +165,11 @@ internal sealed class UniformBufferScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "uniform_buffer.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "uniform_buffer.frag");
 
-        _vertShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
             Name: "uniform_buffer.vert"));
-        _fragShader = ClientTestApp.Instance.Device.CreateShader(new ShaderDescription(
+        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
             Name: "uniform_buffer.frag"));
@@ -177,7 +177,7 @@ internal sealed class UniformBufferScene : IClientTestScene
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Instance.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
             ColorAttachmentFormat: colorFormat,
