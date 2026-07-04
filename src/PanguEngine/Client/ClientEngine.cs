@@ -1,5 +1,5 @@
+using PanguEngine.Client.Game;
 using PanguEngine.Graphics;
-using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Windowing;
 using Silk.NET.Maths;
 using Window = PanguEngine.Windowing.Window;
@@ -43,7 +43,7 @@ public sealed class ClientEngine
     /// </summary>
     public ClientLoop Loop { get; private set; } = null!;
 
-    private VulkanRenderer Renderer { get; set; } = null!;
+    private ClientGame Game { get; set; } = null!;
 
     private GraphicsBackend GraphicsBackend { get; set; } = null!;
 
@@ -86,25 +86,26 @@ public sealed class ClientEngine
             WindowManager.DoEvents,
             OnUpdate,
             WindowManager.RenderWindows);
-        Renderer = new VulkanRenderer(GraphicsBackend.Device, PrimaryWindow.Presenter);
-
         Engine.ModManager.RunClientSetup();
         Engine.ModManager.RunReady();
+
+        Game = new ClientGame(this);
     }
 
     private void OnRunning()
     {
-        PrimaryWindow.Render += (_, alpha) => Renderer.DrawFrame(alpha);
+        PrimaryWindow.Render += (_, alpha) => Game.DrawFrame(alpha);
         Loop.Run();
     }
 
     private void OnUpdate()
     {
+        Game.Update();
     }
 
     private void OnShutdown()
     {
-        Renderer.Destroy();
+        Game.Destroy();
         GraphicsBackend.Destroy();
 
         Engine.Shutdown();
