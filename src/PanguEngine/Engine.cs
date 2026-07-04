@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PanguEngine.Events;
 using PanguEngine.Modding;
+using PanguEngine.Registries;
 using PanguEngine.Resources;
 
 namespace PanguEngine;
@@ -19,6 +20,8 @@ public static class Engine
     /// The runtime event bus.
     /// </summary>
     public static IEventBus EventBus { get; private set; } = null!;
+
+    public static RegistryManager RegistryManager { get; private set; } = null!;
 
     /// <summary>
     /// The loaded mod manager.
@@ -49,10 +52,12 @@ public static class Engine
         Log.Initialize();
         Logger = Log.CreateLogger("Engine");
         EventBus = new EventBus(ThrowingEventExceptionHandler.Instance);
+        RegistryManager = new RegistryManager();
         ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "mods"), Log.CreateLogger("Mods"),
             options.ModPaths);
         ModManager.Load();
         ModManager.RunConfigure();
+        RegistryManager.FreezeAll();
         Resources = CreateResourceManager();
         ModManager.RunCommonSetup();
     }
