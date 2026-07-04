@@ -3,6 +3,7 @@ using PanguEngine.Events;
 using PanguEngine.Modding;
 using PanguEngine.Registries;
 using PanguEngine.Resources;
+using PanguEngine.World.Blocks;
 
 namespace PanguEngine;
 
@@ -21,6 +22,9 @@ public static class Engine
     /// </summary>
     public static IEventBus EventBus { get; private set; } = null!;
 
+    /// <summary>
+    /// The runtime registry manager.
+    /// </summary>
     public static RegistryManager RegistryManager { get; private set; } = null!;
 
     /// <summary>
@@ -53,6 +57,8 @@ public static class Engine
         Logger = Log.CreateLogger("Engine");
         EventBus = new EventBus(ThrowingEventExceptionHandler.Instance);
         RegistryManager = new RegistryManager();
+        BuiltinRegistries.Register(RegistryManager);
+        BuiltinBlocks.Register(BuiltinRegistries.Block);
         ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "mods"), Log.CreateLogger("Mods"),
             options.ModPaths);
         ModManager.Load();
