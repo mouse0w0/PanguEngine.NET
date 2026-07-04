@@ -6,5 +6,5 @@ namespace PanguEngine.Registries;
 public static class RegistryKeys
 {
     /// <summary>The key of the registry catalog.</summary>
-    public static ResourceKey Registries { get; } = ResourceKey.Create("pangu", "registries");
+    public static ResourceKey Registry { get; } = ResourceKey.Create("pangu", "registry");
 }

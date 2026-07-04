@@ -12,8 +12,8 @@ public sealed class RegistryManagerTests
         Assert.False(manager.Registries.IsFrozen);
         Assert.Equal(0, manager.Registries.Count);
         Assert.Empty(manager.Registries.Entries);
-        Assert.False(manager.Registries.ContainsKey(RegistryKeys.Registries));
-        Assert.False(manager.TryGet(RegistryKeys.Registries, out IRegistry? catalog));
+        Assert.False(manager.Registries.ContainsKey(RegistryKeys.Registry));
+        Assert.False(manager.TryGet(RegistryKeys.Registry, out IRegistry? catalog));
         Assert.Null(catalog);
     }
 
@@ -35,7 +35,7 @@ public sealed class RegistryManagerTests
     public void RegisterRejectsRegistryCatalogKey()
     {
         var manager = new RegistryManager();
-        var registry = new Registry<object>(RegistryKeys.Registries);
+        var registry = new Registry<object>(RegistryKeys.Registry);
 
         Assert.Throws<InvalidOperationException>(() => manager.Register(registry));
     }
