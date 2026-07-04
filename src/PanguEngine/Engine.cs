@@ -31,7 +31,7 @@ public static class Engine
     /// <summary>
     /// The runtime resource manager.
     /// </summary>
-    public static ResourceManager Resources { get; private set; } = null!;
+    public static ResourceManager ResourceManager { get; private set; } = null!;
 
     /// <summary>
     /// Initializes the engine.
@@ -58,7 +58,7 @@ public static class Engine
         ModManager.Load();
         ModManager.RunConfigure();
         RegistryManager.FreezeAll();
-        Resources = CreateResourceManager();
+        ResourceManager = CreateResourceManager();
         ModManager.RunCommonSetup();
     }
 
@@ -67,7 +67,7 @@ public static class Engine
     /// </summary>
     internal static void Shutdown()
     {
-        Resources.Dispose();
+        ResourceManager.Dispose();
         ModManager.Shutdown();
         Log.Shutdown();
     }

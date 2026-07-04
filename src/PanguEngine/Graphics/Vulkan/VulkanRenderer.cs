@@ -21,8 +21,8 @@ internal sealed class VulkanRenderer
         _device = device;
         _presenter = presenter;
 
-        var vertSource = Engine.Resources.ReadAllText("pangu/shaders/triangle.vert");
-        var fragSource = Engine.Resources.ReadAllText("pangu/shaders/triangle.frag");
+        var vertSource = Engine.ResourceManager.ReadAllText("pangu/shaders/triangle.vert");
+        var fragSource = Engine.ResourceManager.ReadAllText("pangu/shaders/triangle.frag");
 
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "triangle.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "triangle.frag");
