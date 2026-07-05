@@ -1,5 +1,5 @@
+using PanguEngine.Client.Rendering.World;
 using PanguEngine.Client.World;
-using PanguEngine.Graphics.Vulkan;
 
 namespace PanguEngine.Client.Game;
 
@@ -8,12 +8,12 @@ namespace PanguEngine.Client.Game;
 /// </summary>
 public sealed class ClientGame
 {
-    private readonly VulkanRenderer _renderer;
+    private readonly WorldRenderer _renderer;
 
     internal ClientGame(ClientEngine engine)
     {
         World = new ClientWorld();
-        _renderer = new VulkanRenderer(engine.Device, engine.PrimaryWindow.Presenter);
+        _renderer = new WorldRenderer(engine.Device, engine.PrimaryWindow.Presenter, World);
     }
 
     /// <summary>The local client world state.</summary>
