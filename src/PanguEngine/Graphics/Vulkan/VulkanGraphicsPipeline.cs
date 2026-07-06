@@ -30,6 +30,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts)
     {
         DescriptorSetLayouts = GetDescriptorSetLayouts(description);
+        DepthStencilAttachmentFormat = description.DepthStencilAttachmentFormat;
         CreatePipeline(description, descriptorSetLayouts);
     }
 
@@ -45,6 +46,11 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// Gets the Vulkan pipeline layout handle.
     /// </summary>
     internal PipelineLayout Layout { get; private set; }
+
+    /// <summary>
+    /// Gets the depth/stencil attachment format used by this pipeline.
+    /// </summary>
+    internal TextureFormat DepthStencilAttachmentFormat { get; private set; }
 
     /// <summary>
     /// Gets the descriptor set layouts used by this pipeline.
@@ -213,6 +219,27 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             PAttachments = &colorBlendAttachment,
         };
 
+        var stencilTestEnabled = description.DepthStencil.StencilTestEnabled;
+        PipelineDepthStencilStateCreateInfo depthStencil = new()
+        {
+            SType = StructureType.PipelineDepthStencilStateCreateInfo,
+            DepthTestEnable = description.DepthStencil.DepthTestEnabled,
+            DepthWriteEnable = description.DepthStencil.DepthWriteEnabled,
+            DepthCompareOp = description.DepthStencil.DepthTestEnabled
+                ? VulkanMapping.ToVulkanCompareOp(description.DepthStencil.DepthCompareOperation)
+                : CompareOp.Always,
+            DepthBoundsTestEnable = false,
+            StencilTestEnable = stencilTestEnabled,
+            Front = stencilTestEnabled
+                ? VulkanMapping.ToVulkanStencilOpState(description.DepthStencil.FrontFace)
+                : CreateDisabledStencilOpState(),
+            Back = stencilTestEnabled
+                ? VulkanMapping.ToVulkanStencilOpState(description.DepthStencil.BackFace)
+                : CreateDisabledStencilOpState(),
+            MinDepthBounds = 0,
+            MaxDepthBounds = 1,
+        };
+
         fixed (Silk.NET.Vulkan.DescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
         fixed (PipelineShaderStageCreateInfo* stages = stageInfos)
         {
@@ -231,11 +258,25 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             Layout = pipelineLayout;
 
             var colorFormat = VulkanMapping.ToVulkanFormat(description.ColorAttachmentFormat);
+            var depthFormat = Format.Undefined;
+            var stencilFormat = Format.Undefined;
+            if (description.DepthStencilAttachmentFormat != TextureFormat.Undefined)
+            {
+                var depthStencilFormat = description.DepthStencilAttachmentFormat;
+                var vkDepthStencilFormat = VulkanMapping.ToVulkanFormat(depthStencilFormat);
+                if (VulkanMapping.HasDepthAspect(depthStencilFormat))
+                    depthFormat = vkDepthStencilFormat;
+                if (VulkanMapping.HasStencilAspect(depthStencilFormat))
+                    stencilFormat = vkDepthStencilFormat;
+            }
+
             PipelineRenderingCreateInfo renderingCreateInfo = new()
             {
                 SType = StructureType.PipelineRenderingCreateInfo,
                 ColorAttachmentCount = 1,
                 PColorAttachmentFormats = &colorFormat,
+                DepthAttachmentFormat = depthFormat,
+                StencilAttachmentFormat = stencilFormat,
             };
 
             GraphicsPipelineCreateInfo pipelineInfo = new()
@@ -249,6 +290,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 PViewportState = &viewportState,
                 PRasterizationState = &rasterizer,
                 PMultisampleState = &multisampling,
+                PDepthStencilState = &depthStencil,
                 PColorBlendState = &colorBlending,
                 PDynamicState = dynamicStateCount == 0 ? null : &dynamicState,
                 Layout = Layout,
@@ -286,6 +328,19 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         result.DstAlphaBlendFactor = BlendFactor.OneMinusSrcAlpha;
         result.AlphaBlendOp = BlendOp.Add;
         return result;
+    }
+
+    private static StencilOpState CreateDisabledStencilOpState()
+    {
+        return new StencilOpState
+        {
+            FailOp = StencilOp.Keep,
+            PassOp = StencilOp.Keep,
+            DepthFailOp = StencilOp.Keep,
+            CompareOp = CompareOp.Always,
+            CompareMask = 0xff,
+            WriteMask = 0xff,
+        };
     }
 
     private static VulkanDescriptorSetLayout[] GetDescriptorSetLayouts(in GraphicsPipelineDescription description)

@@ -6,6 +6,7 @@
     <Project Path="test/PanguEngine.Client.Tests.BufferLifecycle/PanguEngine.Client.Tests.BufferLifecycle.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.BufferUpload/PanguEngine.Client.Tests.BufferUpload.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.Clear/PanguEngine.Client.Tests.Clear.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.DepthStencil/PanguEngine.Client.Tests.DepthStencil.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.IndexedQuad/PanguEngine.Client.Tests.IndexedQuad.csproj"/>
     <Project
             Path="test/PanguEngine.Client.Tests.TextureCubeMapUpload/PanguEngine.Client.Tests.TextureCubeMapUpload.csproj"/>

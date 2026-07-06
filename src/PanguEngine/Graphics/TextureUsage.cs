@@ -24,5 +24,10 @@ public enum TextureUsage
     /// <summary>
     /// Texture can be read by shaders through a sampler.
     /// </summary>
-    Sampled = 4
+    Sampled = 4,
+
+    /// <summary>
+    /// Texture can be used as a depth/stencil rendering attachment.
+    /// </summary>
+    DepthStencilAttachment = 8
 }

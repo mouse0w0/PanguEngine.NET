@@ -12,6 +12,8 @@ namespace PanguEngine.Graphics;
 /// <param name="DynamicViewport">Whether viewport state is dynamic.</param>
 /// <param name="DynamicScissor">Whether scissor state is dynamic.</param>
 /// <param name="DescriptorSetLayouts">The descriptor set layouts used by the pipeline.</param>
+/// <param name="DepthStencil">The depth and stencil state.</param>
+/// <param name="DepthStencilAttachmentFormat">The depth/stencil attachment format, or <see cref="TextureFormat.Undefined" /> when the pipeline does not use one.</param>
 public readonly record struct GraphicsPipelineDescription(
     ReadOnlyMemory<Shader> Shaders,
     VertexInputDescription VertexInput,
@@ -21,4 +23,6 @@ public readonly record struct GraphicsPipelineDescription(
     TextureFormat ColorAttachmentFormat = TextureFormat.B8G8R8A8Unorm,
     bool DynamicViewport = true,
     bool DynamicScissor = true,
-    ReadOnlyMemory<DescriptorSetLayout> DescriptorSetLayouts = default);
+    ReadOnlyMemory<DescriptorSetLayout> DescriptorSetLayouts = default,
+    DepthStencilDescription DepthStencil = default,
+    TextureFormat DepthStencilAttachmentFormat = TextureFormat.Undefined);

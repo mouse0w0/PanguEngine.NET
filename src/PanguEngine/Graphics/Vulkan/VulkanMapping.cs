@@ -15,6 +15,8 @@ internal static class VulkanMapping
             TextureFormat.B8G8R8A8Unorm => Format.B8G8R8A8Unorm,
             TextureFormat.B8G8R8A8Srgb => Format.B8G8R8A8Srgb,
             TextureFormat.R8Unorm => Format.R8Unorm,
+            TextureFormat.Depth32Float => Format.D32Sfloat,
+            TextureFormat.Depth24UnormStencil8 => Format.D24UnormS8Uint,
             _ => throw new InvalidOperationException("Unsupported texture format."),
         };
     }
@@ -41,6 +43,32 @@ internal static class VulkanMapping
             TextureFormat.R8Unorm => 1,
             _ => throw new InvalidOperationException("Unsupported texture format."),
         };
+    }
+
+    internal static bool HasDepthAspect(TextureFormat format)
+    {
+        return format is TextureFormat.Depth32Float or TextureFormat.Depth24UnormStencil8;
+    }
+
+    internal static bool HasStencilAspect(TextureFormat format)
+    {
+        return format is TextureFormat.Depth24UnormStencil8;
+    }
+
+    internal static bool IsDepthStencilFormat(TextureFormat format)
+    {
+        return HasDepthAspect(format) || HasStencilAspect(format);
+    }
+
+    internal static ImageAspectFlags ToVulkanImageAspect(TextureFormat format)
+    {
+        var result = (ImageAspectFlags)0;
+        if (HasDepthAspect(format))
+            result |= ImageAspectFlags.DepthBit;
+        if (HasStencilAspect(format))
+            result |= ImageAspectFlags.StencilBit;
+
+        return result == (ImageAspectFlags)0 ? ImageAspectFlags.ColorBit : result;
     }
 
     internal static Filter ToVulkanFilter(FilterMode mode)
@@ -136,6 +164,52 @@ internal static class VulkanMapping
         };
     }
 
+    internal static CompareOp ToVulkanCompareOp(CompareOperation operation)
+    {
+        return operation switch
+        {
+            CompareOperation.Never => CompareOp.Never,
+            CompareOperation.Less => CompareOp.Less,
+            CompareOperation.Equal => CompareOp.Equal,
+            CompareOperation.LessOrEqual => CompareOp.LessOrEqual,
+            CompareOperation.Greater => CompareOp.Greater,
+            CompareOperation.NotEqual => CompareOp.NotEqual,
+            CompareOperation.GreaterOrEqual => CompareOp.GreaterOrEqual,
+            CompareOperation.Always => CompareOp.Always,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unsupported compare operation."),
+        };
+    }
+
+    internal static StencilOp ToVulkanStencilOp(StencilOperation operation)
+    {
+        return operation switch
+        {
+            StencilOperation.Keep => StencilOp.Keep,
+            StencilOperation.Zero => StencilOp.Zero,
+            StencilOperation.Replace => StencilOp.Replace,
+            StencilOperation.IncrementAndClamp => StencilOp.IncrementAndClamp,
+            StencilOperation.DecrementAndClamp => StencilOp.DecrementAndClamp,
+            StencilOperation.Invert => StencilOp.Invert,
+            StencilOperation.IncrementAndWrap => StencilOp.IncrementAndWrap,
+            StencilOperation.DecrementAndWrap => StencilOp.DecrementAndWrap,
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unsupported stencil operation."),
+        };
+    }
+
+    internal static StencilOpState ToVulkanStencilOpState(StencilFaceDescription description)
+    {
+        return new StencilOpState
+        {
+            FailOp = ToVulkanStencilOp(description.StencilFailOperation),
+            PassOp = ToVulkanStencilOp(description.PassOperation),
+            DepthFailOp = ToVulkanStencilOp(description.DepthFailOperation),
+            CompareOp = ToVulkanCompareOp(description.CompareOperation),
+            CompareMask = description.CompareMask,
+            WriteMask = description.WriteMask,
+            Reference = description.Reference,
+        };
+    }
+
     internal static AttachmentLoadOp ToVulkanLoadOperation(LoadOperation operation)
     {
         return operation switch
@@ -200,6 +274,8 @@ internal static class VulkanMapping
             result |= ImageUsageFlags.TransferDstBit;
         if (usage.HasFlag(TextureUsage.Sampled))
             result |= ImageUsageFlags.SampledBit;
+        if (usage.HasFlag(TextureUsage.DepthStencilAttachment))
+            result |= ImageUsageFlags.DepthStencilAttachmentBit;
         return result;
     }
 }

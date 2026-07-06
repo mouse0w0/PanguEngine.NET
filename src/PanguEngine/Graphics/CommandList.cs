@@ -11,7 +11,7 @@ public abstract class CommandList
     public abstract void Begin();
 
     /// <summary>
-    /// Begins color rendering for the active frame target.
+    /// Begins rendering for the active frame target.
     /// </summary>
     /// <param name="description">The rendering description.</param>
     public abstract void BeginRendering(in RenderingDescription description);
