@@ -1,6 +1,6 @@
 using Silk.NET.Vulkan;
 using Vma;
-using VkDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
+using VKDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
 using VKSampler = Silk.NET.Vulkan.Sampler;
 using VmaMemoryUsage = Vma.MemoryUsage;
 
@@ -322,7 +322,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         if (descriptorSetLayouts.Length == 0)
             return new VulkanGraphicsPipeline(description);
 
-        var vulkanDescriptorSetLayouts = new VkDescriptorSetLayout[descriptorSetLayouts.Length];
+        var vulkanDescriptorSetLayouts = new VKDescriptorSetLayout[descriptorSetLayouts.Length];
         for (var i = 0; i < descriptorSetLayouts.Length; i++)
             vulkanDescriptorSetLayouts[i] = ((VulkanDescriptorSetLayout)descriptorSetLayouts[i]).DescriptorSetLayout;
 
@@ -337,7 +337,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     /// <returns>The created graphics pipeline.</returns>
     internal GraphicsPipeline CreateGraphicsPipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<VkDescriptorSetLayout> descriptorSetLayouts)
+        ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts)
     {
         ValidateGraphicsPipelineDescription(description);
         return new VulkanGraphicsPipeline(description, descriptorSetLayouts);

@@ -1,5 +1,6 @@
 using Silk.NET.Vulkan;
-using VkDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
+using VKDescriptorSetLayoutBinding = Silk.NET.Vulkan.DescriptorSetLayoutBinding;
+using VKDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
 using VkDescriptorType = Silk.NET.Vulkan.DescriptorType;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -18,7 +19,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             throw new ArgumentException("Descriptor set layout must contain at least one binding.",
                 nameof(description));
 
-        var vulkanBindings = new Silk.NET.Vulkan.DescriptorSetLayoutBinding[bindings.Length];
+        var vulkanBindings = new VKDescriptorSetLayoutBinding[bindings.Length];
         for (var i = 0; i < bindings.Length; i++)
         {
             for (var previous = 0; previous < i; previous++)
@@ -29,7 +30,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
                         nameof(description));
             }
 
-            vulkanBindings[i] = new Silk.NET.Vulkan.DescriptorSetLayoutBinding
+            vulkanBindings[i] = new VKDescriptorSetLayoutBinding
             {
                 Binding = bindings[i].Binding,
                 DescriptorType = ToVulkanDescriptorType(bindings[i].Type),
@@ -38,7 +39,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             };
         }
 
-        fixed (Silk.NET.Vulkan.DescriptorSetLayoutBinding* pBindings = vulkanBindings)
+        fixed (VKDescriptorSetLayoutBinding* pBindings = vulkanBindings)
         {
             DescriptorSetLayoutCreateInfo layoutInfo = new()
             {
@@ -63,7 +64,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
     /// <summary>
     /// Gets the Vulkan descriptor set layout handle.
     /// </summary>
-    internal VkDescriptorSetLayout DescriptorSetLayout { get; private set; }
+    internal VKDescriptorSetLayout DescriptorSetLayout { get; private set; }
 
     /// <summary>
     /// Gets the layout entries.

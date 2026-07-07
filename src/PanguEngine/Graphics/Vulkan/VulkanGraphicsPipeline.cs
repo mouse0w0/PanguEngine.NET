@@ -1,5 +1,6 @@
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
+using VKDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
 using VkPipeline = Silk.NET.Vulkan.Pipeline;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -27,7 +28,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// <param name="descriptorSetLayouts">The Vulkan descriptor set layouts used by the pipeline layout.</param>
     internal VulkanGraphicsPipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts)
+        ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts)
     {
         DescriptorSetLayouts = GetDescriptorSetLayouts(description);
         ColorAttachmentFormats = description.ColorAttachmentFormats.ToArray();
@@ -90,7 +91,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
 
     private void CreatePipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts)
+        ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts)
     {
         var shaders = description.Shaders.Span;
         var stageInfos = new PipelineShaderStageCreateInfo[shaders.Length];
@@ -125,7 +126,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
 
     private void CreatePipeline(
         in GraphicsPipelineDescription description,
-        ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts,
+        ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts,
         PipelineShaderStageCreateInfo[] stageInfos)
     {
         var bufferLayouts = description.VertexInput.Buffers.Span;
@@ -254,7 +255,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             MaxDepthBounds = 1,
         };
 
-        fixed (Silk.NET.Vulkan.DescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
+        fixed (VKDescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
         fixed (PipelineShaderStageCreateInfo* stages = stageInfos)
         {
             PipelineLayoutCreateInfo pipelineLayoutInfo = new()
@@ -373,14 +374,14 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         return result;
     }
 
-    private static Silk.NET.Vulkan.DescriptorSetLayout[] GetVulkanDescriptorSetLayouts(
+    private static VKDescriptorSetLayout[] GetVulkanDescriptorSetLayouts(
         in GraphicsPipelineDescription description)
     {
         var layouts = description.DescriptorSetLayouts.Span;
         if (layouts.Length == 0)
             return [];
 
-        var result = new Silk.NET.Vulkan.DescriptorSetLayout[layouts.Length];
+        var result = new VKDescriptorSetLayout[layouts.Length];
         for (var i = 0; i < layouts.Length; i++)
         {
             var layout = layouts[i] as VulkanDescriptorSetLayout
