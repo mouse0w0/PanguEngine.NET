@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Silk.NET.Vulkan;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -45,13 +46,13 @@ internal sealed unsafe class VulkanPresenter : Presenter
     public override Frame BeginFrame()
     {
         if (TryBeginFrame(out var frame))
-            return frame!;
+            return frame;
 
         throw new InvalidOperationException("Failed to acquire a renderable swapchain image after recreation.");
     }
 
     /// <inheritdoc/>
-    public override bool TryBeginFrame(out Frame? frame)
+    public override bool TryBeginFrame([MaybeNullWhen(false)] out Frame frame)
     {
         if (_destroyed)
             throw new ObjectDisposedException(GetType().Name);

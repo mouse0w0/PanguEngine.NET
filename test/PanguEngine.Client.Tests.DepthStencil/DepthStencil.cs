@@ -91,20 +91,19 @@ internal sealed class DepthStencilScene : IClientTestScene
             throw new InvalidOperationException(
                 "Index buffer upload did not complete after flushing pending uploads.");
 
-        var activeFrame = frame!;
         try
         {
-            var commands = activeFrame.CommandList;
+            var commands = frame.CommandList;
             commands.Begin();
             commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
+                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
             ], new DepthStencilAttachmentDescription(
                 depthStencilAttachment,
                 DepthClearValue: 1,
                 StencilClearValue: 0)));
             commands.SetGraphicsPipeline(_pipeline);
-            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
-            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetViewport(0, 0, frame.Width, frame.Height);
+            commands.SetScissor(0, 0, frame.Width, frame.Height);
             commands.SetVertexBuffer(0, _vertexBuffer);
             commands.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
             commands.DrawIndexed((uint)_indices.Length);
@@ -114,7 +113,7 @@ internal sealed class DepthStencilScene : IClientTestScene
         }
         finally
         {
-            _presenter.EndFrame(activeFrame);
+            _presenter.EndFrame(frame);
         }
     }
 

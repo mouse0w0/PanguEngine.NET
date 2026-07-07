@@ -80,21 +80,20 @@ internal sealed class UniformBufferScene : IClientTestScene
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
 
-        var activeFrame = frame!;
         try
         {
             var frameIndex = _presenter.CurrentFrameIndex;
             var descriptorIndex = checked((int)frameIndex);
             WriteFrameUniform(frameIndex);
 
-            var commands = activeFrame.CommandList;
+            var commands = frame.CommandList;
             commands.Begin();
             commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.012f, 0.018f, 1)),
+                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.01f, 0.012f, 0.018f, 1)),
             ]));
             commands.SetGraphicsPipeline(_pipeline);
-            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
-            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetViewport(0, 0, frame.Width, frame.Height);
+            commands.SetScissor(0, 0, frame.Width, frame.Height);
             commands.SetVertexBuffer(0, _vertexBuffer);
             commands.SetDescriptorSet(0, _descriptorSets[descriptorIndex]);
             commands.Draw((uint)_vertices.Length);
@@ -104,7 +103,7 @@ internal sealed class UniformBufferScene : IClientTestScene
         }
         finally
         {
-            _presenter.EndFrame(activeFrame);
+            _presenter.EndFrame(frame);
         }
     }
 

@@ -35,19 +35,18 @@ internal sealed class WorldRenderer
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        var activeFrame = frame!;
         InvalidOperationException? uploadFailure = null;
         try
         {
             uploadFailure = GetUploadFailure(uploadHandles);
 
-            var commandList = activeFrame.CommandList;
+            var commandList = frame.CommandList;
             commandList.Begin();
             commandList.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
+                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
             ]));
-            commandList.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
-            commandList.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commandList.SetViewport(0, 0, frame.Width, frame.Height);
+            commandList.SetScissor(0, 0, frame.Width, frame.Height);
 
             if (uploadFailure is null)
                 _chunkRenderer.Draw(commandList);
@@ -58,7 +57,7 @@ internal sealed class WorldRenderer
         }
         finally
         {
-            _presenter.EndFrame(activeFrame);
+            _presenter.EndFrame(frame);
         }
 
         if (uploadFailure is not null)

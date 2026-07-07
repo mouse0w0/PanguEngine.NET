@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace PanguEngine.Graphics;
 
 /// <summary>
@@ -46,7 +48,7 @@ public abstract class Presenter
     /// </summary>
     /// <param name="frame">The active graphics frame when one is available.</param>
     /// <returns>Whether a frame was available for command recording.</returns>
-    public abstract bool TryBeginFrame(out Frame? frame);
+    public abstract bool TryBeginFrame([MaybeNullWhen(false)] out Frame frame);
 
     /// <summary>
     /// Ends, submits, and presents a graphics frame.

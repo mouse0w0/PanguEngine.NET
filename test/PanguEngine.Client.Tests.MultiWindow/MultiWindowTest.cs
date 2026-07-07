@@ -35,13 +35,12 @@ internal sealed class MultiWindowScene : IClientTestScene
         if (!presenter.TryBeginFrame(out var frame))
             return;
 
-        var activeFrame = frame!;
         try
         {
-            var commands = activeFrame.CommandList;
+            var commands = frame.CommandList;
             commands.Begin();
             commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(activeFrame.ColorOutput, clearColor),
+                new ColorAttachmentDescription(frame.ColorOutput, clearColor),
             ]));
             commands.EndRendering();
             commands.PrepareForPresent();
@@ -49,7 +48,7 @@ internal sealed class MultiWindowScene : IClientTestScene
         }
         finally
         {
-            presenter.EndFrame(activeFrame);
+            presenter.EndFrame(frame);
         }
     }
 }

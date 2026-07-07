@@ -41,13 +41,12 @@ internal sealed class ClearOnlyScene : IClientTestScene
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        var activeFrame = frame!;
         try
         {
-            var commands = activeFrame.CommandList;
+            var commands = frame.CommandList;
             commands.Begin();
             commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.02f, 0.04f, 0.08f, 1)),
+                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.02f, 0.04f, 0.08f, 1)),
             ]));
             commands.EndRendering();
             commands.PrepareForPresent();
@@ -55,7 +54,7 @@ internal sealed class ClearOnlyScene : IClientTestScene
         }
         finally
         {
-            _presenter.EndFrame(activeFrame);
+            _presenter.EndFrame(frame);
         }
     }
 }

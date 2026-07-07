@@ -78,17 +78,16 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
         if (!_mipmapUploadHandle.IsCompleted)
             throw new InvalidOperationException("Mipmap generation did not complete after flushing pending uploads.");
 
-        var activeFrame = frame!;
         try
         {
-            var commands = activeFrame.CommandList;
+            var commands = frame.CommandList;
             commands.Begin();
             commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
+                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
             ]));
             commands.SetGraphicsPipeline(_pipeline);
-            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
-            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetViewport(0, 0, frame.Width, frame.Height);
+            commands.SetScissor(0, 0, frame.Width, frame.Height);
             commands.SetVertexBuffer(0, _vertexBuffer);
             commands.SetDescriptorSet(0, _descriptorSet);
             commands.Draw((uint)_vertices.Length);
@@ -98,7 +97,7 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
         }
         finally
         {
-            _presenter.EndFrame(activeFrame);
+            _presenter.EndFrame(frame);
         }
     }
 

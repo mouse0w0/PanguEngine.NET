@@ -57,17 +57,16 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        var activeFrame = frame!;
         try
         {
-            var commands = activeFrame.CommandList;
+            var commands = frame.CommandList;
             commands.Begin();
             commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
+                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
             ]));
             commands.SetGraphicsPipeline(_pipeline);
-            commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
-            commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
+            commands.SetViewport(0, 0, frame.Width, frame.Height);
+            commands.SetScissor(0, 0, frame.Width, frame.Height);
 
             if (!_mesh.UploadHandle.IsCompleted)
                 throw new InvalidOperationException(
@@ -83,7 +82,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         }
         finally
         {
-            _presenter.EndFrame(activeFrame);
+            _presenter.EndFrame(frame);
         }
     }
 
