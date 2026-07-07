@@ -39,9 +39,10 @@ internal sealed class ChunkRenderer
         _fragmentShader =
             _device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode, Name: "world_color.frag"));
         _pipeline = _device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            new[] { _vertexShader, _fragmentShader },
+            [_vertexShader, _fragmentShader],
             ChunkVertex.VertexInput,
-            ColorAttachmentFormats: new[] { colorFormat }));
+            ColorAttachmentFormats: [colorFormat],
+            DescriptorSetLayouts: []));
     }
 
     /// <summary>

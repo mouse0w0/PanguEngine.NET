@@ -43,10 +43,9 @@ internal sealed class WorldRenderer
 
             var commandList = activeFrame.CommandList;
             commandList.Begin();
-            commandList.BeginRendering(new RenderingDescription(new[]
-            {
+            commandList.BeginRendering(new RenderingDescription([
                 new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
-            }));
+            ]));
             commandList.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commandList.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
 

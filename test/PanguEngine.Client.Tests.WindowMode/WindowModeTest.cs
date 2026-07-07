@@ -46,10 +46,9 @@ internal sealed class WindowModeScene : IClientTestScene
         {
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new[]
-            {
+            commands.BeginRendering(new RenderingDescription([
                 new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.02f, 0.04f, 0.08f, 1)),
-            }));
+            ]));
             commands.EndRendering();
             commands.PrepareForPresent();
             commands.End();

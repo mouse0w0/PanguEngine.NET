@@ -9,12 +9,11 @@ internal readonly struct ChunkVertex
     public const uint SizeInBytes = 28;
 
     public static readonly VertexInputDescription VertexInput = new(
-        new[] { new VertexBufferLayoutDescription(0, SizeInBytes) },
-        new[]
-        {
+        [new VertexBufferLayoutDescription(0, SizeInBytes)],
+        [
             new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x3, 0),
             new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x4, 12)
-        });
+        ]);
 
     public readonly float X;
     public readonly float Y;

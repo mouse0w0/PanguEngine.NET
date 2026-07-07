@@ -6,5 +6,5 @@ namespace PanguEngine.Graphics;
 /// <param name="ColorAttachments">The color attachments.</param>
 /// <param name="DepthStencilAttachment">The depth/stencil attachment, or null when rendering without one.</param>
 public readonly record struct RenderingDescription(
-    ReadOnlyMemory<ColorAttachmentDescription> ColorAttachments,
+    ColorAttachmentDescription[] ColorAttachments,
     DepthStencilAttachmentDescription? DepthStencilAttachment = null);

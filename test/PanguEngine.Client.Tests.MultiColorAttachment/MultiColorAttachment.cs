@@ -70,11 +70,10 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
         {
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new[]
-            {
+            commands.BeginRendering(new RenderingDescription([
                 new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.02f, 0.03f, 0.05f, 1)),
                 new ColorAttachmentDescription(offscreenAttachment, new ClearColor(0, 0, 0, 1)),
-            }));
+            ]));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
@@ -153,23 +152,22 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
     private void CreatePipeline(TextureFormat colorFormat)
     {
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            new[] { _vertShader, _fragShader },
+            [_vertShader, _fragShader],
             CreateVertexInputDescription(),
-            ColorAttachmentFormats: new[] { colorFormat, colorFormat }));
+            ColorAttachmentFormats: [colorFormat, colorFormat],
+            DescriptorSetLayouts: []));
     }
 
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            new[]
-            {
+            [
                 new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            },
-            new[]
-            {
+            ],
+            [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 8)
-            });
+            ]);
     }
 
     [StructLayout(LayoutKind.Sequential)]

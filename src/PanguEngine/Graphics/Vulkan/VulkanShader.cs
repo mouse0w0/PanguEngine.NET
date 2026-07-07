@@ -59,7 +59,7 @@ internal sealed unsafe class VulkanShader : Shader
     {
         var bytecode = description.Bytecode;
 
-        fixed (byte* ptr = bytecode.Span)
+        fixed (byte* ptr = bytecode)
         {
             ShaderModuleCreateInfo createInfo = new()
             {

@@ -20,7 +20,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
 
         Layout = layout;
 
-        var bindings = description.Bindings.Span;
+        var bindings = description.Bindings;
         if (bindings.Length == 0)
             throw new ArgumentException("Descriptor set must contain at least one binding.", nameof(description));
         if (bindings.Length != layout.Bindings.Count)

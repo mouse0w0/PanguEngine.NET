@@ -89,10 +89,9 @@ internal sealed class UniformBufferScene : IClientTestScene
 
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new[]
-            {
+            commands.BeginRendering(new RenderingDescription([
                 new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.012f, 0.018f, 1)),
-            }));
+            ]));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
@@ -133,10 +132,9 @@ internal sealed class UniformBufferScene : IClientTestScene
     {
         _descriptorSetLayout = ClientTestApp.Current.Device.CreateDescriptorSetLayout(
             new DescriptorSetLayoutDescription(
-                new[]
-                {
-                    new DescriptorSetLayoutBinding(0, DescriptorType.UniformBuffer, ShaderStage.Vertex)
-                }));
+            [
+                new DescriptorSetLayoutBinding(0, DescriptorType.UniformBuffer, ShaderStage.Vertex)
+            ]));
     }
 
     private void CreateDescriptorSets(uint frameCount)
@@ -148,10 +146,9 @@ internal sealed class UniformBufferScene : IClientTestScene
         {
             descriptorSets[i] = ClientTestApp.Current.Device.CreateDescriptorSet(new DescriptorSetDescription(
                 _descriptorSetLayout,
-                new[]
-                {
+                [
                     new DescriptorSetBinding(0, _uniformBuffer, _uniformStride * (uint)i, uniformSize)
-                }));
+                ]));
         }
 
         _descriptorSets = descriptorSets;
@@ -182,24 +179,22 @@ internal sealed class UniformBufferScene : IClientTestScene
     private void CreatePipeline(TextureFormat colorFormat)
     {
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            new[] { _vertShader, _fragShader },
+            [_vertShader, _fragShader],
             CreateVertexInputDescription(),
-            ColorAttachmentFormats: new[] { colorFormat },
-            DescriptorSetLayouts: new[] { _descriptorSetLayout }));
+            ColorAttachmentFormats: [colorFormat],
+            DescriptorSetLayouts: [_descriptorSetLayout]));
     }
 
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            new[]
-            {
+            [
                 new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            },
-            new[]
-            {
+            ],
+            [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 8)
-            });
+            ]);
     }
 
     private void WriteFrameUniform(uint frameIndex)

@@ -93,7 +93,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         in GraphicsPipelineDescription description,
         ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts)
     {
-        var shaders = description.Shaders.Span;
+        var shaders = description.Shaders;
         var stageInfos = new PipelineShaderStageCreateInfo[shaders.Length];
         var entryPointPointers = new nint[shaders.Length];
 
@@ -129,8 +129,8 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts,
         PipelineShaderStageCreateInfo[] stageInfos)
     {
-        var bufferLayouts = description.VertexInput.Buffers.Span;
-        var attributes = description.VertexInput.Attributes.Span;
+        var bufferLayouts = description.VertexInput.Buffers;
+        var attributes = description.VertexInput.Attributes;
         var bindingDescriptions = stackalloc VertexInputBindingDescription[bufferLayouts.Length];
         var attributeDescriptions = stackalloc VertexInputAttributeDescription[attributes.Length];
 
@@ -216,7 +216,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             RasterizationSamples = SampleCountFlags.Count1Bit,
         };
 
-        var colorAttachmentFormats = description.ColorAttachmentFormats.Span;
+        var colorAttachmentFormats = description.ColorAttachmentFormats;
         var vkColorFormats = stackalloc Format[colorAttachmentFormats.Length];
         var colorBlendAttachments = stackalloc PipelineColorBlendAttachmentState[colorAttachmentFormats.Length];
         for (var i = 0; i < colorAttachmentFormats.Length; i++)
@@ -359,7 +359,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
 
     private static VulkanDescriptorSetLayout[] GetDescriptorSetLayouts(in GraphicsPipelineDescription description)
     {
-        var layouts = description.DescriptorSetLayouts.Span;
+        var layouts = description.DescriptorSetLayouts;
         if (layouts.Length == 0)
             return [];
 
@@ -377,7 +377,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     private static VKDescriptorSetLayout[] GetVulkanDescriptorSetLayouts(
         in GraphicsPipelineDescription description)
     {
-        var layouts = description.DescriptorSetLayouts.Span;
+        var layouts = description.DescriptorSetLayouts;
         if (layouts.Length == 0)
             return [];
 

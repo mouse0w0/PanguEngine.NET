@@ -15,14 +15,14 @@ namespace PanguEngine.Graphics;
 /// <param name="DepthStencil">The depth and stencil state.</param>
 /// <param name="DepthStencilAttachmentFormat">The depth/stencil attachment format, or <see cref="TextureFormat.Undefined" /> when the pipeline does not use one.</param>
 public readonly record struct GraphicsPipelineDescription(
-    ReadOnlyMemory<Shader> Shaders,
+    Shader[] Shaders,
     VertexInputDescription VertexInput,
+    TextureFormat[] ColorAttachmentFormats,
+    DescriptorSetLayout[] DescriptorSetLayouts,
     PrimitiveTopology Topology = PrimitiveTopology.TriangleList,
     RasterizerDescription Rasterizer = default,
     ColorBlendDescription ColorBlend = default,
-    ReadOnlyMemory<TextureFormat> ColorAttachmentFormats = default,
     bool DynamicViewport = true,
     bool DynamicScissor = true,
-    ReadOnlyMemory<DescriptorSetLayout> DescriptorSetLayouts = default,
     DepthStencilDescription DepthStencil = default,
     TextureFormat DepthStencilAttachmentFormat = TextureFormat.Undefined);

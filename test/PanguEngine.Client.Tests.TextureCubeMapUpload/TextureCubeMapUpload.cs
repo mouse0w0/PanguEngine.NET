@@ -84,10 +84,9 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
         {
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new[]
-            {
+            commands.BeginRendering(new RenderingDescription([
                 new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
-            }));
+            ]));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
@@ -162,20 +161,18 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
     {
         _descriptorSetLayout = ClientTestApp.Current.Device.CreateDescriptorSetLayout(
             new DescriptorSetLayoutDescription(
-                new[]
-                {
-                    new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStage.Fragment)
-                }));
+            [
+                new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStage.Fragment)
+            ]));
     }
 
     private void CreateDescriptorSet()
     {
         _descriptorSet = ClientTestApp.Current.Device.CreateDescriptorSet(new DescriptorSetDescription(
             _descriptorSetLayout,
-            new[]
-            {
+            [
                 DescriptorSetBinding.CombinedImageSampler(0, _texture, _sampler)
-            }));
+            ]));
     }
 
     private void CreateShaders()
@@ -202,24 +199,22 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
     private void CreatePipeline(TextureFormat colorFormat)
     {
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            new[] { _vertShader, _fragShader },
+            [_vertShader, _fragShader],
             CreateVertexInputDescription(),
-            ColorAttachmentFormats: new[] { colorFormat },
-            DescriptorSetLayouts: new[] { _descriptorSetLayout }));
+            ColorAttachmentFormats: [colorFormat],
+            DescriptorSetLayouts: [_descriptorSetLayout]));
     }
 
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            new[]
-            {
+            [
                 new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            },
-            new[]
-            {
+            ],
+            [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x2, 8)
-            });
+            ]);
     }
 
     private static byte[] CreateSolidTextureData(uint width, uint height, byte r, byte g, byte b, byte a)

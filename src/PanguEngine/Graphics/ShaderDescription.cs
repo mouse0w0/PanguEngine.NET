@@ -9,6 +9,6 @@ namespace PanguEngine.Graphics;
 /// <param name="Name">The shader name used for diagnostics.</param>
 public readonly record struct ShaderDescription(
     ShaderStage Stage,
-    ReadOnlyMemory<byte> Bytecode,
+    byte[] Bytecode,
     string EntryPoint = "main",
     string Name = "shader");

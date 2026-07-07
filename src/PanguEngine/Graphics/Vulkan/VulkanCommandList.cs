@@ -74,7 +74,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
             throw new InvalidOperationException(
                 "Rendering cannot begin after the frame target was transitioned for presentation.");
 
-        var colorDescriptions = description.ColorAttachments.Span;
+        var colorDescriptions = description.ColorAttachments;
         var colorTextures = GetColorAttachments(colorDescriptions, frame);
         var renderingColorFormats = new TextureFormat[colorTextures.Length];
         for (var i = 0; i < colorTextures.Length; i++)

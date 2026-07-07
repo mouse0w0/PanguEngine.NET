@@ -4,7 +4,7 @@ namespace PanguEngine.Graphics;
 /// Describes a descriptor set layout resource to create.
 /// </summary>
 /// <param name="Bindings">The descriptor set layout bindings.</param>
-public readonly record struct DescriptorSetLayoutDescription(ReadOnlyMemory<DescriptorSetLayoutBinding> Bindings);
+public readonly record struct DescriptorSetLayoutDescription(DescriptorSetLayoutBinding[] Bindings);
 
 /// <summary>
 /// Describes a single descriptor set layout binding.

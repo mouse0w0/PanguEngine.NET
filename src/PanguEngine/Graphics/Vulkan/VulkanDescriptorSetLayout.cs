@@ -14,7 +14,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
 
     public VulkanDescriptorSetLayout(in DescriptorSetLayoutDescription description)
     {
-        var bindings = description.Bindings.Span;
+        var bindings = description.Bindings;
         if (bindings.Length == 0)
             throw new ArgumentException("Descriptor set layout must contain at least one binding.",
                 nameof(description));
@@ -55,7 +55,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             DescriptorSetLayout = layout;
         }
 
-        Bindings = description.Bindings.ToArray();
+        Bindings = bindings.ToArray();
     }
 
     /// <inheritdoc/>

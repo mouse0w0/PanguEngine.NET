@@ -7,7 +7,7 @@ namespace PanguEngine.Graphics;
 /// <param name="Bindings">The concrete descriptor bindings.</param>
 public readonly record struct DescriptorSetDescription(
     DescriptorSetLayout Layout,
-    ReadOnlyMemory<DescriptorSetBinding> Bindings);
+    DescriptorSetBinding[] Bindings);
 
 /// <summary>
 /// Describes a single descriptor binding.

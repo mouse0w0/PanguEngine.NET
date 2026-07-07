@@ -52,9 +52,10 @@ internal sealed class TriangleScene : IClientTestScene
             Name: "triangle.frag"));
 
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            new[] { _vertShader, _fragShader },
+            [_vertShader, _fragShader],
             VertexInputDescription.Empty,
-            ColorAttachmentFormats: new[] { _presenter.ColorFormat }));
+            ColorAttachmentFormats: [_presenter.ColorFormat],
+            DescriptorSetLayouts: []));
 
         window.Render += (_, _) => DrawFrame();
     }
@@ -77,10 +78,9 @@ internal sealed class TriangleScene : IClientTestScene
         {
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new[]
-            {
+            commands.BeginRendering(new RenderingDescription([
                 new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0, 0, 0, 1)),
-            }));
+            ]));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);

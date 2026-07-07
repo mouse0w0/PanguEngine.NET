@@ -96,10 +96,9 @@ internal sealed class DepthStencilScene : IClientTestScene
         {
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new[]
-            {
+            commands.BeginRendering(new RenderingDescription([
                 new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
-            }, new DepthStencilAttachmentDescription(
+            ], new DepthStencilAttachmentDescription(
                 depthStencilAttachment,
                 DepthClearValue: 1,
                 StencilClearValue: 0)));
@@ -189,9 +188,10 @@ internal sealed class DepthStencilScene : IClientTestScene
     private void CreatePipeline(TextureFormat colorFormat)
     {
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            new[] { _vertShader, _fragShader },
+            [_vertShader, _fragShader],
             CreateVertexInputDescription(),
-            ColorAttachmentFormats: new[] { colorFormat },
+            ColorAttachmentFormats: [colorFormat],
+            DescriptorSetLayouts: [],
             DepthStencil: new DepthStencilDescription(
                 DepthTestEnabled: true,
                 DepthWriteEnabled: true,
@@ -205,15 +205,13 @@ internal sealed class DepthStencilScene : IClientTestScene
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            new[]
-            {
+            [
                 new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            },
-            new[]
-            {
+            ],
+            [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x3, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 12)
-            });
+            ]);
     }
 
     [StructLayout(LayoutKind.Sequential)]

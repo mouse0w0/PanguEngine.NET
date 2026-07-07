@@ -318,7 +318,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     public override GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description)
     {
         ValidateGraphicsPipelineDescription(description);
-        var descriptorSetLayouts = description.DescriptorSetLayouts.Span;
+        var descriptorSetLayouts = description.DescriptorSetLayouts;
         if (descriptorSetLayouts.Length == 0)
             return new VulkanGraphicsPipeline(description);
 
@@ -369,9 +369,10 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     private static void ValidateShaderDescription(in ShaderDescription description)
     {
-        if (description.Bytecode.IsEmpty)
+        var bytecode = description.Bytecode;
+        if (bytecode is null || bytecode.Length == 0)
             throw new ArgumentException("Shader bytecode must not be empty.", nameof(description.Bytecode));
-        if (description.Bytecode.Length % 4 != 0)
+        if (bytecode.Length % 4 != 0)
             throw new ArgumentException("Shader bytecode length must be a multiple of 4 bytes.",
                 nameof(description.Bytecode));
         if (string.IsNullOrWhiteSpace(description.EntryPoint))
@@ -380,7 +381,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     internal static void ValidateGraphicsPipelineDescription(in GraphicsPipelineDescription description)
     {
-        var shaders = description.Shaders.Span;
+        var shaders = description.Shaders;
         if (shaders.Length == 0)
             throw new ArgumentException("Graphics pipeline must contain shaders.", nameof(description.Shaders));
 
@@ -405,7 +406,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentException("Graphics pipeline must contain a fragment shader.",
                 nameof(description.Shaders));
 
-        var colorFormats = description.ColorAttachmentFormats.Span;
+        var colorFormats = description.ColorAttachmentFormats;
         if (colorFormats.Length == 0)
             throw new InvalidOperationException("At least one color attachment format must be specified.");
         foreach (var colorFormat in colorFormats)
@@ -425,7 +426,8 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
         ValidateVertexInputDescription(description.VertexInput);
 
-        foreach (var layout in description.DescriptorSetLayouts.Span)
+        var descriptorSetLayouts = description.DescriptorSetLayouts;
+        foreach (var layout in descriptorSetLayouts)
         {
             if (layout == null)
                 throw new ArgumentException("Graphics pipeline descriptor set layouts must not contain null entries.",
@@ -459,8 +461,8 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     private static void ValidateVertexInputDescription(in VertexInputDescription description)
     {
-        var buffers = description.Buffers.Span;
-        var attributes = description.Attributes.Span;
+        var buffers = description.Buffers;
+        var attributes = description.Attributes;
 
         foreach (var buffer in buffers)
         {
