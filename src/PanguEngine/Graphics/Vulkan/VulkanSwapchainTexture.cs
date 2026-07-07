@@ -127,7 +127,10 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
         _layout = ImageLayout.Undefined;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Throws because swapchain textures are owned by the presenter.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Always thrown when called.</exception>
     public override void Destroy()
     {
         throw new InvalidOperationException("Frame color output textures are owned by the presenter.");
