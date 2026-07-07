@@ -79,7 +79,7 @@ internal sealed class DepthStencilScene : IClientTestScene
 
     private void DrawFrame()
     {
-        var depthStencilAttachment = EnsureDepthStencilAttachment();
+        EnsureDepthStencilAttachmentSize();
 
         if (!_presenter.TryBeginFrame(out var frame))
             return;
@@ -90,6 +90,8 @@ internal sealed class DepthStencilScene : IClientTestScene
         if (!_indexUploadHandle.IsCompleted)
             throw new InvalidOperationException(
                 "Index buffer upload did not complete after flushing pending uploads.");
+
+        var depthStencilAttachment = EnsureDepthStencilAttachment(frame.FrameSlot);
 
         try
         {
@@ -121,7 +123,7 @@ internal sealed class DepthStencilScene : IClientTestScene
         }
     }
 
-    private Texture EnsureDepthStencilAttachment()
+    private void EnsureDepthStencilAttachmentSize()
     {
         if (_depthStencilWidth != _presenter.Width || _depthStencilHeight != _presenter.Height)
         {
@@ -135,8 +137,11 @@ internal sealed class DepthStencilScene : IClientTestScene
             _depthStencilWidth = _presenter.Width;
             _depthStencilHeight = _presenter.Height;
         }
+    }
 
-        var frameIndex = checked((int)_presenter.CurrentFrameIndex);
+    private Texture EnsureDepthStencilAttachment(uint frameSlot)
+    {
+        var frameIndex = checked((int)frameSlot);
         return _depthStencilAttachments[frameIndex] ??= ClientTestApp.Current.Device.CreateTexture(
             new TextureDescription(
                 TextureDimension.Type2D,

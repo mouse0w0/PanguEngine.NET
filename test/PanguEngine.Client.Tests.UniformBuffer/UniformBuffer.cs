@@ -82,7 +82,7 @@ internal sealed class UniformBufferScene : IClientTestScene
 
         try
         {
-            var frameIndex = _presenter.CurrentFrameIndex;
+            var frameIndex = frame.FrameSlot;
             var descriptorIndex = checked((int)frameIndex);
             WriteFrameUniform(frameIndex);
 

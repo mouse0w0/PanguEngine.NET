@@ -33,11 +33,6 @@ public abstract class Presenter
     public abstract uint MaxFramesInFlight { get; }
 
     /// <summary>
-    /// Gets the current in-flight frame slot index.
-    /// </summary>
-    public abstract uint CurrentFrameIndex { get; }
-
-    /// <summary>
     /// Begins a graphics frame for command recording.
     /// </summary>
     /// <returns>The active graphics frame.</returns>

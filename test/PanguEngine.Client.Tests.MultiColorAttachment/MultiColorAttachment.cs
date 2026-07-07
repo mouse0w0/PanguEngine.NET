@@ -56,7 +56,7 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
 
     private void DrawFrame()
     {
-        var offscreenAttachment = EnsureOffscreenAttachment();
+        EnsureOffscreenAttachmentSize();
 
         if (!_presenter.TryBeginFrame(out var frame))
             return;
@@ -64,6 +64,8 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
         if (!_vertexUploadHandle.IsCompleted)
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
+
+        var offscreenAttachment = EnsureOffscreenAttachment(frame.FrameSlot);
 
         try
         {
@@ -91,7 +93,7 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
         }
     }
 
-    private Texture EnsureOffscreenAttachment()
+    private void EnsureOffscreenAttachmentSize()
     {
         if (_attachmentWidth != _presenter.Width || _attachmentHeight != _presenter.Height)
         {
@@ -105,8 +107,11 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
             _attachmentWidth = _presenter.Width;
             _attachmentHeight = _presenter.Height;
         }
+    }
 
-        var frameIndex = checked((int)_presenter.CurrentFrameIndex);
+    private Texture EnsureOffscreenAttachment(uint frameSlot)
+    {
+        var frameIndex = checked((int)frameSlot);
         return _offscreenAttachments[frameIndex] ??= ClientTestApp.Current.Device.CreateTexture(
             new TextureDescription(
                 TextureDimension.Type2D,

@@ -6,6 +6,16 @@ namespace PanguEngine.Graphics;
 public abstract class Frame
 {
     /// <summary>
+    /// Gets the monotonically increasing number assigned to this frame.
+    /// </summary>
+    public abstract ulong FrameNumber { get; }
+
+    /// <summary>
+    /// Gets the in-flight frame slot assigned to this frame.
+    /// </summary>
+    public abstract uint FrameSlot { get; }
+
+    /// <summary>
     /// Gets the command list for this frame.
     /// </summary>
     public abstract CommandList CommandList { get; }

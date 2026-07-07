@@ -10,18 +10,24 @@ internal sealed class VulkanFrame : Frame
     /// <summary>
     /// Creates a Vulkan graphics frame.
     /// </summary>
+    /// <param name="frameNumber">The frame number.</param>
+    /// <param name="frameSlot">The in-flight frame slot.</param>
     /// <param name="imageIndex">The swapchain image index.</param>
     /// <param name="width">The frame width.</param>
     /// <param name="height">The frame height.</param>
     /// <param name="colorOutput">The frame color output.</param>
     /// <param name="commandList">The command list for this frame.</param>
     internal VulkanFrame(
+        ulong frameNumber,
+        uint frameSlot,
         uint imageIndex,
         uint width,
         uint height,
         VulkanSwapchainTexture colorOutput,
         VulkanCommandList commandList)
     {
+        FrameNumber = frameNumber;
+        FrameSlot = frameSlot;
         ImageIndex = imageIndex;
         Width = width;
         Height = height;
@@ -29,6 +35,12 @@ internal sealed class VulkanFrame : Frame
         VulkanCommandList = commandList;
         _valid = true;
     }
+
+    /// <inheritdoc/>
+    public override ulong FrameNumber { get; }
+
+    /// <inheritdoc/>
+    public override uint FrameSlot { get; }
 
     /// <inheritdoc/>
     public override CommandList CommandList

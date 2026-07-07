@@ -11,6 +11,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     private readonly VulkanWindow _window;
     private readonly VulkanCommandPool _commandPool;
     private readonly VulkanCommandList _commandList = new();
+    private ulong _nextFrameNumber;
     private bool _destroyed;
     private VulkanFrame? _currentFrame;
 
@@ -38,9 +39,6 @@ internal sealed unsafe class VulkanPresenter : Presenter
 
     /// <inheritdoc/>
     public override uint MaxFramesInFlight => VulkanContext.MaxFramesInFlight;
-
-    /// <inheritdoc/>
-    public override uint CurrentFrameIndex => _window.CurrentFrame;
 
     /// <inheritdoc/>
     public override Frame BeginFrame()
@@ -71,12 +69,15 @@ internal sealed unsafe class VulkanPresenter : Presenter
         if (result == Result.ErrorOutOfDateKhr)
             return false;
 
-        var commandBuffer = _commandPool.CommandBuffers[_window.CurrentFrame];
+        var frameSlot = _window.CurrentFrame;
+        var commandBuffer = _commandPool.CommandBuffers[frameSlot];
         VulkanContext.Vk.ResetCommandBuffer(commandBuffer, 0);
 
         _commandList.Reset(commandBuffer);
 
         var vulkanFrame = new VulkanFrame(
+            _nextFrameNumber++,
+            frameSlot,
             imageIndex,
             _window.Extent.Width,
             _window.Extent.Height,
@@ -101,7 +102,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
         if (!ReferenceEquals(vulkanFrame, _currentFrame) || !vulkanFrame.IsValid)
             throw new InvalidOperationException("Graphics frame is not the active frame for this presenter.");
 
-        var commandBuffer = _commandPool.CommandBuffers[_window.CurrentFrame];
+        var commandBuffer = _commandPool.CommandBuffers[vulkanFrame.FrameSlot];
         var timelineValue = VulkanContext.NextGlobalTimelineValue();
 
         try
