@@ -29,40 +29,67 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
         Height = height;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the Vulkan image handle.
+    /// </summary>
     public VkImage Image { get; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the Vulkan image view handle.
+    /// </summary>
     public VkImageView ImageView { get; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets whether the texture has been destroyed.
+    /// </summary>
     public override bool IsDestroyed => _destroyed;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the texture dimensional shape.
+    /// </summary>
     public override TextureDimension Dimension => TextureDimension.Type2D;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the texture pixel format.
+    /// </summary>
     public override TextureFormat Format { get; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the texture width in pixels.
+    /// </summary>
     public override uint Width { get; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the texture height in pixels.
+    /// </summary>
     public override uint Height { get; }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the texture depth in pixels.
+    /// </summary>
     public override uint Depth => 1;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the number of mip levels.
+    /// </summary>
     public override uint MipLevels => 1;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the number of array layers.
+    /// </summary>
     public override uint ArrayLayers => 1;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the texture usage flags.
+    /// </summary>
     public override TextureUsage Usage => TextureUsage.ColorAttachment;
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets the tracked image layout for a texture subresource.
+    /// </summary>
+    /// <param name="mipLevel">The mip level.</param>
+    /// <param name="arrayLayer">The array layer.</param>
+    /// <returns>The tracked image layout.</returns>
     public ImageLayout GetLayout(uint mipLevel, uint arrayLayer)
     {
         ThrowIfDestroyed();
@@ -70,7 +97,12 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
         return _layout;
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Sets the tracked image layout for a texture subresource.
+    /// </summary>
+    /// <param name="mipLevel">The mip level.</param>
+    /// <param name="arrayLayer">The array layer.</param>
+    /// <param name="layout">The image layout.</param>
     public void SetLayout(uint mipLevel, uint arrayLayer, ImageLayout layout)
     {
         ThrowIfDestroyed();
