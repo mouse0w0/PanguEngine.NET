@@ -77,15 +77,18 @@ internal sealed class TriangleScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0, 0, 0, 1)),
-            ]));
+            commands.BeginRendering(new RenderingDescription(
+                frame.Width,
+                frame.Height,
+                [
+                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0, 0, 0, 1)),
+                ]));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
             commands.Draw(3);
             commands.EndRendering();
-            commands.PrepareForPresent();
+            commands.PrepareForPresent(frame.ColorOutput);
             commands.End();
         }
         finally

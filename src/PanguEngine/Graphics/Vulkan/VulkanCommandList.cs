@@ -7,7 +7,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanCommandList : CommandList
 {
-    private VulkanFrame? _frame;
     private CommandBuffer _commandBuffer;
     private bool _begun;
     private bool _ended;
@@ -28,13 +27,11 @@ internal sealed unsafe class VulkanCommandList : CommandList
     internal bool IsBegun => _begun;
 
     /// <summary>
-    /// Resets this command list for a frame.
+    /// Resets this command list for command recording.
     /// </summary>
-    /// <param name="frame">The owning frame.</param>
     /// <param name="commandBuffer">The command buffer to record.</param>
-    internal void Reset(VulkanFrame frame, CommandBuffer commandBuffer)
+    internal void Reset(CommandBuffer commandBuffer)
     {
-        _frame = frame;
         _commandBuffer = commandBuffer;
         _begun = false;
         _ended = false;
@@ -69,20 +66,22 @@ internal sealed unsafe class VulkanCommandList : CommandList
         EnsureRecording();
         if (_rendering)
             throw new InvalidOperationException("Rendering has already begun.");
-        var frame = GetFrame();
-        if (frame.VulkanColorOutput.GetLayout(0, 0) == ImageLayout.PresentSrcKhr)
-            throw new InvalidOperationException(
-                "Rendering cannot begin after the frame target was transitioned for presentation.");
+        if (description.Width == 0)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Rendering width must be greater than zero.");
+        if (description.Height == 0)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Rendering height must be greater than zero.");
 
         var colorDescriptions = description.ColorAttachments;
-        var colorTextures = GetColorAttachments(colorDescriptions, frame);
+        var colorTextures = GetColorAttachments(colorDescriptions, description.Width, description.Height);
         var renderingColorFormats = new TextureFormat[colorTextures.Length];
         for (var i = 0; i < colorTextures.Length; i++)
             renderingColorFormats[i] = colorTextures[i].Format;
 
         var depthStencilDescription = description.DepthStencilAttachment;
         var depthStencilTexture = depthStencilDescription.HasValue
-            ? GetDepthStencilAttachment(depthStencilDescription.Value.Attachment, frame)
+            ? GetDepthStencilAttachment(depthStencilDescription.Value.Attachment, description.Width, description.Height)
             : null;
         var hasDepthAttachment = depthStencilTexture is not null &&
                                  VulkanMapping.HasDepthAspect(depthStencilTexture.Format);
@@ -174,7 +173,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
             RenderArea = new Rect2D
             {
                 Offset = new Offset2D(0, 0),
-                Extent = new Extent2D { Width = frame.Width, Height = frame.Height },
+                Extent = new Extent2D { Width = description.Width, Height = description.Height },
             },
             LayerCount = 1,
             ColorAttachmentCount = (uint)colorTextures.Length,
@@ -354,13 +353,17 @@ internal sealed unsafe class VulkanCommandList : CommandList
     }
 
     /// <inheritdoc/>
-    public override void PrepareForPresent()
+    public override void PrepareForPresent(Texture colorOutput)
     {
         EnsureRecording();
-        if (_rendering)
-            throw new InvalidOperationException("Rendering must end before preparing the frame for presentation.");
+        ArgumentNullException.ThrowIfNull(colorOutput);
 
-        TransitionTextureLayout(GetFrame().VulkanColorOutput, ImageLayout.PresentSrcKhr,
+        var swapchainOutput = colorOutput as VulkanSwapchainTexture
+                              ?? throw new InvalidOperationException(
+                                  "Presentation output was not created by the Vulkan backend.");
+        swapchainOutput.ThrowIfDestroyed();
+
+        TransitionTextureLayout(swapchainOutput, ImageLayout.PresentSrcKhr,
             PipelineStageFlags2.BottomOfPipeBit, AccessFlags2.None);
     }
 
@@ -387,9 +390,6 @@ internal sealed unsafe class VulkanCommandList : CommandList
         if (_rendering)
             throw new InvalidOperationException("Rendering must end before frame submission.");
 
-        if (GetFrame().VulkanColorOutput.GetLayout(0, 0) != ImageLayout.PresentSrcKhr)
-            throw new InvalidOperationException("The frame must be prepared for presentation before submission.");
-
         if (!_ended)
             EndCommandBuffer();
     }
@@ -400,7 +400,6 @@ internal sealed unsafe class VulkanCommandList : CommandList
     internal void Invalidate()
     {
         _valid = false;
-        _frame = null;
         _commandBuffer = default;
         _graphicsPipeline = null;
         _renderingColorFormats = [];
@@ -429,20 +428,21 @@ internal sealed unsafe class VulkanCommandList : CommandList
         }
     }
 
-    private static IVulkanTexture[] GetColorAttachments(
+    private IVulkanTexture[] GetColorAttachments(
         ReadOnlySpan<ColorAttachmentDescription> attachments,
-        VulkanFrame frame)
+        uint width,
+        uint height)
     {
         if (attachments.Length == 0)
             throw new InvalidOperationException("Rendering must include at least one color attachment.");
 
         var result = new IVulkanTexture[attachments.Length];
         for (var i = 0; i < attachments.Length; i++)
-            result[i] = GetColorAttachment(attachments[i].Attachment, frame);
+            result[i] = GetColorAttachment(attachments[i].Attachment, width, height);
         return result;
     }
 
-    private static IVulkanTexture GetColorAttachment(Texture attachment, VulkanFrame frame)
+    private IVulkanTexture GetColorAttachment(Texture attachment, uint width, uint height)
     {
         ArgumentNullException.ThrowIfNull(attachment);
         var texture = attachment as IVulkanTexture
@@ -450,16 +450,21 @@ internal sealed unsafe class VulkanCommandList : CommandList
                           "Color attachment was not created by the Vulkan backend.");
         if (texture.IsDestroyed)
             throw new ObjectDisposedException(attachment.GetType().Name);
-        if (texture is VulkanSwapchainTexture && !ReferenceEquals(texture, frame.VulkanColorOutput))
-            throw new InvalidOperationException("Swapchain color attachments must be the active frame color output.");
+        if (texture is VulkanSwapchainTexture swapchainTexture)
+        {
+            if (swapchainTexture.GetLayout(0, 0) == ImageLayout.PresentSrcKhr)
+                throw new InvalidOperationException(
+                    "Rendering cannot begin after the frame target was transitioned for presentation.");
+        }
+
         if (texture.Dimension != TextureDimension.Type2D)
             throw new InvalidOperationException("Color attachment must be a 2D texture.");
         if (texture.MipLevels != 1)
             throw new InvalidOperationException("Color attachment must have exactly one mip level.");
         if (texture.ArrayLayers != 1)
             throw new InvalidOperationException("Color attachment must have exactly one array layer.");
-        if (texture.Width != frame.Width || texture.Height != frame.Height)
-            throw new InvalidOperationException("Color attachment size must match the active frame size.");
+        if (texture.Width != width || texture.Height != height)
+            throw new InvalidOperationException("Color attachment size must match the rendering size.");
         if (!texture.Usage.HasFlag(TextureUsage.ColorAttachment))
             throw new InvalidOperationException("Texture was not created with ColorAttachment usage.");
         if (texture.Format == TextureFormat.Undefined || VulkanMapping.IsDepthStencilFormat(texture.Format))
@@ -467,7 +472,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         return texture;
     }
 
-    private static IVulkanTexture? GetDepthStencilAttachment(Texture? attachment, VulkanFrame frame)
+    private static IVulkanTexture? GetDepthStencilAttachment(Texture? attachment, uint width, uint height)
     {
         if (attachment is null)
             return null;
@@ -484,8 +489,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
             throw new InvalidOperationException("Depth/stencil attachment must have exactly one mip level.");
         if (texture.ArrayLayers != 1)
             throw new InvalidOperationException("Depth/stencil attachment must have exactly one array layer.");
-        if (texture.Width != frame.Width || texture.Height != frame.Height)
-            throw new InvalidOperationException("Depth/stencil attachment size must match the active frame size.");
+        if (texture.Width != width || texture.Height != height)
+            throw new InvalidOperationException("Depth/stencil attachment size must match the rendering size.");
         if (!texture.Usage.HasFlag(TextureUsage.DepthStencilAttachment))
             throw new InvalidOperationException("Texture was not created with DepthStencilAttachment usage.");
         if (!VulkanMapping.IsDepthStencilFormat(texture.Format))
@@ -527,19 +532,10 @@ internal sealed unsafe class VulkanCommandList : CommandList
         texture.SetLayout(0, 0, newLayout);
     }
 
-    private VulkanFrame GetFrame()
-    {
-        var frame = _frame ?? throw new InvalidOperationException("Command list is not bound to an active frame.");
-        frame.EnsureValid();
-        return frame;
-    }
-
     private void EnsureUsable()
     {
         if (!_valid)
             throw new InvalidOperationException("Command list is no longer valid.");
-
-        _ = GetFrame();
     }
 
     private void EnsureRecording()

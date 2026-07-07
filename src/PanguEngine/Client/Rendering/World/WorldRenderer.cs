@@ -42,9 +42,12 @@ internal sealed class WorldRenderer
 
             var commandList = frame.CommandList;
             commandList.Begin();
-            commandList.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
-            ]));
+            commandList.BeginRendering(new RenderingDescription(
+                frame.Width,
+                frame.Height,
+                [
+                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
+                ]));
             commandList.SetViewport(0, 0, frame.Width, frame.Height);
             commandList.SetScissor(0, 0, frame.Width, frame.Height);
 
@@ -52,7 +55,7 @@ internal sealed class WorldRenderer
                 _chunkRenderer.Draw(commandList);
 
             commandList.EndRendering();
-            commandList.PrepareForPresent();
+            commandList.PrepareForPresent(frame.ColorOutput);
             commandList.End();
         }
         finally

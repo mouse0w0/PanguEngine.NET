@@ -74,6 +74,8 @@ internal sealed unsafe class VulkanPresenter : Presenter
         var commandBuffer = _commandPool.CommandBuffers[_window.CurrentFrame];
         VulkanContext.Vk.ResetCommandBuffer(commandBuffer, 0);
 
+        _commandList.Reset(commandBuffer);
+
         var vulkanFrame = new VulkanFrame(
             imageIndex,
             _window.Extent.Width,
@@ -81,7 +83,6 @@ internal sealed unsafe class VulkanPresenter : Presenter
             _window.ColorOutputs[imageIndex],
             _commandList);
 
-        _commandList.Reset(vulkanFrame, commandBuffer);
         _currentFrame = vulkanFrame;
         frame = vulkanFrame;
         return true;

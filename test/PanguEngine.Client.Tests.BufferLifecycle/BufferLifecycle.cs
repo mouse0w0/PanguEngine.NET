@@ -61,9 +61,12 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription([
-                new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
-            ]));
+            commands.BeginRendering(new RenderingDescription(
+                frame.Width,
+                frame.Height,
+                [
+                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
+                ]));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
@@ -75,7 +78,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
             commands.SetVertexBuffer(0, _mesh.Buffer);
             commands.Draw(_mesh.VertexCount);
             commands.EndRendering();
-            commands.PrepareForPresent();
+            commands.PrepareForPresent(frame.ColorOutput);
             commands.End();
 
             _mesh.Buffer.Destroy();

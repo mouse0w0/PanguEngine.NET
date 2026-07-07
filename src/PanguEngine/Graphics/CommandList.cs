@@ -1,7 +1,7 @@
 namespace PanguEngine.Graphics;
 
 /// <summary>
-/// Represents a backend-independent graphics command recording object for the active frame.
+/// Represents a backend-independent graphics command recording object.
 /// </summary>
 public abstract class CommandList
 {
@@ -11,7 +11,7 @@ public abstract class CommandList
     public abstract void Begin();
 
     /// <summary>
-    /// Begins rendering for the active frame target.
+    /// Begins rendering for the described attachments.
     /// </summary>
     /// <param name="description">The rendering description.</param>
     public abstract void BeginRendering(in RenderingDescription description);
@@ -93,9 +93,10 @@ public abstract class CommandList
     public abstract void EndRendering();
 
     /// <summary>
-    /// Prepares the active frame color output for presentation.
+    /// Prepares a color output for presentation.
     /// </summary>
-    public abstract void PrepareForPresent();
+    /// <param name="colorOutput">The color output to present.</param>
+    public abstract void PrepareForPresent(Texture colorOutput);
 
     /// <summary>
     /// Ends command recording.
