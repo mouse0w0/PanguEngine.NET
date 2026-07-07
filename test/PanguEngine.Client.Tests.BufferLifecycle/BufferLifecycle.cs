@@ -62,7 +62,10 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         {
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new ClearColor(0.008f, 0.01f, 0.016f, 1)));
+            commands.BeginRendering(new RenderingDescription(new[]
+            {
+                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
+            }));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
@@ -74,6 +77,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
             commands.SetVertexBuffer(0, _mesh.Buffer);
             commands.Draw(_mesh.VertexCount);
             commands.EndRendering();
+            commands.PrepareForPresent();
             commands.End();
 
             _mesh.Buffer.Destroy();
@@ -141,7 +145,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
-            ColorAttachmentFormat: colorFormat));
+            ColorAttachmentFormats: new[] { colorFormat }));
     }
 
     private static VertexInputDescription CreateVertexInputDescription()

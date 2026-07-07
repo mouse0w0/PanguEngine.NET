@@ -9,6 +9,8 @@
     <Project Path="test/PanguEngine.Client.Tests.DepthStencil/PanguEngine.Client.Tests.DepthStencil.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.IndexedQuad/PanguEngine.Client.Tests.IndexedQuad.csproj"/>
     <Project
+            Path="test/PanguEngine.Client.Tests.MultiColorAttachment/PanguEngine.Client.Tests.MultiColorAttachment.csproj"/>
+    <Project
             Path="test/PanguEngine.Client.Tests.TextureCubeMapUpload/PanguEngine.Client.Tests.TextureCubeMapUpload.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.TextureMipUpload/PanguEngine.Client.Tests.TextureMipUpload.csproj"/>
     <Project

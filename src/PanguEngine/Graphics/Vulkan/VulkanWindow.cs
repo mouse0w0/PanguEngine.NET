@@ -33,6 +33,7 @@ public sealed unsafe class VulkanWindow : Window
     private SwapchainKHR _swapchain;
     private Image[]? _images;
     private ImageView[]? _imageViews;
+    private VulkanSwapchainTexture[]? _colorOutputs;
     private Semaphore[]? _imageAvailableSemaphores;
     private Semaphore[]? _renderFinishedSemaphores;
     private Fence[]? _inFlightFences;
@@ -56,6 +57,9 @@ public sealed unsafe class VulkanWindow : Window
 
     /// <summary>The image views for each swapchain image.</summary>
     public ImageView[] ImageViews => _imageViews!;
+
+    /// <summary>The color output textures for each swapchain image.</summary>
+    internal VulkanSwapchainTexture[] ColorOutputs => _colorOutputs!;
 
     /// <summary>The current frame index within the in-flight frame ring.</summary>
     public uint CurrentFrame { get; private set; }
@@ -581,6 +585,8 @@ public sealed unsafe class VulkanWindow : Window
     private void CreateImageViews()
     {
         _imageViews = new ImageView[_images!.Length];
+        _colorOutputs = new VulkanSwapchainTexture[_images.Length];
+        var colorFormat = VulkanMapping.FromVulkanFormat(ImageFormat);
 
         for (var i = 0; i < _images.Length; i++)
         {
@@ -610,6 +616,9 @@ public sealed unsafe class VulkanWindow : Window
             if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in createInfo, null, out _imageViews[i]) !=
                 Result.Success)
                 throw new InvalidOperationException("Failed to create image views.");
+
+            _colorOutputs[i] = new VulkanSwapchainTexture(_images[i], _imageViews[i], colorFormat,
+                Extent.Width, Extent.Height);
         }
     }
 
@@ -646,6 +655,13 @@ public sealed unsafe class VulkanWindow : Window
 
     private void DestroyImageViews()
     {
+        if (_colorOutputs is not null)
+        {
+            foreach (var colorOutput in _colorOutputs)
+                colorOutput.Invalidate();
+            _colorOutputs = null;
+        }
+
         foreach (var imageView in _imageViews!)
             VulkanContext.Vk.DestroyImageView(VulkanContext.Device, imageView, null);
     }

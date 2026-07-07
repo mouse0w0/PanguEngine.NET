@@ -1,5 +1,3 @@
-using Silk.NET.Vulkan;
-
 namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>
@@ -13,27 +11,21 @@ internal sealed class VulkanFrame : Frame
     /// Creates a Vulkan graphics frame.
     /// </summary>
     /// <param name="imageIndex">The swapchain image index.</param>
-    /// <param name="image">The swapchain image.</param>
-    /// <param name="imageView">The swapchain image view.</param>
     /// <param name="width">The frame width.</param>
     /// <param name="height">The frame height.</param>
-    /// <param name="colorFormat">The frame color format.</param>
+    /// <param name="colorOutput">The frame color output.</param>
     /// <param name="commandList">The command list for this frame.</param>
     internal VulkanFrame(
         uint imageIndex,
-        Image image,
-        ImageView imageView,
         uint width,
         uint height,
-        TextureFormat colorFormat,
+        VulkanSwapchainTexture colorOutput,
         VulkanCommandList commandList)
     {
         ImageIndex = imageIndex;
-        Image = image;
-        ImageView = imageView;
         Width = width;
         Height = height;
-        ColorFormat = colorFormat;
+        VulkanColorOutput = colorOutput;
         VulkanCommandList = commandList;
         _valid = true;
     }
@@ -55,7 +47,14 @@ internal sealed class VulkanFrame : Frame
     public override uint Height { get; }
 
     /// <inheritdoc/>
-    public override TextureFormat ColorFormat { get; }
+    public override Texture ColorOutput
+    {
+        get
+        {
+            EnsureValid();
+            return VulkanColorOutput;
+        }
+    }
 
     /// <summary>
     /// Gets the swapchain image index.
@@ -63,14 +62,9 @@ internal sealed class VulkanFrame : Frame
     internal uint ImageIndex { get; }
 
     /// <summary>
-    /// Gets the swapchain image.
+    /// Gets the Vulkan color output for this frame.
     /// </summary>
-    internal Image Image { get; }
-
-    /// <summary>
-    /// Gets the swapchain image view.
-    /// </summary>
-    internal ImageView ImageView { get; }
+    internal VulkanSwapchainTexture VulkanColorOutput { get; }
 
     /// <summary>
     /// Gets the Vulkan command list for this frame.

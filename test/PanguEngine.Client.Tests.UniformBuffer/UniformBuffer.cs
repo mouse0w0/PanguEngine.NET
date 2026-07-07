@@ -89,7 +89,10 @@ internal sealed class UniformBufferScene : IClientTestScene
 
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(new ClearColor(0.01f, 0.012f, 0.018f, 1)));
+            commands.BeginRendering(new RenderingDescription(new[]
+            {
+                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.012f, 0.018f, 1)),
+            }));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
@@ -97,6 +100,7 @@ internal sealed class UniformBufferScene : IClientTestScene
             commands.SetDescriptorSet(0, _descriptorSets[descriptorIndex]);
             commands.Draw((uint)_vertices.Length);
             commands.EndRendering();
+            commands.PrepareForPresent();
             commands.End();
         }
         finally
@@ -180,7 +184,7 @@ internal sealed class UniformBufferScene : IClientTestScene
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
-            ColorAttachmentFormat: colorFormat,
+            ColorAttachmentFormats: new[] { colorFormat },
             DescriptorSetLayouts: new[] { _descriptorSetLayout }));
     }
 

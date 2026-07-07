@@ -3,60 +3,51 @@ using PanguEngine.Graphics;
 using PanguEngine.Windowing;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
-namespace PanguEngine.Client.Tests.IndexedQuad;
+namespace PanguEngine.Client.Tests.MultiColorAttachment;
 
-/// <summary>
-/// Entry point for the indexed quad graphics test.
-/// </summary>
-internal static class IndexedQuad
+internal static class MultiColorAttachment
 {
     private static void Main()
     {
-        ClientTestApp.Run(new IndexedQuadScene());
+        ClientTestApp.Run(new MultiColorAttachmentScene());
     }
 }
 
-/// <summary>
-/// Renders a quad with an index buffer.
-/// </summary>
-internal sealed class IndexedQuadScene : IClientTestScene
+internal sealed class MultiColorAttachmentScene : IClientTestScene
 {
     private readonly Vertex[] _vertices =
     [
-        new(-0.5f, -0.5f, 1, 0, 0),
-        new(0.5f, -0.5f, 0, 1, 0),
-        new(0.5f, 0.5f, 0, 0, 1),
-        new(-0.5f, 0.5f, 1, 1, 0),
+        new(0.0f, -0.6f, 0.95f, 0.2f, 0.1f),
+        new(0.6f, 0.5f, 0.1f, 0.85f, 0.25f),
+        new(-0.6f, 0.5f, 0.2f, 0.35f, 1.0f)
     ];
-
-    private readonly ushort[] _indices = [0, 1, 2, 2, 3, 0];
 
     private Shader _vertShader = null!;
     private Shader _fragShader = null!;
     private GraphicsPipeline _pipeline = null!;
     private GraphicsBuffer _vertexBuffer = null!;
-    private GraphicsBuffer _indexBuffer = null!;
     private UploadHandle _vertexUploadHandle = null!;
-    private UploadHandle _indexUploadHandle = null!;
     private Presenter _presenter = null!;
+    private Texture?[] _offscreenAttachments = [];
+    private uint _attachmentWidth;
+    private uint _attachmentHeight;
 
-    /// <inheritdoc/>
-    public string Name => "IndexedQuad";
+    public string Name => "MultiColorAttachment";
 
-    /// <inheritdoc/>
     public void Initialize(Window window)
     {
         _presenter = window.Presenter;
-        CreateBuffers();
+        _offscreenAttachments = new Texture?[checked((int)_presenter.MaxFramesInFlight)];
+        CreateBuffer();
         CreateShaders();
         CreatePipeline(_presenter.ColorFormat);
         window.Render += (_, _) => DrawFrame();
     }
 
-    /// <inheritdoc/>
     public void Destroy()
     {
-        _indexBuffer.Destroy();
+        foreach (var attachment in _offscreenAttachments)
+            attachment?.Destroy();
         _vertexBuffer.Destroy();
         _pipeline.Destroy();
         _fragShader.Destroy();
@@ -65,15 +56,14 @@ internal sealed class IndexedQuadScene : IClientTestScene
 
     private void DrawFrame()
     {
+        var offscreenAttachment = EnsureOffscreenAttachment();
+
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
         if (!_vertexUploadHandle.IsCompleted)
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
-        if (!_indexUploadHandle.IsCompleted)
-            throw new InvalidOperationException(
-                "Index buffer upload did not complete after flushing pending uploads.");
 
         var activeFrame = frame!;
         try
@@ -82,14 +72,14 @@ internal sealed class IndexedQuadScene : IClientTestScene
             commands.Begin();
             commands.BeginRendering(new RenderingDescription(new[]
             {
-                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
+                new ColorAttachmentDescription(activeFrame.ColorOutput, new ClearColor(0.02f, 0.03f, 0.05f, 1)),
+                new ColorAttachmentDescription(offscreenAttachment, new ClearColor(0, 0, 0, 1)),
             }));
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetScissor(0, 0, activeFrame.Width, activeFrame.Height);
             commands.SetVertexBuffer(0, _vertexBuffer);
-            commands.SetIndexBuffer(_indexBuffer, IndexFormat.UInt16);
-            commands.DrawIndexed((uint)_indices.Length);
+            commands.Draw((uint)_vertices.Length);
             commands.EndRendering();
             commands.PrepareForPresent();
             commands.End();
@@ -100,7 +90,35 @@ internal sealed class IndexedQuadScene : IClientTestScene
         }
     }
 
-    private void CreateBuffers()
+    private Texture EnsureOffscreenAttachment()
+    {
+        if (_attachmentWidth != _presenter.Width || _attachmentHeight != _presenter.Height)
+        {
+            ClientTestApp.Current.Device.WaitIdle();
+            for (var i = 0; i < _offscreenAttachments.Length; i++)
+            {
+                _offscreenAttachments[i]?.Destroy();
+                _offscreenAttachments[i] = null;
+            }
+
+            _attachmentWidth = _presenter.Width;
+            _attachmentHeight = _presenter.Height;
+        }
+
+        var frameIndex = checked((int)_presenter.CurrentFrameIndex);
+        return _offscreenAttachments[frameIndex] ??= ClientTestApp.Current.Device.CreateTexture(
+            new TextureDescription(
+                TextureDimension.Type2D,
+                _presenter.ColorFormat,
+                _attachmentWidth,
+                _attachmentHeight,
+                1,
+                1,
+                1,
+                TextureUsage.ColorAttachment));
+    }
+
+    private void CreateBuffer()
     {
         var vertexBufferSize = (ulong)(Marshal.SizeOf<Vertex>() * _vertices.Length);
         _vertexBuffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
@@ -108,35 +126,28 @@ internal sealed class IndexedQuadScene : IClientTestScene
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
         _vertexUploadHandle = ClientTestApp.Current.Device.UploadBuffer(_vertexBuffer, _vertices);
-
-        var indexBufferSize = (ulong)(sizeof(ushort) * _indices.Length);
-        _indexBuffer = ClientTestApp.Current.Device.CreateBuffer(new BufferDescription(
-            indexBufferSize,
-            BufferUsage.TransferDestination | BufferUsage.Index,
-            MemoryUsage.GpuOnly));
-        _indexUploadHandle = ClientTestApp.Current.Device.UploadBuffer(_indexBuffer, _indices);
     }
 
     private void CreateShaders()
     {
         var basePath = AppContext.BaseDirectory;
-        var vertPath = Path.Combine(basePath, "shaders", "indexed_quad.vert");
-        var fragPath = Path.Combine(basePath, "shaders", "indexed_quad.frag");
+        var vertPath = Path.Combine(basePath, "shaders", "multi_color.vert");
+        var fragPath = Path.Combine(basePath, "shaders", "multi_color.frag");
 
         var vertSource = File.ReadAllText(vertPath);
         var fragSource = File.ReadAllText(fragPath);
 
-        var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "indexed_quad.vert");
-        var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "indexed_quad.frag");
+        var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "multi_color.vert");
+        var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "multi_color.frag");
 
         _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Vertex,
             vertBytecode,
-            Name: "indexed_quad.vert"));
+            Name: "multi_color.vert"));
         _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
             ShaderStage.Fragment,
             fragBytecode,
-            Name: "indexed_quad.frag"));
+            Name: "multi_color.frag"));
     }
 
     private void CreatePipeline(TextureFormat colorFormat)
@@ -144,7 +155,7 @@ internal sealed class IndexedQuadScene : IClientTestScene
         _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertShader, _fragShader },
             CreateVertexInputDescription(),
-            ColorAttachmentFormats: new[] { colorFormat }));
+            ColorAttachmentFormats: new[] { colorFormat, colorFormat }));
     }
 
     private static VertexInputDescription CreateVertexInputDescription()

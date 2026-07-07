@@ -27,7 +27,12 @@ public enum TextureUsage
     Sampled = 4,
 
     /// <summary>
+    /// Texture can be used as a color rendering attachment.
+    /// </summary>
+    ColorAttachment = 8,
+
+    /// <summary>
     /// Texture can be used as a depth/stencil rendering attachment.
     /// </summary>
-    DepthStencilAttachment = 8
+    DepthStencilAttachment = 16
 }

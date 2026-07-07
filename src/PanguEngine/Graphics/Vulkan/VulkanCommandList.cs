@@ -12,9 +12,9 @@ internal sealed unsafe class VulkanCommandList : CommandList
     private bool _begun;
     private bool _ended;
     private bool _rendering;
-    private bool _presentTransitionRecorded;
     private bool _valid;
     private VulkanGraphicsPipeline? _graphicsPipeline;
+    private TextureFormat[] _renderingColorFormats = [];
     private TextureFormat _renderingDepthStencilFormat;
 
     /// <summary>
@@ -39,9 +39,9 @@ internal sealed unsafe class VulkanCommandList : CommandList
         _begun = false;
         _ended = false;
         _rendering = false;
-        _presentTransitionRecorded = false;
         _valid = true;
         _graphicsPipeline = null;
+        _renderingColorFormats = [];
         _renderingDepthStencilFormat = TextureFormat.Undefined;
     }
 
@@ -69,75 +69,75 @@ internal sealed unsafe class VulkanCommandList : CommandList
         EnsureRecording();
         if (_rendering)
             throw new InvalidOperationException("Rendering has already begun.");
-        if (_presentTransitionRecorded)
+        var frame = GetFrame();
+        if (frame.VulkanColorOutput.GetLayout(0, 0) == ImageLayout.PresentSrcKhr)
             throw new InvalidOperationException(
                 "Rendering cannot begin after the frame target was transitioned for presentation.");
 
-        var frame = GetFrame();
-        var depthStencilTexture = GetDepthStencilAttachment(description.DepthStencilAttachment, frame);
+        var colorDescriptions = description.ColorAttachments.Span;
+        var colorTextures = GetColorAttachments(colorDescriptions, frame);
+        var renderingColorFormats = new TextureFormat[colorTextures.Length];
+        for (var i = 0; i < colorTextures.Length; i++)
+            renderingColorFormats[i] = colorTextures[i].Format;
+
+        var depthStencilDescription = description.DepthStencilAttachment;
+        var depthStencilTexture = depthStencilDescription.HasValue
+            ? GetDepthStencilAttachment(depthStencilDescription.Value.Attachment, frame)
+            : null;
         var hasDepthAttachment = depthStencilTexture is not null &&
                                  VulkanMapping.HasDepthAspect(depthStencilTexture.Format);
         var hasStencilAttachment = depthStencilTexture is not null &&
                                    VulkanMapping.HasStencilAspect(depthStencilTexture.Format);
         var renderingDepthStencilFormat = depthStencilTexture?.Format ?? TextureFormat.Undefined;
         if (_graphicsPipeline is not null)
+        {
+            ValidateColorFormats(_graphicsPipeline, renderingColorFormats);
             ValidateDepthStencilFormat(_graphicsPipeline, renderingDepthStencilFormat);
+        }
 
-        RecordImageTransition(ImageLayout.Undefined, ImageLayout.ColorAttachmentOptimal,
-            PipelineStageFlags2.TopOfPipeBit, AccessFlags2.None,
-            PipelineStageFlags2.ColorAttachmentOutputBit, AccessFlags2.ColorAttachmentWriteBit);
-
-        ClearValue clearColor = new()
+        var colorAttachments = stackalloc RenderingAttachmentInfo[colorTextures.Length];
+        for (var i = 0; i < colorTextures.Length; i++)
         {
-            Color = new ClearColorValue
+            TransitionTextureLayout(colorTextures[i], ImageLayout.ColorAttachmentOptimal,
+                PipelineStageFlags2.ColorAttachmentOutputBit, AccessFlags2.ColorAttachmentWriteBit);
+
+            var clearColor = colorDescriptions[i].ClearColor;
+            colorAttachments[i] = new RenderingAttachmentInfo
             {
-                Float32_0 = description.ClearColor.R,
-                Float32_1 = description.ClearColor.G,
-                Float32_2 = description.ClearColor.B,
-                Float32_3 = description.ClearColor.A,
-            },
-        };
-
-        RenderingAttachmentInfo colorAttachment = new()
-        {
-            SType = StructureType.RenderingAttachmentInfo,
-            ImageView = frame.ImageView,
-            ImageLayout = ImageLayout.ColorAttachmentOptimal,
-            LoadOp = VulkanMapping.ToVulkanLoadOperation(description.LoadOperation),
-            StoreOp = VulkanMapping.ToVulkanStoreOperation(description.StoreOperation),
-            ClearValue = clearColor,
-        };
+                SType = StructureType.RenderingAttachmentInfo,
+                ImageView = colorTextures[i].ImageView,
+                ImageLayout = ImageLayout.ColorAttachmentOptimal,
+                LoadOp = VulkanMapping.ToVulkanLoadOperation(colorDescriptions[i].LoadOperation),
+                StoreOp = VulkanMapping.ToVulkanStoreOperation(colorDescriptions[i].StoreOperation),
+                ClearValue = new ClearValue
+                {
+                    Color = new ClearColorValue
+                    {
+                        Float32_0 = clearColor.R,
+                        Float32_1 = clearColor.G,
+                        Float32_2 = clearColor.B,
+                        Float32_3 = clearColor.A,
+                    },
+                },
+            };
+        }
 
         RenderingAttachmentInfo depthAttachment = default;
         RenderingAttachmentInfo stencilAttachment = default;
 
         if (depthStencilTexture is not null)
         {
-            var oldLayout = depthStencilTexture.GetLayout(0, 0);
-            if (oldLayout != ImageLayout.DepthStencilAttachmentOptimal)
-            {
-                VulkanBarrier.RecordImageLayoutTransition(
-                    _commandBuffer,
-                    depthStencilTexture.Image,
-                    0,
-                    0,
-                    1,
-                    VulkanMapping.ToVulkanImageAspect(depthStencilTexture.Format),
-                    oldLayout,
-                    ImageLayout.DepthStencilAttachmentOptimal,
-                    VulkanBarrier.GetStageForLayout(oldLayout),
-                    VulkanBarrier.GetAccessForLayout(oldLayout),
-                    PipelineStageFlags2.EarlyFragmentTestsBit | PipelineStageFlags2.LateFragmentTestsBit,
-                    AccessFlags2.DepthStencilAttachmentReadBit | AccessFlags2.DepthStencilAttachmentWriteBit);
-                depthStencilTexture.SetLayout(0, 0, ImageLayout.DepthStencilAttachmentOptimal);
-            }
+            var depthStencil = depthStencilDescription!.Value;
+            TransitionTextureLayout(depthStencilTexture, ImageLayout.DepthStencilAttachmentOptimal,
+                PipelineStageFlags2.EarlyFragmentTestsBit | PipelineStageFlags2.LateFragmentTestsBit,
+                AccessFlags2.DepthStencilAttachmentReadBit | AccessFlags2.DepthStencilAttachmentWriteBit);
 
             ClearValue depthStencilClear = new()
             {
                 DepthStencil = new ClearDepthStencilValue
                 {
-                    Depth = description.DepthClearValue,
-                    Stencil = description.StencilClearValue,
+                    Depth = depthStencil.DepthClearValue,
+                    Stencil = depthStencil.StencilClearValue,
                 },
             };
 
@@ -148,8 +148,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
                     SType = StructureType.RenderingAttachmentInfo,
                     ImageView = depthStencilTexture.ImageView,
                     ImageLayout = ImageLayout.DepthStencilAttachmentOptimal,
-                    LoadOp = VulkanMapping.ToVulkanLoadOperation(description.DepthLoadOperation),
-                    StoreOp = VulkanMapping.ToVulkanStoreOperation(description.DepthStoreOperation),
+                    LoadOp = VulkanMapping.ToVulkanLoadOperation(depthStencil.DepthLoadOperation),
+                    StoreOp = VulkanMapping.ToVulkanStoreOperation(depthStencil.DepthStoreOperation),
                     ClearValue = depthStencilClear,
                 };
             }
@@ -161,8 +161,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
                     SType = StructureType.RenderingAttachmentInfo,
                     ImageView = depthStencilTexture.ImageView,
                     ImageLayout = ImageLayout.DepthStencilAttachmentOptimal,
-                    LoadOp = VulkanMapping.ToVulkanLoadOperation(description.StencilLoadOperation),
-                    StoreOp = VulkanMapping.ToVulkanStoreOperation(description.StencilStoreOperation),
+                    LoadOp = VulkanMapping.ToVulkanLoadOperation(depthStencil.StencilLoadOperation),
+                    StoreOp = VulkanMapping.ToVulkanStoreOperation(depthStencil.StencilStoreOperation),
                     ClearValue = depthStencilClear,
                 };
             }
@@ -177,8 +177,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
                 Extent = new Extent2D { Width = frame.Width, Height = frame.Height },
             },
             LayerCount = 1,
-            ColorAttachmentCount = 1,
-            PColorAttachments = &colorAttachment,
+            ColorAttachmentCount = (uint)colorTextures.Length,
+            PColorAttachments = colorAttachments,
         };
 
         if (hasDepthAttachment)
@@ -188,6 +188,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
 
         VulkanContext.Vk.CmdBeginRendering(_commandBuffer, &renderingInfo);
         _rendering = true;
+        _renderingColorFormats = renderingColorFormats;
         _renderingDepthStencilFormat = renderingDepthStencilFormat;
     }
 
@@ -235,7 +236,10 @@ internal sealed unsafe class VulkanCommandList : CommandList
 
         vulkanPipeline.ThrowIfDestroyed();
         if (_rendering)
+        {
+            ValidateColorFormats(vulkanPipeline, _renderingColorFormats);
             ValidateDepthStencilFormat(vulkanPipeline, _renderingDepthStencilFormat);
+        }
 
         VulkanContext.Vk.CmdBindPipeline(_commandBuffer, PipelineBindPoint.Graphics, vulkanPipeline.Pipeline);
         _graphicsPipeline = vulkanPipeline;
@@ -345,9 +349,19 @@ internal sealed unsafe class VulkanCommandList : CommandList
 
         VulkanContext.Vk.CmdEndRendering(_commandBuffer);
         _rendering = false;
+        _renderingColorFormats = [];
         _renderingDepthStencilFormat = TextureFormat.Undefined;
-        RecordPresentTransition(ImageLayout.ColorAttachmentOptimal,
-            PipelineStageFlags2.ColorAttachmentOutputBit, AccessFlags2.ColorAttachmentWriteBit);
+    }
+
+    /// <inheritdoc/>
+    public override void PrepareForPresent()
+    {
+        EnsureRecording();
+        if (_rendering)
+            throw new InvalidOperationException("Rendering must end before preparing the frame for presentation.");
+
+        TransitionTextureLayout(GetFrame().VulkanColorOutput, ImageLayout.PresentSrcKhr,
+            PipelineStageFlags2.BottomOfPipeBit, AccessFlags2.None);
     }
 
     /// <inheritdoc/>
@@ -356,9 +370,6 @@ internal sealed unsafe class VulkanCommandList : CommandList
         EnsureRecording();
         if (_rendering)
             throw new InvalidOperationException("Rendering must end before command recording ends.");
-
-        if (!_presentTransitionRecorded)
-            RecordPresentTransition(ImageLayout.Undefined, PipelineStageFlags2.TopOfPipeBit, AccessFlags2.None);
 
         EndCommandBuffer();
     }
@@ -371,19 +382,13 @@ internal sealed unsafe class VulkanCommandList : CommandList
         EnsureUsable();
 
         if (!_begun)
-            Begin();
+            throw new InvalidOperationException("Command recording must begin before frame submission.");
 
         if (_rendering)
-        {
-            VulkanContext.Vk.CmdEndRendering(_commandBuffer);
-            _rendering = false;
-            _renderingDepthStencilFormat = TextureFormat.Undefined;
-            RecordPresentTransition(ImageLayout.ColorAttachmentOptimal,
-                PipelineStageFlags2.ColorAttachmentOutputBit, AccessFlags2.ColorAttachmentWriteBit);
-        }
+            throw new InvalidOperationException("Rendering must end before frame submission.");
 
-        if (!_presentTransitionRecorded)
-            RecordPresentTransition(ImageLayout.Undefined, PipelineStageFlags2.TopOfPipeBit, AccessFlags2.None);
+        if (GetFrame().VulkanColorOutput.GetLayout(0, 0) != ImageLayout.PresentSrcKhr)
+            throw new InvalidOperationException("The frame must be prepared for presentation before submission.");
 
         if (!_ended)
             EndCommandBuffer();
@@ -398,6 +403,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         _frame = null;
         _commandBuffer = default;
         _graphicsPipeline = null;
+        _renderingColorFormats = [];
         _renderingDepthStencilFormat = TextureFormat.Undefined;
     }
 
@@ -408,15 +414,69 @@ internal sealed unsafe class VulkanCommandList : CommandList
                 "Graphics pipeline depth/stencil attachment format does not match the active rendering operation.");
     }
 
-    private static VulkanTexture? GetDepthStencilAttachment(Texture? attachment, VulkanFrame frame)
+    private static void ValidateColorFormats(VulkanGraphicsPipeline pipeline,
+        ReadOnlySpan<TextureFormat> renderingFormats)
+    {
+        if (pipeline.ColorAttachmentFormats.Length != renderingFormats.Length)
+            throw new InvalidOperationException(
+                "Graphics pipeline color attachment count does not match the active rendering operation.");
+
+        for (var i = 0; i < renderingFormats.Length; i++)
+        {
+            if (pipeline.ColorAttachmentFormats[i] != renderingFormats[i])
+                throw new InvalidOperationException(
+                    "Graphics pipeline color attachment format does not match the active rendering operation.");
+        }
+    }
+
+    private static IVulkanTexture[] GetColorAttachments(
+        ReadOnlySpan<ColorAttachmentDescription> attachments,
+        VulkanFrame frame)
+    {
+        if (attachments.Length == 0)
+            throw new InvalidOperationException("Rendering must include at least one color attachment.");
+
+        var result = new IVulkanTexture[attachments.Length];
+        for (var i = 0; i < attachments.Length; i++)
+            result[i] = GetColorAttachment(attachments[i].Attachment, frame);
+        return result;
+    }
+
+    private static IVulkanTexture GetColorAttachment(Texture attachment, VulkanFrame frame)
+    {
+        ArgumentNullException.ThrowIfNull(attachment);
+        var texture = attachment as IVulkanTexture
+                      ?? throw new InvalidOperationException(
+                          "Color attachment was not created by the Vulkan backend.");
+        if (texture.IsDestroyed)
+            throw new ObjectDisposedException(attachment.GetType().Name);
+        if (texture is VulkanSwapchainTexture && !ReferenceEquals(texture, frame.VulkanColorOutput))
+            throw new InvalidOperationException("Swapchain color attachments must be the active frame color output.");
+        if (texture.Dimension != TextureDimension.Type2D)
+            throw new InvalidOperationException("Color attachment must be a 2D texture.");
+        if (texture.MipLevels != 1)
+            throw new InvalidOperationException("Color attachment must have exactly one mip level.");
+        if (texture.ArrayLayers != 1)
+            throw new InvalidOperationException("Color attachment must have exactly one array layer.");
+        if (texture.Width != frame.Width || texture.Height != frame.Height)
+            throw new InvalidOperationException("Color attachment size must match the active frame size.");
+        if (!texture.Usage.HasFlag(TextureUsage.ColorAttachment))
+            throw new InvalidOperationException("Texture was not created with ColorAttachment usage.");
+        if (texture.Format == TextureFormat.Undefined || VulkanMapping.IsDepthStencilFormat(texture.Format))
+            throw new InvalidOperationException("Color attachment must use a color format.");
+        return texture;
+    }
+
+    private static IVulkanTexture? GetDepthStencilAttachment(Texture? attachment, VulkanFrame frame)
     {
         if (attachment is null)
             return null;
 
-        var texture = attachment as VulkanTexture
+        var texture = attachment as IVulkanTexture
                       ?? throw new InvalidOperationException(
                           "Depth/stencil attachment was not created by the Vulkan backend.");
-        texture.ThrowIfDestroyed();
+        if (texture.IsDestroyed)
+            throw new ObjectDisposedException(attachment.GetType().Name);
 
         if (texture.Dimension != TextureDimension.Type2D)
             throw new InvalidOperationException("Depth/stencil attachment must be a 2D texture.");
@@ -432,6 +492,39 @@ internal sealed unsafe class VulkanCommandList : CommandList
             throw new InvalidOperationException("Depth/stencil attachment must use a depth/stencil format.");
 
         return texture;
+    }
+
+    /// <summary>
+    /// Transitions a Vulkan texture to the requested image layout.
+    /// </summary>
+    /// <param name="texture">The texture to transition.</param>
+    /// <param name="newLayout">The requested image layout.</param>
+    /// <param name="dstStageMask">The destination pipeline stage mask.</param>
+    /// <param name="dstAccessMask">The destination access mask.</param>
+    private void TransitionTextureLayout(
+        IVulkanTexture texture,
+        ImageLayout newLayout,
+        PipelineStageFlags2 dstStageMask,
+        AccessFlags2 dstAccessMask)
+    {
+        var oldLayout = texture.GetLayout(0, 0);
+        if (oldLayout == newLayout)
+            return;
+
+        VulkanBarrier.RecordImageLayoutTransition(
+            _commandBuffer,
+            texture.Image,
+            0,
+            0,
+            1,
+            VulkanMapping.ToVulkanImageAspect(texture.Format),
+            oldLayout,
+            newLayout,
+            VulkanBarrier.GetStageForLayout(oldLayout),
+            VulkanBarrier.GetAccessForLayout(oldLayout),
+            dstStageMask,
+            dstAccessMask);
+        texture.SetLayout(0, 0, newLayout);
     }
 
     private VulkanFrame GetFrame()
@@ -467,29 +560,5 @@ internal sealed unsafe class VulkanCommandList : CommandList
             throw new InvalidOperationException("Failed to record command buffer.");
 
         _ended = true;
-    }
-
-    private void RecordPresentTransition(
-        ImageLayout oldLayout,
-        PipelineStageFlags2 srcStageMask,
-        AccessFlags2 srcAccessMask)
-    {
-        RecordImageTransition(oldLayout, ImageLayout.PresentSrcKhr,
-            srcStageMask, srcAccessMask, PipelineStageFlags2.BottomOfPipeBit, AccessFlags2.None);
-        _presentTransitionRecorded = true;
-    }
-
-    private void RecordImageTransition(
-        ImageLayout oldLayout,
-        ImageLayout newLayout,
-        PipelineStageFlags2 srcStageMask,
-        AccessFlags2 srcAccessMask,
-        PipelineStageFlags2 dstStageMask,
-        AccessFlags2 dstAccessMask)
-    {
-        var frame = GetFrame();
-        VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, frame.Image, 0, 0, 1, ImageAspectFlags.ColorBit,
-            oldLayout, newLayout,
-            srcStageMask, srcAccessMask, dstStageMask, dstAccessMask);
     }
 }

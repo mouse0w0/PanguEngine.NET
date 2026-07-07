@@ -1,38 +1,53 @@
 using Silk.NET.Vulkan;
 using Vma;
 using VkImage = Silk.NET.Vulkan.Image;
+using VkImageView = Silk.NET.Vulkan.ImageView;
 
 namespace PanguEngine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanTexture : Texture
+/// <summary>
+/// Vulkan implementation of <see cref="Texture"/>.
+/// </summary>
+internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
 {
     private readonly Allocation* _allocation;
     private readonly ImageLayout[] _subresourceLayouts;
     private bool _destroyed;
 
+    /// <inheritdoc/>
     public VkImage Image { get; }
 
-    public ImageView ImageView { get; }
+    /// <inheritdoc/>
+    public VkImageView ImageView { get; }
 
+    /// <inheritdoc/>
     public override bool IsDestroyed => _destroyed;
 
+    /// <inheritdoc/>
     public override TextureFormat Format { get; }
 
+    /// <inheritdoc/>
     public override TextureDimension Dimension { get; }
 
+    /// <inheritdoc/>
     public override uint Width { get; }
 
+    /// <inheritdoc/>
     public override uint Height { get; }
 
+    /// <inheritdoc/>
     public override uint Depth { get; }
 
+    /// <inheritdoc/>
     public override uint MipLevels { get; }
 
+    /// <inheritdoc/>
     public override uint ArrayLayers { get; }
 
+    /// <inheritdoc/>
     public override TextureUsage Usage { get; }
 
-    internal VulkanTexture(VkImage image, Allocation* allocation, ImageView imageView, TextureDimension dimension,
+    internal VulkanTexture(VkImage image, Allocation* allocation, VkImageView imageView, TextureDimension dimension,
         TextureFormat format, uint width, uint height, uint depth, uint mipLevels, uint arrayLayers, TextureUsage usage)
     {
         Image = image;
@@ -54,12 +69,14 @@ internal sealed unsafe class VulkanTexture : Texture
         Array.Fill(_subresourceLayouts, ImageLayout.Undefined);
     }
 
+    /// <inheritdoc/>
     public ImageLayout GetLayout(uint mipLevel, uint arrayLayer)
     {
         if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
         return _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)];
     }
 
+    /// <inheritdoc/>
     public void SetLayout(uint mipLevel, uint arrayLayer, ImageLayout layout)
     {
         if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
@@ -93,6 +110,7 @@ internal sealed unsafe class VulkanTexture : Texture
         return checked((int)(mipLevel * ArrayLayers + arrayLayer));
     }
 
+    /// <inheritdoc/>
     public override void Destroy()
     {
         if (_destroyed) return;

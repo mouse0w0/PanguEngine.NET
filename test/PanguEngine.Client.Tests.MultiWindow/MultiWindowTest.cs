@@ -40,8 +40,12 @@ internal sealed class MultiWindowScene : IClientTestScene
         {
             var commands = activeFrame.CommandList;
             commands.Begin();
-            commands.BeginRendering(new RenderingDescription(clearColor));
+            commands.BeginRendering(new RenderingDescription(new[]
+            {
+                new ColorAttachmentDescription(activeFrame.ColorOutput, clearColor),
+            }));
             commands.EndRendering();
+            commands.PrepareForPresent();
             commands.End();
         }
         finally

@@ -30,6 +30,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         ReadOnlySpan<Silk.NET.Vulkan.DescriptorSetLayout> descriptorSetLayouts)
     {
         DescriptorSetLayouts = GetDescriptorSetLayouts(description);
+        ColorAttachmentFormats = description.ColorAttachmentFormats.ToArray();
         DepthStencilAttachmentFormat = description.DepthStencilAttachmentFormat;
         CreatePipeline(description, descriptorSetLayouts);
     }
@@ -51,6 +52,11 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// Gets the depth/stencil attachment format used by this pipeline.
     /// </summary>
     internal TextureFormat DepthStencilAttachmentFormat { get; private set; }
+
+    /// <summary>
+    /// Gets the color attachment formats used by this pipeline.
+    /// </summary>
+    internal TextureFormat[] ColorAttachmentFormats { get; }
 
     /// <summary>
     /// Gets the descriptor set layouts used by this pipeline.
@@ -209,14 +215,22 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             RasterizationSamples = SampleCountFlags.Count1Bit,
         };
 
-        PipelineColorBlendAttachmentState colorBlendAttachment = CreateColorBlendAttachment(description.ColorBlend);
+        var colorAttachmentFormats = description.ColorAttachmentFormats.Span;
+        var vkColorFormats = stackalloc Format[colorAttachmentFormats.Length];
+        var colorBlendAttachments = stackalloc PipelineColorBlendAttachmentState[colorAttachmentFormats.Length];
+        for (var i = 0; i < colorAttachmentFormats.Length; i++)
+        {
+            vkColorFormats[i] = VulkanMapping.ToVulkanFormat(colorAttachmentFormats[i]);
+            colorBlendAttachments[i] = CreateColorBlendAttachment(description.ColorBlend);
+        }
+
         PipelineColorBlendStateCreateInfo colorBlending = new()
         {
             SType = StructureType.PipelineColorBlendStateCreateInfo,
             LogicOpEnable = false,
             LogicOp = LogicOp.Copy,
-            AttachmentCount = 1,
-            PAttachments = &colorBlendAttachment,
+            AttachmentCount = (uint)colorAttachmentFormats.Length,
+            PAttachments = colorBlendAttachments,
         };
 
         var stencilTestEnabled = description.DepthStencil.StencilTestEnabled;
@@ -257,7 +271,6 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
 
             Layout = pipelineLayout;
 
-            var colorFormat = VulkanMapping.ToVulkanFormat(description.ColorAttachmentFormat);
             var depthFormat = Format.Undefined;
             var stencilFormat = Format.Undefined;
             if (description.DepthStencilAttachmentFormat != TextureFormat.Undefined)
@@ -273,8 +286,8 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             PipelineRenderingCreateInfo renderingCreateInfo = new()
             {
                 SType = StructureType.PipelineRenderingCreateInfo,
-                ColorAttachmentCount = 1,
-                PColorAttachmentFormats = &colorFormat,
+                ColorAttachmentCount = (uint)colorAttachmentFormats.Length,
+                PColorAttachmentFormats = vkColorFormats,
                 DepthAttachmentFormat = depthFormat,
                 StencilAttachmentFormat = stencilFormat,
             };

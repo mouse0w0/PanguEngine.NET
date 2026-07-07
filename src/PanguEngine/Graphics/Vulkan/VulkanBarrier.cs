@@ -63,9 +63,11 @@ internal static unsafe class VulkanBarrier
         return layout switch
         {
             ImageLayout.Undefined => PipelineStageFlags2.TopOfPipeBit,
+            ImageLayout.ColorAttachmentOptimal => PipelineStageFlags2.ColorAttachmentOutputBit,
             ImageLayout.ShaderReadOnlyOptimal => PipelineStageFlags2.FragmentShaderBit,
             ImageLayout.TransferDstOptimal => PipelineStageFlags2.TransferBit,
             ImageLayout.TransferSrcOptimal => PipelineStageFlags2.TransferBit,
+            ImageLayout.PresentSrcKhr => PipelineStageFlags2.BottomOfPipeBit,
             ImageLayout.DepthStencilAttachmentOptimal =>
                 PipelineStageFlags2.EarlyFragmentTestsBit | PipelineStageFlags2.LateFragmentTestsBit,
             _ => PipelineStageFlags2.AllCommandsBit,
@@ -80,9 +82,12 @@ internal static unsafe class VulkanBarrier
         return layout switch
         {
             ImageLayout.Undefined => AccessFlags2.None,
+            ImageLayout.ColorAttachmentOptimal =>
+                AccessFlags2.ColorAttachmentReadBit | AccessFlags2.ColorAttachmentWriteBit,
             ImageLayout.ShaderReadOnlyOptimal => AccessFlags2.ShaderSampledReadBit,
             ImageLayout.TransferDstOptimal => AccessFlags2.TransferWriteBit,
             ImageLayout.TransferSrcOptimal => AccessFlags2.TransferReadBit,
+            ImageLayout.PresentSrcKhr => AccessFlags2.None,
             ImageLayout.DepthStencilAttachmentOptimal =>
                 AccessFlags2.DepthStencilAttachmentReadBit | AccessFlags2.DepthStencilAttachmentWriteBit,
             _ => AccessFlags2.MemoryReadBit | AccessFlags2.MemoryWriteBit,

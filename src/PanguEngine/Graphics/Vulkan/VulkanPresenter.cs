@@ -75,11 +75,9 @@ internal sealed unsafe class VulkanPresenter : Presenter
 
         var vulkanFrame = new VulkanFrame(
             imageIndex,
-            _window.Images[imageIndex],
-            _window.ImageViews[imageIndex],
             _window.Extent.Width,
             _window.Extent.Height,
-            ColorFormat,
+            _window.ColorOutputs[imageIndex],
             _commandList);
 
         _commandList.Reset(vulkanFrame, commandBuffer);
@@ -109,6 +107,8 @@ internal sealed unsafe class VulkanPresenter : Presenter
             vulkanFrame.VulkanCommandList.CompleteForSubmit();
             Submit(commandBuffer, timelineValue);
             _window.PresentImage(vulkanFrame.ImageIndex);
+            if (!vulkanFrame.VulkanColorOutput.IsDestroyed)
+                vulkanFrame.VulkanColorOutput.ResetLayout();
             _window.AdvanceFrame();
             VulkanDeletionQueue.Collect();
         }

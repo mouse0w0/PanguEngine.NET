@@ -405,9 +405,18 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentException("Graphics pipeline must contain a fragment shader.",
                 nameof(description.Shaders));
 
-        if (description.ColorAttachmentFormat == TextureFormat.Undefined)
-            throw new InvalidOperationException("Color attachment format must be specified.");
-        _ = VulkanMapping.ToVulkanFormat(description.ColorAttachmentFormat);
+        var colorFormats = description.ColorAttachmentFormats.Span;
+        if (colorFormats.Length == 0)
+            throw new InvalidOperationException("At least one color attachment format must be specified.");
+        foreach (var colorFormat in colorFormats)
+        {
+            if (colorFormat == TextureFormat.Undefined)
+                throw new InvalidOperationException("Color attachment format must be specified.");
+            if (VulkanMapping.IsDepthStencilFormat(colorFormat))
+                throw new InvalidOperationException("Color attachment format must not be a depth/stencil format.");
+            _ = VulkanMapping.ToVulkanFormat(colorFormat);
+        }
+
         ValidateDepthStencilPipelineDescription(description);
 
         if (!float.IsFinite(description.Rasterizer.LineWidth) || description.Rasterizer.LineWidth < 0)
@@ -543,8 +552,16 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new ArgumentException("Texture usage must not be None.", nameof(description.Usage));
         if (description.Format == TextureFormat.Undefined)
             throw new InvalidOperationException("Texture format must be specified.");
+        if (description.Usage.HasFlag(TextureUsage.ColorAttachment) &&
+            description.Usage.HasFlag(TextureUsage.DepthStencilAttachment))
+            throw new InvalidOperationException(
+                "Texture cannot be both a color attachment and a depth/stencil attachment.");
+        if (description.Usage.HasFlag(TextureUsage.ColorAttachment))
+            ValidateColorAttachmentFormat(description.Format);
         if (description.Usage.HasFlag(TextureUsage.DepthStencilAttachment))
             ValidateDepthStencilAttachmentFormat(description.Format);
+        else if (VulkanMapping.IsDepthStencilFormat(description.Format))
+            throw new InvalidOperationException("Depth/stencil texture formats require DepthStencilAttachment usage.");
         if (description.ArrayLayers > VulkanContext.MaxImageArrayLayers)
             throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
                 "Texture array layers exceed the device limit.");
@@ -695,6 +712,18 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         if ((properties.OptimalTilingFeatures & FormatFeatureFlags.DepthStencilAttachmentBit) == 0)
             throw new InvalidOperationException(
                 $"Texture format '{format}' does not support depth/stencil attachments.");
+    }
+
+    private static void ValidateColorAttachmentFormat(TextureFormat format)
+    {
+        if (VulkanMapping.IsDepthStencilFormat(format))
+            throw new InvalidOperationException("Color attachment usage requires a color texture format.");
+
+        var vkFormat = VulkanMapping.ToVulkanFormat(format);
+        VulkanContext.Vk.GetPhysicalDeviceFormatProperties(VulkanContext.PhysicalDevice, vkFormat,
+            out var properties);
+        if ((properties.OptimalTilingFeatures & FormatFeatureFlags.ColorAttachmentBit) == 0)
+            throw new InvalidOperationException($"Texture format '{format}' does not support color attachments.");
     }
 
     private static uint GetImageArrayLayers(in TextureDescription description)

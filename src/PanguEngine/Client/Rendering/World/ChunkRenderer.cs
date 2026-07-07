@@ -41,7 +41,7 @@ internal sealed class ChunkRenderer
         _pipeline = _device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
             new[] { _vertexShader, _fragmentShader },
             ChunkVertex.VertexInput,
-            ColorAttachmentFormat: colorFormat));
+            ColorAttachmentFormats: new[] { colorFormat }));
     }
 
     /// <summary>

@@ -93,6 +93,11 @@ public abstract class CommandList
     public abstract void EndRendering();
 
     /// <summary>
+    /// Prepares the active frame color output for presentation.
+    /// </summary>
+    public abstract void PrepareForPresent();
+
+    /// <summary>
     /// Ends command recording.
     /// </summary>
     public abstract void End();

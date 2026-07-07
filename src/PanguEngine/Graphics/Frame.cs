@@ -21,7 +21,7 @@ public abstract class Frame
     public abstract uint Height { get; }
 
     /// <summary>
-    /// Gets the color format of the active frame target.
+    /// Gets the color output texture for the active frame.
     /// </summary>
-    public abstract TextureFormat ColorFormat { get; }
+    public abstract Texture ColorOutput { get; }
 }

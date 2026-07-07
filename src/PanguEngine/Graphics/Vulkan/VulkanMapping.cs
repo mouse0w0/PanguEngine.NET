@@ -274,6 +274,8 @@ internal static class VulkanMapping
             result |= ImageUsageFlags.TransferDstBit;
         if (usage.HasFlag(TextureUsage.Sampled))
             result |= ImageUsageFlags.SampledBit;
+        if (usage.HasFlag(TextureUsage.ColorAttachment))
+            result |= ImageUsageFlags.ColorAttachmentBit;
         if (usage.HasFlag(TextureUsage.DepthStencilAttachment))
             result |= ImageUsageFlags.DepthStencilAttachmentBit;
         return result;
