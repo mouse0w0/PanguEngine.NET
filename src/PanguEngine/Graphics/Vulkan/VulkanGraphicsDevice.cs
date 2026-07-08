@@ -36,9 +36,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     public override Buffer CreateBuffer(in BufferDescription description)
     {
         if (description.Size == 0)
-            throw new ArgumentOutOfRangeException(nameof(description.Size), "Buffer size must be greater than zero.");
+            throw new ArgumentOutOfRangeException(nameof(description), "Buffer size must be greater than zero.");
         if (description.Usage == BufferUsage.None)
-            throw new ArgumentException("Buffer usage must not be None.", nameof(description.Usage));
+            throw new ArgumentException("Buffer usage must not be None.", nameof(description));
 
         var vkUsage = BufferUsageFlags.None;
         if (description.Usage.HasFlag(BufferUsage.TransferSource))
@@ -371,19 +371,19 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     {
         var bytecode = description.Bytecode;
         if (bytecode is null || bytecode.Length == 0)
-            throw new ArgumentException("Shader bytecode must not be empty.", nameof(description.Bytecode));
+            throw new ArgumentException("Shader bytecode must not be empty.", nameof(description));
         if (bytecode.Length % 4 != 0)
             throw new ArgumentException("Shader bytecode length must be a multiple of 4 bytes.",
-                nameof(description.Bytecode));
+                nameof(description));
         if (string.IsNullOrWhiteSpace(description.EntryPoint))
-            throw new ArgumentException("Shader entry point must not be empty.", nameof(description.EntryPoint));
+            throw new ArgumentException("Shader entry point must not be empty.", nameof(description));
     }
 
     internal static void ValidateGraphicsPipelineDescription(in GraphicsPipelineDescription description)
     {
         var shaders = description.Shaders;
         if (shaders.Length == 0)
-            throw new ArgumentException("Graphics pipeline must contain shaders.", nameof(description.Shaders));
+            throw new ArgumentException("Graphics pipeline must contain shaders.", nameof(description));
 
         var hasVertexShader = false;
         var hasFragmentShader = false;
@@ -391,7 +391,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         {
             if (shader == null)
                 throw new ArgumentException("Graphics pipeline shaders must not contain null entries.",
-                    nameof(description.Shaders));
+                    nameof(description));
 
             var vulkanShader = RequireVulkanShader(shader);
             vulkanShader.ThrowIfDestroyed();
@@ -401,10 +401,10 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         }
 
         if (!hasVertexShader)
-            throw new ArgumentException("Graphics pipeline must contain a vertex shader.", nameof(description.Shaders));
+            throw new ArgumentException("Graphics pipeline must contain a vertex shader.", nameof(description));
         if (!hasFragmentShader)
             throw new ArgumentException("Graphics pipeline must contain a fragment shader.",
-                nameof(description.Shaders));
+                nameof(description));
 
         var colorFormats = description.ColorAttachmentFormats;
         if (colorFormats.Length == 0)
@@ -421,7 +421,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         ValidateDepthStencilPipelineDescription(description);
 
         if (!float.IsFinite(description.Rasterizer.LineWidth) || description.Rasterizer.LineWidth < 0)
-            throw new ArgumentOutOfRangeException(nameof(description.Rasterizer.LineWidth),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Rasterizer line width must be a non-negative finite value.");
 
         ValidateVertexInputDescription(description.VertexInput);
@@ -431,7 +431,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         {
             if (layout == null)
                 throw new ArgumentException("Graphics pipeline descriptor set layouts must not contain null entries.",
-                    nameof(description.DescriptorSetLayouts));
+                    nameof(description));
 
             var vulkanLayout = RequireVulkanDescriptorSetLayout(layout);
             vulkanLayout.ThrowIfDestroyed();
@@ -467,7 +467,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         foreach (var buffer in buffers)
         {
             if (buffer.Stride == 0)
-                throw new ArgumentOutOfRangeException(nameof(buffer.Stride),
+                throw new ArgumentOutOfRangeException(nameof(description),
                     "Vertex buffer stride must be greater than zero.");
         }
 
@@ -488,9 +488,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
             if (!foundBinding)
                 throw new ArgumentException("Vertex attribute binding must reference an existing vertex buffer layout.",
-                    nameof(description.Attributes));
+                    nameof(description));
             if (attribute.Offset > stride)
-                throw new ArgumentOutOfRangeException(nameof(attribute.Offset),
+                throw new ArgumentOutOfRangeException(nameof(description),
                     "Vertex attribute offset must not exceed the vertex buffer stride.");
         }
     }
@@ -498,24 +498,24 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     private static void ValidateSamplerDescription(in SamplerDescription description)
     {
         if (!float.IsFinite(description.MaxAnisotropy) || description.MaxAnisotropy < 0)
-            throw new ArgumentOutOfRangeException(nameof(description.MaxAnisotropy),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "MaxAnisotropy must be a non-negative finite value.");
         if (!float.IsFinite(description.MinLod))
-            throw new ArgumentOutOfRangeException(nameof(description.MinLod), "MinLod must be a finite value.");
+            throw new ArgumentOutOfRangeException(nameof(description), "MinLod must be a finite value.");
         if (!float.IsFinite(description.MaxLod))
-            throw new ArgumentOutOfRangeException(nameof(description.MaxLod), "MaxLod must be a finite value.");
+            throw new ArgumentOutOfRangeException(nameof(description), "MaxLod must be a finite value.");
         if (!float.IsFinite(description.MipLodBias))
-            throw new ArgumentOutOfRangeException(nameof(description.MipLodBias), "MipLodBias must be a finite value.");
+            throw new ArgumentOutOfRangeException(nameof(description), "MipLodBias must be a finite value.");
 
         if (description.MinLod < 0)
-            throw new ArgumentOutOfRangeException(nameof(description.MinLod), "MinLod must be non-negative.");
+            throw new ArgumentOutOfRangeException(nameof(description), "MinLod must be non-negative.");
         if (description.MaxLod < 0)
-            throw new ArgumentOutOfRangeException(nameof(description.MaxLod), "MaxLod must be non-negative.");
+            throw new ArgumentOutOfRangeException(nameof(description), "MaxLod must be non-negative.");
         if (description.MinLod > description.MaxLod)
-            throw new ArgumentOutOfRangeException(nameof(description.MinLod), "MinLod must not exceed MaxLod.");
+            throw new ArgumentOutOfRangeException(nameof(description), "MinLod must not exceed MaxLod.");
 
         if (MathF.Abs(description.MipLodBias) > VulkanContext.MaxSamplerLodBias)
-            throw new ArgumentOutOfRangeException(nameof(description.MipLodBias),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "MipLodBias exceeds the device limit.");
 
         if (description.MaxAnisotropy <= 1)
@@ -524,7 +524,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         if (!VulkanContext.SamplerAnisotropySupported)
             throw new InvalidOperationException("Anisotropic filtering is not supported by the device.");
         if (description.MaxAnisotropy > VulkanContext.MaxSamplerAnisotropy)
-            throw new ArgumentOutOfRangeException(nameof(description.MaxAnisotropy),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "MaxAnisotropy exceeds the device limit.");
         if (description.MinFilter != FilterMode.Linear || description.MagFilter != FilterMode.Linear)
             throw new InvalidOperationException("Anisotropic filtering requires MinFilter and MagFilter to be Linear.");
@@ -533,25 +533,25 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     private static void ValidateTextureDescription(in TextureDescription description)
     {
         if (description.Width == 0)
-            throw new ArgumentOutOfRangeException(nameof(description.Width),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture width must be greater than zero.");
         if (description.Height == 0)
-            throw new ArgumentOutOfRangeException(nameof(description.Height),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture height must be greater than zero.");
         if (description.Depth == 0)
-            throw new ArgumentOutOfRangeException(nameof(description.Depth),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture depth must be greater than zero.");
         if (description.ArrayLayers == 0)
-            throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture array layers must be greater than zero.");
         if (description.MipLevels == 0)
-            throw new ArgumentOutOfRangeException(nameof(description.MipLevels),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture mip levels must be greater than zero.");
         if (description.MipLevels > GetMaxMipLevels(description.Width, description.Height, description.Depth))
-            throw new ArgumentOutOfRangeException(nameof(description.MipLevels),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture mip levels exceed the maximum allowed by the texture extent.");
         if (description.Usage == TextureUsage.None)
-            throw new ArgumentException("Texture usage must not be None.", nameof(description.Usage));
+            throw new ArgumentException("Texture usage must not be None.", nameof(description));
         if (description.Format == TextureFormat.Undefined)
             throw new InvalidOperationException("Texture format must be specified.");
         if (description.Usage.HasFlag(TextureUsage.ColorAttachment) &&
@@ -565,84 +565,84 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         else if (VulkanMapping.IsDepthStencilFormat(description.Format))
             throw new InvalidOperationException("Depth/stencil texture formats require DepthStencilAttachment usage.");
         if (description.ArrayLayers > VulkanContext.MaxImageArrayLayers)
-            throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+            throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture array layers exceed the device limit.");
 
         switch (description.Dimension)
         {
             case TextureDimension.Type1D:
                 if (description.Width > VulkanContext.MaxImageDimension1D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture width exceeds the device limit.");
                 if (description.Height != 1)
-                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "1D textures must have a height of one.");
                 if (description.Depth != 1)
-                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "1D textures must have a depth of one.");
                 break;
             case TextureDimension.Type2D:
                 if (description.Width > VulkanContext.MaxImageDimension2D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture width exceeds the device limit.");
                 if (description.Height > VulkanContext.MaxImageDimension2D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture height exceeds the device limit.");
                 if (description.Depth != 1)
-                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "2D textures must have a depth of one.");
                 break;
             case TextureDimension.Type3D:
                 if (description.Width > VulkanContext.MaxImageDimension3D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture width exceeds the device limit.");
                 if (description.Height > VulkanContext.MaxImageDimension3D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture height exceeds the device limit.");
                 if (description.Depth > VulkanContext.MaxImageDimension3D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture depth exceeds the device limit.");
                 if (description.ArrayLayers != 1)
-                    throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "3D textures must have exactly one array layer.");
                 break;
             case TextureDimension.CubeMap:
                 if (description.Width > VulkanContext.MaxImageDimension2D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Width),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture width exceeds the device limit.");
                 if (description.Height > VulkanContext.MaxImageDimension2D)
-                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Texture height exceeds the device limit.");
                 if (description.Height != description.Width)
-                    throw new ArgumentOutOfRangeException(nameof(description.Height),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Cube map textures must be square.");
                 if (description.Depth != 1)
-                    throw new ArgumentOutOfRangeException(nameof(description.Depth),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Cube map textures must have a depth of one.");
                 if (description.ArrayLayers % 6 != 0)
-                    throw new ArgumentOutOfRangeException(nameof(description.ArrayLayers),
+                    throw new ArgumentOutOfRangeException(nameof(description),
                         "Cube map texture array layers must be a multiple of six.");
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(description.Dimension), "Unsupported texture dimension.");
+                throw new ArgumentOutOfRangeException(nameof(description), "Unsupported texture dimension.");
         }
     }
 
     private static void ValidateTextureUploadRegion(VulkanTexture texture, in TextureUploadRegion region)
     {
         if (region.MipLevel >= texture.MipLevels)
-            throw new ArgumentOutOfRangeException(nameof(region.MipLevel), "Texture upload mip level is out of range.");
+            throw new ArgumentOutOfRangeException(nameof(region), "Texture upload mip level is out of range.");
         if (region.Width == 0)
-            throw new ArgumentOutOfRangeException(nameof(region.Width),
+            throw new ArgumentOutOfRangeException(nameof(region),
                 "Texture upload width must be greater than zero.");
         if (region.Height == 0)
-            throw new ArgumentOutOfRangeException(nameof(region.Height),
+            throw new ArgumentOutOfRangeException(nameof(region),
                 "Texture upload height must be greater than zero.");
         if (region.Depth == 0)
-            throw new ArgumentOutOfRangeException(nameof(region.Depth),
+            throw new ArgumentOutOfRangeException(nameof(region),
                 "Texture upload depth must be greater than zero.");
         if (region.LayerCount == 0)
-            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
+            throw new ArgumentOutOfRangeException(nameof(region),
                 "Texture upload layer count must be greater than zero.");
 
         var mipWidth = VulkanTexture.GetMipExtent(texture.Width, region.MipLevel);
@@ -650,11 +650,11 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         var mipDepth = VulkanTexture.GetMipExtent(texture.Depth, region.MipLevel);
 
         if (region.X > mipWidth || region.Width > mipWidth - region.X)
-            throw new ArgumentOutOfRangeException(nameof(region.X), "Texture upload X range exceeds the mip bounds.");
+            throw new ArgumentOutOfRangeException(nameof(region), "Texture upload X range exceeds the mip bounds.");
         if (region.Y > mipHeight || region.Height > mipHeight - region.Y)
-            throw new ArgumentOutOfRangeException(nameof(region.Y), "Texture upload Y range exceeds the mip bounds.");
+            throw new ArgumentOutOfRangeException(nameof(region), "Texture upload Y range exceeds the mip bounds.");
         if (region.Z > mipDepth || region.Depth > mipDepth - region.Z)
-            throw new ArgumentOutOfRangeException(nameof(region.Z), "Texture upload Z range exceeds the mip bounds.");
+            throw new ArgumentOutOfRangeException(nameof(region), "Texture upload Z range exceeds the mip bounds.");
 
         switch (texture.Dimension)
         {
@@ -676,17 +676,17 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                     throw new ArgumentException("3D texture uploads must not target array layers.", nameof(region));
                 break;
             default:
-                throw new ArgumentOutOfRangeException(nameof(texture.Dimension), "Unsupported texture dimension.");
+                throw new ArgumentOutOfRangeException(nameof(texture), "Unsupported texture dimension.");
         }
     }
 
     private static void ValidateTextureUploadArrayLayers(VulkanTexture texture, in TextureUploadRegion region)
     {
         if (region.ArrayLayer >= texture.ArrayLayers)
-            throw new ArgumentOutOfRangeException(nameof(region.ArrayLayer),
+            throw new ArgumentOutOfRangeException(nameof(region),
                 "Texture upload array layer is out of range.");
         if (region.LayerCount > texture.ArrayLayers - region.ArrayLayer)
-            throw new ArgumentOutOfRangeException(nameof(region.LayerCount),
+            throw new ArgumentOutOfRangeException(nameof(region),
                 "Texture upload layer range exceeds the texture bounds.");
     }
 
