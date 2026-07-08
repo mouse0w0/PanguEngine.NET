@@ -61,8 +61,8 @@ public sealed unsafe class VulkanWindow : Window
     /// <summary>The color output textures for each swapchain image.</summary>
     internal VulkanSwapchainTexture[] ColorOutputs => _colorOutputs!;
 
-    /// <summary>The current frame index within the in-flight frame ring.</summary>
-    public uint CurrentFrame { get; private set; }
+    /// <summary>The current frame slot within the in-flight frame ring.</summary>
+    public uint CurrentFrameSlot { get; private set; }
 
     /// <inheritdoc/>
     public override bool IsDestroyed => _isDestroyed;
@@ -285,7 +285,7 @@ public sealed unsafe class VulkanWindow : Window
         imageIndex = 0;
         var result = VulkanContext.KhrSwapchain.AcquireNextImage(
             VulkanContext.Device, _swapchain, ulong.MaxValue,
-            _imageAvailableSemaphores![CurrentFrame], default, ref imageIndex);
+            _imageAvailableSemaphores![CurrentFrameSlot], default, ref imageIndex);
 
         if (result == Result.ErrorOutOfDateKhr)
         {
@@ -303,7 +303,7 @@ public sealed unsafe class VulkanWindow : Window
     public void PresentImage(uint imageIndex)
     {
         var swapChains = stackalloc[] { _swapchain };
-        var signalSemaphores = stackalloc[] { _renderFinishedSemaphores![CurrentFrame] };
+        var signalSemaphores = stackalloc[] { _renderFinishedSemaphores![CurrentFrameSlot] };
 
         PresentInfoKHR presentInfo = new()
         {
@@ -331,30 +331,30 @@ public sealed unsafe class VulkanWindow : Window
     /// <summary>Advances the current frame index to the next in-flight frame slot.</summary>
     public void AdvanceFrame()
     {
-        CurrentFrame = (CurrentFrame + 1) % VulkanContext.MaxFramesInFlight;
+        CurrentFrameSlot = (CurrentFrameSlot + 1) % VulkanContext.MaxFramesInFlight;
     }
 
     /// <summary>Blocks until the in-flight fence for the current frame is signaled.</summary>
     public void WaitForInFlightFence()
     {
-        VulkanContext.Vk.WaitForFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrame], true,
+        VulkanContext.Vk.WaitForFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrameSlot], true,
             ulong.MaxValue);
     }
 
     /// <summary>Resets the in-flight fence for the current frame back to unsignaled state.</summary>
     public void ResetInFlightFence()
     {
-        VulkanContext.Vk.ResetFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrame]);
+        VulkanContext.Vk.ResetFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrameSlot]);
     }
 
     /// <summary>Gets a reference to the image-available semaphore for the current frame.</summary>
-    public ref Semaphore GetImageAvailableSemaphore() => ref _imageAvailableSemaphores![CurrentFrame];
+    public ref Semaphore GetImageAvailableSemaphore() => ref _imageAvailableSemaphores![CurrentFrameSlot];
 
     /// <summary>Gets a reference to the render-finished semaphore for the current frame.</summary>
-    public ref Semaphore GetRenderFinishedSemaphore() => ref _renderFinishedSemaphores![CurrentFrame];
+    public ref Semaphore GetRenderFinishedSemaphore() => ref _renderFinishedSemaphores![CurrentFrameSlot];
 
     /// <summary>Gets a reference to the in-flight fence for the current frame.</summary>
-    public ref Fence GetInFlightFence() => ref _inFlightFences![CurrentFrame];
+    public ref Fence GetInFlightFence() => ref _inFlightFences![CurrentFrameSlot];
 
     /// <inheritdoc/>
     public override void Show() => _silkWindow.IsVisible = true;

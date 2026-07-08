@@ -69,7 +69,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
         if (result == Result.ErrorOutOfDateKhr)
             return false;
 
-        var frameSlot = _window.CurrentFrame;
+        var frameSlot = _window.CurrentFrameSlot;
         var commandBuffer = _commandPool.CommandBuffers[frameSlot];
         VulkanContext.Vk.ResetCommandBuffer(commandBuffer, 0);
 
