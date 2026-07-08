@@ -70,7 +70,7 @@ internal static unsafe class VulkanBarrier
             ImageLayout.PresentSrcKhr => PipelineStageFlags2.BottomOfPipeBit,
             ImageLayout.DepthStencilAttachmentOptimal =>
                 PipelineStageFlags2.EarlyFragmentTestsBit | PipelineStageFlags2.LateFragmentTestsBit,
-            _ => PipelineStageFlags2.AllCommandsBit,
+            _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported image layout."),
         };
     }
 
@@ -90,7 +90,7 @@ internal static unsafe class VulkanBarrier
             ImageLayout.PresentSrcKhr => AccessFlags2.None,
             ImageLayout.DepthStencilAttachmentOptimal =>
                 AccessFlags2.DepthStencilAttachmentReadBit | AccessFlags2.DepthStencilAttachmentWriteBit,
-            _ => AccessFlags2.MemoryReadBit | AccessFlags2.MemoryWriteBit,
+            _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported image layout."),
         };
     }
 }

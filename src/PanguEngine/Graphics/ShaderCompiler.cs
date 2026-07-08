@@ -67,9 +67,11 @@ public static unsafe class ShaderCompiler
     {
         return stage switch
         {
+            ShaderStage.None => throw new ArgumentException("Shader stage must not be None.", nameof(stage)),
             ShaderStage.Vertex => ShaderKind.VertexShader,
             ShaderStage.Fragment => ShaderKind.FragmentShader,
-            _ => throw new ArgumentOutOfRangeException(nameof(stage), "Unsupported shader stage."),
+            _ => throw new ArgumentOutOfRangeException(nameof(stage), stage,
+                "Shader stage must identify a supported single shader stage."),
         };
     }
 }

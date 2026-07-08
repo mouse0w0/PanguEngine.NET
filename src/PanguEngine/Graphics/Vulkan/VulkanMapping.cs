@@ -11,13 +11,14 @@ internal static class VulkanMapping
     {
         return format switch
         {
+            TextureFormat.Undefined => Format.Undefined,
             TextureFormat.R8G8B8A8Unorm => Format.R8G8B8A8Unorm,
             TextureFormat.B8G8R8A8Unorm => Format.B8G8R8A8Unorm,
             TextureFormat.B8G8R8A8Srgb => Format.B8G8R8A8Srgb,
             TextureFormat.R8Unorm => Format.R8Unorm,
             TextureFormat.Depth32Float => Format.D32Sfloat,
             TextureFormat.Depth24UnormStencil8 => Format.D24UnormS8Uint,
-            _ => throw new InvalidOperationException("Unsupported texture format."),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format."),
         };
     }
 
@@ -25,11 +26,14 @@ internal static class VulkanMapping
     {
         return format switch
         {
+            Format.Undefined => TextureFormat.Undefined,
             Format.R8G8B8A8Unorm => TextureFormat.R8G8B8A8Unorm,
             Format.B8G8R8A8Unorm => TextureFormat.B8G8R8A8Unorm,
             Format.B8G8R8A8Srgb => TextureFormat.B8G8R8A8Srgb,
             Format.R8Unorm => TextureFormat.R8Unorm,
-            _ => throw new InvalidOperationException("Unsupported Vulkan texture format."),
+            Format.D32Sfloat => TextureFormat.Depth32Float,
+            Format.D24UnormS8Uint => TextureFormat.Depth24UnormStencil8,
+            _ => throw new NotSupportedException($"Vulkan texture format '{format}' is not supported."),
         };
     }
 
@@ -41,7 +45,7 @@ internal static class VulkanMapping
             TextureFormat.B8G8R8A8Unorm => 4,
             TextureFormat.B8G8R8A8Srgb => 4,
             TextureFormat.R8Unorm => 1,
-            _ => throw new InvalidOperationException("Unsupported texture format."),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format."),
         };
     }
 
@@ -62,13 +66,17 @@ internal static class VulkanMapping
 
     internal static ImageAspectFlags ToVulkanImageAspect(TextureFormat format)
     {
-        var result = (ImageAspectFlags)0;
-        if (HasDepthAspect(format))
-            result |= ImageAspectFlags.DepthBit;
-        if (HasStencilAspect(format))
-            result |= ImageAspectFlags.StencilBit;
-
-        return result == (ImageAspectFlags)0 ? ImageAspectFlags.ColorBit : result;
+        return format switch
+        {
+            TextureFormat.Undefined => ImageAspectFlags.None,
+            TextureFormat.R8G8B8A8Unorm => ImageAspectFlags.ColorBit,
+            TextureFormat.B8G8R8A8Unorm => ImageAspectFlags.ColorBit,
+            TextureFormat.B8G8R8A8Srgb => ImageAspectFlags.ColorBit,
+            TextureFormat.R8Unorm => ImageAspectFlags.ColorBit,
+            TextureFormat.Depth32Float => ImageAspectFlags.DepthBit,
+            TextureFormat.Depth24UnormStencil8 => ImageAspectFlags.DepthBit | ImageAspectFlags.StencilBit,
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format."),
+        };
     }
 
     internal static Filter ToVulkanFilter(FilterMode mode)
@@ -107,9 +115,12 @@ internal static class VulkanMapping
     {
         return stage switch
         {
+            ShaderStage.None => ShaderStageFlags.None,
             ShaderStage.Vertex => ShaderStageFlags.VertexBit,
             ShaderStage.Fragment => ShaderStageFlags.FragmentBit,
-            _ => throw new ArgumentOutOfRangeException(nameof(stage), "Unsupported shader stage."),
+            ShaderStage.Vertex | ShaderStage.Fragment => ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
+            _ => throw new ArgumentOutOfRangeException(nameof(stage), stage,
+                "Unsupported shader stage."),
         };
     }
 

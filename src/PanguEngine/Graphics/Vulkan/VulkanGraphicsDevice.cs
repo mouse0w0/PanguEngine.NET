@@ -377,6 +377,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                 nameof(description));
         if (string.IsNullOrWhiteSpace(description.EntryPoint))
             throw new ArgumentException("Shader entry point must not be empty.", nameof(description));
+        if (description.Stage != ShaderStage.Vertex && description.Stage != ShaderStage.Fragment)
+            throw new ArgumentOutOfRangeException(nameof(description), description.Stage,
+                "Shader stage must identify a supported single shader stage.");
     }
 
     internal static void ValidateGraphicsPipelineDescription(in GraphicsPipelineDescription description)

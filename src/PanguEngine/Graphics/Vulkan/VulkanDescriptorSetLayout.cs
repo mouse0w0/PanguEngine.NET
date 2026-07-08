@@ -112,7 +112,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
 
     private static ShaderStageFlags ToVulkanShaderStageFlags(ShaderStage stage)
     {
-        var result = default(ShaderStageFlags);
+        var result = ShaderStageFlags.None;
         if (stage.HasFlag(ShaderStage.Vertex))
             result |= ShaderStageFlags.VertexBit;
         if (stage.HasFlag(ShaderStage.Fragment))
