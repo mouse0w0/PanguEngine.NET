@@ -61,7 +61,7 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        if (!_vertexUploadHandle.IsCompleted)
+        if (!_vertexUploadHandle.CheckSuccess())
             throw new InvalidOperationException(
                 "Vertex buffer upload did not complete after flushing pending uploads.");
 

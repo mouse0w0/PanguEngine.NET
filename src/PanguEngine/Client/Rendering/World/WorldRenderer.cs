@@ -85,13 +85,14 @@ internal sealed class WorldRenderer
     {
         foreach (var uploadHandle in uploadHandles)
         {
-            if (uploadHandle.IsFaulted)
-                return new InvalidOperationException("World chunk mesh upload failed.", uploadHandle.Exception);
             if (!uploadHandle.IsCompleted)
             {
                 return new InvalidOperationException(
                     "World chunk mesh upload did not complete after flushing pending uploads.");
             }
+
+            if (uploadHandle.IsFaulted)
+                return new InvalidOperationException("World chunk mesh upload failed.", uploadHandle.Exception);
         }
 
         return null;

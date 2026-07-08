@@ -20,10 +20,6 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         public override bool IsFaulted => false;
 
         public override Exception? Exception => null;
-
-        public override void Wait()
-        {
-        }
     }
 
     /// <inheritdoc/>
