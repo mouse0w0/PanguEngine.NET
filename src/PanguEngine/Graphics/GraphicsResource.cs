@@ -15,8 +15,7 @@ public abstract class GraphicsResource
     /// </summary>
     public void ThrowIfDestroyed()
     {
-        if (IsDestroyed)
-            throw new ObjectDisposedException(GetType().Name);
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
     }
 
     /// <summary>
