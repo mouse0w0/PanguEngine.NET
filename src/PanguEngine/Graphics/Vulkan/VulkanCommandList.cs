@@ -428,7 +428,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         }
     }
 
-    private IVulkanTexture[] GetColorAttachments(
+    private static IVulkanTexture[] GetColorAttachments(
         ReadOnlySpan<ColorAttachmentDescription> attachments,
         uint width,
         uint height)
@@ -442,7 +442,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         return result;
     }
 
-    private IVulkanTexture GetColorAttachment(Texture attachment, uint width, uint height)
+    private static IVulkanTexture GetColorAttachment(Texture attachment, uint width, uint height)
     {
         ArgumentNullException.ThrowIfNull(attachment);
         var texture = attachment as IVulkanTexture

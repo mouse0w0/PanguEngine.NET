@@ -95,8 +95,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         }
         catch
         {
-            if (primaryWindow is not null)
-                primaryWindow?.Destroy();
+            primaryWindow?.Destroy();
 
             if (uploaderInitialized)
                 VulkanUploader.Destroy();

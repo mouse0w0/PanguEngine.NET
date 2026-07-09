@@ -52,7 +52,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// <summary>
     /// Gets the depth/stencil attachment format used by this pipeline.
     /// </summary>
-    internal TextureFormat DepthStencilAttachmentFormat { get; private set; }
+    internal TextureFormat DepthStencilAttachmentFormat { get; }
 
     /// <summary>
     /// Gets the color attachment formats used by this pipeline.

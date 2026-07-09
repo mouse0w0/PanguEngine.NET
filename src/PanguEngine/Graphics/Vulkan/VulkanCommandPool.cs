@@ -6,10 +6,10 @@ namespace PanguEngine.Graphics.Vulkan;
 public sealed unsafe class VulkanCommandPool
 {
     /// <summary>Gets the underlying Vulkan command pool handle.</summary>
-    public CommandPool CommandPool { get; private set; }
+    public CommandPool CommandPool { get; }
 
     /// <summary>Gets the command buffers allocated from this pool.</summary>
-    public CommandBuffer[] CommandBuffers { get; private set; }
+    public CommandBuffer[] CommandBuffers { get; }
 
     /// <summary>Creates a command pool and allocates command buffers using <see cref="VulkanContext.MaxFramesInFlight"/> as the buffer count.</summary>
     public VulkanCommandPool() : this(VulkanContext.MaxFramesInFlight)

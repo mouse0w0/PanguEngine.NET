@@ -41,7 +41,7 @@ public sealed unsafe class VulkanWindow : Window
     private readonly SilkWindow _silkWindow;
 
     /// <summary>The Vulkan surface created from the window.</summary>
-    public SurfaceKHR Surface { get; private set; }
+    public SurfaceKHR Surface { get; }
 
     /// <summary>The swapchain handle.</summary>
     public SwapchainKHR Swapchain => _swapchain;
@@ -671,7 +671,7 @@ public sealed unsafe class VulkanWindow : Window
         VulkanContext.KhrSwapchain.DestroySwapchain(VulkanContext.Device, _swapchain, null);
     }
 
-    private SurfaceFormatKHR ChooseSwapSurfaceFormat(IReadOnlyList<SurfaceFormatKHR> availableFormats)
+    private static SurfaceFormatKHR ChooseSwapSurfaceFormat(IReadOnlyList<SurfaceFormatKHR> availableFormats)
     {
         foreach (var format in availableFormats)
         {
@@ -682,7 +682,7 @@ public sealed unsafe class VulkanWindow : Window
         return availableFormats[0];
     }
 
-    private PresentModeKHR ChoosePresentMode(IReadOnlyList<PresentModeKHR> availablePresentModes)
+    private static PresentModeKHR ChoosePresentMode(IReadOnlyList<PresentModeKHR> availablePresentModes)
     {
         foreach (var mode in availablePresentModes)
         {
