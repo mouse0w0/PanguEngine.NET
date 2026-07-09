@@ -49,7 +49,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// <returns>A pointer to the mapped memory.</returns>
     internal T* Map<T>() where T : unmanaged
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+        ObjectDisposedException.ThrowIf(_destroyed, this);
 
         return VulkanAllocator.Map<T>(_allocation);
     }
@@ -59,14 +59,14 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// </summary>
     internal void Unmap()
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+        ObjectDisposedException.ThrowIf(_destroyed, this);
 
         VulkanAllocator.Unmap(_allocation);
     }
 
     internal void PersistentlyMapForWrite()
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+        ObjectDisposedException.ThrowIf(_destroyed, this);
         if (_persistentlyMapped)
             return;
 
@@ -84,7 +84,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// <inheritdoc/>
     public override void Write<T>(ReadOnlySpan<T> data, ulong destinationOffset = 0)
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanBuffer));
+        ObjectDisposedException.ThrowIf(_destroyed, this);
         if (!Usage.HasFlag(BufferUsageFlags.UniformBufferBit))
             throw new InvalidOperationException(
                 "Buffer.Write is only supported for buffers created with Uniform usage.");

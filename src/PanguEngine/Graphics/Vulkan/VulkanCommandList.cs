@@ -448,8 +448,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         var texture = attachment as IVulkanTexture
                       ?? throw new InvalidOperationException(
                           "Color attachment was not created by the Vulkan backend.");
-        if (texture.IsDestroyed)
-            throw new ObjectDisposedException(attachment.GetType().Name);
+        ObjectDisposedException.ThrowIf(texture.IsDestroyed, attachment);
         if (texture is VulkanSwapchainTexture swapchainTexture)
         {
             if (swapchainTexture.GetLayout(0, 0) == ImageLayout.PresentSrcKhr)
@@ -480,8 +479,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         var texture = attachment as IVulkanTexture
                       ?? throw new InvalidOperationException(
                           "Depth/stencil attachment was not created by the Vulkan backend.");
-        if (texture.IsDestroyed)
-            throw new ObjectDisposedException(attachment.GetType().Name);
+        ObjectDisposedException.ThrowIf(texture.IsDestroyed, attachment);
 
         if (texture.Dimension != TextureDimension.Type2D)
             throw new InvalidOperationException("Depth/stencil attachment must be a 2D texture.");

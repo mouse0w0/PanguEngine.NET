@@ -88,8 +88,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         ReadOnlySpan<T> data,
         ulong destinationOffset = 0)
     {
-        if (destination == null)
-            throw new ArgumentNullException(nameof(destination));
+        ArgumentNullException.ThrowIfNull(destination);
 
         var vulkanBuffer = RequireVulkanBuffer(destination);
 
@@ -184,8 +183,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     public override UploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data)
     {
-        if (destination == null)
-            throw new ArgumentNullException(nameof(destination));
+        ArgumentNullException.ThrowIfNull(destination);
 
         var texture = RequireVulkanTexture(destination);
         var region = texture.Dimension == TextureDimension.Type3D
@@ -199,8 +197,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         ReadOnlySpan<byte> data,
         in TextureUploadRegion region)
     {
-        if (destination == null)
-            throw new ArgumentNullException(nameof(destination));
+        ArgumentNullException.ThrowIfNull(destination);
 
         var texture = RequireVulkanTexture(destination);
         texture.ThrowIfDestroyed();
@@ -222,8 +219,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     public override UploadHandle GenerateMipmaps(Texture texture)
     {
-        if (texture == null)
-            throw new ArgumentNullException(nameof(texture));
+        ArgumentNullException.ThrowIfNull(texture);
 
         var vulkanTexture = RequireVulkanTexture(texture);
         vulkanTexture.ThrowIfDestroyed();

@@ -266,8 +266,7 @@ public static unsafe class VulkanUploader
                 throw _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.");
         }
 
-        if (dst == null)
-            throw new ArgumentNullException(nameof(dst));
+        ArgumentNullException.ThrowIfNull(dst);
 
         if (!dst.Usage.HasFlag(BufferUsageFlags.TransferDstBit))
             throw new ArgumentException("Destination buffer must have TransferDst usage.", nameof(dst));
@@ -312,8 +311,7 @@ public static unsafe class VulkanUploader
                 throw _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.");
         }
 
-        if (dst == null)
-            throw new ArgumentNullException(nameof(dst));
+        ArgumentNullException.ThrowIfNull(dst);
 
         dst.ThrowIfDestroyed();
 
@@ -342,8 +340,7 @@ public static unsafe class VulkanUploader
                 throw _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.");
         }
 
-        if (texture == null)
-            throw new ArgumentNullException(nameof(texture));
+        ArgumentNullException.ThrowIfNull(texture);
 
         texture.ThrowIfDestroyed();
 

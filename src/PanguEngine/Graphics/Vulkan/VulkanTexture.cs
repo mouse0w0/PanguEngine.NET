@@ -99,7 +99,7 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     /// <returns>The tracked image layout.</returns>
     public ImageLayout GetLayout(uint mipLevel, uint arrayLayer)
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
+        ObjectDisposedException.ThrowIf(_destroyed, this);
         return _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)];
     }
 
@@ -111,7 +111,7 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     /// <param name="layout">The image layout.</param>
     public void SetLayout(uint mipLevel, uint arrayLayer, ImageLayout layout)
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanTexture));
+        ObjectDisposedException.ThrowIf(_destroyed, this);
         _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)] = layout;
     }
 

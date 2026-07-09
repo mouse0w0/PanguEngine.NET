@@ -49,7 +49,7 @@ public static unsafe class VulkanAllocator
         in BufferCreateInfo bufferInfo,
         in AllocationCreateInfo allocInfo = default)
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
+        ObjectDisposedException.ThrowIf(_destroyed, typeof(VulkanAllocator));
 
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)
@@ -82,7 +82,7 @@ public static unsafe class VulkanAllocator
         out VkImage image,
         out Allocation* allocation)
     {
-        if (_destroyed) throw new ObjectDisposedException(nameof(VulkanAllocator));
+        ObjectDisposedException.ThrowIf(_destroyed, typeof(VulkanAllocator));
 
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)

@@ -52,8 +52,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     /// <inheritdoc/>
     public override bool TryBeginFrame([MaybeNullWhen(false)] out Frame frame)
     {
-        if (_destroyed)
-            throw new ObjectDisposedException(GetType().Name);
+        ObjectDisposedException.ThrowIf(_destroyed, this);
         if (_currentFrame != null)
             throw new InvalidOperationException("A graphics frame is already active.");
 
@@ -92,8 +91,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     /// <inheritdoc/>
     public override void EndFrame(Frame frame)
     {
-        if (_destroyed)
-            throw new ObjectDisposedException(GetType().Name);
+        ObjectDisposedException.ThrowIf(_destroyed, this);
 
         var vulkanFrame = frame as VulkanFrame
                           ?? throw new InvalidOperationException(
