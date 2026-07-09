@@ -66,7 +66,8 @@ public sealed class WindowManager
         var now = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
         foreach (var window in _windows)
         {
-            if (window.IsDestroyed || window.IsClosing || !window.IsVisible || window.IsMinimized)
+            if (window.IsDestroyed || window.IsClosing || !window.IsVisible ||
+                window.WindowState == WindowState.Minimized)
                 continue;
 
             _lastRenderTimes.TryGetValue(window, out var lastRenderTime);

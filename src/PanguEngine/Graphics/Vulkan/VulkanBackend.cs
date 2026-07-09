@@ -2,10 +2,7 @@ using PanguEngine.Windowing;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
 using SilkWindow = Silk.NET.Windowing.IWindow;
-using SilkWindowBorder = Silk.NET.Windowing.WindowBorder;
 using SilkWindowCreator = Silk.NET.Windowing.Window;
-using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
-using SilkWindowState = Silk.NET.Windowing.WindowState;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -21,6 +18,9 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
 
     /// <inheritdoc/>
     public override GraphicsDevice Device { get; }
+
+    /// <inheritdoc/>
+    public override DisplayManager DisplayManager { get; }
 
     /// <inheritdoc/>
     public override WindowManager WindowManager { get; }
@@ -43,22 +43,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         var instanceInitialized = false;
         var allocatorInitialized = false;
         var uploaderInitialized = false;
-        var silkOptions = SilkWindowOptions.DefaultVulkan with
-        {
-            IsVisible = options.PrimaryWindow.IsVisible,
-            Position = options.PrimaryWindow.Position,
-            Size = options.PrimaryWindow.Size,
-            Title = options.PrimaryWindow.Title,
-            WindowBorder = options.PrimaryWindow.WindowBorder switch
-            {
-                WindowBorder.Fixed => SilkWindowBorder.Fixed,
-                WindowBorder.Hidden => SilkWindowBorder.Hidden,
-                _ => SilkWindowBorder.Resizable
-            },
-            WindowState = options.PrimaryWindow.IsFullscreen
-                ? SilkWindowState.Fullscreen
-                : SilkWindowState.Normal
-        };
+        var silkOptions = VulkanWindowFactory.CreateSilkWindowOptions(options.PrimaryWindow);
 
         try
         {
@@ -85,11 +70,16 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             uploaderInitialized = true;
 
             var device = new VulkanGraphicsDevice();
+            var displayManager = new VulkanDisplayManager(silkWindow);
 
             primaryWindow = new VulkanWindow(silkWindow, surface, true, options.PrimaryWindow.FramesPerSecond);
+            if (options.PrimaryWindow.Icons.Length > 0)
+                primaryWindow.SetWindowIcons(options.PrimaryWindow.Icons);
+
             var windowManager = new WindowManager(primaryWindow, VulkanWindowFactory.CreateWindow);
 
             Device = device;
+            DisplayManager = displayManager;
             PrimaryWindow = primaryWindow;
             WindowManager = windowManager;
         }

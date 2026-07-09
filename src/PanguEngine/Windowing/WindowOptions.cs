@@ -25,8 +25,20 @@ public record struct WindowOptions
     /// <summary>The target render events per second. Values less than or equal to zero mean unlimited.</summary>
     public double FramesPerSecond { get; set; } = 60;
 
-    /// <summary>Whether the window starts in exclusive fullscreen mode.</summary>
-    public bool IsFullscreen { get; set; }
+    /// <summary>The initial window state.</summary>
+    public WindowState WindowState { get; set; } = WindowState.Normal;
+
+    /// <summary>Whether vertical synchronization should be requested for presentation.</summary>
+    public bool VSync { get; set; }
+
+    /// <summary>The requested monitor video mode.</summary>
+    public VideoMode VideoMode { get; set; } = VideoMode.Default;
+
+    /// <summary>Whether the window should stay above other windows.</summary>
+    public bool TopMost { get; set; }
+
+    /// <summary>The icons to assign to the window after creation.</summary>
+    public WindowIcon[] Icons { get; set; } = [];
 
     /// <summary>Initializes a new instance with default values.</summary>
     public WindowOptions()

@@ -84,17 +84,17 @@ internal sealed class WindowModeScene : IClientTestScene
         switch (nextMode)
         {
             case DisplayMode.Windowed:
-                window.IsFullscreen = false;
+                window.WindowState = WindowState.Normal;
                 window.WindowBorder = _savedBorder;
                 window.Size = _savedSize;
                 window.Position = _savedPosition;
                 break;
             case DisplayMode.Fullscreen:
-                window.IsFullscreen = true;
+                window.WindowState = WindowState.Fullscreen;
                 break;
             case DisplayMode.BorderlessFullscreen:
-                var monitorSize = window.MonitorSize;
-                window.IsFullscreen = false;
+                var monitorSize = window.Monitor?.VideoMode.Resolution ?? window.Size;
+                window.WindowState = WindowState.Normal;
                 window.WindowBorder = WindowBorder.Hidden;
                 window.Size = monitorSize;
                 window.Position = new Vector2D<int>(0, 0);

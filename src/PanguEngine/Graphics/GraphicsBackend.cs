@@ -18,6 +18,11 @@ public abstract class GraphicsBackend
     public abstract GraphicsDevice Device { get; }
 
     /// <summary>
+    /// Gets the display manager created by the backend.
+    /// </summary>
+    public abstract DisplayManager DisplayManager { get; }
+
+    /// <summary>
     /// Gets the window manager created by the backend.
     /// </summary>
     public abstract WindowManager WindowManager { get; }

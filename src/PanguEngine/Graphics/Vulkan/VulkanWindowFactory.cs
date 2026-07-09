@@ -4,7 +4,6 @@ using SilkWindow = Silk.NET.Windowing.IWindow;
 using SilkWindowBorder = Silk.NET.Windowing.WindowBorder;
 using SilkWindowCreator = Silk.NET.Windowing.Window;
 using SilkWindowOptions = Silk.NET.Windowing.WindowOptions;
-using SilkWindowState = Silk.NET.Windowing.WindowState;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -34,6 +33,9 @@ public static unsafe class VulkanWindowFactory
                 .ToSurface();
 
             window = new VulkanWindow(silkWindow, surface, false, options.FramesPerSecond);
+            if (options.Icons.Length > 0)
+                window.SetWindowIcons(options.Icons);
+
             return window;
         }
         catch
@@ -47,9 +49,12 @@ public static unsafe class VulkanWindowFactory
         }
     }
 
-    private static SilkWindow CreateSilkWindow(WindowOptions options)
+    /// <summary>Creates Silk.NET window options from engine-level window options.</summary>
+    /// <param name="options">The engine-level window options.</param>
+    /// <returns>The Silk.NET window options.</returns>
+    internal static SilkWindowOptions CreateSilkWindowOptions(WindowOptions options)
     {
-        var silkOptions = SilkWindowOptions.DefaultVulkan with
+        return SilkWindowOptions.DefaultVulkan with
         {
             IsVisible = options.IsVisible,
             Position = options.Position,
@@ -61,10 +66,19 @@ public static unsafe class VulkanWindowFactory
                 WindowBorder.Hidden => SilkWindowBorder.Hidden,
                 _ => SilkWindowBorder.Resizable
             },
-            WindowState = options.IsFullscreen
-                ? SilkWindowState.Fullscreen
-                : SilkWindowState.Normal
+            WindowState = VulkanWindow.ToSilkWindowStateForOptions(options.WindowState),
+            VSync = options.VSync,
+            VideoMode = VulkanDisplayManager.ToSilkVideoMode(options.VideoMode),
+            TopMost = options.TopMost
         };
+    }
+
+    /// <summary>Creates a Silk.NET window from engine-level window options.</summary>
+    /// <param name="options">The engine-level window options.</param>
+    /// <returns>The created Silk.NET window.</returns>
+    private static SilkWindow CreateSilkWindow(WindowOptions options)
+    {
+        var silkOptions = CreateSilkWindowOptions(options);
         return SilkWindowCreator.Create(silkOptions);
     }
 }
