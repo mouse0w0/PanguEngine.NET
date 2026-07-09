@@ -82,7 +82,7 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
         try
         {
             var commands = frame.CommandList;
-            commands.Begin();
+            commands.BeginRecording();
             commands.BeginRendering(new RenderingDescription(
                 frame.Width,
                 frame.Height,
@@ -97,7 +97,7 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
             commands.Draw((uint)_vertices.Length);
             commands.EndRendering();
             commands.PrepareForPresent(frame.ColorOutput);
-            commands.End();
+            commands.EndRecording();
         }
         finally
         {

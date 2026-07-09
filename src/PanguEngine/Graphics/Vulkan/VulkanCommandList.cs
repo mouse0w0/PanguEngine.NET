@@ -43,7 +43,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
     }
 
     /// <inheritdoc/>
-    public override void Begin()
+    public override void BeginRecording()
     {
         EnsureUsable();
         if (_begun)
@@ -368,7 +368,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
     }
 
     /// <inheritdoc/>
-    public override void End()
+    public override void EndRecording()
     {
         EnsureRecording();
         if (_rendering)

@@ -8,7 +8,7 @@ public abstract class CommandList
     /// <summary>
     /// Begins command recording.
     /// </summary>
-    public abstract void Begin();
+    public abstract void BeginRecording();
 
     /// <summary>
     /// Begins rendering for the described attachments.
@@ -101,5 +101,5 @@ public abstract class CommandList
     /// <summary>
     /// Ends command recording.
     /// </summary>
-    public abstract void End();
+    public abstract void EndRecording();
 }

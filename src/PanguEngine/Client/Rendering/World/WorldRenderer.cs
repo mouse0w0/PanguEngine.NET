@@ -41,7 +41,7 @@ internal sealed class WorldRenderer
             uploadFailure = GetUploadFailure(uploadHandles);
 
             var commandList = frame.CommandList;
-            commandList.Begin();
+            commandList.BeginRecording();
             commandList.BeginRendering(new RenderingDescription(
                 frame.Width,
                 frame.Height,
@@ -56,7 +56,7 @@ internal sealed class WorldRenderer
 
             commandList.EndRendering();
             commandList.PrepareForPresent(frame.ColorOutput);
-            commandList.End();
+            commandList.EndRecording();
         }
         finally
         {

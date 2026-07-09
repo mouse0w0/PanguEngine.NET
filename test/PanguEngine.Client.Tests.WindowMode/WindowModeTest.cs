@@ -44,7 +44,7 @@ internal sealed class WindowModeScene : IClientTestScene
         try
         {
             var commands = frame.CommandList;
-            commands.Begin();
+            commands.BeginRecording();
             commands.BeginRendering(new RenderingDescription(
                 frame.Width,
                 frame.Height,
@@ -53,7 +53,7 @@ internal sealed class WindowModeScene : IClientTestScene
                 ]));
             commands.EndRendering();
             commands.PrepareForPresent(frame.ColorOutput);
-            commands.End();
+            commands.EndRecording();
         }
         finally
         {

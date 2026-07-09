@@ -96,7 +96,7 @@ internal sealed class DepthStencilScene : IClientTestScene
         try
         {
             var commands = frame.CommandList;
-            commands.Begin();
+            commands.BeginRecording();
             commands.BeginRendering(new RenderingDescription(
                 frame.Width,
                 frame.Height,
@@ -115,7 +115,7 @@ internal sealed class DepthStencilScene : IClientTestScene
             commands.DrawIndexed((uint)_indices.Length);
             commands.EndRendering();
             commands.PrepareForPresent(frame.ColorOutput);
-            commands.End();
+            commands.EndRecording();
         }
         finally
         {

@@ -60,7 +60,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         try
         {
             var commands = frame.CommandList;
-            commands.Begin();
+            commands.BeginRecording();
             commands.BeginRendering(new RenderingDescription(
                 frame.Width,
                 frame.Height,
@@ -79,7 +79,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
             commands.Draw(_mesh.VertexCount);
             commands.EndRendering();
             commands.PrepareForPresent(frame.ColorOutput);
-            commands.End();
+            commands.EndRecording();
 
             _mesh.Buffer.Destroy();
         }

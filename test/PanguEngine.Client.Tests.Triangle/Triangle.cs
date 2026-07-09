@@ -76,7 +76,7 @@ internal sealed class TriangleScene : IClientTestScene
         try
         {
             var commands = frame.CommandList;
-            commands.Begin();
+            commands.BeginRecording();
             commands.BeginRendering(new RenderingDescription(
                 frame.Width,
                 frame.Height,
@@ -89,7 +89,7 @@ internal sealed class TriangleScene : IClientTestScene
             commands.Draw(3);
             commands.EndRendering();
             commands.PrepareForPresent(frame.ColorOutput);
-            commands.End();
+            commands.EndRecording();
         }
         finally
         {
