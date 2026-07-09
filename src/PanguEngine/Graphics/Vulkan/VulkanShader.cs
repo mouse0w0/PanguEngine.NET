@@ -65,7 +65,7 @@ internal sealed unsafe class VulkanShader : Shader
             {
                 SType = StructureType.ShaderModuleCreateInfo,
                 CodeSize = (nuint)bytecode.Length,
-                PCode = (uint*)ptr,
+                PCode = (uint*)ptr
             };
 
             if (VulkanContext.Vk.CreateShaderModule(VulkanContext.Device, in createInfo, null, out var module) !=

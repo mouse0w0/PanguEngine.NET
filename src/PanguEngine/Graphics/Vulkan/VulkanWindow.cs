@@ -541,7 +541,7 @@ public sealed unsafe class VulkanWindow : Window
             ImageColorSpace = surfaceFormat.ColorSpace,
             ImageExtent = extent,
             ImageArrayLayers = 1,
-            ImageUsage = ImageUsageFlags.ColorAttachmentBit,
+            ImageUsage = ImageUsageFlags.ColorAttachmentBit
         };
 
         if (VulkanContext.GraphicsQueueFamily != VulkanContext.PresentQueueFamily)
@@ -550,7 +550,7 @@ public sealed unsafe class VulkanWindow : Window
             {
                 ImageSharingMode = SharingMode.Concurrent,
                 QueueFamilyIndexCount = 2,
-                PQueueFamilyIndices = queueFamilyIndices,
+                PQueueFamilyIndices = queueFamilyIndices
             };
         }
         else
@@ -563,7 +563,7 @@ public sealed unsafe class VulkanWindow : Window
             PreTransform = swapChainSupport.Capabilities.CurrentTransform,
             CompositeAlpha = CompositeAlphaFlagsKHR.OpaqueBitKhr,
             PresentMode = presentMode,
-            Clipped = true,
+            Clipped = true
         };
 
         if (VulkanContext.KhrSwapchain.CreateSwapchain(VulkanContext.Device, in createInfo, null, out _swapchain) !=
@@ -601,7 +601,7 @@ public sealed unsafe class VulkanWindow : Window
                     R = ComponentSwizzle.Identity,
                     G = ComponentSwizzle.Identity,
                     B = ComponentSwizzle.Identity,
-                    A = ComponentSwizzle.Identity,
+                    A = ComponentSwizzle.Identity
                 },
                 SubresourceRange =
                 {
@@ -609,7 +609,7 @@ public sealed unsafe class VulkanWindow : Window
                     BaseMipLevel = 0,
                     LevelCount = 1,
                     BaseArrayLayer = 0,
-                    LayerCount = 1,
+                    LayerCount = 1
                 }
             };
 
@@ -630,13 +630,13 @@ public sealed unsafe class VulkanWindow : Window
 
         SemaphoreCreateInfo semaphoreInfo = new()
         {
-            SType = StructureType.SemaphoreCreateInfo,
+            SType = StructureType.SemaphoreCreateInfo
         };
 
         FenceCreateInfo fenceInfo = new()
         {
             SType = StructureType.FenceCreateInfo,
-            Flags = FenceCreateFlags.SignaledBit,
+            Flags = FenceCreateFlags.SignaledBit
         };
 
         for (var i = 0; i < VulkanContext.MaxFramesInFlight; i++)

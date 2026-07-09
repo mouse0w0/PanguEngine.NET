@@ -36,7 +36,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 SType = StructureType.DescriptorPoolCreateInfo,
                 MaxSets = 1,
                 PoolSizeCount = (uint)poolSizes.Length,
-                PPoolSizes = pPoolSizes,
+                PPoolSizes = pPoolSizes
             };
 
             if (VulkanContext.Vk.CreateDescriptorPool(VulkanContext.Device, in poolInfo, null, out var pool) !=
@@ -54,7 +54,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 SType = StructureType.DescriptorSetAllocateInfo,
                 DescriptorPool = DescriptorPool,
                 DescriptorSetCount = 1,
-                PSetLayouts = &descriptorSetLayout,
+                PSetLayouts = &descriptorSetLayout
             };
 
             if (VulkanContext.Vk.AllocateDescriptorSets(VulkanContext.Device, in allocateInfo, out var descriptorSet) !=
@@ -129,7 +129,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 DstBinding = bindings[i].Binding,
                 DstArrayElement = 0,
                 DescriptorCount = 1,
-                DescriptorType = ToVulkanDescriptorType(bindings[i].Type),
+                DescriptorType = ToVulkanDescriptorType(bindings[i].Type)
             };
 
             switch (bindings[i].Type)
@@ -192,7 +192,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 poolSizes.Add(new DescriptorPoolSize
                 {
                     Type = descriptorType,
-                    DescriptorCount = 1,
+                    DescriptorCount = 1
                 });
             }
         }
@@ -230,7 +230,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         {
             Buffer = buffer.Buffer,
             Offset = binding.Offset,
-            Range = binding.Size,
+            Range = binding.Size
         };
     }
 
@@ -254,7 +254,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         {
             ImageView = texture.ImageView,
             Sampler = sampler.Handle,
-            ImageLayout = ImageLayout.ShaderReadOnlyOptimal,
+            ImageLayout = ImageLayout.ShaderReadOnlyOptimal
         };
     }
 
@@ -264,7 +264,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         {
             DescriptorType.UniformBuffer => VkDescriptorType.UniformBuffer,
             DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
-            _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type."),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
         };
     }
 }

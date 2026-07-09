@@ -51,7 +51,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
 
         CommandBufferBeginInfo beginInfo = new()
         {
-            SType = StructureType.CommandBufferBeginInfo,
+            SType = StructureType.CommandBufferBeginInfo
         };
 
         if (VulkanContext.Vk.BeginCommandBuffer(_commandBuffer, &beginInfo) != Result.Success)
@@ -115,9 +115,9 @@ internal sealed unsafe class VulkanCommandList : CommandList
                         Float32_0 = clearColor.R,
                         Float32_1 = clearColor.G,
                         Float32_2 = clearColor.B,
-                        Float32_3 = clearColor.A,
-                    },
-                },
+                        Float32_3 = clearColor.A
+                    }
+                }
             };
         }
 
@@ -136,8 +136,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
                 DepthStencil = new ClearDepthStencilValue
                 {
                     Depth = depthStencil.DepthClearValue,
-                    Stencil = depthStencil.StencilClearValue,
-                },
+                    Stencil = depthStencil.StencilClearValue
+                }
             };
 
             if (hasDepthAttachment)
@@ -149,7 +149,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
                     ImageLayout = ImageLayout.DepthStencilAttachmentOptimal,
                     LoadOp = VulkanMapping.ToVulkanLoadOperation(depthStencil.DepthLoadOperation),
                     StoreOp = VulkanMapping.ToVulkanStoreOperation(depthStencil.DepthStoreOperation),
-                    ClearValue = depthStencilClear,
+                    ClearValue = depthStencilClear
                 };
             }
 
@@ -162,7 +162,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
                     ImageLayout = ImageLayout.DepthStencilAttachmentOptimal,
                     LoadOp = VulkanMapping.ToVulkanLoadOperation(depthStencil.StencilLoadOperation),
                     StoreOp = VulkanMapping.ToVulkanStoreOperation(depthStencil.StencilStoreOperation),
-                    ClearValue = depthStencilClear,
+                    ClearValue = depthStencilClear
                 };
             }
         }
@@ -173,11 +173,11 @@ internal sealed unsafe class VulkanCommandList : CommandList
             RenderArea = new Rect2D
             {
                 Offset = new Offset2D(0, 0),
-                Extent = new Extent2D { Width = description.Width, Height = description.Height },
+                Extent = new Extent2D { Width = description.Width, Height = description.Height }
             },
             LayerCount = 1,
             ColorAttachmentCount = (uint)colorTextures.Length,
-            PColorAttachments = colorAttachments,
+            PColorAttachments = colorAttachments
         };
 
         if (hasDepthAttachment)
@@ -203,7 +203,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
             Width = width,
             Height = height,
             MinDepth = 0,
-            MaxDepth = 1,
+            MaxDepth = 1
         };
 
         VulkanContext.Vk.CmdSetViewport(_commandBuffer, 0, 1, &viewport);
@@ -217,7 +217,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         Rect2D scissor = new()
         {
             Offset = new Offset2D(x, y),
-            Extent = new Extent2D { Width = width, Height = height },
+            Extent = new Extent2D { Width = width, Height = height }
         };
 
         VulkanContext.Vk.CmdSetScissor(_commandBuffer, 0, 1, &scissor);

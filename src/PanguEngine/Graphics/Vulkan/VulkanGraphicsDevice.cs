@@ -53,7 +53,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             SType = StructureType.BufferCreateInfo,
             Size = description.Size,
             Usage = vkUsage,
-            SharingMode = SharingMode.Exclusive,
+            SharingMode = SharingMode.Exclusive
         };
 
         var vmaUsage = description.MemoryUsage.Value switch
@@ -61,12 +61,12 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             0 => VmaMemoryUsage.AutoPreferDevice,
             1 => VmaMemoryUsage.CpuToGpu,
             2 => VmaMemoryUsage.GpuToCpu,
-            _ => VmaMemoryUsage.Auto,
+            _ => VmaMemoryUsage.Auto
         };
 
         AllocationCreateInfo allocInfo = new()
         {
-            Usage = vmaUsage,
+            Usage = vmaUsage
         };
 
         if (description.Usage.HasFlag(BufferUsage.Uniform))
@@ -130,7 +130,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             {
                 Width = description.Width,
                 Height = description.Height,
-                Depth = description.Dimension == TextureDimension.Type3D ? description.Depth : 1,
+                Depth = description.Dimension == TextureDimension.Type3D ? description.Depth : 1
             },
             MipLevels = description.MipLevels,
             ArrayLayers = imageArrayLayers,
@@ -138,12 +138,12 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             Tiling = ImageTiling.Optimal,
             Usage = VulkanMapping.ToVulkanImageUsage(description.Usage),
             SharingMode = SharingMode.Exclusive,
-            InitialLayout = ImageLayout.Undefined,
+            InitialLayout = ImageLayout.Undefined
         };
 
         AllocationCreateInfo allocInfo = new()
         {
-            Usage = VmaMemoryUsage.AutoPreferDevice,
+            Usage = VmaMemoryUsage.AutoPreferDevice
         };
 
         VulkanAllocator.CreateImage(in imageInfo, in allocInfo, out var image, out var allocation);
@@ -162,8 +162,8 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                     BaseMipLevel = 0,
                     LevelCount = description.MipLevels,
                     BaseArrayLayer = 0,
-                    LayerCount = imageArrayLayers,
-                },
+                    LayerCount = imageArrayLayers
+                }
             };
 
             if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in viewInfo, null, out var imageView) !=
@@ -264,7 +264,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             BorderColor = BorderColor.FloatTransparentBlack,
             CompareEnable = false,
             CompareOp = CompareOp.Always,
-            UnnormalizedCoordinates = false,
+            UnnormalizedCoordinates = false
         };
 
         if (VulkanContext.Vk.CreateSampler(VulkanContext.Device, in samplerInfo, null, out VKSampler sampler) !=

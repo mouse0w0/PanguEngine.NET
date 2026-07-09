@@ -108,7 +108,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                     SType = StructureType.PipelineShaderStageCreateInfo,
                     Stage = VulkanMapping.ToShaderStageFlags(shader.Stage),
                     Module = shader.Module,
-                    PName = (byte*)entryPointPointers[i],
+                    PName = (byte*)entryPointPointers[i]
                 };
             }
 
@@ -140,7 +140,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             {
                 Binding = bufferLayouts[i].Binding,
                 Stride = bufferLayouts[i].Stride,
-                InputRate = VulkanMapping.ToVulkanVertexInputRate(bufferLayouts[i].InputRate),
+                InputRate = VulkanMapping.ToVulkanVertexInputRate(bufferLayouts[i].InputRate)
             };
         }
 
@@ -151,7 +151,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 Location = attributes[i].Location,
                 Binding = attributes[i].Binding,
                 Format = VulkanMapping.ToVulkanVertexAttributeFormat(attributes[i].Format),
-                Offset = attributes[i].Offset,
+                Offset = attributes[i].Offset
             };
         }
 
@@ -161,14 +161,14 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             VertexBindingDescriptionCount = (uint)bufferLayouts.Length,
             PVertexBindingDescriptions = bufferLayouts.Length == 0 ? null : bindingDescriptions,
             VertexAttributeDescriptionCount = (uint)attributes.Length,
-            PVertexAttributeDescriptions = attributes.Length == 0 ? null : attributeDescriptions,
+            PVertexAttributeDescriptions = attributes.Length == 0 ? null : attributeDescriptions
         };
 
         PipelineInputAssemblyStateCreateInfo inputAssembly = new()
         {
             SType = StructureType.PipelineInputAssemblyStateCreateInfo,
             Topology = VulkanMapping.ToVulkanPrimitiveTopology(description.Topology),
-            PrimitiveRestartEnable = false,
+            PrimitiveRestartEnable = false
         };
 
         Viewport viewport = new() { X = 0, Y = 0, Width = 1, Height = 1, MinDepth = 0, MaxDepth = 1 };
@@ -179,7 +179,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             ViewportCount = 1,
             PViewports = description.DynamicViewport ? null : &viewport,
             ScissorCount = 1,
-            PScissors = description.DynamicScissor ? null : &scissor,
+            PScissors = description.DynamicScissor ? null : &scissor
         };
 
         var dynamicStateCount = (description.DynamicViewport ? 1 : 0) + (description.DynamicScissor ? 1 : 0);
@@ -194,7 +194,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         {
             SType = StructureType.PipelineDynamicStateCreateInfo,
             DynamicStateCount = (uint)dynamicStateCount,
-            PDynamicStates = dynamicStateCount == 0 ? null : dynamicStates,
+            PDynamicStates = dynamicStateCount == 0 ? null : dynamicStates
         };
 
         PipelineRasterizationStateCreateInfo rasterizer = new()
@@ -206,14 +206,14 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             LineWidth = description.Rasterizer.LineWidth == 0 ? 1 : description.Rasterizer.LineWidth,
             CullMode = VulkanMapping.ToVulkanCullMode(description.Rasterizer.CullMode),
             FrontFace = VulkanMapping.ToVulkanFrontFace(description.Rasterizer.FrontFace),
-            DepthBiasEnable = false,
+            DepthBiasEnable = false
         };
 
         PipelineMultisampleStateCreateInfo multisampling = new()
         {
             SType = StructureType.PipelineMultisampleStateCreateInfo,
             SampleShadingEnable = false,
-            RasterizationSamples = SampleCountFlags.Count1Bit,
+            RasterizationSamples = SampleCountFlags.Count1Bit
         };
 
         var colorAttachmentFormats = description.ColorAttachmentFormats;
@@ -231,7 +231,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             LogicOpEnable = false,
             LogicOp = LogicOp.Copy,
             AttachmentCount = (uint)colorAttachmentFormats.Length,
-            PAttachments = colorBlendAttachments,
+            PAttachments = colorBlendAttachments
         };
 
         var stencilTestEnabled = description.DepthStencil.StencilTestEnabled;
@@ -252,7 +252,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 ? VulkanMapping.ToVulkanStencilOpState(description.DepthStencil.BackFace)
                 : CreateDisabledStencilOpState(),
             MinDepthBounds = 0,
-            MaxDepthBounds = 1,
+            MaxDepthBounds = 1
         };
 
         fixed (VKDescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
@@ -263,7 +263,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 SType = StructureType.PipelineLayoutCreateInfo,
                 SetLayoutCount = (uint)descriptorSetLayouts.Length,
                 PSetLayouts = descriptorSetLayouts.Length == 0 ? null : descriptorLayouts,
-                PushConstantRangeCount = 0,
+                PushConstantRangeCount = 0
             };
 
             if (VulkanContext.Vk.CreatePipelineLayout(VulkanContext.Device, in pipelineLayoutInfo, null,
@@ -290,7 +290,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 ColorAttachmentCount = (uint)colorAttachmentFormats.Length,
                 PColorAttachmentFormats = vkColorFormats,
                 DepthAttachmentFormat = depthFormat,
-                StencilAttachmentFormat = stencilFormat,
+                StencilAttachmentFormat = stencilFormat
             };
 
             GraphicsPipelineCreateInfo pipelineInfo = new()
@@ -308,7 +308,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 PColorBlendState = &colorBlending,
                 PDynamicState = dynamicStateCount == 0 ? null : &dynamicState,
                 Layout = Layout,
-                BasePipelineHandle = default,
+                BasePipelineHandle = default
             };
 
             if (VulkanContext.Vk.CreateGraphicsPipelines(VulkanContext.Device, default, 1, in pipelineInfo, null,
@@ -329,7 +329,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         {
             ColorWriteMask = ColorComponentFlags.RBit | ColorComponentFlags.GBit | ColorComponentFlags.BBit |
                              ColorComponentFlags.ABit,
-            BlendEnable = description.AlphaBlend,
+            BlendEnable = description.AlphaBlend
         };
 
         if (!description.AlphaBlend)
@@ -353,7 +353,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             DepthFailOp = StencilOp.Keep,
             CompareOp = CompareOp.Always,
             CompareMask = 0xff,
-            WriteMask = 0xff,
+            WriteMask = 0xff
         };
     }
 

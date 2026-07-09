@@ -42,15 +42,15 @@ internal static unsafe class VulkanBarrier
                 BaseMipLevel = mipLevel,
                 LevelCount = 1,
                 BaseArrayLayer = baseArrayLayer,
-                LayerCount = layerCount,
-            },
+                LayerCount = layerCount
+            }
         };
 
         DependencyInfo dependency = new()
         {
             SType = StructureType.DependencyInfo,
             ImageMemoryBarrierCount = 1,
-            PImageMemoryBarriers = &barrier,
+            PImageMemoryBarriers = &barrier
         };
         VulkanContext.Vk.CmdPipelineBarrier2(commandBuffer, &dependency);
     }
@@ -70,7 +70,7 @@ internal static unsafe class VulkanBarrier
             ImageLayout.PresentSrcKhr => PipelineStageFlags2.BottomOfPipeBit,
             ImageLayout.DepthStencilAttachmentOptimal =>
                 PipelineStageFlags2.EarlyFragmentTestsBit | PipelineStageFlags2.LateFragmentTestsBit,
-            _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported image layout."),
+            _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported image layout.")
         };
     }
 
@@ -90,7 +90,7 @@ internal static unsafe class VulkanBarrier
             ImageLayout.PresentSrcKhr => AccessFlags2.None,
             ImageLayout.DepthStencilAttachmentOptimal =>
                 AccessFlags2.DepthStencilAttachmentReadBit | AccessFlags2.DepthStencilAttachmentWriteBit,
-            _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported image layout."),
+            _ => throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported image layout.")
         };
     }
 }

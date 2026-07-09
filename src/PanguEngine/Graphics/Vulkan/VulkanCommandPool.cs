@@ -24,7 +24,7 @@ public sealed unsafe class VulkanCommandPool
         {
             SType = StructureType.CommandPoolCreateInfo,
             Flags = CommandPoolCreateFlags.ResetCommandBufferBit,
-            QueueFamilyIndex = VulkanContext.GraphicsQueueFamily,
+            QueueFamilyIndex = VulkanContext.GraphicsQueueFamily
         };
 
         if (VulkanContext.Vk.CreateCommandPool(VulkanContext.Device, in poolInfo, null, out var commandPool) !=
@@ -42,7 +42,7 @@ public sealed unsafe class VulkanCommandPool
             SType = StructureType.CommandBufferAllocateInfo,
             CommandPool = CommandPool,
             Level = CommandBufferLevel.Primary,
-            CommandBufferCount = count,
+            CommandBufferCount = count
         };
 
         var commandBuffers = new CommandBuffer[count];

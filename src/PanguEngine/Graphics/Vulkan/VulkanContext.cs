@@ -244,12 +244,12 @@ public static unsafe class VulkanContext
             {
                 SType = StructureType.SemaphoreTypeCreateInfo,
                 SemaphoreType = SemaphoreType.Timeline,
-                InitialValue = 0,
+                InitialValue = 0
             };
             SemaphoreCreateInfo semaphoreInfo = new()
             {
                 SType = StructureType.SemaphoreCreateInfo,
-                PNext = &timelineCreateInfo,
+                PNext = &timelineCreateInfo
             };
             if (Vk.CreateSemaphore(Device, in semaphoreInfo, null, out _globalTimelineSemaphore) != Result.Success)
                 throw new InvalidOperationException("Failed to create global timeline semaphore.");
@@ -582,13 +582,13 @@ public static unsafe class VulkanContext
 
         PhysicalDeviceFeatures deviceFeatures = new()
         {
-            SamplerAnisotropy = SamplerAnisotropySupported,
+            SamplerAnisotropy = SamplerAnisotropySupported
         };
 
         PhysicalDeviceVulkan12Features vulkan12Features = new()
         {
             SType = StructureType.PhysicalDeviceVulkan12Features,
-            TimelineSemaphore = true,
+            TimelineSemaphore = true
         };
 
         PhysicalDeviceVulkan13Features vulkan13Features = new()
@@ -596,7 +596,7 @@ public static unsafe class VulkanContext
             SType = StructureType.PhysicalDeviceVulkan13Features,
             PNext = &vulkan12Features,
             DynamicRendering = true,
-            Synchronization2 = true,
+            Synchronization2 = true
         };
 
         DeviceCreateInfo createInfo = new()

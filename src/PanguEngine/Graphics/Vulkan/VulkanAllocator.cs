@@ -25,7 +25,7 @@ public static unsafe class VulkanAllocator
             VulkanApiVersion = Vk.Version13,
             Instance = VulkanContext.VkInstance,
             PhysicalDevice = VulkanContext.PhysicalDevice,
-            Device = VulkanContext.Device,
+            Device = VulkanContext.Device
         };
 
         Allocator* allocator;

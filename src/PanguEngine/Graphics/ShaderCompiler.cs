@@ -71,7 +71,7 @@ public static unsafe class ShaderCompiler
             ShaderStage.Vertex => ShaderKind.VertexShader,
             ShaderStage.Fragment => ShaderKind.FragmentShader,
             _ => throw new ArgumentOutOfRangeException(nameof(stage), stage,
-                "Shader stage must identify a supported single shader stage."),
+                "Shader stage must identify a supported single shader stage.")
         };
     }
 }

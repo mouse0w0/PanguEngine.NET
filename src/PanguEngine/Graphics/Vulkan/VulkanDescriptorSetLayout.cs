@@ -35,7 +35,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
                 Binding = bindings[i].Binding,
                 DescriptorType = ToVulkanDescriptorType(bindings[i].Type),
                 DescriptorCount = 1,
-                StageFlags = ToVulkanShaderStageFlags(bindings[i].Stages),
+                StageFlags = ToVulkanShaderStageFlags(bindings[i].Stages)
             };
         }
 
@@ -45,7 +45,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             {
                 SType = StructureType.DescriptorSetLayoutCreateInfo,
                 BindingCount = (uint)bindings.Length,
-                PBindings = pBindings,
+                PBindings = pBindings
             };
 
             if (VulkanContext.Vk.CreateDescriptorSetLayout(VulkanContext.Device, in layoutInfo, null, out var layout) !=
@@ -106,7 +106,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
         {
             DescriptorType.UniformBuffer => VkDescriptorType.UniformBuffer,
             DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
-            _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type."),
+            _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
         };
     }
 

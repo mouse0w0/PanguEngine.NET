@@ -148,7 +148,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
         {
             SType = StructureType.TimelineSemaphoreSubmitInfo,
             SignalSemaphoreValueCount = 2,
-            PSignalSemaphoreValues = signalValues,
+            PSignalSemaphoreValues = signalValues
         };
 
         SubmitInfo submitInfo = new()
@@ -161,7 +161,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
             CommandBufferCount = 1,
             PCommandBuffers = &commandBuffer,
             SignalSemaphoreCount = 2,
-            PSignalSemaphores = signalSemaphores,
+            PSignalSemaphores = signalSemaphores
         };
 
         if (VulkanContext.Vk.QueueSubmit(VulkanContext.GraphicsQueue, 1, in submitInfo, _window.GetInFlightFence()) !=

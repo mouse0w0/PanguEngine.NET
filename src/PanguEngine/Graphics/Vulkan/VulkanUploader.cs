@@ -108,12 +108,12 @@ public static unsafe class VulkanUploader
                 SType = StructureType.BufferCreateInfo,
                 Size = _size,
                 Usage = BufferUsageFlags.TransferSrcBit,
-                SharingMode = SharingMode.Exclusive,
+                SharingMode = SharingMode.Exclusive
             };
 
             AllocationCreateInfo allocInfo = new()
             {
-                Usage = VmaMemoryUsage.CpuToGpu,
+                Usage = VmaMemoryUsage.CpuToGpu
             };
 
             _stagingBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
@@ -122,7 +122,7 @@ public static unsafe class VulkanUploader
             {
                 SType = StructureType.CommandPoolCreateInfo,
                 Flags = CommandPoolCreateFlags.ResetCommandBufferBit,
-                QueueFamilyIndex = VulkanContext.GraphicsQueueFamily,
+                QueueFamilyIndex = VulkanContext.GraphicsQueueFamily
             };
 
             if (VulkanContext.Vk.CreateCommandPool(VulkanContext.Device, in poolInfo, null, out _commandPool) !=
@@ -134,7 +134,7 @@ public static unsafe class VulkanUploader
                 SType = StructureType.CommandBufferAllocateInfo,
                 CommandPool = _commandPool,
                 Level = CommandBufferLevel.Primary,
-                CommandBufferCount = 1,
+                CommandBufferCount = 1
             };
 
             var tempBuffer = new CommandBuffer[1];
@@ -150,7 +150,7 @@ public static unsafe class VulkanUploader
             FenceCreateInfo fenceInfo = new()
             {
                 SType = StructureType.FenceCreateInfo,
-                Flags = FenceCreateFlags.SignaledBit,
+                Flags = FenceCreateFlags.SignaledBit
             };
 
             if (VulkanContext.Vk.CreateFence(VulkanContext.Device, in fenceInfo, null, out _fence) !=
@@ -286,7 +286,7 @@ public static unsafe class VulkanUploader
             Data = dataCopy,
             DstOffset = dstOffset,
             Size = dataSize,
-            Handle = handle,
+            Handle = handle
         };
 
         PendingUploads.Enqueue(upload);
@@ -323,7 +323,7 @@ public static unsafe class VulkanUploader
             Data = dataCopy,
             Size = (ulong)dataCopy.Length,
             Region = region,
-            Handle = handle,
+            Handle = handle
         });
 
         return handle;
@@ -348,7 +348,7 @@ public static unsafe class VulkanUploader
         PendingMipmapGenerations.Enqueue(new PendingMipmapGeneration
         {
             Texture = texture,
-            Handle = handle,
+            Handle = handle
         });
 
         return handle;
@@ -453,7 +453,7 @@ public static unsafe class VulkanUploader
         CommandBufferBeginInfo beginInfo = new()
         {
             SType = StructureType.CommandBufferBeginInfo,
-            Flags = CommandBufferUsageFlags.OneTimeSubmitBit,
+            Flags = CommandBufferUsageFlags.OneTimeSubmitBit
         };
 
         if (VulkanContext.Vk.BeginCommandBuffer(_commandBuffer, in beginInfo) != Result.Success)
@@ -472,7 +472,7 @@ public static unsafe class VulkanUploader
             {
                 SrcOffset = stagingOffset,
                 DstOffset = upload.DstOffset,
-                Size = upload.Size,
+                Size = upload.Size
             };
             VulkanContext.Vk.CmdCopyBuffer(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Buffer, 1, in copyRegion);
             stagingOffset += upload.Size;
@@ -512,7 +512,7 @@ public static unsafe class VulkanUploader
         {
             SType = StructureType.SubmitInfo,
             CommandBufferCount = 1,
-            PCommandBuffers = &cmdBuffer,
+            PCommandBuffers = &cmdBuffer
         };
 
         var submitResult = VulkanContext.Vk.QueueSubmit(VulkanContext.GraphicsQueue, 1, in submitInfo, _fence);
@@ -636,20 +636,20 @@ public static unsafe class VulkanUploader
                 AspectMask = ImageAspectFlags.ColorBit,
                 MipLevel = upload.Region.MipLevel,
                 BaseArrayLayer = baseArrayLayer,
-                LayerCount = layerCount,
+                LayerCount = layerCount
             },
             ImageOffset = new Offset3D
             {
                 X = checked((int)upload.Region.X),
                 Y = checked((int)upload.Region.Y),
-                Z = checked((int)upload.Region.Z),
+                Z = checked((int)upload.Region.Z)
             },
             ImageExtent = new Extent3D
             {
                 Width = upload.Region.Width,
                 Height = upload.Region.Height,
-                Depth = upload.Region.Depth,
-            },
+                Depth = upload.Region.Depth
+            }
         };
         VulkanContext.Vk.CmdCopyBufferToImage(_commandBuffer, _stagingBuffer.Buffer, upload.Dst.Image,
             ImageLayout.TransferDstOptimal, 1, in copyRegion);
@@ -706,15 +706,15 @@ public static unsafe class VulkanUploader
                     AspectMask = ImageAspectFlags.ColorBit,
                     MipLevel = srcMip,
                     BaseArrayLayer = arrayLayer,
-                    LayerCount = 1,
+                    LayerCount = 1
                 },
                 DstSubresource = new ImageSubresourceLayers
                 {
                     AspectMask = ImageAspectFlags.ColorBit,
                     MipLevel = dstMip,
                     BaseArrayLayer = arrayLayer,
-                    LayerCount = 1,
-                },
+                    LayerCount = 1
+                }
             };
             blit.SrcOffsets[0] = new Offset3D(0, 0, 0);
             blit.SrcOffsets[1] = new Offset3D(checked((int)srcWidth), checked((int)srcHeight), 1);
@@ -763,12 +763,12 @@ public static unsafe class VulkanUploader
             SType = StructureType.BufferCreateInfo,
             Size = newSize,
             Usage = BufferUsageFlags.TransferSrcBit,
-            SharingMode = SharingMode.Exclusive,
+            SharingMode = SharingMode.Exclusive
         };
 
         AllocationCreateInfo allocInfo = new()
         {
-            Usage = VmaMemoryUsage.CpuToGpu,
+            Usage = VmaMemoryUsage.CpuToGpu
         };
 
         var newBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);

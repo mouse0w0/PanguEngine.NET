@@ -18,7 +18,7 @@ internal static class VulkanMapping
             TextureFormat.R8Unorm => Format.R8Unorm,
             TextureFormat.Depth32Float => Format.D32Sfloat,
             TextureFormat.Depth24UnormStencil8 => Format.D24UnormS8Uint,
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format."),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format.")
         };
     }
 
@@ -33,7 +33,7 @@ internal static class VulkanMapping
             Format.R8Unorm => TextureFormat.R8Unorm,
             Format.D32Sfloat => TextureFormat.Depth32Float,
             Format.D24UnormS8Uint => TextureFormat.Depth24UnormStencil8,
-            _ => throw new NotSupportedException($"Vulkan texture format '{format}' is not supported."),
+            _ => throw new NotSupportedException($"Vulkan texture format '{format}' is not supported.")
         };
     }
 
@@ -45,7 +45,7 @@ internal static class VulkanMapping
             TextureFormat.B8G8R8A8Unorm => 4,
             TextureFormat.B8G8R8A8Srgb => 4,
             TextureFormat.R8Unorm => 1,
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format."),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format.")
         };
     }
 
@@ -75,7 +75,7 @@ internal static class VulkanMapping
             TextureFormat.R8Unorm => ImageAspectFlags.ColorBit,
             TextureFormat.Depth32Float => ImageAspectFlags.DepthBit,
             TextureFormat.Depth24UnormStencil8 => ImageAspectFlags.DepthBit | ImageAspectFlags.StencilBit,
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format."),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported texture format.")
         };
     }
 
@@ -85,7 +85,7 @@ internal static class VulkanMapping
         {
             FilterMode.Nearest => Filter.Nearest,
             FilterMode.Linear => Filter.Linear,
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported filter mode."),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported filter mode.")
         };
     }
 
@@ -95,7 +95,7 @@ internal static class VulkanMapping
         {
             MipmapMode.Nearest => SamplerMipmapMode.Nearest,
             MipmapMode.Linear => SamplerMipmapMode.Linear,
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported mipmap mode."),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported mipmap mode.")
         };
     }
 
@@ -107,7 +107,7 @@ internal static class VulkanMapping
             WrapMode.MirroredRepeat => SamplerAddressMode.MirroredRepeat,
             WrapMode.ClampToEdge => SamplerAddressMode.ClampToEdge,
             WrapMode.ClampToBorder => SamplerAddressMode.ClampToBorder,
-            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported wrap mode."),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), "Unsupported wrap mode.")
         };
     }
 
@@ -120,7 +120,7 @@ internal static class VulkanMapping
             ShaderStage.Fragment => ShaderStageFlags.FragmentBit,
             ShaderStage.Vertex | ShaderStage.Fragment => ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
             _ => throw new ArgumentOutOfRangeException(nameof(stage), stage,
-                "Unsupported shader stage."),
+                "Unsupported shader stage.")
         };
     }
 
@@ -130,7 +130,7 @@ internal static class VulkanMapping
         {
             VertexInputRate.Vertex => VkVertexInputRate.Vertex,
             VertexInputRate.Instance => VkVertexInputRate.Instance,
-            _ => throw new ArgumentOutOfRangeException(nameof(inputRate), "Unsupported vertex input rate."),
+            _ => throw new ArgumentOutOfRangeException(nameof(inputRate), "Unsupported vertex input rate.")
         };
     }
 
@@ -141,7 +141,7 @@ internal static class VulkanMapping
             VertexAttributeFormat.Float32x2 => Format.R32G32Sfloat,
             VertexAttributeFormat.Float32x3 => Format.R32G32B32Sfloat,
             VertexAttributeFormat.Float32x4 => Format.R32G32B32A32Sfloat,
-            _ => throw new ArgumentOutOfRangeException(nameof(format), "Unsupported vertex attribute format."),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), "Unsupported vertex attribute format.")
         };
     }
 
@@ -150,7 +150,7 @@ internal static class VulkanMapping
         return topology switch
         {
             PrimitiveTopology.TriangleList => VkPrimitiveTopology.TriangleList,
-            _ => throw new ArgumentOutOfRangeException(nameof(topology), "Unsupported primitive topology."),
+            _ => throw new ArgumentOutOfRangeException(nameof(topology), "Unsupported primitive topology.")
         };
     }
 
@@ -161,7 +161,7 @@ internal static class VulkanMapping
             CullMode.None => CullModeFlags.None,
             CullMode.Front => CullModeFlags.FrontBit,
             CullMode.Back => CullModeFlags.BackBit,
-            _ => throw new ArgumentOutOfRangeException(nameof(cullMode), "Unsupported cull mode."),
+            _ => throw new ArgumentOutOfRangeException(nameof(cullMode), "Unsupported cull mode.")
         };
     }
 
@@ -171,7 +171,7 @@ internal static class VulkanMapping
         {
             FrontFace.Clockwise => VkFrontFace.Clockwise,
             FrontFace.CounterClockwise => VkFrontFace.CounterClockwise,
-            _ => throw new ArgumentOutOfRangeException(nameof(frontFace), "Unsupported front face."),
+            _ => throw new ArgumentOutOfRangeException(nameof(frontFace), "Unsupported front face.")
         };
     }
 
@@ -187,7 +187,7 @@ internal static class VulkanMapping
             CompareOperation.NotEqual => CompareOp.NotEqual,
             CompareOperation.GreaterOrEqual => CompareOp.GreaterOrEqual,
             CompareOperation.Always => CompareOp.Always,
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unsupported compare operation."),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unsupported compare operation.")
         };
     }
 
@@ -203,7 +203,7 @@ internal static class VulkanMapping
             StencilOperation.Invert => StencilOp.Invert,
             StencilOperation.IncrementAndWrap => StencilOp.IncrementAndWrap,
             StencilOperation.DecrementAndWrap => StencilOp.DecrementAndWrap,
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unsupported stencil operation."),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), operation, "Unsupported stencil operation.")
         };
     }
 
@@ -217,7 +217,7 @@ internal static class VulkanMapping
             CompareOp = ToVulkanCompareOp(description.CompareOperation),
             CompareMask = description.CompareMask,
             WriteMask = description.WriteMask,
-            Reference = description.Reference,
+            Reference = description.Reference
         };
     }
 
@@ -228,7 +228,7 @@ internal static class VulkanMapping
             LoadOperation.Load => AttachmentLoadOp.Load,
             LoadOperation.Clear => AttachmentLoadOp.Clear,
             LoadOperation.DontCare => AttachmentLoadOp.DontCare,
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), "Unsupported load operation."),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), "Unsupported load operation.")
         };
     }
 
@@ -238,7 +238,7 @@ internal static class VulkanMapping
         {
             StoreOperation.Store => AttachmentStoreOp.Store,
             StoreOperation.DontCare => AttachmentStoreOp.DontCare,
-            _ => throw new ArgumentOutOfRangeException(nameof(operation), "Unsupported store operation."),
+            _ => throw new ArgumentOutOfRangeException(nameof(operation), "Unsupported store operation.")
         };
     }
 
@@ -248,7 +248,7 @@ internal static class VulkanMapping
         {
             IndexFormat.UInt16 => IndexType.Uint16,
             IndexFormat.UInt32 => IndexType.Uint32,
-            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported index format."),
+            _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported index format.")
         };
     }
 
@@ -260,7 +260,7 @@ internal static class VulkanMapping
             TextureDimension.Type2D => ImageType.Type2D,
             TextureDimension.Type3D => ImageType.Type3D,
             TextureDimension.CubeMap => ImageType.Type2D,
-            _ => throw new InvalidOperationException("Unsupported texture dimension."),
+            _ => throw new InvalidOperationException("Unsupported texture dimension.")
         };
     }
 
@@ -272,7 +272,7 @@ internal static class VulkanMapping
             TextureDimension.Type2D => arrayLayers == 1 ? ImageViewType.Type2D : ImageViewType.Type2DArray,
             TextureDimension.Type3D => ImageViewType.Type3D,
             TextureDimension.CubeMap => arrayLayers == 6 ? ImageViewType.TypeCube : ImageViewType.TypeCubeArray,
-            _ => throw new InvalidOperationException("Unsupported texture dimension."),
+            _ => throw new InvalidOperationException("Unsupported texture dimension.")
         };
     }
 
