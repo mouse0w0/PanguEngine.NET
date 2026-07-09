@@ -153,7 +153,7 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
         _descriptorSetLayout = ClientTestApp.Current.Device.CreateDescriptorSetLayout(
             new DescriptorSetLayoutDescription(
             [
-                new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStage.Fragment)
+                new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStageFlags.Fragment)
             ]));
     }
 

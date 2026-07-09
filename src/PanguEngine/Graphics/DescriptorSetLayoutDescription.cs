@@ -11,5 +11,8 @@ public readonly record struct DescriptorSetLayoutDescription(DescriptorSetLayout
 /// </summary>
 /// <param name="Binding">The shader binding index.</param>
 /// <param name="Type">The descriptor type.</param>
-/// <param name="Stages">The shader stages that can access the binding.</param>
-public readonly record struct DescriptorSetLayoutBinding(uint Binding, DescriptorType Type, ShaderStage Stages);
+/// <param name="StageFlags">The shader stages that can access the binding.</param>
+public readonly record struct DescriptorSetLayoutBinding(
+    uint Binding,
+    DescriptorType Type,
+    ShaderStageFlags StageFlags);

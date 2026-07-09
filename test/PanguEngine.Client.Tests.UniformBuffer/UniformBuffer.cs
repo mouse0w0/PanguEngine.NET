@@ -135,7 +135,7 @@ internal sealed class UniformBufferScene : IClientTestScene
         _descriptorSetLayout = ClientTestApp.Current.Device.CreateDescriptorSetLayout(
             new DescriptorSetLayoutDescription(
             [
-                new DescriptorSetLayoutBinding(0, DescriptorType.UniformBuffer, ShaderStage.Vertex)
+                new DescriptorSetLayoutBinding(0, DescriptorType.UniformBuffer, ShaderStageFlags.Vertex)
             ]));
     }
 

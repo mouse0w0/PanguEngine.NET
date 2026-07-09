@@ -35,7 +35,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
                 Binding = bindings[i].Binding,
                 DescriptorType = ToVulkanDescriptorType(bindings[i].Type),
                 DescriptorCount = 1,
-                StageFlags = ToVulkanShaderStageFlags(bindings[i].Stages)
+                StageFlags = VulkanMapping.ToVulkanShaderStageFlags(bindings[i].StageFlags)
             };
         }
 
@@ -108,16 +108,5 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
             _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
         };
-    }
-
-    private static ShaderStageFlags ToVulkanShaderStageFlags(ShaderStage stage)
-    {
-        var result = ShaderStageFlags.None;
-        if (stage.HasFlag(ShaderStage.Vertex))
-            result |= ShaderStageFlags.VertexBit;
-        if (stage.HasFlag(ShaderStage.Fragment))
-            result |= ShaderStageFlags.FragmentBit;
-
-        return result;
     }
 }

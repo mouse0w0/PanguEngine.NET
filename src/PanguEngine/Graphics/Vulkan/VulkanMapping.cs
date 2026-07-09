@@ -1,4 +1,5 @@
 using Silk.NET.Vulkan;
+using VKShaderStageFlags = Silk.NET.Vulkan.ShaderStageFlags;
 using VkFrontFace = Silk.NET.Vulkan.FrontFace;
 using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
 using VkVertexInputRate = Silk.NET.Vulkan.VertexInputRate;
@@ -111,17 +112,26 @@ internal static class VulkanMapping
         };
     }
 
-    internal static ShaderStageFlags ToShaderStageFlags(ShaderStage stage)
+    internal static VKShaderStageFlags ToVulkanShaderStageFlags(ShaderStage stage)
     {
         return stage switch
         {
-            ShaderStage.None => ShaderStageFlags.None,
-            ShaderStage.Vertex => ShaderStageFlags.VertexBit,
-            ShaderStage.Fragment => ShaderStageFlags.FragmentBit,
-            ShaderStage.Vertex | ShaderStage.Fragment => ShaderStageFlags.VertexBit | ShaderStageFlags.FragmentBit,
+            ShaderStage.Vertex => VKShaderStageFlags.VertexBit,
+            ShaderStage.Fragment => VKShaderStageFlags.FragmentBit,
             _ => throw new ArgumentOutOfRangeException(nameof(stage), stage,
                 "Unsupported shader stage.")
         };
+    }
+
+    internal static VKShaderStageFlags ToVulkanShaderStageFlags(ShaderStageFlags stageFlags)
+    {
+        var result = VKShaderStageFlags.None;
+        if (stageFlags.HasFlag(ShaderStageFlags.Vertex))
+            result |= VKShaderStageFlags.VertexBit;
+        if (stageFlags.HasFlag(ShaderStageFlags.Fragment))
+            result |= VKShaderStageFlags.FragmentBit;
+
+        return result;
     }
 
     internal static VkVertexInputRate ToVulkanVertexInputRate(VertexInputRate inputRate)

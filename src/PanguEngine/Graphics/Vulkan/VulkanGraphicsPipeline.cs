@@ -106,7 +106,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 stageInfos[i] = new PipelineShaderStageCreateInfo
                 {
                     SType = StructureType.PipelineShaderStageCreateInfo,
-                    Stage = VulkanMapping.ToShaderStageFlags(shader.Stage),
+                    Stage = VulkanMapping.ToVulkanShaderStageFlags(shader.Stage),
                     Module = shader.Module,
                     PName = (byte*)entryPointPointers[i]
                 };

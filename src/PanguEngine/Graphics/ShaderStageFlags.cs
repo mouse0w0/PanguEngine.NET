@@ -1,10 +1,16 @@
 namespace PanguEngine.Graphics;
 
 /// <summary>
-/// Identifies the programmable stage of a shader.
+/// Identifies a set of programmable shader stages.
 /// </summary>
-public enum ShaderStage
+[Flags]
+public enum ShaderStageFlags
 {
+    /// <summary>
+    /// No shader stages.
+    /// </summary>
+    None = 0,
+
     /// <summary>
     /// Vertex shader stage.
     /// </summary>
