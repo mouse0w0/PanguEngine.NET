@@ -167,16 +167,13 @@ public sealed unsafe class VulkanWindow : Window
         };
         set
         {
-            if (_cursor != null)
+            _cursor?.CursorMode = value switch
             {
-                _cursor.CursorMode = value switch
-                {
-                    CursorState.Hidden => CursorMode.Hidden,
-                    CursorState.Disabled => CursorMode.Disabled,
-                    CursorState.Raw => CursorMode.Raw,
-                    _ => CursorMode.Normal
-                };
-            }
+                CursorState.Hidden => CursorMode.Hidden,
+                CursorState.Disabled => CursorMode.Disabled,
+                CursorState.Raw => CursorMode.Raw,
+                _ => CursorMode.Normal
+            };
         }
     }
 
@@ -201,26 +198,23 @@ public sealed unsafe class VulkanWindow : Window
         };
         set
         {
-            if (_cursor != null)
+            _cursor?.Type = CursorType.Standard;
+            _cursor?.StandardCursor = value switch
             {
-                _cursor.Type = CursorType.Standard;
-                _cursor.StandardCursor = value switch
-                {
-                    CursorShape.Arrow => StandardCursor.Arrow,
-                    CursorShape.IBeam => StandardCursor.IBeam,
-                    CursorShape.Crosshair => StandardCursor.Crosshair,
-                    CursorShape.Hand => StandardCursor.Hand,
-                    CursorShape.HResize => StandardCursor.HResize,
-                    CursorShape.VResize => StandardCursor.VResize,
-                    CursorShape.NwseResize => StandardCursor.NwseResize,
-                    CursorShape.NeswResize => StandardCursor.NeswResize,
-                    CursorShape.ResizeAll => StandardCursor.ResizeAll,
-                    CursorShape.NotAllowed => StandardCursor.NotAllowed,
-                    CursorShape.Wait => StandardCursor.Wait,
-                    CursorShape.WaitArrow => StandardCursor.WaitArrow,
-                    _ => StandardCursor.Arrow
-                };
-            }
+                CursorShape.Arrow => StandardCursor.Arrow,
+                CursorShape.IBeam => StandardCursor.IBeam,
+                CursorShape.Crosshair => StandardCursor.Crosshair,
+                CursorShape.Hand => StandardCursor.Hand,
+                CursorShape.HResize => StandardCursor.HResize,
+                CursorShape.VResize => StandardCursor.VResize,
+                CursorShape.NwseResize => StandardCursor.NwseResize,
+                CursorShape.NeswResize => StandardCursor.NeswResize,
+                CursorShape.ResizeAll => StandardCursor.ResizeAll,
+                CursorShape.NotAllowed => StandardCursor.NotAllowed,
+                CursorShape.Wait => StandardCursor.Wait,
+                CursorShape.WaitArrow => StandardCursor.WaitArrow,
+                _ => StandardCursor.Arrow
+            };
         }
     }
 
@@ -671,7 +665,7 @@ public sealed unsafe class VulkanWindow : Window
         VulkanContext.KhrSwapchain.DestroySwapchain(VulkanContext.Device, _swapchain, null);
     }
 
-    private static SurfaceFormatKHR ChooseSwapSurfaceFormat(IReadOnlyList<SurfaceFormatKHR> availableFormats)
+    private static SurfaceFormatKHR ChooseSwapSurfaceFormat(SurfaceFormatKHR[] availableFormats)
     {
         foreach (var format in availableFormats)
         {

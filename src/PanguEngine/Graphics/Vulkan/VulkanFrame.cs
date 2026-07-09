@@ -5,8 +5,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed class VulkanFrame : Frame
 {
-    private bool _valid;
-
     /// <summary>
     /// Creates a Vulkan graphics frame.
     /// </summary>
@@ -33,7 +31,7 @@ internal sealed class VulkanFrame : Frame
         Height = height;
         VulkanColorOutput = colorOutput;
         VulkanCommandList = commandList;
-        _valid = true;
+        IsValid = true;
     }
 
     /// <inheritdoc/>
@@ -86,14 +84,14 @@ internal sealed class VulkanFrame : Frame
     /// <summary>
     /// Gets whether this frame is still active.
     /// </summary>
-    internal bool IsValid => _valid;
+    internal bool IsValid { get; private set; }
 
     /// <summary>
     /// Invalidates the frame and its command list.
     /// </summary>
     internal void Invalidate()
     {
-        _valid = false;
+        IsValid = false;
         VulkanCommandList.Invalidate();
     }
 
@@ -102,7 +100,7 @@ internal sealed class VulkanFrame : Frame
     /// </summary>
     internal void EnsureValid()
     {
-        if (!_valid)
+        if (!IsValid)
             throw new InvalidOperationException("Graphics frame is no longer valid.");
     }
 }

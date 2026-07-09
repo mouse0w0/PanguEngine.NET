@@ -1,7 +1,6 @@
 using Silk.NET.Vulkan;
 using Vma;
 using VKDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
-using VKSampler = Silk.NET.Vulkan.Sampler;
 using VmaMemoryUsage = Vma.MemoryUsage;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -267,7 +266,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             UnnormalizedCoordinates = false
         };
 
-        if (VulkanContext.Vk.CreateSampler(VulkanContext.Device, in samplerInfo, null, out VKSampler sampler) !=
+        if (VulkanContext.Vk.CreateSampler(VulkanContext.Device, in samplerInfo, null, out var sampler) !=
             Result.Success)
             throw new InvalidOperationException("Failed to create Vulkan sampler.");
 
@@ -303,7 +302,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         if (align == 0)
             throw new InvalidOperationException(
                 "VulkanContext.MinUniformBufferOffsetAlignment is 0. Ensure VulkanContext is initialized.");
-        return checked(((rawSize + align - 1) / align) * align);
+        return checked((rawSize + align - 1) / align * align);
     }
 
     /// <inheritdoc/>
@@ -319,20 +318,6 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             vulkanDescriptorSetLayouts[i] = ((VulkanDescriptorSetLayout)descriptorSetLayouts[i]).DescriptorSetLayout;
 
         return new VulkanGraphicsPipeline(description, vulkanDescriptorSetLayouts);
-    }
-
-    /// <summary>
-    /// Creates a graphics pipeline with Vulkan descriptor set layouts.
-    /// </summary>
-    /// <param name="description">The graphics pipeline description.</param>
-    /// <param name="descriptorSetLayouts">The Vulkan descriptor set layouts used by the pipeline layout.</param>
-    /// <returns>The created graphics pipeline.</returns>
-    internal GraphicsPipeline CreateGraphicsPipeline(
-        in GraphicsPipelineDescription description,
-        ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts)
-    {
-        ValidateGraphicsPipelineDescription(description);
-        return new VulkanGraphicsPipeline(description, descriptorSetLayouts);
     }
 
     private static VulkanBuffer RequireVulkanBuffer(Buffer buffer)
@@ -469,7 +454,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         foreach (var attribute in attributes)
         {
             var foundBinding = false;
-            uint stride = 0;
+            var stride = 0u;
 
             foreach (var buffer in buffers)
             {
@@ -690,9 +675,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         var vkFormat = VulkanMapping.ToVulkanFormat(format);
         VulkanContext.Vk.GetPhysicalDeviceFormatProperties(VulkanContext.PhysicalDevice, vkFormat,
             out var properties);
-        var required = FormatFeatureFlags.BlitSrcBit
-                       | FormatFeatureFlags.BlitDstBit
-                       | FormatFeatureFlags.SampledImageFilterLinearBit;
+        const FormatFeatureFlags required = FormatFeatureFlags.BlitSrcBit
+                                            | FormatFeatureFlags.BlitDstBit
+                                            | FormatFeatureFlags.SampledImageFilterLinearBit;
         if ((properties.OptimalTilingFeatures & required) != required)
             throw new InvalidOperationException("Texture format does not support linear blit mipmap generation.");
     }

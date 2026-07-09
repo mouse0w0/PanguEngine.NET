@@ -178,19 +178,19 @@ public static unsafe class VulkanUploader
 
             while (PendingUploads.TryDequeue(out var upload))
             {
-                remainingBuffers ??= new List<PendingBufferUpload>();
+                remainingBuffers ??= [];
                 remainingBuffers.Add(upload);
             }
 
             while (PendingTextureUploads.TryDequeue(out var upload))
             {
-                remainingTextures ??= new List<PendingTextureUpload>();
+                remainingTextures ??= [];
                 remainingTextures.Add(upload);
             }
 
             while (PendingMipmapGenerations.TryDequeue(out var generation))
             {
-                remainingMipmaps ??= new List<PendingMipmapGeneration>();
+                remainingMipmaps ??= [];
                 remainingMipmaps.Add(generation);
             }
 
@@ -565,19 +565,19 @@ public static unsafe class VulkanUploader
     private static (List<PendingBufferUpload> Buffers, List<PendingTextureUpload> Textures,
         List<PendingMipmapGeneration> Mipmaps) DrainPendingUploads()
     {
-        var buffers = new List<PendingBufferUpload>();
+        List<PendingBufferUpload> buffers = [];
         while (PendingUploads.TryDequeue(out var upload))
         {
             buffers.Add(upload);
         }
 
-        var textures = new List<PendingTextureUpload>();
+        List<PendingTextureUpload> textures = [];
         while (PendingTextureUploads.TryDequeue(out var upload))
         {
             textures.Add(upload);
         }
 
-        var mipmaps = new List<PendingMipmapGeneration>();
+        List<PendingMipmapGeneration> mipmaps = [];
         while (PendingMipmapGenerations.TryDequeue(out var generation))
         {
             mipmaps.Add(generation);

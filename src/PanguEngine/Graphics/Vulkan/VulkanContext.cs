@@ -144,11 +144,6 @@ public static unsafe class VulkanContext
     private static bool _destroyed;
 
     /// <summary>
-    /// Gets whether the Vulkan instance has been initialized.
-    /// </summary>
-    public static bool IsInstanceInitialized => _instanceInitialized;
-
-    /// <summary>
     /// Initializes the Vulkan instance with the specified required extensions.
     /// </summary>
     /// <param name="requiredExtensions">Extensions required by the application (e.g., surface extensions).</param>
@@ -194,17 +189,6 @@ public static unsafe class VulkanContext
 
             throw;
         }
-    }
-
-    /// <summary>
-    /// Initializes the Vulkan instance if it has not been initialized yet.
-    /// </summary>
-    /// <param name="requiredExtensions">Extensions required by the application.</param>
-    /// <param name="enableValidationLayers">Whether to enable Vulkan validation layers for debugging.</param>
-    internal static void EnsureInstanceInitialized(string[] requiredExtensions, bool enableValidationLayers = true)
-    {
-        if (IsInstanceInitialized) return;
-        InitializeInstance(requiredExtensions, enableValidationLayers);
     }
 
     /// <summary>

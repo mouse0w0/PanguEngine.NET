@@ -8,8 +8,6 @@ namespace PanguEngine.Graphics.Vulkan;
 internal sealed unsafe class VulkanCommandList : CommandList
 {
     private CommandBuffer _commandBuffer;
-    private bool _begun;
-    private bool _ended;
     private bool _rendering;
     private bool _valid;
     private VulkanGraphicsPipeline? _graphicsPipeline;
@@ -19,12 +17,12 @@ internal sealed unsafe class VulkanCommandList : CommandList
     /// <summary>
     /// Gets whether command recording has ended.
     /// </summary>
-    internal bool IsEnded => _ended;
+    internal bool IsEnded { get; private set; }
 
     /// <summary>
     /// Gets whether command recording has begun.
     /// </summary>
-    internal bool IsBegun => _begun;
+    internal bool IsBegun { get; private set; }
 
     /// <summary>
     /// Resets this command list for command recording.
@@ -33,8 +31,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
     internal void Reset(CommandBuffer commandBuffer)
     {
         _commandBuffer = commandBuffer;
-        _begun = false;
-        _ended = false;
+        IsBegun = false;
+        IsEnded = false;
         _rendering = false;
         _valid = true;
         _graphicsPipeline = null;
@@ -46,7 +44,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
     public override void BeginRecording()
     {
         EnsureUsable();
-        if (_begun)
+        if (IsBegun)
             throw new InvalidOperationException("Command recording has already begun.");
 
         CommandBufferBeginInfo beginInfo = new()
@@ -57,7 +55,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         if (VulkanContext.Vk.BeginCommandBuffer(_commandBuffer, &beginInfo) != Result.Success)
             throw new InvalidOperationException("Failed to begin recording command buffer.");
 
-        _begun = true;
+        IsBegun = true;
     }
 
     /// <inheritdoc/>
@@ -384,13 +382,13 @@ internal sealed unsafe class VulkanCommandList : CommandList
     {
         EnsureUsable();
 
-        if (!_begun)
+        if (!IsBegun)
             throw new InvalidOperationException("Command recording must begin before frame submission.");
 
         if (_rendering)
             throw new InvalidOperationException("Rendering must end before frame submission.");
 
-        if (!_ended)
+        if (!IsEnded)
             EndCommandBuffer();
     }
 
@@ -539,20 +537,20 @@ internal sealed unsafe class VulkanCommandList : CommandList
     private void EnsureRecording()
     {
         EnsureUsable();
-        if (!_begun)
+        if (!IsBegun)
             throw new InvalidOperationException("Command recording has not begun.");
-        if (_ended)
+        if (IsEnded)
             throw new InvalidOperationException("Command recording has already ended.");
     }
 
     private void EndCommandBuffer()
     {
-        if (_ended)
+        if (IsEnded)
             throw new InvalidOperationException("Command recording has already ended.");
 
         if (VulkanContext.Vk.EndCommandBuffer(_commandBuffer) != Result.Success)
             throw new InvalidOperationException("Failed to record command buffer.");
 
-        _ended = true;
+        IsEnded = true;
     }
 }
