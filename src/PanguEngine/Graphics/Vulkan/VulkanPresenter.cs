@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Silk.NET.Vulkan;
+using Semaphore = Silk.NET.Vulkan.Semaphore;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -9,10 +10,11 @@ namespace PanguEngine.Graphics.Vulkan;
 internal sealed unsafe class VulkanPresenter : Presenter
 {
     private readonly VulkanWindow _window;
-    private readonly VulkanCommandPool _commandPool;
-    private readonly VulkanCommandList _commandList = new();
+    private readonly VulkanFrameContext[] _frameContexts;
+    private uint _frameSlot;
     private ulong _nextFrameNumber;
     private bool _destroyed;
+    private bool _faulted;
     private VulkanFrame? _currentFrame;
 
     /// <summary>
@@ -22,10 +24,24 @@ internal sealed unsafe class VulkanPresenter : Presenter
     internal VulkanPresenter(VulkanWindow window)
     {
         _window = window ?? throw new ArgumentNullException(nameof(window));
-        _commandPool = new VulkanCommandPool();
+        _frameContexts = new VulkanFrameContext[VulkanContext.MaxFramesInFlight];
+
+        var createdCount = 0;
+        try
+        {
+            for (; createdCount < _frameContexts.Length; createdCount++)
+                _frameContexts[createdCount] = new VulkanFrameContext();
+        }
+        catch
+        {
+            for (var i = 0; i < createdCount; i++)
+                _frameContexts[i].Destroy();
+            throw;
+        }
     }
 
     /// <inheritdoc/>
+    // ReSharper disable once ConvertToAutoPropertyWithPrivateSetter
     public override bool IsDestroyed => _destroyed;
 
     /// <inheritdoc/>
@@ -52,46 +68,51 @@ internal sealed unsafe class VulkanPresenter : Presenter
     /// <inheritdoc/>
     public override bool TryBeginFrame([MaybeNullWhen(false)] out Frame frame)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        EnsureUsable();
         if (_currentFrame != null)
             throw new InvalidOperationException("A graphics frame is already active.");
 
         frame = null;
+        var context = _frameContexts[_frameSlot];
 
-        _window.WaitForInFlightFence();
-        VulkanUploader.FlushPendingUploads();
+        try
+        {
+            context.WaitForReuse();
+            VulkanUploader.FlushPendingUploads();
 
-        var result = _window.AcquireNextImage(out var imageIndex);
-        if (result == Result.ErrorOutOfDateKhr)
-            result = _window.AcquireNextImage(out imageIndex);
+            var result = _window.AcquireNextImage(context.ImageAvailableSemaphore, out var imageIndex);
+            if (result == Result.ErrorOutOfDateKhr)
+                result = _window.AcquireNextImage(context.ImageAvailableSemaphore, out imageIndex);
 
-        if (result == Result.ErrorOutOfDateKhr)
-            return false;
+            if (result == Result.ErrorOutOfDateKhr)
+                return false;
 
-        var frameSlot = _window.CurrentFrameSlot;
-        var commandBuffer = _commandPool.CommandBuffers[frameSlot];
-        VulkanContext.Vk.ResetCommandBuffer(commandBuffer, 0);
+            context.ResetCommands();
 
-        _commandList.Reset(commandBuffer);
+            var vulkanFrame = new VulkanFrame(
+                _nextFrameNumber++,
+                _frameSlot,
+                imageIndex,
+                _window.Extent.Width,
+                _window.Extent.Height,
+                _window.ColorOutputs[imageIndex]!,
+                context);
 
-        var vulkanFrame = new VulkanFrame(
-            _nextFrameNumber++,
-            frameSlot,
-            imageIndex,
-            _window.Extent.Width,
-            _window.Extent.Height,
-            _window.ColorOutputs[imageIndex],
-            _commandList);
-
-        _currentFrame = vulkanFrame;
-        frame = vulkanFrame;
-        return true;
+            _currentFrame = vulkanFrame;
+            frame = vulkanFrame;
+            return true;
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
+        }
     }
 
     /// <inheritdoc/>
     public override void EndFrame(Frame frame)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        EnsureUsable();
 
         var vulkanFrame = frame as VulkanFrame
                           ?? throw new InvalidOperationException(
@@ -100,18 +121,30 @@ internal sealed unsafe class VulkanPresenter : Presenter
         if (!ReferenceEquals(vulkanFrame, _currentFrame) || !vulkanFrame.IsValid)
             throw new InvalidOperationException("Graphics frame is not the active frame for this presenter.");
 
-        var commandBuffer = _commandPool.CommandBuffers[vulkanFrame.FrameSlot];
-        var timelineValue = VulkanContext.NextGlobalTimelineValue();
+        var context = vulkanFrame.FrameContext;
 
         try
         {
             vulkanFrame.VulkanCommandList.CompleteForSubmit();
-            Submit(commandBuffer, timelineValue);
-            _window.PresentImage(vulkanFrame.ImageIndex);
+
+            var renderFinishedSemaphore = _window.GetRenderFinishedSemaphore(vulkanFrame.ImageIndex);
+            var timelineValue = VulkanContext.NextGlobalTimelineValue();
+
+            context.ResetFenceForSubmit();
+            Submit(context, renderFinishedSemaphore, timelineValue);
+            context.MarkSubmitted();
+            _window.PresentImage(vulkanFrame.ImageIndex, renderFinishedSemaphore);
+
             if (!vulkanFrame.VulkanColorOutput.IsDestroyed)
                 vulkanFrame.VulkanColorOutput.ResetLayout();
-            _window.AdvanceFrame();
+
+            _frameSlot = (_frameSlot + 1) % VulkanContext.MaxFramesInFlight;
             VulkanDeletionQueue.Collect();
+        }
+        catch
+        {
+            _faulted = true;
+            throw;
         }
         finally
         {
@@ -129,18 +162,23 @@ internal sealed unsafe class VulkanPresenter : Presenter
         VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
         _currentFrame?.Invalidate();
         _currentFrame = null;
-        _commandPool.Destroy();
+
+        foreach (var context in _frameContexts)
+            context.Destroy();
+
         _destroyed = true;
     }
 
-    private void Submit(CommandBuffer commandBuffer, ulong timelineValue)
+    private static void Submit(
+        VulkanFrameContext context,
+        Semaphore renderFinishedSemaphore,
+        ulong timelineValue)
     {
-        _window.ResetInFlightFence();
-
-        var waitSemaphores = stackalloc[] { _window.GetImageAvailableSemaphore() };
+        var commandBuffer = context.CommandBuffer;
+        var waitSemaphores = stackalloc[] { context.ImageAvailableSemaphore };
         var waitStages = stackalloc[] { PipelineStageFlags.ColorAttachmentOutputBit };
         var signalSemaphores = stackalloc[]
-            { _window.GetRenderFinishedSemaphore(), VulkanContext.GlobalTimelineSemaphore };
+            { renderFinishedSemaphore, VulkanContext.GlobalTimelineSemaphore };
 
         var signalValues = stackalloc[] { 0UL, timelineValue };
 
@@ -164,8 +202,18 @@ internal sealed unsafe class VulkanPresenter : Presenter
             PSignalSemaphores = signalSemaphores
         };
 
-        if (VulkanContext.Vk.QueueSubmit(VulkanContext.GraphicsQueue, 1, in submitInfo, _window.GetInFlightFence()) !=
+        if (VulkanContext.Vk.QueueSubmit(VulkanContext.GraphicsQueue, 1, in submitInfo, context.Fence) !=
             Result.Success)
             throw new InvalidOperationException("Failed to submit draw command buffer.");
+    }
+
+    /// <summary>
+    /// Ensures this presenter can begin or end a frame.
+    /// </summary>
+    private void EnsureUsable()
+    {
+        ObjectDisposedException.ThrowIf(_destroyed, this);
+        if (_faulted)
+            throw new InvalidOperationException("The graphics presenter is faulted and can no longer submit frames.");
     }
 }

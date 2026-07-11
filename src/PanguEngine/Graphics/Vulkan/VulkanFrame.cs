@@ -14,7 +14,7 @@ internal sealed class VulkanFrame : Frame
     /// <param name="width">The frame width.</param>
     /// <param name="height">The frame height.</param>
     /// <param name="colorOutput">The frame color output.</param>
-    /// <param name="commandList">The command list for this frame.</param>
+    /// <param name="frameContext">The Vulkan resources assigned to this frame.</param>
     internal VulkanFrame(
         ulong frameNumber,
         uint frameSlot,
@@ -22,7 +22,7 @@ internal sealed class VulkanFrame : Frame
         uint width,
         uint height,
         VulkanSwapchainTexture colorOutput,
-        VulkanCommandList commandList)
+        VulkanFrameContext frameContext)
     {
         FrameNumber = frameNumber;
         FrameSlot = frameSlot;
@@ -30,7 +30,7 @@ internal sealed class VulkanFrame : Frame
         Width = width;
         Height = height;
         VulkanColorOutput = colorOutput;
-        VulkanCommandList = commandList;
+        FrameContext = frameContext;
         IsValid = true;
     }
 
@@ -72,6 +72,11 @@ internal sealed class VulkanFrame : Frame
     internal uint ImageIndex { get; }
 
     /// <summary>
+    /// Gets the Vulkan resources assigned to this frame.
+    /// </summary>
+    internal VulkanFrameContext FrameContext { get; }
+
+    /// <summary>
     /// Gets the Vulkan color output for this frame.
     /// </summary>
     internal VulkanSwapchainTexture VulkanColorOutput { get; }
@@ -79,7 +84,7 @@ internal sealed class VulkanFrame : Frame
     /// <summary>
     /// Gets the Vulkan command list for this frame.
     /// </summary>
-    internal VulkanCommandList VulkanCommandList { get; }
+    internal VulkanCommandList VulkanCommandList => FrameContext.CommandList;
 
     /// <summary>
     /// Gets whether this frame is still active.

@@ -3,22 +3,17 @@ using Silk.NET.Vulkan;
 namespace PanguEngine.Graphics.Vulkan;
 
 /// <summary>Manages a Vulkan command pool and its allocated command buffers.</summary>
-public sealed unsafe class VulkanCommandPool
+internal sealed unsafe class VulkanCommandPool
 {
     /// <summary>Gets the underlying Vulkan command pool handle.</summary>
-    public CommandPool CommandPool { get; }
+    internal CommandPool CommandPool { get; }
 
     /// <summary>Gets the command buffers allocated from this pool.</summary>
-    public CommandBuffer[] CommandBuffers { get; }
-
-    /// <summary>Creates a command pool and allocates command buffers using <see cref="VulkanContext.MaxFramesInFlight"/> as the buffer count.</summary>
-    public VulkanCommandPool() : this(VulkanContext.MaxFramesInFlight)
-    {
-    }
+    internal CommandBuffer[] CommandBuffers { get; }
 
     /// <summary>Creates a command pool and allocates the specified number of primary command buffers.</summary>
     /// <param name="count">The number of command buffers to allocate.</param>
-    public VulkanCommandPool(uint count)
+    internal VulkanCommandPool(uint count)
     {
         CommandPoolCreateInfo poolInfo = new()
         {
@@ -32,7 +27,22 @@ public sealed unsafe class VulkanCommandPool
             throw new InvalidOperationException("Failed to create command pool.");
 
         CommandPool = commandPool;
-        CommandBuffers = AllocateCommandBuffers(count);
+        try
+        {
+            CommandBuffers = AllocateCommandBuffers(count);
+        }
+        catch
+        {
+            VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, CommandPool, null);
+            throw;
+        }
+    }
+
+    /// <summary>Resets the command pool and all command buffers allocated from it.</summary>
+    internal void Reset()
+    {
+        if (VulkanContext.Vk.ResetCommandPool(VulkanContext.Device, CommandPool, 0) != Result.Success)
+            throw new InvalidOperationException("Failed to reset command pool.");
     }
 
     private CommandBuffer[] AllocateCommandBuffers(uint count)
@@ -57,7 +67,7 @@ public sealed unsafe class VulkanCommandPool
     }
 
     /// <summary>Destroys the command pool and releases associated Vulkan resources.</summary>
-    public void Destroy()
+    internal void Destroy()
     {
         VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, CommandPool, null);
     }

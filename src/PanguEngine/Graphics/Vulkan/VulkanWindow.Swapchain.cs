@@ -11,10 +11,8 @@ public sealed unsafe partial class VulkanWindow
     private SwapchainKHR _swapchain;
     private Image[]? _images;
     private ImageView[]? _imageViews;
-    private VulkanSwapchainTexture[]? _colorOutputs;
-    private Semaphore[]? _imageAvailableSemaphores;
+    private VulkanSwapchainTexture?[]? _colorOutputs;
     private Semaphore[]? _renderFinishedSemaphores;
-    private Fence[]? _inFlightFences;
 
     /// <summary>The image format selected for the swapchain images.</summary>
     public Format ImageFormat { get; private set; }
@@ -23,20 +21,18 @@ public sealed unsafe partial class VulkanWindow
     public Extent2D Extent { get; private set; }
 
     /// <summary>The color output textures for each swapchain image.</summary>
-    internal VulkanSwapchainTexture[] ColorOutputs => _colorOutputs!;
-
-    /// <summary>The current frame slot within the in-flight frame ring.</summary>
-    public uint CurrentFrameSlot { get; private set; }
+    internal VulkanSwapchainTexture?[] ColorOutputs => _colorOutputs!;
 
     /// <summary>Acquires the next swapchain image for rendering.</summary>
+    /// <param name="imageAvailableSemaphore">The semaphore to signal when the image is available.</param>
     /// <param name="imageIndex">The acquired swapchain image index.</param>
     /// <returns>The Vulkan acquisition result.</returns>
-    public Result AcquireNextImage(out uint imageIndex)
+    public Result AcquireNextImage(Semaphore imageAvailableSemaphore, out uint imageIndex)
     {
         imageIndex = 0;
         var result = VulkanContext.KhrSwapchain.AcquireNextImage(
             VulkanContext.Device, _swapchain, ulong.MaxValue,
-            _imageAvailableSemaphores![CurrentFrameSlot], default, ref imageIndex);
+            imageAvailableSemaphore, default, ref imageIndex);
 
         if (result == Result.ErrorOutOfDateKhr)
         {
@@ -52,10 +48,11 @@ public sealed unsafe partial class VulkanWindow
 
     /// <summary>Presents the rendered image at the given swapchain image index.</summary>
     /// <param name="imageIndex">The swapchain image index to present.</param>
-    public void PresentImage(uint imageIndex)
+    /// <param name="renderFinishedSemaphore">The semaphore signaled when rendering is complete.</param>
+    public void PresentImage(uint imageIndex, Semaphore renderFinishedSemaphore)
     {
         var swapChains = stackalloc[] { _swapchain };
-        var signalSemaphores = stackalloc[] { _renderFinishedSemaphores![CurrentFrameSlot] };
+        var signalSemaphores = stackalloc[] { renderFinishedSemaphore };
 
         PresentInfoKHR presentInfo = new()
         {
@@ -80,43 +77,18 @@ public sealed unsafe partial class VulkanWindow
             throw new InvalidOperationException("Failed to present swap chain image.");
     }
 
-    /// <summary>Advances the current frame index to the next in-flight frame slot.</summary>
-    public void AdvanceFrame()
-    {
-        CurrentFrameSlot = (CurrentFrameSlot + 1) % VulkanContext.MaxFramesInFlight;
-    }
-
-    /// <summary>Blocks until the in-flight fence for the current frame is signaled.</summary>
-    public void WaitForInFlightFence()
-    {
-        VulkanContext.Vk.WaitForFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrameSlot], true,
-            ulong.MaxValue);
-    }
-
-    /// <summary>Resets the in-flight fence for the current frame back to unsignaled state.</summary>
-    public void ResetInFlightFence()
-    {
-        VulkanContext.Vk.ResetFences(VulkanContext.Device, 1, in _inFlightFences![CurrentFrameSlot]);
-    }
-
-    /// <summary>Gets a reference to the image-available semaphore for the current frame.</summary>
-    /// <returns>A reference to the image-available semaphore.</returns>
-    public ref Semaphore GetImageAvailableSemaphore() => ref _imageAvailableSemaphores![CurrentFrameSlot];
-
-    /// <summary>Gets a reference to the render-finished semaphore for the current frame.</summary>
-    /// <returns>A reference to the render-finished semaphore.</returns>
-    public ref Semaphore GetRenderFinishedSemaphore() => ref _renderFinishedSemaphores![CurrentFrameSlot];
-
-    /// <summary>Gets a reference to the in-flight fence for the current frame.</summary>
-    /// <returns>A reference to the in-flight fence.</returns>
-    public ref Fence GetInFlightFence() => ref _inFlightFences![CurrentFrameSlot];
+    /// <summary>Gets the render-finished semaphore assigned to a swapchain image.</summary>
+    /// <param name="imageIndex">The swapchain image index.</param>
+    /// <returns>The render-finished semaphore.</returns>
+    public Semaphore GetRenderFinishedSemaphore(uint imageIndex) =>
+        _renderFinishedSemaphores![checked((int)imageIndex)];
 
     /// <summary>Initializes swapchain resources for the window.</summary>
     private void InitializeSwapchain()
     {
         CreateSwapchain();
         CreateImageViews();
-        CreateSyncObjects();
+        CreateRenderFinishedSemaphores();
     }
 
     /// <summary>Recreates swapchain resources for the current framebuffer size.</summary>
@@ -130,13 +102,16 @@ public sealed unsafe partial class VulkanWindow
             _silkWindow.DoEvents();
         }
 
-        VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
+        if (VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device) != Result.Success)
+            throw new InvalidOperationException("Failed to wait for the device before recreating the swap chain.");
 
+        DestroyRenderFinishedSemaphores();
         DestroyImageViews();
         DestroySwapchain();
 
         CreateSwapchain();
         CreateImageViews();
+        CreateRenderFinishedSemaphores();
     }
 
     /// <summary>Creates the window swapchain.</summary>
@@ -204,74 +179,97 @@ public sealed unsafe partial class VulkanWindow
     /// <summary>Creates image views for the current swapchain images.</summary>
     private void CreateImageViews()
     {
-        _imageViews = new ImageView[_images!.Length];
-        _colorOutputs = new VulkanSwapchainTexture[_images.Length];
+        var images = _images!;
+        var imageViews = new ImageView[images.Length];
+        var colorOutputs = new VulkanSwapchainTexture?[images.Length];
+        _imageViews = imageViews;
+        _colorOutputs = colorOutputs;
         var colorFormat = VulkanMapping.FromVulkanFormat(ImageFormat);
 
-        for (var i = 0; i < _images.Length; i++)
+        try
         {
-            ImageViewCreateInfo createInfo = new()
+            for (var i = 0; i < images.Length; i++)
             {
-                SType = StructureType.ImageViewCreateInfo,
-                Image = _images[i],
-                ViewType = ImageViewType.Type2D,
-                Format = ImageFormat,
-                Components =
+                ImageViewCreateInfo createInfo = new()
                 {
-                    R = ComponentSwizzle.Identity,
-                    G = ComponentSwizzle.Identity,
-                    B = ComponentSwizzle.Identity,
-                    A = ComponentSwizzle.Identity
-                },
-                SubresourceRange =
-                {
-                    AspectMask = ImageAspectFlags.ColorBit,
-                    BaseMipLevel = 0,
-                    LevelCount = 1,
-                    BaseArrayLayer = 0,
-                    LayerCount = 1
-                }
-            };
+                    SType = StructureType.ImageViewCreateInfo,
+                    Image = images[i],
+                    ViewType = ImageViewType.Type2D,
+                    Format = ImageFormat,
+                    Components =
+                    {
+                        R = ComponentSwizzle.Identity,
+                        G = ComponentSwizzle.Identity,
+                        B = ComponentSwizzle.Identity,
+                        A = ComponentSwizzle.Identity
+                    },
+                    SubresourceRange =
+                    {
+                        AspectMask = ImageAspectFlags.ColorBit,
+                        BaseMipLevel = 0,
+                        LevelCount = 1,
+                        BaseArrayLayer = 0,
+                        LayerCount = 1
+                    }
+                };
 
-            if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in createInfo, null, out _imageViews[i]) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to create image views.");
+                if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in createInfo, null, out var imageView) !=
+                    Result.Success)
+                    throw new InvalidOperationException("Failed to create image views.");
 
-            _colorOutputs[i] = new VulkanSwapchainTexture(_images[i], _imageViews[i], colorFormat,
-                Extent.Width, Extent.Height);
+                imageViews[i] = imageView;
+                colorOutputs[i] = new VulkanSwapchainTexture(images[i], imageView, colorFormat,
+                    Extent.Width, Extent.Height);
+            }
+        }
+        catch
+        {
+            DestroyImageViews();
+            throw;
         }
     }
 
-    /// <summary>Creates frame synchronization objects.</summary>
-    private void CreateSyncObjects()
+    /// <summary>Creates render-finished semaphores for the swapchain images.</summary>
+    private void CreateRenderFinishedSemaphores()
     {
-        _imageAvailableSemaphores = new Semaphore[VulkanContext.MaxFramesInFlight];
-        _renderFinishedSemaphores = new Semaphore[VulkanContext.MaxFramesInFlight];
-        _inFlightFences = new Fence[VulkanContext.MaxFramesInFlight];
+        var semaphores = new Semaphore[_images!.Length];
+        _renderFinishedSemaphores = semaphores;
 
         SemaphoreCreateInfo semaphoreInfo = new()
         {
             SType = StructureType.SemaphoreCreateInfo
         };
 
-        FenceCreateInfo fenceInfo = new()
+        try
         {
-            SType = StructureType.FenceCreateInfo,
-            Flags = FenceCreateFlags.SignaledBit
-        };
-
-        for (var i = 0; i < VulkanContext.MaxFramesInFlight; i++)
-        {
-            if (VulkanContext.Vk.CreateSemaphore(VulkanContext.Device, in semaphoreInfo, null,
-                    out _imageAvailableSemaphores[i]) != Result.Success ||
-                VulkanContext.Vk.CreateSemaphore(VulkanContext.Device, in semaphoreInfo, null,
-                    out _renderFinishedSemaphores[i]) != Result.Success ||
-                VulkanContext.Vk.CreateFence(VulkanContext.Device, in fenceInfo, null, out _inFlightFences[i]) !=
-                Result.Success)
+            for (var i = 0; i < semaphores.Length; i++)
             {
-                throw new InvalidOperationException("Failed to create synchronization objects for a frame.");
+                if (VulkanContext.Vk.CreateSemaphore(VulkanContext.Device, in semaphoreInfo, null,
+                        out var semaphore) != Result.Success)
+                    throw new InvalidOperationException("Failed to create render-finished semaphore.");
+                semaphores[i] = semaphore;
             }
         }
+        catch
+        {
+            DestroyRenderFinishedSemaphores();
+            throw;
+        }
+    }
+
+    /// <summary>Destroys the render-finished semaphores owned by the swapchain.</summary>
+    private void DestroyRenderFinishedSemaphores()
+    {
+        if (_renderFinishedSemaphores is null)
+            return;
+
+        foreach (var semaphore in _renderFinishedSemaphores)
+        {
+            if (semaphore.Handle != 0)
+                VulkanContext.Vk.DestroySemaphore(VulkanContext.Device, semaphore, null);
+        }
+
+        _renderFinishedSemaphores = null;
     }
 
     /// <summary>Destroys swapchain image views.</summary>
@@ -280,7 +278,7 @@ public sealed unsafe partial class VulkanWindow
         if (_colorOutputs is not null)
         {
             foreach (var colorOutput in _colorOutputs)
-                colorOutput.Invalidate();
+                colorOutput?.Invalidate();
             _colorOutputs = null;
         }
 

@@ -63,20 +63,7 @@ public sealed unsafe partial class VulkanWindow : Window
         if (_presenter is { IsDestroyed: false })
             _presenter.Destroy();
 
-        if (_renderFinishedSemaphores is not null && _imageAvailableSemaphores is not null &&
-            _inFlightFences is not null)
-        {
-            for (var i = 0; i < VulkanContext.MaxFramesInFlight; i++)
-            {
-                if (_renderFinishedSemaphores[i].Handle != 0)
-                    VulkanContext.Vk.DestroySemaphore(VulkanContext.Device, _renderFinishedSemaphores[i], null);
-                if (_imageAvailableSemaphores[i].Handle != 0)
-                    VulkanContext.Vk.DestroySemaphore(VulkanContext.Device, _imageAvailableSemaphores[i], null);
-                if (_inFlightFences[i].Handle != 0)
-                    VulkanContext.Vk.DestroyFence(VulkanContext.Device, _inFlightFences[i], null);
-            }
-        }
-
+        DestroyRenderFinishedSemaphores();
         DestroyImageViews();
         DestroySwapchain();
 
