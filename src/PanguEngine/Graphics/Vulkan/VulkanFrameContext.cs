@@ -18,11 +18,12 @@ internal sealed unsafe class VulkanFrameContext
     /// </summary>
     internal VulkanFrameContext()
     {
-        _commandPool = new VulkanCommandPool(1);
+        _commandPool = new VulkanCommandPool();
 
         try
         {
-            CommandList = new VulkanCommandList();
+            CommandBuffer = _commandPool.AllocateCommandBuffer();
+            CommandList = new VulkanCommandList(CommandBuffer);
 
             SemaphoreCreateInfo semaphoreInfo = new()
             {
@@ -55,7 +56,7 @@ internal sealed unsafe class VulkanFrameContext
     /// <summary>
     /// Gets the primary command buffer assigned to this frame slot.
     /// </summary>
-    internal CommandBuffer CommandBuffer => _commandPool.CommandBuffers[0];
+    internal CommandBuffer CommandBuffer { get; }
 
     /// <summary>
     /// Gets the command list assigned to this frame slot.
@@ -101,7 +102,7 @@ internal sealed unsafe class VulkanFrameContext
             throw new InvalidOperationException("Cannot reset commands while the frame is pending.");
 
         _commandPool.Reset();
-        CommandList.Reset(CommandBuffer);
+        CommandList.Reset();
     }
 
     /// <summary>

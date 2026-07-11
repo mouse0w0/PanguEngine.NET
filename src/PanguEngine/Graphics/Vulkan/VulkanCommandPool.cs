@@ -2,23 +2,18 @@ using Silk.NET.Vulkan;
 
 namespace PanguEngine.Graphics.Vulkan;
 
-/// <summary>Manages a Vulkan command pool and its allocated command buffers.</summary>
+/// <summary>Manages a Vulkan command pool.</summary>
 internal sealed unsafe class VulkanCommandPool
 {
     /// <summary>Gets the underlying Vulkan command pool handle.</summary>
     internal CommandPool CommandPool { get; }
 
-    /// <summary>Gets the command buffers allocated from this pool.</summary>
-    internal CommandBuffer[] CommandBuffers { get; }
-
-    /// <summary>Creates a command pool and allocates the specified number of primary command buffers.</summary>
-    /// <param name="count">The number of command buffers to allocate.</param>
-    internal VulkanCommandPool(uint count)
+    /// <summary>Creates a Vulkan command pool.</summary>
+    internal VulkanCommandPool()
     {
         CommandPoolCreateInfo poolInfo = new()
         {
             SType = StructureType.CommandPoolCreateInfo,
-            Flags = CommandPoolCreateFlags.ResetCommandBufferBit,
             QueueFamilyIndex = VulkanContext.GraphicsQueueFamily
         };
 
@@ -27,15 +22,30 @@ internal sealed unsafe class VulkanCommandPool
             throw new InvalidOperationException("Failed to create command pool.");
 
         CommandPool = commandPool;
-        try
-        {
-            CommandBuffers = AllocateCommandBuffers(count);
-        }
-        catch
-        {
-            VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, CommandPool, null);
-            throw;
-        }
+    }
+
+    /// <summary>Allocates one primary command buffer from this command pool.</summary>
+    /// <returns>The allocated command buffer.</returns>
+    internal CommandBuffer AllocateCommandBuffer()
+    {
+        CommandBuffer commandBuffer = default;
+        AllocateCommandBuffers(&commandBuffer, 1);
+        return commandBuffer;
+    }
+
+    /// <summary>Allocates primary command buffers from this command pool.</summary>
+    /// <param name="count">The number of command buffers to allocate.</param>
+    /// <returns>The allocated command buffers.</returns>
+    internal CommandBuffer[] AllocateCommandBuffers(uint count)
+    {
+        if (count == 0)
+            throw new ArgumentOutOfRangeException(nameof(count), "At least one command buffer must be allocated.");
+
+        var commandBuffers = new CommandBuffer[count];
+        fixed (CommandBuffer* commandBuffersPtr = commandBuffers)
+            AllocateCommandBuffers(commandBuffersPtr, count);
+
+        return commandBuffers;
     }
 
     /// <summary>Resets the command pool and all command buffers allocated from it.</summary>
@@ -45,7 +55,7 @@ internal sealed unsafe class VulkanCommandPool
             throw new InvalidOperationException("Failed to reset command pool.");
     }
 
-    private CommandBuffer[] AllocateCommandBuffers(uint count)
+    private void AllocateCommandBuffers(CommandBuffer* commandBuffers, uint count)
     {
         CommandBufferAllocateInfo allocInfo = new()
         {
@@ -55,15 +65,9 @@ internal sealed unsafe class VulkanCommandPool
             CommandBufferCount = count
         };
 
-        var commandBuffers = new CommandBuffer[count];
-        fixed (CommandBuffer* commandBuffersPtr = commandBuffers)
-        {
-            if (VulkanContext.Vk.AllocateCommandBuffers(VulkanContext.Device, in allocInfo, commandBuffersPtr) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to allocate command buffers.");
-        }
-
-        return commandBuffers;
+        if (VulkanContext.Vk.AllocateCommandBuffers(VulkanContext.Device, in allocInfo, commandBuffers) !=
+            Result.Success)
+            throw new InvalidOperationException("Failed to allocate command buffers.");
     }
 
     /// <summary>Destroys the command pool and releases associated Vulkan resources.</summary>

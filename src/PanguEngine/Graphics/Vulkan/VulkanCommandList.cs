@@ -7,12 +7,19 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanCommandList : CommandList
 {
-    private CommandBuffer _commandBuffer;
+    private readonly CommandBuffer _commandBuffer;
     private bool _rendering;
     private bool _valid;
     private VulkanGraphicsPipeline? _graphicsPipeline;
     private TextureFormat[] _renderingColorFormats = [];
     private TextureFormat _renderingDepthStencilFormat;
+
+    /// <summary>Creates a command list bound to a command buffer.</summary>
+    /// <param name="commandBuffer">The command buffer used for recording.</param>
+    internal VulkanCommandList(CommandBuffer commandBuffer)
+    {
+        _commandBuffer = commandBuffer;
+    }
 
     /// <summary>
     /// Gets whether command recording has ended.
@@ -27,10 +34,8 @@ internal sealed unsafe class VulkanCommandList : CommandList
     /// <summary>
     /// Resets this command list for command recording.
     /// </summary>
-    /// <param name="commandBuffer">The command buffer to record.</param>
-    internal void Reset(CommandBuffer commandBuffer)
+    internal void Reset()
     {
-        _commandBuffer = commandBuffer;
         IsBegun = false;
         IsEnded = false;
         _rendering = false;
@@ -398,7 +403,6 @@ internal sealed unsafe class VulkanCommandList : CommandList
     internal void Invalidate()
     {
         _valid = false;
-        _commandBuffer = default;
         _graphicsPipeline = null;
         _renderingColorFormats = [];
         _renderingDepthStencilFormat = TextureFormat.Undefined;
