@@ -23,8 +23,15 @@ internal sealed class ChunkRenderer
     /// </summary>
     /// <param name="device">The graphics device.</param>
     /// <param name="colorFormat">The target color format.</param>
+    /// <param name="cameraLayout">The camera descriptor set layout.</param>
+    /// <param name="depthStencilFormat">The target depth/stencil format.</param>
     /// <param name="world">The client world to render.</param>
-    public ChunkRenderer(GraphicsDevice device, TextureFormat colorFormat, ClientWorld world)
+    public ChunkRenderer(
+        GraphicsDevice device,
+        TextureFormat colorFormat,
+        DescriptorSetLayout cameraLayout,
+        TextureFormat depthStencilFormat,
+        ClientWorld world)
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
         _world = world ?? throw new ArgumentNullException(nameof(world));
@@ -42,7 +49,18 @@ internal sealed class ChunkRenderer
             [_vertexShader, _fragmentShader],
             ChunkVertex.VertexInput,
             ColorAttachmentFormats: [colorFormat],
-            DescriptorSetLayouts: []));
+            DescriptorSetLayouts: [cameraLayout],
+            Rasterizer: new RasterizerDescription(
+                CullMode: CullMode.Back,
+                FrontFace: FrontFace.CounterClockwise),
+            DepthStencil: new DepthStencilDescription(
+                DepthTestEnabled: true,
+                DepthWriteEnabled: true,
+                DepthCompareOperation: CompareOperation.LessOrEqual,
+                StencilTestEnabled: false,
+                FrontFace: default,
+                BackFace: default),
+            DepthStencilAttachmentFormat: depthStencilFormat));
     }
 
     /// <summary>
@@ -82,11 +100,14 @@ internal sealed class ChunkRenderer
     /// Records chunk draw commands.
     /// </summary>
     /// <param name="commandList">The active command list.</param>
-    public void Draw(CommandList commandList)
+    /// <param name="cameraDescriptorSet">The camera descriptor set for the active frame slot.</param>
+    public void Draw(CommandList commandList, DescriptorSet cameraDescriptorSet)
     {
         ArgumentNullException.ThrowIfNull(commandList);
+        ArgumentNullException.ThrowIfNull(cameraDescriptorSet);
 
         commandList.SetGraphicsPipeline(_pipeline);
+        commandList.SetDescriptorSet(0, cameraDescriptorSet);
         foreach (var mesh in _meshes.Values)
         {
             commandList.SetVertexBuffer(0, mesh.Buffer);

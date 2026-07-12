@@ -59,5 +59,10 @@ public sealed class ClientWorld
                 SetBlock(new BlockPos(x, 0, z), BuiltinBlocks.Grass.DefaultState);
             }
         }
+
+        for (var y = 1; y < 8; y++)
+        {
+            SetBlock(new BlockPos(8, y, 8), BuiltinBlocks.Stone.DefaultState);
+        }
     }
 }

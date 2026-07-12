@@ -63,6 +63,24 @@ public sealed class ChunkMeshBuilderTests
     }
 
     [Fact]
+    public void BuildSingleSolidBlockUsesOutwardFaceWinding()
+    {
+        var world = new ClientWorld();
+        var position = new BlockPos(32, 32, 32);
+        world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
+        var chunk = GetChunk(world, position.ToChunkPos());
+
+        var mesh = new ChunkMeshBuilder().Build(world, chunk);
+
+        AssertFaceNormal(mesh, 0, 0, -1, 0);
+        AssertFaceNormal(mesh, 1, 0, 1, 0);
+        AssertFaceNormal(mesh, 2, 0, 0, -1);
+        AssertFaceNormal(mesh, 3, 0, 0, 1);
+        AssertFaceNormal(mesh, 4, -1, 0, 0);
+        AssertFaceNormal(mesh, 5, 1, 0, 0);
+    }
+
+    [Fact]
     public void BuildUsesWorldNeighborsAcrossChunkBoundaries()
     {
         var world = new ClientWorld();
@@ -93,5 +111,27 @@ public sealed class ChunkMeshBuilderTests
             Assert.InRange(vertex.B, expectedRgb - 0.0001f, expectedRgb + 0.0001f);
             Assert.Equal(1f, vertex.A);
         });
+    }
+
+    private static void AssertFaceNormal(
+        ChunkMesh mesh,
+        int faceIndex,
+        float expectedX,
+        float expectedY,
+        float expectedZ)
+    {
+        var first = mesh.Vertices[faceIndex * 6];
+        var second = mesh.Vertices[faceIndex * 6 + 1];
+        var third = mesh.Vertices[faceIndex * 6 + 2];
+        var ab = (X: second.X - first.X, Y: second.Y - first.Y, Z: second.Z - first.Z);
+        var ac = (X: third.X - first.X, Y: third.Y - first.Y, Z: third.Z - first.Z);
+        var normal = (
+            X: ab.Y * ac.Z - ab.Z * ac.Y,
+            Y: ab.Z * ac.X - ab.X * ac.Z,
+            Z: ab.X * ac.Y - ab.Y * ac.X);
+
+        Assert.Equal(expectedX, normal.X);
+        Assert.Equal(expectedY, normal.Y);
+        Assert.Equal(expectedZ, normal.Z);
     }
 }

@@ -102,11 +102,11 @@ internal sealed class ChunkMeshBuilder
         (float X, float Y, float Z) fourth)
     {
         vertices.Add(CreateVertex(first, color));
-        vertices.Add(CreateVertex(second, color));
+        vertices.Add(CreateVertex(fourth, color));
         vertices.Add(CreateVertex(third, color));
         vertices.Add(CreateVertex(first, color));
         vertices.Add(CreateVertex(third, color));
-        vertices.Add(CreateVertex(fourth, color));
+        vertices.Add(CreateVertex(second, color));
     }
 
     private static ChunkVertex CreateVertex(
