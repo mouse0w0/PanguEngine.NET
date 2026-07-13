@@ -85,9 +85,9 @@ public sealed unsafe class VulkanBuffer : Buffer
     public override void Write<T>(ReadOnlySpan<T> data, ulong destinationOffset = 0)
     {
         ObjectDisposedException.ThrowIf(_destroyed, this);
-        if (!Usage.HasFlag(BufferUsageFlags.UniformBufferBit))
+        if (!_persistentlyMapped)
             throw new InvalidOperationException(
-                "Buffer.Write is only supported for buffers created with Uniform usage.");
+                "Buffer.Write requires a buffer created with CpuToGpu memory usage.");
 
         var dataSize = checked((ulong)data.Length * (ulong)sizeof(T));
         if (destinationOffset > Size || dataSize > Size - destinationOffset)
@@ -95,8 +95,6 @@ public sealed unsafe class VulkanBuffer : Buffer
                 "Destination offset and data size exceed the buffer bounds.");
         if (dataSize == 0)
             return;
-        if (!_persistentlyMapped)
-            throw new InvalidOperationException("Buffer.Write requires a persistently mapped uniform buffer.");
 
         fixed (T* source = data)
         {

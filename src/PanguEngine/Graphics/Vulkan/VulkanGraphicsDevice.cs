@@ -68,7 +68,8 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             Usage = vmaUsage
         };
 
-        if (description.Usage.HasFlag(BufferUsage.Uniform))
+        var persistentlyMapped = ShouldPersistentlyMap(description);
+        if (persistentlyMapped)
         {
             allocInfo.Usage = VmaMemoryUsage.Auto;
             allocInfo.Flags = AllocationCreateFlags.HostAccessSequentialWriteBit;
@@ -76,10 +77,15 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         }
 
         var buffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
-        if (description.Usage.HasFlag(BufferUsage.Uniform))
+        if (persistentlyMapped)
             buffer.PersistentlyMapForWrite();
 
         return buffer;
+    }
+
+    internal static bool ShouldPersistentlyMap(in BufferDescription description)
+    {
+        return description.MemoryUsage == MemoryUsage.CpuToGpu;
     }
 
     public override UploadHandle UploadBuffer<T>(
