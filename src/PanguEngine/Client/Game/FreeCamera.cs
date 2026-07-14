@@ -16,6 +16,7 @@ internal sealed class FreeCamera
     internal const float FarPlane = 1000f;
 
     private const float DegreesToRadians = MathF.PI / 180f;
+    private const float DirectionComponentEpsilon = 0.000001f;
 
     internal FreeCamera()
     {
@@ -44,11 +45,20 @@ internal sealed class FreeCamera
         {
             var yaw = Yaw * DegreesToRadians;
             var pitch = Pitch * DegreesToRadians;
-            return Vector3D.Normalize(new Vector3D<float>(
+            var direction = Vector3D.Normalize(new Vector3D<float>(
                 MathF.Cos(pitch) * MathF.Cos(yaw),
                 MathF.Sin(pitch),
                 MathF.Cos(pitch) * MathF.Sin(yaw)));
+            return Vector3D.Normalize(new Vector3D<float>(
+                SnapDirectionComponent(direction.X),
+                SnapDirectionComponent(direction.Y),
+                SnapDirectionComponent(direction.Z)));
         }
+    }
+
+    private static float SnapDirectionComponent(float value)
+    {
+        return MathF.Abs(value) < DirectionComponentEpsilon ? 0 : value;
     }
 
     /// <summary>
@@ -106,7 +116,7 @@ internal sealed class FreeCamera
     /// </summary>
     /// <param name="aspectRatio">The presentation width divided by height.</param>
     /// <returns>The projection matrix.</returns>
-    internal Matrix4X4<float> CreateProjectionMatrix(float aspectRatio)
+    internal static Matrix4X4<float> CreateProjectionMatrix(float aspectRatio)
     {
         if (!float.IsFinite(aspectRatio) || aspectRatio <= 0)
             throw new ArgumentOutOfRangeException(nameof(aspectRatio));

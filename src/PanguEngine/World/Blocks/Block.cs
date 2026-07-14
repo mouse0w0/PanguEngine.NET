@@ -1,3 +1,5 @@
+using PanguEngine.World.Chunking;
+
 namespace PanguEngine.World.Blocks;
 
 /// <summary>
@@ -27,5 +29,20 @@ public class Block
     public virtual bool CanOccludeFace(Direction direction)
     {
         return true;
+    }
+
+    /// <summary>
+    /// Gets the selection shape for a block state at a world position.
+    /// </summary>
+    /// <param name="state">The block state.</param>
+    /// <param name="blockAccessor">The block state accessor.</param>
+    /// <param name="position">The world block position.</param>
+    /// <returns>The selection shape.</returns>
+    public virtual IBlockShape GetSelectionShape(
+        BlockState state,
+        IReadOnlyBlockAccessor blockAccessor,
+        BlockPos position)
+    {
+        return BlockShape.FullBlock;
     }
 }

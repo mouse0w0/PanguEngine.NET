@@ -1,3 +1,4 @@
+using PanguEngine.World;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
 
@@ -6,7 +7,7 @@ namespace PanguEngine.Client.World;
 /// <summary>
 /// Stores local client world block state.
 /// </summary>
-public sealed class ClientWorld
+public sealed class ClientWorld : IReadOnlyBlockAccessor
 {
     /// <summary>
     /// Creates a client world with the default platform.

@@ -1,6 +1,8 @@
 using PanguEngine.Client.Rendering.World;
 using PanguEngine.Client.World;
 using PanguEngine.Input;
+using PanguEngine.World.Interaction;
+using Silk.NET.Maths;
 
 namespace PanguEngine.Client.Game;
 
@@ -25,6 +27,9 @@ public sealed class ClientGame
     /// <summary>The local client world state.</summary>
     public ClientWorld World { get; }
 
+    /// <summary>The block currently selected by the camera ray.</summary>
+    public BlockHit? SelectedBlock { get; private set; }
+
     /// <summary>
     /// Updates the client game state for the current tick.
     /// </summary>
@@ -35,6 +40,8 @@ public sealed class ClientGame
         var right = (_input.IsKeyDown(Key.D) ? 1 : 0)
                     - (_input.IsKeyDown(Key.A) ? 1 : 0);
         _camera.Move(forward, right);
+
+        SelectedBlock = RaycastSelection(_camera.CurrentPosition);
     }
 
     /// <summary>
@@ -43,7 +50,23 @@ public sealed class ClientGame
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
     public void DrawFrame(double alpha)
     {
-        _renderer.DrawFrame(_camera, alpha);
+        var renderSelection = RaycastSelection(_camera.GetInterpolatedPosition(alpha));
+        _renderer.DrawFrame(_camera, renderSelection, alpha);
+    }
+
+    private BlockHit? RaycastSelection(Vector3D<float> position)
+    {
+        var direction = _camera.Forward;
+        var ray = new Ray3D<double>(
+            new Vector3D<double>(position.X, position.Y, position.Z),
+            new Vector3D<double>(direction.X, direction.Y, direction.Z));
+        return BlockRaycaster.TryRaycast(
+            World,
+            ray,
+            5d,
+            out var hit)
+            ? hit
+            : null;
     }
 
     /// <summary>

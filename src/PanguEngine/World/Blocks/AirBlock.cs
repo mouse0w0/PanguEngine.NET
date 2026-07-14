@@ -1,3 +1,5 @@
+using PanguEngine.World.Chunking;
+
 namespace PanguEngine.World.Blocks;
 
 /// <summary>
@@ -19,5 +21,14 @@ public sealed class AirBlock : Block
     public override bool CanOccludeFace(Direction direction)
     {
         return false;
+    }
+
+    /// <inheritdoc/>
+    public override IBlockShape GetSelectionShape(
+        BlockState state,
+        IReadOnlyBlockAccessor blockAccessor,
+        BlockPos position)
+    {
+        return BlockShape.Empty;
     }
 }

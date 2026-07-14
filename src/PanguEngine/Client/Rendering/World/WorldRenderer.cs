@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.World;
 using PanguEngine.Graphics;
+using PanguEngine.World.Interaction;
 using Silk.NET.Maths;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
@@ -22,6 +23,7 @@ internal sealed class WorldRenderer
     private readonly DescriptorSet[] _cameraDescriptorSets;
     private readonly Texture?[] _depthStencilAttachments;
     private readonly ChunkRenderer _chunkRenderer;
+    private readonly SelectionRenderer _selectionRenderer;
     private uint _depthStencilWidth;
     private uint _depthStencilHeight;
 
@@ -69,14 +71,22 @@ internal sealed class WorldRenderer
             _cameraDescriptorLayout,
             DepthStencilFormat,
             world);
+        _selectionRenderer = new SelectionRenderer(
+            _device,
+            _presenter.ColorFormat,
+            DepthStencilFormat,
+            _cameraDescriptorLayout,
+            world,
+            _presenter.MaxFramesInFlight);
     }
 
     /// <summary>
     /// Draws a world frame.
     /// </summary>
     /// <param name="camera">The camera used to draw the world.</param>
+    /// <param name="selection">The currently selected block.</param>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
-    public void DrawFrame(FreeCamera camera, double alpha)
+    public void DrawFrame(FreeCamera camera, BlockHit? selection, double alpha)
     {
         ArgumentNullException.ThrowIfNull(camera);
 
@@ -85,7 +95,7 @@ internal sealed class WorldRenderer
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        InvalidOperationException? uploadFailure = null;
+        InvalidOperationException? uploadFailure;
         try
         {
             uploadFailure = GetUploadFailure(uploadHandles);
@@ -104,14 +114,16 @@ internal sealed class WorldRenderer
             var depthStencilAttachment = EnsureDepthStencilAttachment(frame.FrameSlot);
             var aspectRatio = (float)frame.Width / frame.Height;
             var cameraUniform = new CameraUniform(camera.CreateViewProjection(aspectRatio, alpha));
-            _cameraBuffer.Write(cameraUniform, checked((ulong)frame.FrameSlot * _cameraUniformStride));
+            _cameraBuffer.Write(cameraUniform, checked(frame.FrameSlot * _cameraUniformStride));
+            if (uploadFailure is null)
+                _selectionRenderer.Prepare(frame.FrameSlot, selection);
 
             commandList.BeginRecording();
             commandList.BeginRendering(new RenderingDescription(
                 frame.Width,
                 frame.Height,
                 [
-                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
+                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1))
                 ],
                 new DepthStencilAttachmentDescription(
                     depthStencilAttachment,
@@ -121,7 +133,10 @@ internal sealed class WorldRenderer
             commandList.SetScissor(0, 0, frame.Width, frame.Height);
 
             if (uploadFailure is null)
+            {
                 _chunkRenderer.Draw(commandList, _cameraDescriptorSets[frameIndex]);
+                _selectionRenderer.Draw(commandList, _cameraDescriptorSets[frameIndex], frame.FrameSlot);
+            }
 
             commandList.EndRendering();
             commandList.PrepareForPresent(frame.ColorOutput);
@@ -144,6 +159,7 @@ internal sealed class WorldRenderer
         _device.WaitIdle();
         foreach (var depthStencilAttachment in _depthStencilAttachments)
             depthStencilAttachment?.Destroy();
+        _selectionRenderer.Destroy();
         _chunkRenderer.Destroy();
         foreach (var descriptorSet in _cameraDescriptorSets)
             descriptorSet.Destroy();

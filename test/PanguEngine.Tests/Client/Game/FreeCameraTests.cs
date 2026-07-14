@@ -11,7 +11,7 @@ public sealed class FreeCameraTests
         var camera = new FreeCamera();
 
         AssertVector(new Vector3D<float>(8, 6, 24), camera.CurrentPosition);
-        Assert.InRange(camera.Forward.X, -0.0001f, 0.0001f);
+        Assert.Equal(0, camera.Forward.X);
         Assert.True(camera.Forward.Y < 0);
         Assert.True(camera.Forward.Z < 0);
     }
@@ -97,7 +97,7 @@ public sealed class FreeCameraTests
     [Fact]
     public void ProjectionMapsNearAndFarPlanesToVulkanDepthRange()
     {
-        var projection = new FreeCamera().CreateProjectionMatrix(16f / 9f);
+        var projection = FreeCamera.CreateProjectionMatrix(16f / 9f);
 
         var nearClip = new Vector4D<float>(0, 0, -FreeCamera.NearPlane, 1) * projection;
         var farClip = new Vector4D<float>(0, 0, -FreeCamera.FarPlane, 1) * projection;
@@ -109,8 +109,8 @@ public sealed class FreeCameraTests
     [Fact]
     public void ProjectionUsesProvidedAspectRatio()
     {
-        var square = new FreeCamera().CreateProjectionMatrix(1);
-        var wide = new FreeCamera().CreateProjectionMatrix(2);
+        var square = FreeCamera.CreateProjectionMatrix(1);
+        var wide = FreeCamera.CreateProjectionMatrix(2);
 
         Assert.Equal(square.M11 / 2, wide.M11, 4);
         Assert.Equal(square.M22, wide.M22, 4);
@@ -119,7 +119,7 @@ public sealed class FreeCameraTests
     [Fact]
     public void ProjectionMapsPositiveViewYTowardTopOfVulkanViewport()
     {
-        var projection = new FreeCamera().CreateProjectionMatrix(1);
+        var projection = FreeCamera.CreateProjectionMatrix(1);
 
         var clip = new Vector4D<float>(0, 1, -1, 1) * projection;
 
