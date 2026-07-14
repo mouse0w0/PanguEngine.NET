@@ -41,19 +41,4 @@ public sealed class ChunkManagerTests
             [new ChunkPos(-1, 0, 0), new ChunkPos(0, 0, 0), new ChunkPos(1, 0, 0)],
             manager.EnumerateChunks().Select(chunk => chunk.Position).OrderBy(pos => pos.X).ToArray());
     }
-
-    [Fact]
-    public void EnumerateDirtyChunksReturnsOnlyDirtyChunks()
-    {
-        var manager = new ChunkManager();
-
-        manager.SetBlock(new BlockPos(0, 0, 0), BuiltinBlocks.Stone.DefaultState);
-        manager.SetBlock(new BlockPos(16, 0, 0), BuiltinBlocks.Dirt.DefaultState);
-        var cleanChunk = manager.EnumerateChunks().Single(chunk => chunk.Position == new ChunkPos(0, 0, 0));
-        cleanChunk.ClearDirty();
-
-        Assert.Equal(
-            [new ChunkPos(1, 0, 0)],
-            manager.EnumerateDirtyChunks().Select(chunk => chunk.Position).ToArray());
-    }
 }

@@ -49,13 +49,4 @@ public sealed class ChunkManager
     {
         return _chunks.Values;
     }
-
-    /// <summary>
-    /// Enumerates the chunks that need a mesh rebuild.
-    /// </summary>
-    /// <returns>The dirty chunks.</returns>
-    public IEnumerable<Chunk> EnumerateDirtyChunks()
-    {
-        return _chunks.Values.Where(chunk => chunk.IsDirty);
-    }
 }

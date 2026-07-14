@@ -7,17 +7,6 @@ namespace PanguEngine.Tests.Client.World;
 public sealed class ClientWorldTests
 {
     [Fact]
-    public void SetBlockStoresState()
-    {
-        var world = new ClientWorld();
-        var position = new BlockPos(32, 4, 32);
-
-        world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
-
-        Assert.Same(BuiltinBlocks.Stone.DefaultState, world.GetBlock(position));
-    }
-
-    [Fact]
     public void IsAirReflectsStoredBlockState()
     {
         var world = new ClientWorld();
@@ -28,5 +17,24 @@ public sealed class ClientWorldTests
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
 
         Assert.False(world.IsAir(position));
+    }
+
+    [Fact]
+    public void SetBlockNotifiesAfterStateIsStored()
+    {
+        var world = new ClientWorld();
+        var position = new BlockPos(32, 4, 32);
+        var notifications = new List<BlockPos>();
+        BlockState? observedState = null;
+        world.BlockChanged += changedPosition =>
+        {
+            notifications.Add(changedPosition);
+            observedState = world.GetBlock(changedPosition);
+        };
+
+        world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
+
+        Assert.Equal([position], notifications);
+        Assert.Same(BuiltinBlocks.Stone.DefaultState, observedState);
     }
 }

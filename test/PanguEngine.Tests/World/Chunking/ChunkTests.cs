@@ -24,21 +24,6 @@ public sealed class ChunkTests
     }
 
     [Fact]
-    public void SetBlockMarksChunkDirtyAndClearDirtyResetsIt()
-    {
-        var chunk = new Chunk(new ChunkPos(0, 0, 0));
-
-        Assert.False(chunk.IsDirty);
-
-        chunk.SetBlock(new BlockPos(1, 0, 0), BuiltinBlocks.Stone.DefaultState);
-
-        Assert.True(chunk.IsDirty);
-
-        chunk.ClearDirty();
-        Assert.False(chunk.IsDirty);
-    }
-
-    [Fact]
     public void LocalSlotUsesLowBits()
     {
         var chunk = new Chunk(new ChunkPos(0, 0, 0));

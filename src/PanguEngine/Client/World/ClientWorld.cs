@@ -21,6 +21,9 @@ public sealed class ClientWorld : IReadOnlyBlockAccessor
     /// <summary>The chunks that store this world's block state.</summary>
     public ChunkManager Chunks { get; }
 
+    /// <summary>Raised after a block state is stored.</summary>
+    internal event Action<BlockPos>? BlockChanged;
+
     /// <summary>
     /// Gets a block state by world block position.
     /// </summary>
@@ -39,6 +42,7 @@ public sealed class ClientWorld : IReadOnlyBlockAccessor
     public void SetBlock(BlockPos position, BlockState state)
     {
         Chunks.SetBlock(position, state);
+        BlockChanged?.Invoke(position);
     }
 
     /// <summary>

@@ -17,6 +17,7 @@ internal sealed class ChunkRenderer
     private readonly Shader _vertexShader;
     private readonly Shader _fragmentShader;
     private readonly GraphicsPipeline _pipeline;
+    private HashSet<ChunkPos> _invalidatedChunkPositions = [];
 
     /// <summary>
     /// Creates a chunk renderer.
@@ -61,6 +62,10 @@ internal sealed class ChunkRenderer
                 FrontFace: default,
                 BackFace: default),
             DepthStencilAttachmentFormat: depthStencilFormat));
+
+        foreach (var chunk in _world.Chunks.EnumerateChunks())
+            Invalidate(chunk.Position);
+        _world.BlockChanged += OnBlockChanged;
     }
 
     /// <summary>
@@ -70,7 +75,11 @@ internal sealed class ChunkRenderer
     public List<UploadHandle> RebuildDirtyChunks()
     {
         var uploadHandles = new List<UploadHandle>();
-        foreach (var chunk in _world.Chunks.EnumerateDirtyChunks().ToArray())
+        var invalidatedPositions = _invalidatedChunkPositions;
+        _invalidatedChunkPositions = [];
+        foreach (var chunk in _world.Chunks.EnumerateChunks()
+                     .Where(chunk => invalidatedPositions.Contains(chunk.Position))
+                     .ToArray())
         {
             var chunkPos = chunk.Position;
             var mesh = _meshBuilder.Build(_world, chunk);
@@ -89,8 +98,6 @@ internal sealed class ChunkRenderer
                 _meshes.Add(chunkPos, new ChunkMeshResource(buffer, uploadHandle, checked((uint)mesh.VertexCount)));
                 uploadHandles.Add(uploadHandle);
             }
-
-            chunk.ClearDirty();
         }
 
         return uploadHandles;
@@ -120,6 +127,7 @@ internal sealed class ChunkRenderer
     /// </summary>
     public void Destroy()
     {
+        _world.BlockChanged -= OnBlockChanged;
         foreach (var mesh in _meshes.Values)
             mesh.Destroy();
         _meshes.Clear();
@@ -127,6 +135,36 @@ internal sealed class ChunkRenderer
         _pipeline.Destroy();
         _fragmentShader.Destroy();
         _vertexShader.Destroy();
+    }
+
+    private void OnBlockChanged(BlockPos position)
+    {
+        Invalidate(position);
+    }
+
+    private void Invalidate(ChunkPos position)
+    {
+        _invalidatedChunkPositions.Add(position);
+    }
+
+    private void Invalidate(BlockPos position)
+    {
+        var chunkPosition = position.ToChunkPos();
+        var localPosition = position.ToChunkLocalPos();
+        Invalidate(chunkPosition);
+
+        if (localPosition.X == 0)
+            Invalidate(chunkPosition.Offset(-1, 0, 0));
+        if (localPosition.X == Chunk.MaskX)
+            Invalidate(chunkPosition.Offset(1, 0, 0));
+        if (localPosition.Y == 0)
+            Invalidate(chunkPosition.Offset(0, -1, 0));
+        if (localPosition.Y == Chunk.MaskY)
+            Invalidate(chunkPosition.Offset(0, 1, 0));
+        if (localPosition.Z == 0)
+            Invalidate(chunkPosition.Offset(0, 0, -1));
+        if (localPosition.Z == Chunk.MaskZ)
+            Invalidate(chunkPosition.Offset(0, 0, 1));
     }
 
     /// <summary>

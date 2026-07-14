@@ -53,9 +53,6 @@ public sealed class Chunk
     /// <summary>The position of this chunk in chunk space.</summary>
     public ChunkPos Position { get; }
 
-    /// <summary>Whether this chunk needs a mesh rebuild.</summary>
-    public bool IsDirty { get; private set; }
-
     /// <summary>
     /// Gets a block state by world block position.
     /// </summary>
@@ -76,15 +73,6 @@ public sealed class Chunk
         ArgumentNullException.ThrowIfNull(state);
 
         _blocks[GetIndex(position)] = state;
-        IsDirty = true;
-    }
-
-    /// <summary>
-    /// Clears the dirty flag.
-    /// </summary>
-    public void ClearDirty()
-    {
-        IsDirty = false;
     }
 
     /// <summary>
