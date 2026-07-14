@@ -1,6 +1,7 @@
 using PanguEngine.Client.Rendering.World;
 using PanguEngine.Client.World;
 using PanguEngine.Input;
+using PanguEngine.World.Blocks;
 using PanguEngine.World.Interaction;
 using Silk.NET.Maths;
 
@@ -42,6 +43,11 @@ public sealed class ClientGame
         _camera.Move(forward, right);
 
         SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+        if (_input.ConsumeRightClickRequest()
+            && TryPlaceBlock(World, SelectedBlock))
+        {
+            SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+        }
     }
 
     /// <summary>
@@ -52,6 +58,19 @@ public sealed class ClientGame
     {
         var renderSelection = RaycastSelection(_camera.GetInterpolatedPosition(alpha));
         _renderer.DrawFrame(_camera, renderSelection, alpha);
+    }
+
+    internal static bool TryPlaceBlock(ClientWorld world, BlockHit? selection)
+    {
+        if (selection is not { } hit)
+            return false;
+
+        var targetPosition = hit.BlockPosition.Offset(hit.Face);
+        if (!world.IsAir(targetPosition))
+            return false;
+
+        world.SetBlock(targetPosition, BuiltinBlocks.Stone.DefaultState);
+        return true;
     }
 
     private BlockHit? RaycastSelection(Vector3D<float> position)

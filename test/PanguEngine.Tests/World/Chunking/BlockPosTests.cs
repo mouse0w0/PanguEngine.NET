@@ -1,3 +1,4 @@
+using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
 using Silk.NET.Maths;
 
@@ -77,6 +78,47 @@ public sealed class BlockPosTests
 
         Assert.Equal(new BlockPos(5, 7, 9), blockPos.Offset(4, 5, 6));
         Assert.Equal(new BlockPos(5, 7, 9), blockPos.Offset(new BlockPos(4, 5, 6)));
+    }
+
+    [Fact]
+    public void OffsetDirectionUsesDefaultDistance()
+    {
+        var blockPos = new BlockPos(1, 2, 3);
+
+        Assert.Equal(new BlockPos(1, 3, 3), blockPos.Offset(Direction.Up));
+    }
+
+    [Theory]
+    [InlineData(Direction.Down, 2, 1, 0, 3)]
+    [InlineData(Direction.Up, 2, 1, 4, 3)]
+    [InlineData(Direction.North, 2, 1, 2, 1)]
+    [InlineData(Direction.South, 2, 1, 2, 5)]
+    [InlineData(Direction.West, 2, -1, 2, 3)]
+    [InlineData(Direction.East, 2, 3, 2, 3)]
+    [InlineData(Direction.East, -2, -1, 2, 3)]
+    public void OffsetDirectionMovesByDistance(
+        Direction direction,
+        int distance,
+        int expectedX,
+        int expectedY,
+        int expectedZ)
+    {
+        var blockPos = new BlockPos(1, 2, 3);
+
+        Assert.Equal(new BlockPos(expectedX, expectedY, expectedZ), blockPos.Offset(direction, distance));
+    }
+
+    [Fact]
+    public void DirectionMethodsUseDefaultDistance()
+    {
+        var blockPos = new BlockPos(1, 2, 3);
+
+        Assert.Equal(new BlockPos(1, 3, 3), blockPos.Up());
+        Assert.Equal(new BlockPos(1, 1, 3), blockPos.Down());
+        Assert.Equal(new BlockPos(1, 2, 2), blockPos.North());
+        Assert.Equal(new BlockPos(1, 2, 4), blockPos.South());
+        Assert.Equal(new BlockPos(0, 2, 3), blockPos.West());
+        Assert.Equal(new BlockPos(2, 2, 3), blockPos.East());
     }
 
     [Fact]

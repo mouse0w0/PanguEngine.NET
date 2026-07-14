@@ -1,3 +1,4 @@
+using PanguEngine.World.Blocks;
 using Silk.NET.Maths;
 
 namespace PanguEngine.World.Chunking;
@@ -68,6 +69,68 @@ public readonly record struct BlockPos(int X, int Y, int Z)
     {
         return Offset(offset.X, offset.Y, offset.Z);
     }
+
+    /// <summary>
+    /// Offsets this block position by the specified distance in a direction.
+    /// </summary>
+    /// <param name="direction">The direction to move.</param>
+    /// <param name="distance">The signed distance to move.</param>
+    /// <returns>The offset block position.</returns>
+    public BlockPos Offset(Direction direction, int distance = 1)
+    {
+        return direction switch
+        {
+            Direction.Down => Down(distance),
+            Direction.Up => Up(distance),
+            Direction.North => North(distance),
+            Direction.South => South(distance),
+            Direction.West => West(distance),
+            Direction.East => East(distance),
+            _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
+        };
+    }
+
+    /// <summary>
+    /// Offsets this block position upward by the specified distance.
+    /// </summary>
+    /// <param name="distance">The signed distance to move.</param>
+    /// <returns>The offset block position.</returns>
+    public BlockPos Up(int distance = 1) => Offset(0, distance, 0);
+
+    /// <summary>
+    /// Offsets this block position downward by the specified distance.
+    /// </summary>
+    /// <param name="distance">The signed distance to move.</param>
+    /// <returns>The offset block position.</returns>
+    public BlockPos Down(int distance = 1) => Offset(0, -distance, 0);
+
+    /// <summary>
+    /// Offsets this block position northward by the specified distance.
+    /// </summary>
+    /// <param name="distance">The signed distance to move.</param>
+    /// <returns>The offset block position.</returns>
+    public BlockPos North(int distance = 1) => Offset(0, 0, -distance);
+
+    /// <summary>
+    /// Offsets this block position southward by the specified distance.
+    /// </summary>
+    /// <param name="distance">The signed distance to move.</param>
+    /// <returns>The offset block position.</returns>
+    public BlockPos South(int distance = 1) => Offset(0, 0, distance);
+
+    /// <summary>
+    /// Offsets this block position westward by the specified distance.
+    /// </summary>
+    /// <param name="distance">The signed distance to move.</param>
+    /// <returns>The offset block position.</returns>
+    public BlockPos West(int distance = 1) => Offset(-distance, 0, 0);
+
+    /// <summary>
+    /// Offsets this block position eastward by the specified distance.
+    /// </summary>
+    /// <param name="distance">The signed distance to move.</param>
+    /// <returns>The offset block position.</returns>
+    public BlockPos East(int distance = 1) => Offset(distance, 0, 0);
 
     /// <summary>
     /// Adds two block positions component-wise.
