@@ -24,6 +24,7 @@ internal sealed class WorldRenderer
     private readonly Texture?[] _depthStencilAttachments;
     private readonly ChunkRenderer _chunkRenderer;
     private readonly SelectionRenderer _selectionRenderer;
+    private readonly CrosshairRenderer _crosshairRenderer;
     private uint _depthStencilWidth;
     private uint _depthStencilHeight;
 
@@ -78,6 +79,11 @@ internal sealed class WorldRenderer
             _cameraDescriptorLayout,
             world,
             _presenter.MaxFramesInFlight);
+        _crosshairRenderer = new CrosshairRenderer(
+            _device,
+            _presenter.ColorFormat,
+            DepthStencilFormat,
+            _presenter.MaxFramesInFlight);
     }
 
     /// <summary>
@@ -117,6 +123,7 @@ internal sealed class WorldRenderer
             _cameraBuffer.Write(cameraUniform, checked(frame.FrameSlot * _cameraUniformStride));
             if (uploadFailure is null)
                 _selectionRenderer.Prepare(frame.FrameSlot, selection);
+            _crosshairRenderer.Prepare(frame.FrameSlot, frame.Width, frame.Height);
 
             commandList.BeginRecording();
             commandList.BeginRendering(new RenderingDescription(
@@ -136,6 +143,7 @@ internal sealed class WorldRenderer
             {
                 _chunkRenderer.Draw(commandList, _cameraDescriptorSets[frameIndex]);
                 _selectionRenderer.Draw(commandList, _cameraDescriptorSets[frameIndex], frame.FrameSlot);
+                _crosshairRenderer.Draw(commandList, frame.FrameSlot);
             }
 
             commandList.EndRendering();
@@ -160,6 +168,7 @@ internal sealed class WorldRenderer
         foreach (var depthStencilAttachment in _depthStencilAttachments)
             depthStencilAttachment?.Destroy();
         _selectionRenderer.Destroy();
+        _crosshairRenderer.Destroy();
         _chunkRenderer.Destroy();
         foreach (var descriptorSet in _cameraDescriptorSets)
             descriptorSet.Destroy();
