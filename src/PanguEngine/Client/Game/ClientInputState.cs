@@ -14,6 +14,7 @@ internal sealed class ClientInputState
     private readonly Action<CursorState> _setCursorState;
     private Vector2D<float> _mouseBaseline;
     private bool _hasMouseBaseline;
+    private bool _leftClickRequested;
     private bool _rightClickRequested;
     private bool _isDestroyed;
 
@@ -45,6 +46,17 @@ internal sealed class ClientInputState
     /// <param name="key">The key to query.</param>
     /// <returns><see langword="true" /> when the key is pressed.</returns>
     internal bool IsKeyDown(Key key) => _pressedKeys.Contains(key);
+
+    /// <summary>
+    /// Consumes the pending left-click request.
+    /// </summary>
+    /// <returns><see langword="true" /> once for each observed left click while captured.</returns>
+    internal bool ConsumeLeftClickRequest()
+    {
+        var requested = _leftClickRequested;
+        _leftClickRequested = false;
+        return requested;
+    }
 
     /// <summary>
     /// Consumes the pending right-click request.
@@ -115,6 +127,12 @@ internal sealed class ClientInputState
         if (args.Button != MouseButton.Left)
             return;
 
+        if (IsMouseCaptured)
+        {
+            _leftClickRequested = true;
+            return;
+        }
+
         CaptureMouse();
         _mouseBaseline = new Vector2D<float>(args.X, args.Y);
         _hasMouseBaseline = true;
@@ -126,6 +144,7 @@ internal sealed class ClientInputState
             return;
 
         _pressedKeys.Clear();
+        _leftClickRequested = false;
         _rightClickRequested = false;
         ReleaseMouse();
     }
@@ -149,6 +168,7 @@ internal sealed class ClientInputState
         }
 
         _pressedKeys.Clear();
+        _leftClickRequested = false;
         _rightClickRequested = false;
         var wasMouseCaptured = IsMouseCaptured;
         ReleaseMouse();

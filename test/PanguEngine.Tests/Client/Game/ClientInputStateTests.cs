@@ -35,6 +35,38 @@ public sealed class ClientInputStateTests
     }
 
     [Fact]
+    public void LeftClickRequestRequiresCapturedMouseAndIsConsumedOnce()
+    {
+        var input = CreateInput(out _);
+
+        input.HandleMouseDown(new MouseClickEventArgs(MouseButton.Left, 10, 20));
+
+        Assert.False(input.ConsumeLeftClickRequest());
+
+        input.HandleMouseDown(new MouseClickEventArgs(MouseButton.Left, 10, 20));
+
+        Assert.True(input.ConsumeLeftClickRequest());
+        Assert.False(input.ConsumeLeftClickRequest());
+    }
+
+    [Fact]
+    public void LeftClickWhileCapturedDoesNotResetMouseBaseline()
+    {
+        var input = CreateInput(out _);
+        var deltas = new List<Vector2D<float>>();
+        input.MouseDelta += deltas.Add;
+        input.HandleMouseDown(new MouseClickEventArgs(MouseButton.Left, 10, 20));
+        input.HandleMouseMove(new MouseMoveEventArgs(13, 18));
+
+        input.HandleMouseDown(new MouseClickEventArgs(MouseButton.Left, 100, 100));
+        input.HandleMouseMove(new MouseMoveEventArgs(15, 17));
+
+        Assert.Equal(
+            [new Vector2D<float>(3, -2), new Vector2D<float>(2, -1)],
+            deltas);
+    }
+
+    [Fact]
     public void FirstMoveAfterCaptureWithoutClickPositionOnlyEstablishesBaseline()
     {
         var input = CreateInput(out _);

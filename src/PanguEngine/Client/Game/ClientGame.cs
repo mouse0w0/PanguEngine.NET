@@ -43,6 +43,12 @@ public sealed class ClientGame
         _camera.Move(forward, right);
 
         SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+        if (_input.ConsumeLeftClickRequest()
+            && TryBreakBlock(World, SelectedBlock))
+        {
+            SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+        }
+
         if (_input.ConsumeRightClickRequest()
             && TryPlaceBlock(World, SelectedBlock))
         {
@@ -58,6 +64,15 @@ public sealed class ClientGame
     {
         var renderSelection = RaycastSelection(_camera.GetInterpolatedPosition(alpha));
         _renderer.DrawFrame(_camera, renderSelection, alpha);
+    }
+
+    internal static bool TryBreakBlock(ClientWorld world, BlockHit? selection)
+    {
+        if (selection is not { } hit)
+            return false;
+
+        world.SetBlock(hit.BlockPosition, BuiltinBlocks.Air.DefaultState);
+        return true;
     }
 
     internal static bool TryPlaceBlock(ClientWorld world, BlockHit? selection)
