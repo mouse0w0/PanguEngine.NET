@@ -159,8 +159,14 @@ internal static class VulkanMapping
     {
         return topology switch
         {
+            PrimitiveTopology.PointList => VkPrimitiveTopology.PointList,
+            PrimitiveTopology.LineList => VkPrimitiveTopology.LineList,
+            PrimitiveTopology.LineStrip => VkPrimitiveTopology.LineStrip,
             PrimitiveTopology.TriangleList => VkPrimitiveTopology.TriangleList,
-            _ => throw new ArgumentOutOfRangeException(nameof(topology), "Unsupported primitive topology.")
+            PrimitiveTopology.TriangleStrip => VkPrimitiveTopology.TriangleStrip,
+            PrimitiveTopology.TriangleFan => VkPrimitiveTopology.TriangleFan,
+            _ => throw new ArgumentOutOfRangeException(nameof(topology), topology,
+                "Unsupported primitive topology.")
         };
     }
 
