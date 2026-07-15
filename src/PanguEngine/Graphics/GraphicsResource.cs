@@ -8,7 +8,15 @@ public abstract class GraphicsResource
     /// <summary>
     /// Gets whether the resource has been destroyed.
     /// </summary>
-    public abstract bool IsDestroyed { get; }
+    public bool IsDestroyed { get; private set; }
+
+    /// <summary>
+    /// Marks the resource as destroyed.
+    /// </summary>
+    protected void MarkDestroyed()
+    {
+        IsDestroyed = true;
+    }
 
     /// <summary>
     /// Throws an <see cref="ObjectDisposedException"/> if the resource has been destroyed.

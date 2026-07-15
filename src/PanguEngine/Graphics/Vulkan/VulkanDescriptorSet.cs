@@ -9,8 +9,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
 {
-    private bool _destroyed;
-
     public VulkanDescriptorSet(in DescriptorSetDescription description)
     {
         var layout = description.Layout as VulkanDescriptorSetLayout
@@ -72,9 +70,6 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         }
     }
 
-    /// <inheritdoc/>
-    public override bool IsDestroyed => _destroyed;
-
     /// <summary>
     /// Gets the Vulkan descriptor set handle.
     /// </summary>
@@ -90,9 +85,9 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
     /// <inheritdoc/>
     public override void Destroy()
     {
-        if (_destroyed)
+        if (IsDestroyed)
             return;
-        _destroyed = true;
+        MarkDestroyed();
 
         var descriptorPool = DescriptorPool;
         DescriptorPool = default;

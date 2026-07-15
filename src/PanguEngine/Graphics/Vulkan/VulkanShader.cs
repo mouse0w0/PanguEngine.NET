@@ -7,8 +7,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanShader : Shader
 {
-    private bool _destroyed;
-
     /// <summary>
     /// Creates a Vulkan shader from the given description.
     /// </summary>
@@ -27,9 +25,6 @@ internal sealed unsafe class VulkanShader : Shader
     /// <inheritdoc/>
     public override string EntryPoint { get; }
 
-    /// <inheritdoc/>
-    public override bool IsDestroyed => _destroyed;
-
     /// <summary>
     /// Gets the shader name used for diagnostics.
     /// </summary>
@@ -43,16 +38,15 @@ internal sealed unsafe class VulkanShader : Shader
     /// <inheritdoc/>
     public override void Destroy()
     {
-        if (_destroyed)
+        if (IsDestroyed)
             return;
+        MarkDestroyed();
 
         if (Module.Handle != 0)
         {
             VulkanContext.Vk.DestroyShaderModule(VulkanContext.Device, Module, null);
             Module = default;
         }
-
-        _destroyed = true;
     }
 
     private static ShaderModule CreateShaderModule(in ShaderDescription description)

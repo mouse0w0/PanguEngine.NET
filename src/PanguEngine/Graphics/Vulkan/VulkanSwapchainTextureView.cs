@@ -7,8 +7,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed class VulkanSwapchainTextureView : TextureView, IVulkanTextureView
 {
-    private bool _destroyed;
-
     internal VulkanSwapchainTextureView(VulkanSwapchainTexture texture, VkImageView imageView)
     {
         VulkanTexture = texture;
@@ -28,9 +26,6 @@ internal sealed class VulkanSwapchainTextureView : TextureView, IVulkanTextureVi
 
     /// <inheritdoc cref="IVulkanTextureView.ImageView"/>
     public VkImageView ImageView { get; }
-
-    /// <inheritdoc cref="TextureView.IsDestroyed"/>
-    public override bool IsDestroyed => _destroyed;
 
     /// <inheritdoc cref="TextureView.Dimension"/>
     public override TextureViewDimension Dimension => TextureViewDimension.Type2D;
@@ -64,7 +59,7 @@ internal sealed class VulkanSwapchainTextureView : TextureView, IVulkanTextureVi
     /// </summary>
     internal void Invalidate()
     {
-        _destroyed = true;
+        MarkDestroyed();
     }
 
     /// <summary>

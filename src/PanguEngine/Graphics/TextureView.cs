@@ -6,11 +6,6 @@ namespace PanguEngine.Graphics;
 public abstract class TextureView : GraphicsResource
 {
     /// <summary>
-    /// Gets whether the texture view has been destroyed.
-    /// </summary>
-    public abstract override bool IsDestroyed { get; }
-
-    /// <summary>
     /// Gets the texture referenced by the view.
     /// </summary>
     public abstract Texture Texture { get; }

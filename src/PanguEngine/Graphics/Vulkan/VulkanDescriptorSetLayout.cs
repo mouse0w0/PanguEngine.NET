@@ -10,8 +10,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
 {
-    private bool _destroyed;
-
     public VulkanDescriptorSetLayout(in DescriptorSetLayoutDescription description)
     {
         var bindings = description.Bindings;
@@ -58,9 +56,6 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
         Bindings = bindings.ToArray();
     }
 
-    /// <inheritdoc/>
-    public override bool IsDestroyed => _destroyed;
-
     /// <summary>
     /// Gets the Vulkan descriptor set layout handle.
     /// </summary>
@@ -74,8 +69,9 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
     /// <inheritdoc/>
     public override void Destroy()
     {
-        if (_destroyed)
+        if (IsDestroyed)
             return;
+        MarkDestroyed();
 
         if (DescriptorSetLayout.Handle != 0)
         {
@@ -85,8 +81,6 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             VulkanDeletionQueue.Enqueue(retireValue,
                 () => VulkanContext.Vk.DestroyDescriptorSetLayout(VulkanContext.Device, descriptorSetLayout, null));
         }
-
-        _destroyed = true;
     }
 
     internal DescriptorSetLayoutBinding GetBinding(uint binding)

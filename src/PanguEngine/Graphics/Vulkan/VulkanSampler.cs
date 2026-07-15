@@ -7,17 +7,10 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanSampler : Sampler
 {
-    private bool _destroyed;
-
     /// <summary>
     /// The Vulkan sampler handle.
     /// </summary>
     internal VKSampler Handle { get; }
-
-    /// <summary>
-    /// Gets whether the sampler has been destroyed.
-    /// </summary>
-    public override bool IsDestroyed => _destroyed;
 
     internal VulkanSampler(VKSampler sampler)
     {
@@ -29,8 +22,8 @@ internal sealed unsafe class VulkanSampler : Sampler
     /// </summary>
     public override void Destroy()
     {
-        if (_destroyed) return;
-        _destroyed = true;
+        if (IsDestroyed) return;
+        MarkDestroyed();
 
         var sampler = Handle;
         var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;

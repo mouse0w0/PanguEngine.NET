@@ -7,8 +7,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanTextureView : TextureView, IVulkanTextureView
 {
-    private bool _destroyed;
-
     internal VulkanTextureView(
         VulkanTexture texture,
         VkImageView imageView,
@@ -44,9 +42,6 @@ internal sealed unsafe class VulkanTextureView : TextureView, IVulkanTextureView
     /// <inheritdoc cref="IVulkanTextureView.ImageView"/>
     public VkImageView ImageView { get; }
 
-    /// <inheritdoc cref="TextureView.IsDestroyed"/>
-    public override bool IsDestroyed => _destroyed;
-
     /// <inheritdoc cref="TextureView.Dimension"/>
     public override TextureViewDimension Dimension { get; }
 
@@ -77,8 +72,8 @@ internal sealed unsafe class VulkanTextureView : TextureView, IVulkanTextureView
     /// <inheritdoc cref="GraphicsResource.Destroy"/>
     public override void Destroy()
     {
-        if (_destroyed) return;
-        _destroyed = true;
+        if (IsDestroyed) return;
+        MarkDestroyed();
 
         var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
         VulkanTexture.ReleaseView(retireValue);

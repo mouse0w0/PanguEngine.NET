@@ -9,7 +9,6 @@ namespace PanguEngine.Graphics.Vulkan;
 internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
 {
     private ImageLayout _layout = ImageLayout.Undefined;
-    private bool _destroyed;
 
     /// <summary>
     /// Creates a Vulkan swapchain texture wrapper.
@@ -30,11 +29,6 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
     /// Gets the Vulkan image handle.
     /// </summary>
     public VkImage Image { get; }
-
-    /// <summary>
-    /// Gets whether the texture has been destroyed.
-    /// </summary>
-    public override bool IsDestroyed => _destroyed;
 
     /// <summary>
     /// Gets the texture dimensional shape.
@@ -112,7 +106,7 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
     /// </summary>
     internal void Invalidate()
     {
-        _destroyed = true;
+        MarkDestroyed();
     }
 
     /// <summary>

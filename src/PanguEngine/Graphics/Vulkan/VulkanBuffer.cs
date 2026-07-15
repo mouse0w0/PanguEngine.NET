@@ -12,7 +12,6 @@ public sealed unsafe class VulkanBuffer : Buffer
     private readonly Allocation* _allocation;
     private byte* _mappedData;
     private bool _persistentlyMapped;
-    private bool _destroyed;
 
     /// <summary>
     /// The Vulkan buffer handle.
@@ -29,11 +28,6 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// </summary>
     public BufferUsageFlags Usage { get; }
 
-    /// <summary>
-    /// Gets whether the buffer has been destroyed.
-    /// </summary>
-    public override bool IsDestroyed => _destroyed;
-
     internal VulkanBuffer(VkBuffer buffer, Allocation* allocation, ulong size, BufferUsageFlags usage)
     {
         Buffer = buffer;
@@ -49,7 +43,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// <returns>A pointer to the mapped memory.</returns>
     internal T* Map<T>() where T : unmanaged
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
 
         return VulkanAllocator.Map<T>(_allocation);
     }
@@ -59,14 +53,14 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// </summary>
     internal void Unmap()
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
 
         VulkanAllocator.Unmap(_allocation);
     }
 
     internal void PersistentlyMapForWrite()
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
         if (_persistentlyMapped)
             return;
 
@@ -84,7 +78,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// <inheritdoc/>
     public override void Write<T>(ReadOnlySpan<T> data, ulong destinationOffset = 0)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
         if (!_persistentlyMapped)
             throw new InvalidOperationException(
                 "Buffer.Write requires a buffer created with CpuToGpu memory usage.");
@@ -107,15 +101,14 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// </summary>
     public override void Destroy()
     {
-        if (_destroyed) return;
+        if (IsDestroyed) return;
+        MarkDestroyed();
 
         if (_persistentlyMapped)
         {
             _mappedData = null;
             _persistentlyMapped = false;
         }
-
-        _destroyed = true;
 
         var buffer = Buffer;
         var allocation = _allocation;

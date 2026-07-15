@@ -13,17 +13,11 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     private readonly ImageLayout[] _subresourceLayouts;
     private uint _activeViewCount;
     private ulong _maxViewRetireValue;
-    private bool _destroyed;
 
     /// <summary>
     /// Gets the Vulkan image handle.
     /// </summary>
     public VkImage Image { get; }
-
-    /// <summary>
-    /// Gets whether the texture has been destroyed.
-    /// </summary>
-    public override bool IsDestroyed => _destroyed;
 
     /// <summary>
     /// Gets the texture pixel format.
@@ -101,7 +95,7 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     /// <returns>The tracked image layout.</returns>
     public ImageLayout GetLayout(uint mipLevel, uint arrayLayer)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
         return _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)];
     }
 
@@ -113,7 +107,7 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     /// <param name="layout">The image layout.</param>
     public void SetLayout(uint mipLevel, uint arrayLayer, ImageLayout layout)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
         _subresourceLayouts[GetLayoutIndex(mipLevel, arrayLayer)] = layout;
     }
 
@@ -166,11 +160,11 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     /// <inheritdoc/>
     public override void Destroy()
     {
-        if (_destroyed) return;
+        if (IsDestroyed) return;
         if (_activeViewCount != 0)
             throw new InvalidOperationException("Texture cannot be destroyed while texture views are still alive.");
 
-        _destroyed = true;
+        MarkDestroyed();
 
         var image = Image;
         var allocation = _allocation;

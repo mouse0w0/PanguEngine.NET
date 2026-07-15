@@ -10,8 +10,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
 {
-    private bool _destroyed;
-
     /// <summary>
     /// Creates a Vulkan graphics pipeline with no descriptor set layouts.
     /// </summary>
@@ -35,9 +33,6 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         DepthStencilAttachmentFormat = description.DepthStencilAttachmentFormat;
         CreatePipeline(description, descriptorSetLayouts);
     }
-
-    /// <inheritdoc/>
-    public override bool IsDestroyed => _destroyed;
 
     /// <summary>
     /// Gets the Vulkan graphics pipeline handle.
@@ -67,15 +62,14 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// <inheritdoc/>
     public override void Destroy()
     {
-        if (_destroyed)
+        if (IsDestroyed)
             return;
+        MarkDestroyed();
 
         var pipeline = Pipeline;
         var layout = Layout;
         Pipeline = default;
         Layout = default;
-        _destroyed = true;
-
         if (pipeline.Handle == 0 && layout.Handle == 0)
             return;
 
