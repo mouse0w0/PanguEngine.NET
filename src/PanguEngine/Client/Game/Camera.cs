@@ -3,14 +3,10 @@ using Silk.NET.Maths;
 namespace PanguEngine.Client.Game;
 
 /// <summary>
-/// Represents a free-moving client camera with fixed-update position state.
+/// Represents a client camera with fixed-update position state.
 /// </summary>
-internal sealed class FreeCamera
+internal sealed class Camera
 {
-    internal const double MoveDistancePerTick = 0.4d;
-    internal const double MouseSensitivity = 0.08d;
-    internal const double MinPitch = -89d;
-    internal const double MaxPitch = 89d;
     internal const double FieldOfView = 70d;
     internal const double NearPlane = 0.05d;
     internal const double FarPlane = 1000d;
@@ -18,7 +14,7 @@ internal sealed class FreeCamera
     private const double DegreesToRadians = Math.PI / 180d;
     private const double DirectionComponentEpsilon = 0.000001d;
 
-    internal FreeCamera()
+    internal Camera()
     {
         PreviousPosition = new Vector3D<double>(8, 6, 24);
         CurrentPosition = PreviousPosition;
@@ -59,37 +55,32 @@ internal sealed class FreeCamera
         }
     }
 
-    private static double SnapDirectionComponent(double value)
-    {
-        return Math.Abs(value) < DirectionComponentEpsilon ? 0 : value;
-    }
-
     /// <summary>
-    /// Applies a relative mouse movement to the camera orientation.
+    /// Captures the current position as the previous fixed-update position.
     /// </summary>
-    /// <param name="delta">The relative movement in screen coordinates.</param>
-    internal void ApplyMouseDelta(Vector2D<float> delta)
-    {
-        Yaw += (double)delta.X * MouseSensitivity;
-        Pitch = Math.Clamp(Pitch - (double)delta.Y * MouseSensitivity, MinPitch, MaxPitch);
-    }
-
-    /// <summary>
-    /// Advances the camera position by one fixed update.
-    /// </summary>
-    /// <param name="forward">The signed forward input.</param>
-    /// <param name="right">The signed right input.</param>
-    internal void Move(double forward, double right)
+    internal void BeginFixedUpdate()
     {
         PreviousPosition = CurrentPosition;
+    }
 
-        var rightDirection = Vector3D.Normalize(Vector3D.Cross(Forward, Vector3D<double>.UnitY));
-        var movement = Forward * forward + rightDirection * right;
-        var lengthSquared = Vector3D.Dot(movement, movement);
-        if (lengthSquared <= 0)
-            return;
+    /// <summary>
+    /// Sets the current camera position.
+    /// </summary>
+    /// <param name="position">The new current position.</param>
+    internal void SetPosition(Vector3D<double> position)
+    {
+        CurrentPosition = position;
+    }
 
-        CurrentPosition += movement / Math.Sqrt(lengthSquared) * MoveDistancePerTick;
+    /// <summary>
+    /// Sets the current camera orientation.
+    /// </summary>
+    /// <param name="yaw">The horizontal angle in degrees.</param>
+    /// <param name="pitch">The vertical angle in degrees.</param>
+    internal void SetOrientation(double yaw, double pitch)
+    {
+        Yaw = yaw;
+        Pitch = pitch;
     }
 
     /// <summary>
@@ -137,5 +128,10 @@ internal sealed class FreeCamera
     internal Matrix4X4<float> CreateViewProjection(double alpha)
     {
         return (Matrix4X4<float>)(CreateViewMatrix(alpha) * CreateProjectionMatrix());
+    }
+
+    private static double SnapDirectionComponent(double value)
+    {
+        return Math.Abs(value) < DirectionComponentEpsilon ? 0 : value;
     }
 }

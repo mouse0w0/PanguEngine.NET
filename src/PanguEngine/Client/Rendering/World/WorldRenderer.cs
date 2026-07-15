@@ -94,7 +94,7 @@ internal sealed class WorldRenderer
     /// <param name="camera">The camera used to draw the world.</param>
     /// <param name="selection">The currently selected block.</param>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
-    public void DrawFrame(FreeCamera camera, BlockHit? selection, double alpha)
+    public void DrawFrame(Camera camera, BlockHit? selection, double alpha)
     {
         ArgumentNullException.ThrowIfNull(camera);
 
