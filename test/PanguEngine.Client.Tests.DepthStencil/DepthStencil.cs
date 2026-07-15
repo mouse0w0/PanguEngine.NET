@@ -47,7 +47,8 @@ internal sealed class DepthStencilScene : IClientTestScene
     private UploadHandle _vertexUploadHandle = null!;
     private UploadHandle _indexUploadHandle = null!;
     private Presenter _presenter = null!;
-    private Texture?[] _depthStencilAttachments = [];
+    private Texture?[] _depthStencilTextures = [];
+    private TextureView?[] _depthStencilAttachments = [];
     private uint _depthStencilWidth;
     private uint _depthStencilHeight;
 
@@ -58,7 +59,9 @@ internal sealed class DepthStencilScene : IClientTestScene
     public void Initialize(Window window)
     {
         _presenter = window.Presenter;
-        _depthStencilAttachments = new Texture?[checked((int)_presenter.MaxFramesInFlight)];
+        var frameSlotCount = checked((int)_presenter.MaxFramesInFlight);
+        _depthStencilTextures = new Texture?[frameSlotCount];
+        _depthStencilAttachments = new TextureView?[frameSlotCount];
         CreateBuffers();
         CreateShaders();
         CreatePipeline(_presenter.ColorFormat);
@@ -70,6 +73,8 @@ internal sealed class DepthStencilScene : IClientTestScene
     {
         foreach (var depthStencilAttachment in _depthStencilAttachments)
             depthStencilAttachment?.Destroy();
+        foreach (var depthStencilTexture in _depthStencilTextures)
+            depthStencilTexture?.Destroy();
         _indexBuffer.Destroy();
         _vertexBuffer.Destroy();
         _pipeline.Destroy();
@@ -132,6 +137,8 @@ internal sealed class DepthStencilScene : IClientTestScene
             {
                 _depthStencilAttachments[i]?.Destroy();
                 _depthStencilAttachments[i] = null;
+                _depthStencilTextures[i]?.Destroy();
+                _depthStencilTextures[i] = null;
             }
 
             _depthStencilWidth = _presenter.Width;
@@ -139,19 +146,39 @@ internal sealed class DepthStencilScene : IClientTestScene
         }
     }
 
-    private Texture EnsureDepthStencilAttachment(uint frameSlot)
+    private TextureView EnsureDepthStencilAttachment(uint frameSlot)
     {
         var frameIndex = checked((int)frameSlot);
-        return _depthStencilAttachments[frameIndex] ??= ClientTestApp.Current.Device.CreateTexture(
-            new TextureDescription(
-                TextureDimension.Type2D,
-                TextureFormat.Depth24UnormStencil8,
-                _depthStencilWidth,
-                _depthStencilHeight,
+        if (_depthStencilAttachments[frameIndex] is { } existingAttachment)
+            return existingAttachment;
+
+        var device = ClientTestApp.Current.Device;
+        var texture = device.CreateTexture(new TextureDescription(
+            TextureDimension.Type2D,
+            TextureFormat.Depth24UnormStencil8,
+            _depthStencilWidth,
+            _depthStencilHeight,
+            1,
+            1,
+            1,
+            TextureUsage.DepthStencilAttachment));
+        try
+        {
+            var attachment = device.CreateTextureView(texture, new TextureViewDescription(
+                TextureViewDimension.Type2D,
+                0,
                 1,
-                1,
-                1,
-                TextureUsage.DepthStencilAttachment));
+                0,
+                1));
+            _depthStencilTextures[frameIndex] = texture;
+            _depthStencilAttachments[frameIndex] = attachment;
+            return attachment;
+        }
+        catch
+        {
+            texture.Destroy();
+            throw;
+        }
     }
 
     private void CreateBuffers()

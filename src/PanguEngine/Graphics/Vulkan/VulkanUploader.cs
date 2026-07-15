@@ -620,7 +620,7 @@ public static unsafe class VulkanUploader
             var arrayLayer = upload.Dst.Dimension == TextureDimension.Type3D ? 0 : baseArrayLayer + layer;
             var oldLayout = upload.Dst.GetLayout(upload.Region.MipLevel, arrayLayer);
             VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, upload.Dst.Image, upload.Region.MipLevel,
-                arrayLayer, 1, ImageAspectFlags.ColorBit, oldLayout,
+                1, arrayLayer, 1, ImageAspectFlags.ColorBit, oldLayout,
                 ImageLayout.TransferDstOptimal, VulkanBarrier.GetStageForLayout(oldLayout),
                 VulkanBarrier.GetAccessForLayout(oldLayout), PipelineStageFlags2.TransferBit,
                 AccessFlags2.TransferWriteBit);
@@ -655,7 +655,7 @@ public static unsafe class VulkanUploader
             ImageLayout.TransferDstOptimal, 1, in copyRegion);
 
         VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, upload.Dst.Image, upload.Region.MipLevel,
-            baseArrayLayer, layerCount, ImageAspectFlags.ColorBit,
+            1, baseArrayLayer, layerCount, ImageAspectFlags.ColorBit,
             ImageLayout.TransferDstOptimal, ImageLayout.ShaderReadOnlyOptimal, PipelineStageFlags2.TransferBit,
             AccessFlags2.TransferWriteBit, PipelineStageFlags2.FragmentShaderBit, AccessFlags2.ShaderSampledReadBit);
 
@@ -744,7 +744,7 @@ public static unsafe class VulkanUploader
         if (oldLayout == newLayout)
             return;
 
-        VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, texture.Image, mipLevel, arrayLayer, 1,
+        VulkanBarrier.RecordImageLayoutTransition(_commandBuffer, texture.Image, mipLevel, 1, arrayLayer, 1,
             ImageAspectFlags.ColorBit, oldLayout, newLayout,
             VulkanBarrier.GetStageForLayout(oldLayout), VulkanBarrier.GetAccessForLayout(oldLayout), dstStage,
             dstAccess);

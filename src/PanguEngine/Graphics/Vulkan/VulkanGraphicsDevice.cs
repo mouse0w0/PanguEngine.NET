@@ -119,9 +119,8 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         ValidateTextureDescription(description);
 
         var imageType = VulkanMapping.ToVulkanImageType(description.Dimension);
-        var imageViewType = VulkanMapping.ToVulkanImageViewType(description.Dimension, description.ArrayLayers);
         var imageArrayLayers = GetImageArrayLayers(description);
-        var imageCreateFlags = description.Dimension == TextureDimension.CubeMap
+        var imageCreateFlags = description.Flags.HasFlag(TextureCreateFlags.CubeCompatible)
             ? ImageCreateFlags.CreateCubeCompatibleBit
             : ImageCreateFlags.None;
 
@@ -152,38 +151,49 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         };
 
         VulkanAllocator.CreateImage(in imageInfo, in allocInfo, out var image, out var allocation);
+        return new VulkanTexture(image, allocation, description.Dimension, description.Format,
+            description.Width, description.Height, description.Depth, description.MipLevels, imageArrayLayers,
+            description.Usage, description.Flags);
+    }
 
-        try
+    public override TextureView CreateTextureView(
+        Texture texture,
+        in TextureViewDescription description)
+    {
+        ArgumentNullException.ThrowIfNull(texture);
+
+        var vulkanTexture = RequireVulkanTexture(texture);
+        vulkanTexture.ThrowIfDestroyed();
+        ValidateTextureViewDescription(vulkanTexture, description);
+
+        ImageViewCreateInfo viewInfo = new()
         {
-            ImageViewCreateInfo viewInfo = new()
+            SType = StructureType.ImageViewCreateInfo,
+            Image = vulkanTexture.Image,
+            ViewType = VulkanMapping.ToVulkanImageViewType(description.Dimension),
+            Format = VulkanMapping.ToVulkanFormat(vulkanTexture.Format),
+            SubresourceRange = new ImageSubresourceRange
             {
-                SType = StructureType.ImageViewCreateInfo,
-                Image = image,
-                ViewType = imageViewType,
-                Format = imageInfo.Format,
-                SubresourceRange = new ImageSubresourceRange
-                {
-                    AspectMask = VulkanMapping.ToVulkanImageAspect(description.Format),
-                    BaseMipLevel = 0,
-                    LevelCount = description.MipLevels,
-                    BaseArrayLayer = 0,
-                    LayerCount = imageArrayLayers
-                }
-            };
+                AspectMask = VulkanMapping.ToVulkanImageAspect(vulkanTexture.Format),
+                BaseMipLevel = description.BaseMipLevel,
+                LevelCount = description.MipLevels,
+                BaseArrayLayer = description.BaseArrayLayer,
+                LayerCount = description.ArrayLayers
+            }
+        };
 
-            if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in viewInfo, null, out var imageView) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to create texture image view.");
+        if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in viewInfo, null, out var imageView) !=
+            Result.Success)
+            throw new InvalidOperationException("Failed to create texture image view.");
 
-            return new VulkanTexture(image, allocation, imageView, description.Dimension, description.Format,
-                description.Width, description.Height, description.Depth, description.MipLevels, imageArrayLayers,
-                description.Usage);
-        }
-        catch
-        {
-            VulkanAllocator.DestroyImage(image, allocation);
-            throw;
-        }
+        var width = VulkanTexture.GetMipExtent(vulkanTexture.Width, description.BaseMipLevel);
+        var height = description.Dimension is TextureViewDimension.Type1D or TextureViewDimension.Type1DArray
+            ? 1
+            : VulkanTexture.GetMipExtent(vulkanTexture.Height, description.BaseMipLevel);
+        var depth = description.Dimension == TextureViewDimension.Type3D
+            ? VulkanTexture.GetMipExtent(vulkanTexture.Depth, description.BaseMipLevel)
+            : 1;
+        return new VulkanTextureView(vulkanTexture, imageView, description, width, height, depth);
     }
 
     public override UploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data)
@@ -592,25 +602,94 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                     throw new ArgumentOutOfRangeException(nameof(description),
                         "3D textures must have exactly one array layer.");
                 break;
-            case TextureDimension.CubeMap:
-                if (description.Width > VulkanContext.MaxImageDimension2D)
-                    throw new ArgumentOutOfRangeException(nameof(description),
-                        "Texture width exceeds the device limit.");
-                if (description.Height > VulkanContext.MaxImageDimension2D)
-                    throw new ArgumentOutOfRangeException(nameof(description),
-                        "Texture height exceeds the device limit.");
-                if (description.Height != description.Width)
-                    throw new ArgumentOutOfRangeException(nameof(description),
-                        "Cube map textures must be square.");
-                if (description.Depth != 1)
-                    throw new ArgumentOutOfRangeException(nameof(description),
-                        "Cube map textures must have a depth of one.");
-                if (description.ArrayLayers % 6 != 0)
-                    throw new ArgumentOutOfRangeException(nameof(description),
-                        "Cube map texture array layers must be a multiple of six.");
-                break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(description), "Unsupported texture dimension.");
+        }
+
+        if (description.Flags.HasFlag(TextureCreateFlags.CubeCompatible))
+        {
+            if (description.Dimension != TextureDimension.Type2D)
+                throw new ArgumentException("Cube-compatible textures must be two-dimensional.",
+                    nameof(description));
+            if (description.Width != description.Height)
+                throw new ArgumentException("Cube-compatible textures must be square.", nameof(description));
+            if (description.ArrayLayers < 6)
+                throw new ArgumentException("Cube-compatible textures must have at least six array layers.",
+                    nameof(description));
+        }
+    }
+
+    private static void ValidateTextureViewDescription(
+        VulkanTexture texture,
+        in TextureViewDescription description)
+    {
+        if (description.MipLevels == 0)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Texture view mip levels must be greater than zero.");
+        if (description.ArrayLayers == 0)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Texture view array layers must be greater than zero.");
+        if (description.BaseMipLevel >= texture.MipLevels)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Texture view base mip level is out of range.");
+        if (description.MipLevels > texture.MipLevels - description.BaseMipLevel)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Texture view mip range exceeds the texture bounds.");
+        if (description.BaseArrayLayer >= texture.ArrayLayers)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Texture view base array layer is out of range.");
+        if (description.ArrayLayers > texture.ArrayLayers - description.BaseArrayLayer)
+            throw new ArgumentOutOfRangeException(nameof(description),
+                "Texture view array layer range exceeds the texture bounds.");
+
+        switch (texture.Dimension)
+        {
+            case TextureDimension.Type1D:
+                if (description.Dimension != TextureViewDimension.Type1D &&
+                    description.Dimension != TextureViewDimension.Type1DArray)
+                    throw new ArgumentException("1D textures require 1D or 1D array texture views.",
+                        nameof(description));
+                if (description.Dimension == TextureViewDimension.Type1D && description.ArrayLayers != 1)
+                    throw new ArgumentException("1D texture views must include exactly one array layer.",
+                        nameof(description));
+                break;
+            case TextureDimension.Type2D:
+                if (description.Dimension == TextureViewDimension.Type2D)
+                {
+                    if (description.ArrayLayers != 1)
+                        throw new ArgumentException("2D texture views must include exactly one array layer.",
+                            nameof(description));
+                    break;
+                }
+
+                if (description.Dimension == TextureViewDimension.Type2DArray)
+                    break;
+                if (description.Dimension != TextureViewDimension.Cube &&
+                    description.Dimension != TextureViewDimension.CubeArray)
+                    throw new ArgumentException("2D textures require 2D, 2D array, cube, or cube array views.",
+                        nameof(description));
+                if (!texture.CreateFlags.HasFlag(TextureCreateFlags.CubeCompatible))
+                    throw new ArgumentException("Cube texture views require a cube-compatible texture.",
+                        nameof(description));
+                if (description.BaseArrayLayer % 6 != 0)
+                    throw new ArgumentException("Cube texture view base array layers must be aligned to six layers.",
+                        nameof(description));
+                if (description.Dimension == TextureViewDimension.Cube && description.ArrayLayers != 6)
+                    throw new ArgumentException("Cube texture views must include exactly six array layers.",
+                        nameof(description));
+                if (description.Dimension == TextureViewDimension.CubeArray && description.ArrayLayers % 6 != 0)
+                    throw new ArgumentException("Cube array texture view layers must be a multiple of six.",
+                        nameof(description));
+                break;
+            case TextureDimension.Type3D:
+                if (description.Dimension != TextureViewDimension.Type3D)
+                    throw new ArgumentException("3D textures require 3D texture views.", nameof(description));
+                if (description.BaseArrayLayer != 0 || description.ArrayLayers != 1)
+                    throw new ArgumentException("3D texture views must include the single texture array layer.",
+                        nameof(description));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(texture), "Unsupported texture dimension.");
         }
     }
 
@@ -651,9 +730,8 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                 ValidateTextureUploadArrayLayers(texture, region);
                 break;
             case TextureDimension.Type2D:
-            case TextureDimension.CubeMap:
                 if (region.Z != 0 || region.Depth != 1)
-                    throw new ArgumentException("2D and cube texture uploads must target a two-dimensional region.",
+                    throw new ArgumentException("2D texture uploads must target a two-dimensional region.",
                         nameof(region));
                 ValidateTextureUploadArrayLayers(texture, region);
                 break;

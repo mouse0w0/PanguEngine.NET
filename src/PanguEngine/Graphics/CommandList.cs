@@ -95,8 +95,8 @@ public abstract class CommandList
     /// <summary>
     /// Prepares a color output for presentation.
     /// </summary>
-    /// <param name="colorOutput">The color output to present.</param>
-    public abstract void PrepareForPresent(Texture colorOutput);
+    /// <param name="colorOutput">The color output view to present.</param>
+    public abstract void PrepareForPresent(TextureView colorOutput);
 
     /// <summary>
     /// Ends command recording.

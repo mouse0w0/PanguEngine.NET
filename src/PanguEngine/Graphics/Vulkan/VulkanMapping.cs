@@ -275,20 +275,22 @@ internal static class VulkanMapping
             TextureDimension.Type1D => ImageType.Type1D,
             TextureDimension.Type2D => ImageType.Type2D,
             TextureDimension.Type3D => ImageType.Type3D,
-            TextureDimension.CubeMap => ImageType.Type2D,
             _ => throw new InvalidOperationException("Unsupported texture dimension.")
         };
     }
 
-    internal static ImageViewType ToVulkanImageViewType(TextureDimension dimension, uint arrayLayers)
+    internal static ImageViewType ToVulkanImageViewType(TextureViewDimension dimension)
     {
         return dimension switch
         {
-            TextureDimension.Type1D => arrayLayers == 1 ? ImageViewType.Type1D : ImageViewType.Type1DArray,
-            TextureDimension.Type2D => arrayLayers == 1 ? ImageViewType.Type2D : ImageViewType.Type2DArray,
-            TextureDimension.Type3D => ImageViewType.Type3D,
-            TextureDimension.CubeMap => arrayLayers == 6 ? ImageViewType.TypeCube : ImageViewType.TypeCubeArray,
-            _ => throw new InvalidOperationException("Unsupported texture dimension.")
+            TextureViewDimension.Type1D => ImageViewType.Type1D,
+            TextureViewDimension.Type1DArray => ImageViewType.Type1DArray,
+            TextureViewDimension.Type2D => ImageViewType.Type2D,
+            TextureViewDimension.Type2DArray => ImageViewType.Type2DArray,
+            TextureViewDimension.Type3D => ImageViewType.Type3D,
+            TextureViewDimension.Cube => ImageViewType.TypeCube,
+            TextureViewDimension.CubeArray => ImageViewType.TypeCubeArray,
+            _ => throw new InvalidOperationException("Unsupported texture view dimension.")
         };
     }
 

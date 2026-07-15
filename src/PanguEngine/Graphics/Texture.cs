@@ -44,4 +44,9 @@ public abstract class Texture : GraphicsResource
     /// Gets the texture usage flags.
     /// </summary>
     public abstract TextureUsage Usage { get; }
+
+    /// <summary>
+    /// Gets the texture creation capability flags.
+    /// </summary>
+    public abstract TextureCreateFlags CreateFlags { get; }
 }

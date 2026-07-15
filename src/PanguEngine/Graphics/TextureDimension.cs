@@ -18,10 +18,5 @@ public enum TextureDimension
     /// <summary>
     /// A three-dimensional texture.
     /// </summary>
-    Type3D,
-
-    /// <summary>
-    /// A cube-compatible texture.
-    /// </summary>
-    CubeMap
+    Type3D
 }

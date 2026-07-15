@@ -14,6 +14,7 @@ internal static unsafe class VulkanBarrier
         CommandBuffer commandBuffer,
         Image image,
         uint mipLevel,
+        uint levelCount,
         uint baseArrayLayer,
         uint layerCount,
         ImageAspectFlags aspectMask,
@@ -40,7 +41,7 @@ internal static unsafe class VulkanBarrier
             {
                 AspectMask = aspectMask,
                 BaseMipLevel = mipLevel,
-                LevelCount = 1,
+                LevelCount = levelCount,
                 BaseArrayLayer = baseArrayLayer,
                 LayerCount = layerCount
             }

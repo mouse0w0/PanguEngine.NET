@@ -32,6 +32,7 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
     private GraphicsPipeline _pipeline = null!;
     private GraphicsBuffer _vertexBuffer = null!;
     private Texture _texture = null!;
+    private TextureView _textureView = null!;
     private Sampler _sampler = null!;
     private UploadHandle _vertexUploadHandle = null!;
     private UploadHandle[] _textureUploadHandles = [];
@@ -58,6 +59,7 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
         _descriptorSet.Destroy();
         _descriptorSetLayout.Destroy();
         _sampler.Destroy();
+        _textureView.Destroy();
         _texture.Destroy();
         _fragShader.Destroy();
         _vertShader.Destroy();
@@ -118,14 +120,21 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
     private void CreateTexture()
     {
         _texture = ClientTestApp.Current.Device.CreateTexture(new TextureDescription(
-            TextureDimension.CubeMap,
+            TextureDimension.Type2D,
             TextureFormat.R8G8B8A8Unorm,
             4,
             4,
             1,
             1,
             6,
-            TextureUsage.TransferDestination | TextureUsage.Sampled));
+            TextureUsage.TransferDestination | TextureUsage.Sampled,
+            TextureCreateFlags.CubeCompatible));
+        _textureView = ClientTestApp.Current.Device.CreateTextureView(_texture, new TextureViewDescription(
+            TextureViewDimension.Cube,
+            0,
+            1,
+            0,
+            6));
 
         _textureUploadHandles =
         [
@@ -173,7 +182,7 @@ internal sealed class TextureCubeMapUploadScene : IClientTestScene
         _descriptorSet = ClientTestApp.Current.Device.CreateDescriptorSet(new DescriptorSetDescription(
             _descriptorSetLayout,
             [
-                DescriptorSetBinding.CombinedImageSampler(0, _texture, _sampler)
+                DescriptorSetBinding.CombinedImageSampler(0, _textureView, _sampler)
             ]));
     }
 

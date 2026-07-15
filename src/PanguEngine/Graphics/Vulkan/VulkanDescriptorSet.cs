@@ -239,12 +239,14 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         DescriptorImageInfo[] imageInfos,
         int index)
     {
-        var texture = binding.Texture as VulkanTexture
-                      ?? throw new InvalidOperationException(
-                          "Descriptor set texture was not created by the Vulkan backend.");
+        var textureView = binding.TextureView as VulkanTextureView
+                          ?? throw new InvalidOperationException(
+                              "Descriptor set texture view was not created by the Vulkan backend.");
         var sampler = binding.Sampler as VulkanSampler
                       ?? throw new InvalidOperationException(
                           "Descriptor set sampler was not created by the Vulkan backend.");
+        textureView.ThrowIfDestroyed();
+        var texture = textureView.VulkanTexture;
         texture.ThrowIfDestroyed();
         sampler.ThrowIfDestroyed();
         if (!texture.Usage.HasFlag(TextureUsage.Sampled))
@@ -252,7 +254,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
 
         imageInfos[index] = new DescriptorImageInfo
         {
-            ImageView = texture.ImageView,
+            ImageView = textureView.ImageView,
             Sampler = sampler.Handle,
             ImageLayout = ImageLayout.ShaderReadOnlyOptimal
         };

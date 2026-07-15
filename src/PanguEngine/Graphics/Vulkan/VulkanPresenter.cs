@@ -136,7 +136,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
             _window.PresentImage(vulkanFrame.ImageIndex, renderFinishedSemaphore);
 
             if (!vulkanFrame.VulkanColorOutput.IsDestroyed)
-                vulkanFrame.VulkanColorOutput.ResetLayout();
+                vulkanFrame.VulkanColorOutput.VulkanTexture.ResetLayout();
 
             _frameSlot = (_frameSlot + 1) % VulkanContext.MaxFramesInFlight;
             VulkanDeletionQueue.Collect();

@@ -1,7 +1,6 @@
 using Silk.NET.Vulkan;
 using Vma;
 using VkImage = Silk.NET.Vulkan.Image;
-using VkImageView = Silk.NET.Vulkan.ImageView;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -12,17 +11,14 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
 {
     private readonly Allocation* _allocation;
     private readonly ImageLayout[] _subresourceLayouts;
+    private uint _activeViewCount;
+    private ulong _maxViewRetireValue;
     private bool _destroyed;
 
     /// <summary>
     /// Gets the Vulkan image handle.
     /// </summary>
     public VkImage Image { get; }
-
-    /// <summary>
-    /// Gets the Vulkan image view handle.
-    /// </summary>
-    public VkImageView ImageView { get; }
 
     /// <summary>
     /// Gets whether the texture has been destroyed.
@@ -69,12 +65,17 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     /// </summary>
     public override TextureUsage Usage { get; }
 
-    internal VulkanTexture(VkImage image, Allocation* allocation, VkImageView imageView, TextureDimension dimension,
-        TextureFormat format, uint width, uint height, uint depth, uint mipLevels, uint arrayLayers, TextureUsage usage)
+    /// <summary>
+    /// Gets the texture creation capability flags.
+    /// </summary>
+    public override TextureCreateFlags CreateFlags { get; }
+
+    internal VulkanTexture(VkImage image, Allocation* allocation, TextureDimension dimension,
+        TextureFormat format, uint width, uint height, uint depth, uint mipLevels, uint arrayLayers, TextureUsage usage,
+        TextureCreateFlags createFlags)
     {
         Image = image;
         _allocation = allocation;
-        ImageView = imageView;
         Dimension = dimension;
         Format = format;
         Width = width;
@@ -83,6 +84,7 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
         MipLevels = mipLevels;
         ArrayLayers = arrayLayers;
         Usage = usage;
+        CreateFlags = createFlags;
 
         var trackedSubresourceCount = dimension == TextureDimension.Type3D
             ? mipLevels
@@ -126,6 +128,25 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
         return Math.Max(1u, extent >> (int)mipLevel);
     }
 
+    /// <summary>
+    /// Registers a live view created from this texture.
+    /// </summary>
+    internal void RegisterView()
+    {
+        ThrowIfDestroyed();
+        _activeViewCount++;
+    }
+
+    /// <summary>
+    /// Records the destruction of a view created from this texture.
+    /// </summary>
+    /// <param name="retireValue">The view deletion retirement value.</param>
+    internal void ReleaseView(ulong retireValue)
+    {
+        _activeViewCount--;
+        _maxViewRetireValue = Math.Max(_maxViewRetireValue, retireValue);
+    }
+
     private int GetLayoutIndex(uint mipLevel, uint arrayLayer)
     {
         if (mipLevel >= MipLevels)
@@ -146,16 +167,17 @@ internal sealed unsafe class VulkanTexture : Texture, IVulkanTexture
     public override void Destroy()
     {
         if (_destroyed) return;
+        if (_activeViewCount != 0)
+            throw new InvalidOperationException("Texture cannot be destroyed while texture views are still alive.");
+
         _destroyed = true;
 
         var image = Image;
-        var imageView = ImageView;
         var allocation = _allocation;
-        var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
-        VulkanDeletionQueue.Enqueue(retireValue, () =>
-        {
-            VulkanContext.Vk.DestroyImageView(VulkanContext.Device, imageView, null);
-            VulkanAllocator.DestroyImage(image, allocation);
-        });
+        var baseRetireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
+        var retireValue = _maxViewRetireValue >= baseRetireValue
+            ? checked(_maxViewRetireValue + 1)
+            : baseRetireValue;
+        VulkanDeletionQueue.Enqueue(retireValue, () => VulkanAllocator.DestroyImage(image, allocation));
     }
 }

@@ -1,6 +1,5 @@
 using Silk.NET.Vulkan;
 using VkImage = Silk.NET.Vulkan.Image;
-using VkImageView = Silk.NET.Vulkan.ImageView;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -13,11 +12,6 @@ internal interface IVulkanTexture
     /// Gets the Vulkan image handle.
     /// </summary>
     VkImage Image { get; }
-
-    /// <summary>
-    /// Gets the Vulkan image view handle.
-    /// </summary>
-    VkImageView ImageView { get; }
 
     /// <summary>
     /// Gets the texture dimension.
@@ -58,6 +52,11 @@ internal interface IVulkanTexture
     /// Gets the texture usage flags.
     /// </summary>
     TextureUsage Usage { get; }
+
+    /// <summary>
+    /// Gets the texture creation capability flags.
+    /// </summary>
+    TextureCreateFlags CreateFlags { get; }
 
     /// <summary>
     /// Gets whether the texture has been destroyed.

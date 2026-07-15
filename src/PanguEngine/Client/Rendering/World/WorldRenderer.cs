@@ -21,7 +21,8 @@ internal sealed class WorldRenderer
     private readonly GraphicsBuffer _cameraBuffer;
     private readonly ulong _cameraUniformStride;
     private readonly DescriptorSet[] _cameraDescriptorSets;
-    private readonly Texture?[] _depthStencilAttachments;
+    private readonly Texture?[] _depthStencilTextures;
+    private readonly TextureView?[] _depthStencilAttachments;
     private readonly ChunkRenderer _chunkRenderer;
     private readonly SelectionRenderer _selectionRenderer;
     private readonly CrosshairRenderer _crosshairRenderer;
@@ -65,7 +66,8 @@ internal sealed class WorldRenderer
                 ]));
         }
 
-        _depthStencilAttachments = new Texture?[frameSlotCount];
+        _depthStencilTextures = new Texture?[frameSlotCount];
+        _depthStencilAttachments = new TextureView?[frameSlotCount];
         _chunkRenderer = new ChunkRenderer(
             _device,
             _presenter.ColorFormat,
@@ -167,6 +169,8 @@ internal sealed class WorldRenderer
         _device.WaitIdle();
         foreach (var depthStencilAttachment in _depthStencilAttachments)
             depthStencilAttachment?.Destroy();
+        foreach (var depthStencilTexture in _depthStencilTextures)
+            depthStencilTexture?.Destroy();
         _selectionRenderer.Destroy();
         _crosshairRenderer.Destroy();
         _chunkRenderer.Destroy();
@@ -208,16 +212,21 @@ internal sealed class WorldRenderer
         {
             _depthStencilAttachments[i]?.Destroy();
             _depthStencilAttachments[i] = null;
+            _depthStencilTextures[i]?.Destroy();
+            _depthStencilTextures[i] = null;
         }
 
         _depthStencilWidth = _presenter.Width;
         _depthStencilHeight = _presenter.Height;
     }
 
-    private Texture EnsureDepthStencilAttachment(uint frameSlot)
+    private TextureView EnsureDepthStencilAttachment(uint frameSlot)
     {
         var frameIndex = checked((int)frameSlot);
-        return _depthStencilAttachments[frameIndex] ??= _device.CreateTexture(new TextureDescription(
+        if (_depthStencilAttachments[frameIndex] is { } existingAttachment)
+            return existingAttachment;
+
+        var texture = _device.CreateTexture(new TextureDescription(
             TextureDimension.Type2D,
             DepthStencilFormat,
             _depthStencilWidth,
@@ -226,6 +235,23 @@ internal sealed class WorldRenderer
             1,
             1,
             TextureUsage.DepthStencilAttachment));
+        try
+        {
+            var attachment = _device.CreateTextureView(texture, new TextureViewDescription(
+                TextureViewDimension.Type2D,
+                0,
+                1,
+                0,
+                1));
+            _depthStencilTextures[frameIndex] = texture;
+            _depthStencilAttachments[frameIndex] = attachment;
+            return attachment;
+        }
+        catch
+        {
+            texture.Destroy();
+            throw;
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

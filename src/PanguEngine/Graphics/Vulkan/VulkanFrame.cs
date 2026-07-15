@@ -21,7 +21,7 @@ internal sealed class VulkanFrame : Frame
         uint imageIndex,
         uint width,
         uint height,
-        VulkanSwapchainTexture colorOutput,
+        VulkanSwapchainTextureView colorOutput,
         VulkanFrameContext frameContext)
     {
         FrameNumber = frameNumber;
@@ -57,7 +57,7 @@ internal sealed class VulkanFrame : Frame
     public override uint Height { get; }
 
     /// <inheritdoc/>
-    public override Texture ColorOutput
+    public override TextureView ColorOutput
     {
         get
         {
@@ -79,7 +79,7 @@ internal sealed class VulkanFrame : Frame
     /// <summary>
     /// Gets the Vulkan color output for this frame.
     /// </summary>
-    internal VulkanSwapchainTexture VulkanColorOutput { get; }
+    internal VulkanSwapchainTextureView VulkanColorOutput { get; }
 
     /// <summary>
     /// Gets the Vulkan command list for this frame.

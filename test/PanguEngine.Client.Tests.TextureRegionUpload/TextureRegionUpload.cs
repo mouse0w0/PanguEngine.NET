@@ -32,6 +32,7 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
     private GraphicsPipeline _pipeline = null!;
     private GraphicsBuffer _vertexBuffer = null!;
     private Texture _texture = null!;
+    private TextureView _textureView = null!;
     private Sampler _sampler = null!;
     private UploadHandle _vertexUploadHandle = null!;
     private UploadHandle[] _textureUploadHandles = [];
@@ -58,6 +59,7 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
         _descriptorSet.Destroy();
         _descriptorSetLayout.Destroy();
         _sampler.Destroy();
+        _textureView.Destroy();
         _texture.Destroy();
         _fragShader.Destroy();
         _vertShader.Destroy();
@@ -126,6 +128,12 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
             1,
             1,
             TextureUsage.TransferDestination | TextureUsage.Sampled));
+        _textureView = ClientTestApp.Current.Device.CreateTextureView(_texture, new TextureViewDescription(
+            TextureViewDimension.Type2D,
+            0,
+            1,
+            0,
+            1));
 
         var baseData = CreateSolidTextureData(8, 8, 0x20, 0x20, 0x20, 0xff);
         var firstRegionData = CreateSolidTextureData(4, 4, 0xff, 0x00, 0x00, 0xff);
@@ -169,7 +177,7 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
         _descriptorSet = ClientTestApp.Current.Device.CreateDescriptorSet(new DescriptorSetDescription(
             _descriptorSetLayout,
             [
-                DescriptorSetBinding.CombinedImageSampler(0, _texture, _sampler)
+                DescriptorSetBinding.CombinedImageSampler(0, _textureView, _sampler)
             ]));
     }
 

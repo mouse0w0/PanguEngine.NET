@@ -32,6 +32,7 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
     private GraphicsPipeline _pipeline = null!;
     private GraphicsBuffer _vertexBuffer = null!;
     private Texture _texture = null!;
+    private TextureView _textureView = null!;
     private Sampler _sampler = null!;
     private UploadHandle _vertexUploadHandle = null!;
     private UploadHandle _textureUploadHandle = null!;
@@ -59,6 +60,7 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
         _descriptorSet.Destroy();
         _descriptorSetLayout.Destroy();
         _sampler.Destroy();
+        _textureView.Destroy();
         _texture.Destroy();
         _fragShader.Destroy();
         _vertShader.Destroy();
@@ -125,6 +127,12 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
             3,
             1,
             TextureUsage.TransferSource | TextureUsage.TransferDestination | TextureUsage.Sampled));
+        _textureView = ClientTestApp.Current.Device.CreateTextureView(_texture, new TextureViewDescription(
+            TextureViewDimension.Type2D,
+            0,
+            3,
+            0,
+            1));
 
         _textureUploadHandle = ClientTestApp.Current.Device.UploadTexture(
             _texture,
@@ -162,7 +170,7 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
         _descriptorSet = ClientTestApp.Current.Device.CreateDescriptorSet(new DescriptorSetDescription(
             _descriptorSetLayout,
             [
-                DescriptorSetBinding.CombinedImageSampler(0, _texture, _sampler)
+                DescriptorSetBinding.CombinedImageSampler(0, _textureView, _sampler)
             ]));
     }
 

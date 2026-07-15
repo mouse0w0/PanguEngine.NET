@@ -28,7 +28,8 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
     private GraphicsBuffer _vertexBuffer = null!;
     private UploadHandle _vertexUploadHandle = null!;
     private Presenter _presenter = null!;
-    private Texture?[] _offscreenAttachments = [];
+    private Texture?[] _offscreenTextures = [];
+    private TextureView?[] _offscreenAttachments = [];
     private uint _attachmentWidth;
     private uint _attachmentHeight;
 
@@ -37,7 +38,9 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
     public void Initialize(Window window)
     {
         _presenter = window.Presenter;
-        _offscreenAttachments = new Texture?[checked((int)_presenter.MaxFramesInFlight)];
+        var frameSlotCount = checked((int)_presenter.MaxFramesInFlight);
+        _offscreenTextures = new Texture?[frameSlotCount];
+        _offscreenAttachments = new TextureView?[frameSlotCount];
         CreateBuffer();
         CreateShaders();
         CreatePipeline(_presenter.ColorFormat);
@@ -48,6 +51,8 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
     {
         foreach (var attachment in _offscreenAttachments)
             attachment?.Destroy();
+        foreach (var texture in _offscreenTextures)
+            texture?.Destroy();
         _vertexBuffer.Destroy();
         _pipeline.Destroy();
         _fragShader.Destroy();
@@ -102,6 +107,8 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
             {
                 _offscreenAttachments[i]?.Destroy();
                 _offscreenAttachments[i] = null;
+                _offscreenTextures[i]?.Destroy();
+                _offscreenTextures[i] = null;
             }
 
             _attachmentWidth = _presenter.Width;
@@ -109,19 +116,39 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
         }
     }
 
-    private Texture EnsureOffscreenAttachment(uint frameSlot)
+    private TextureView EnsureOffscreenAttachment(uint frameSlot)
     {
         var frameIndex = checked((int)frameSlot);
-        return _offscreenAttachments[frameIndex] ??= ClientTestApp.Current.Device.CreateTexture(
-            new TextureDescription(
-                TextureDimension.Type2D,
-                _presenter.ColorFormat,
-                _attachmentWidth,
-                _attachmentHeight,
+        if (_offscreenAttachments[frameIndex] is { } existingAttachment)
+            return existingAttachment;
+
+        var device = ClientTestApp.Current.Device;
+        var texture = device.CreateTexture(new TextureDescription(
+            TextureDimension.Type2D,
+            _presenter.ColorFormat,
+            _attachmentWidth,
+            _attachmentHeight,
+            1,
+            1,
+            1,
+            TextureUsage.ColorAttachment));
+        try
+        {
+            var attachment = device.CreateTextureView(texture, new TextureViewDescription(
+                TextureViewDimension.Type2D,
+                0,
                 1,
-                1,
-                1,
-                TextureUsage.ColorAttachment));
+                0,
+                1));
+            _offscreenTextures[frameIndex] = texture;
+            _offscreenAttachments[frameIndex] = attachment;
+            return attachment;
+        }
+        catch
+        {
+            texture.Destroy();
+            throw;
+        }
     }
 
     private void CreateBuffer()

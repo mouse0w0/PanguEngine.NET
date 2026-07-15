@@ -77,37 +77,37 @@ internal sealed unsafe class VulkanCommandList : CommandList
                 "Rendering height must be greater than zero.");
 
         var colorDescriptions = description.ColorAttachments;
-        var colorTextures = GetColorAttachments(colorDescriptions, description.Width, description.Height);
-        var renderingColorFormats = new TextureFormat[colorTextures.Length];
-        for (var i = 0; i < colorTextures.Length; i++)
-            renderingColorFormats[i] = colorTextures[i].Format;
+        var colorViews = GetColorAttachments(colorDescriptions, description.Width, description.Height);
+        var renderingColorFormats = new TextureFormat[colorViews.Length];
+        for (var i = 0; i < colorViews.Length; i++)
+            renderingColorFormats[i] = colorViews[i].Format;
 
         var depthStencilDescription = description.DepthStencilAttachment;
-        var depthStencilTexture = depthStencilDescription.HasValue
+        var depthStencilView = depthStencilDescription.HasValue
             ? GetDepthStencilAttachment(depthStencilDescription.Value.Attachment, description.Width, description.Height)
             : null;
-        var hasDepthAttachment = depthStencilTexture is not null &&
-                                 VulkanMapping.HasDepthAspect(depthStencilTexture.Format);
-        var hasStencilAttachment = depthStencilTexture is not null &&
-                                   VulkanMapping.HasStencilAspect(depthStencilTexture.Format);
-        var renderingDepthStencilFormat = depthStencilTexture?.Format ?? TextureFormat.Undefined;
+        var hasDepthAttachment = depthStencilView is not null &&
+                                 VulkanMapping.HasDepthAspect(depthStencilView.Format);
+        var hasStencilAttachment = depthStencilView is not null &&
+                                   VulkanMapping.HasStencilAspect(depthStencilView.Format);
+        var renderingDepthStencilFormat = depthStencilView?.Format ?? TextureFormat.Undefined;
         if (_graphicsPipeline is not null)
         {
             ValidateColorFormats(_graphicsPipeline, renderingColorFormats);
             ValidateDepthStencilFormat(_graphicsPipeline, renderingDepthStencilFormat);
         }
 
-        var colorAttachments = stackalloc RenderingAttachmentInfo[colorTextures.Length];
-        for (var i = 0; i < colorTextures.Length; i++)
+        var colorAttachments = stackalloc RenderingAttachmentInfo[colorViews.Length];
+        for (var i = 0; i < colorViews.Length; i++)
         {
-            TransitionTextureLayout(colorTextures[i], ImageLayout.ColorAttachmentOptimal,
+            TransitionTextureLayout(colorViews[i], ImageLayout.ColorAttachmentOptimal,
                 PipelineStageFlags2.ColorAttachmentOutputBit, AccessFlags2.ColorAttachmentWriteBit);
 
             var clearColor = colorDescriptions[i].ClearColor;
             colorAttachments[i] = new RenderingAttachmentInfo
             {
                 SType = StructureType.RenderingAttachmentInfo,
-                ImageView = colorTextures[i].ImageView,
+                ImageView = colorViews[i].ImageView,
                 ImageLayout = ImageLayout.ColorAttachmentOptimal,
                 LoadOp = VulkanMapping.ToVulkanLoadOperation(colorDescriptions[i].LoadOperation),
                 StoreOp = VulkanMapping.ToVulkanStoreOperation(colorDescriptions[i].StoreOperation),
@@ -127,10 +127,10 @@ internal sealed unsafe class VulkanCommandList : CommandList
         RenderingAttachmentInfo depthAttachment = default;
         RenderingAttachmentInfo stencilAttachment = default;
 
-        if (depthStencilTexture is not null)
+        if (depthStencilView is not null)
         {
             var depthStencil = depthStencilDescription!.Value;
-            TransitionTextureLayout(depthStencilTexture, ImageLayout.DepthStencilAttachmentOptimal,
+            TransitionTextureLayout(depthStencilView, ImageLayout.DepthStencilAttachmentOptimal,
                 PipelineStageFlags2.EarlyFragmentTestsBit | PipelineStageFlags2.LateFragmentTestsBit,
                 AccessFlags2.DepthStencilAttachmentReadBit | AccessFlags2.DepthStencilAttachmentWriteBit);
 
@@ -148,7 +148,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
                 depthAttachment = new RenderingAttachmentInfo
                 {
                     SType = StructureType.RenderingAttachmentInfo,
-                    ImageView = depthStencilTexture.ImageView,
+                    ImageView = depthStencilView.ImageView,
                     ImageLayout = ImageLayout.DepthStencilAttachmentOptimal,
                     LoadOp = VulkanMapping.ToVulkanLoadOperation(depthStencil.DepthLoadOperation),
                     StoreOp = VulkanMapping.ToVulkanStoreOperation(depthStencil.DepthStoreOperation),
@@ -161,7 +161,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
                 stencilAttachment = new RenderingAttachmentInfo
                 {
                     SType = StructureType.RenderingAttachmentInfo,
-                    ImageView = depthStencilTexture.ImageView,
+                    ImageView = depthStencilView.ImageView,
                     ImageLayout = ImageLayout.DepthStencilAttachmentOptimal,
                     LoadOp = VulkanMapping.ToVulkanLoadOperation(depthStencil.StencilLoadOperation),
                     StoreOp = VulkanMapping.ToVulkanStoreOperation(depthStencil.StencilStoreOperation),
@@ -179,7 +179,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
                 Extent = new Extent2D { Width = description.Width, Height = description.Height }
             },
             LayerCount = 1,
-            ColorAttachmentCount = (uint)colorTextures.Length,
+            ColorAttachmentCount = (uint)colorViews.Length,
             PColorAttachments = colorAttachments
         };
 
@@ -356,12 +356,12 @@ internal sealed unsafe class VulkanCommandList : CommandList
     }
 
     /// <inheritdoc/>
-    public override void PrepareForPresent(Texture colorOutput)
+    public override void PrepareForPresent(TextureView colorOutput)
     {
         EnsureRecording();
         ArgumentNullException.ThrowIfNull(colorOutput);
 
-        var swapchainOutput = colorOutput as VulkanSwapchainTexture
+        var swapchainOutput = colorOutput as VulkanSwapchainTextureView
                               ?? throw new InvalidOperationException(
                                   "Presentation output was not created by the Vulkan backend.");
         swapchainOutput.ThrowIfDestroyed();
@@ -430,7 +430,7 @@ internal sealed unsafe class VulkanCommandList : CommandList
         }
     }
 
-    private static IVulkanTexture[] GetColorAttachments(
+    private static IVulkanTextureView[] GetColorAttachments(
         ReadOnlySpan<ColorAttachmentDescription> attachments,
         uint width,
         uint height)
@@ -438,98 +438,104 @@ internal sealed unsafe class VulkanCommandList : CommandList
         if (attachments.Length == 0)
             throw new InvalidOperationException("Rendering must include at least one color attachment.");
 
-        var result = new IVulkanTexture[attachments.Length];
+        var result = new IVulkanTextureView[attachments.Length];
         for (var i = 0; i < attachments.Length; i++)
             result[i] = GetColorAttachment(attachments[i].Attachment, width, height);
         return result;
     }
 
-    private static IVulkanTexture GetColorAttachment(Texture attachment, uint width, uint height)
+    private static IVulkanTextureView GetColorAttachment(TextureView attachment, uint width, uint height)
     {
-        ArgumentNullException.ThrowIfNull(attachment);
-        var texture = attachment as IVulkanTexture
-                      ?? throw new InvalidOperationException(
-                          "Color attachment was not created by the Vulkan backend.");
-        ObjectDisposedException.ThrowIf(texture.IsDestroyed, attachment);
-        if (texture is VulkanSwapchainTexture swapchainTexture)
+        var view = attachment as IVulkanTextureView
+                   ?? throw new InvalidOperationException(
+                       "Color attachment view was not created by the Vulkan backend.");
+        ObjectDisposedException.ThrowIf(view.IsDestroyed, attachment);
+        var texture = view.Texture;
+        if (view is VulkanSwapchainTextureView swapchainView)
         {
-            if (swapchainTexture.GetLayout(0, 0) == ImageLayout.PresentSrcKhr)
+            if (swapchainView.VulkanTexture.GetLayout(0, 0) == ImageLayout.PresentSrcKhr)
                 throw new InvalidOperationException(
                     "Rendering cannot begin after the frame target was transitioned for presentation.");
         }
 
-        if (texture.Dimension != TextureDimension.Type2D)
-            throw new InvalidOperationException("Color attachment must be a 2D texture.");
-        if (texture.MipLevels != 1)
-            throw new InvalidOperationException("Color attachment must have exactly one mip level.");
-        if (texture.ArrayLayers != 1)
-            throw new InvalidOperationException("Color attachment must have exactly one array layer.");
-        if (texture.Width != width || texture.Height != height)
+        if (view.Dimension != TextureViewDimension.Type2D)
+            throw new InvalidOperationException("Color attachment must be a 2D texture view.");
+        if (view.MipLevels != 1)
+            throw new InvalidOperationException("Color attachment view must have exactly one mip level.");
+        if (view.ArrayLayers != 1)
+            throw new InvalidOperationException("Color attachment view must have exactly one array layer.");
+        if (view.Width != width || view.Height != height)
             throw new InvalidOperationException("Color attachment size must match the rendering size.");
         if (!texture.Usage.HasFlag(TextureUsage.ColorAttachment))
             throw new InvalidOperationException("Texture was not created with ColorAttachment usage.");
-        if (texture.Format == TextureFormat.Undefined || VulkanMapping.IsDepthStencilFormat(texture.Format))
+        if (view.Format == TextureFormat.Undefined || VulkanMapping.IsDepthStencilFormat(view.Format))
             throw new InvalidOperationException("Color attachment must use a color format.");
-        return texture;
+        return view;
     }
 
-    private static IVulkanTexture? GetDepthStencilAttachment(Texture? attachment, uint width, uint height)
+    private static IVulkanTextureView GetDepthStencilAttachment(TextureView attachment, uint width, uint height)
     {
-        if (attachment is null)
-            return null;
+        var view = attachment as IVulkanTextureView
+                   ?? throw new InvalidOperationException(
+                       "Depth/stencil attachment view was not created by the Vulkan backend.");
+        ObjectDisposedException.ThrowIf(view.IsDestroyed, attachment);
+        var texture = view.Texture;
 
-        var texture = attachment as IVulkanTexture
-                      ?? throw new InvalidOperationException(
-                          "Depth/stencil attachment was not created by the Vulkan backend.");
-        ObjectDisposedException.ThrowIf(texture.IsDestroyed, attachment);
-
-        if (texture.Dimension != TextureDimension.Type2D)
-            throw new InvalidOperationException("Depth/stencil attachment must be a 2D texture.");
-        if (texture.MipLevels != 1)
-            throw new InvalidOperationException("Depth/stencil attachment must have exactly one mip level.");
-        if (texture.ArrayLayers != 1)
-            throw new InvalidOperationException("Depth/stencil attachment must have exactly one array layer.");
-        if (texture.Width != width || texture.Height != height)
+        if (view.Dimension != TextureViewDimension.Type2D)
+            throw new InvalidOperationException("Depth/stencil attachment must be a 2D texture view.");
+        if (view.MipLevels != 1)
+            throw new InvalidOperationException("Depth/stencil attachment view must have exactly one mip level.");
+        if (view.ArrayLayers != 1)
+            throw new InvalidOperationException("Depth/stencil attachment view must have exactly one array layer.");
+        if (view.Width != width || view.Height != height)
             throw new InvalidOperationException("Depth/stencil attachment size must match the rendering size.");
         if (!texture.Usage.HasFlag(TextureUsage.DepthStencilAttachment))
             throw new InvalidOperationException("Texture was not created with DepthStencilAttachment usage.");
-        if (!VulkanMapping.IsDepthStencilFormat(texture.Format))
+        if (!VulkanMapping.IsDepthStencilFormat(view.Format))
             throw new InvalidOperationException("Depth/stencil attachment must use a depth/stencil format.");
 
-        return texture;
+        return view;
     }
 
     /// <summary>
-    /// Transitions a Vulkan texture to the requested image layout.
+    /// Transitions a Vulkan texture view to the requested image layout.
     /// </summary>
-    /// <param name="texture">The texture to transition.</param>
+    /// <param name="view">The texture view to transition.</param>
     /// <param name="newLayout">The requested image layout.</param>
     /// <param name="dstStageMask">The destination pipeline stage mask.</param>
     /// <param name="dstAccessMask">The destination access mask.</param>
     private void TransitionTextureLayout(
-        IVulkanTexture texture,
+        IVulkanTextureView view,
         ImageLayout newLayout,
         PipelineStageFlags2 dstStageMask,
         AccessFlags2 dstAccessMask)
     {
-        var oldLayout = texture.GetLayout(0, 0);
+        var texture = view.Texture;
+        var oldLayout = texture.GetLayout(view.BaseMipLevel, view.BaseArrayLayer);
         if (oldLayout == newLayout)
             return;
 
         VulkanBarrier.RecordImageLayoutTransition(
             _commandBuffer,
             texture.Image,
-            0,
-            0,
-            1,
-            VulkanMapping.ToVulkanImageAspect(texture.Format),
+            view.BaseMipLevel,
+            view.MipLevels,
+            view.BaseArrayLayer,
+            view.ArrayLayers,
+            VulkanMapping.ToVulkanImageAspect(view.Format),
             oldLayout,
             newLayout,
             VulkanBarrier.GetStageForLayout(oldLayout),
             VulkanBarrier.GetAccessForLayout(oldLayout),
             dstStageMask,
             dstAccessMask);
-        texture.SetLayout(0, 0, newLayout);
+        for (var mipLevel = view.BaseMipLevel; mipLevel < view.BaseMipLevel + view.MipLevels; mipLevel++)
+        {
+            for (var arrayLayer = view.BaseArrayLayer;
+                 arrayLayer < view.BaseArrayLayer + view.ArrayLayers;
+                 arrayLayer++)
+                texture.SetLayout(mipLevel, arrayLayer, newLayout);
+        }
     }
 
     private void EnsureUsable()

@@ -1,6 +1,5 @@
 using Silk.NET.Vulkan;
 using VkImage = Silk.NET.Vulkan.Image;
-using VkImageView = Silk.NET.Vulkan.ImageView;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -16,14 +15,12 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
     /// Creates a Vulkan swapchain texture wrapper.
     /// </summary>
     /// <param name="image">The Vulkan swapchain image.</param>
-    /// <param name="imageView">The Vulkan image view.</param>
     /// <param name="format">The texture format.</param>
     /// <param name="width">The texture width.</param>
     /// <param name="height">The texture height.</param>
-    internal VulkanSwapchainTexture(VkImage image, VkImageView imageView, TextureFormat format, uint width, uint height)
+    internal VulkanSwapchainTexture(VkImage image, TextureFormat format, uint width, uint height)
     {
         Image = image;
-        ImageView = imageView;
         Format = format;
         Width = width;
         Height = height;
@@ -33,11 +30,6 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
     /// Gets the Vulkan image handle.
     /// </summary>
     public VkImage Image { get; }
-
-    /// <summary>
-    /// Gets the Vulkan image view handle.
-    /// </summary>
-    public VkImageView ImageView { get; }
 
     /// <summary>
     /// Gets whether the texture has been destroyed.
@@ -83,6 +75,11 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
     /// Gets the texture usage flags.
     /// </summary>
     public override TextureUsage Usage => TextureUsage.ColorAttachment;
+
+    /// <summary>
+    /// Gets the texture creation capability flags.
+    /// </summary>
+    public override TextureCreateFlags CreateFlags => TextureCreateFlags.None;
 
     /// <summary>
     /// Gets the tracked image layout for a texture subresource.

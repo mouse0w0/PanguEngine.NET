@@ -10,8 +10,8 @@ public sealed unsafe partial class VulkanWindow
 
     private SwapchainKHR _swapchain;
     private Image[]? _images;
-    private ImageView[]? _imageViews;
-    private VulkanSwapchainTexture?[]? _colorOutputs;
+    private VulkanSwapchainTexture?[]? _colorOutputTextures;
+    private VulkanSwapchainTextureView?[]? _colorOutputs;
     private Semaphore[]? _renderFinishedSemaphores;
 
     /// <summary>The image format selected for the swapchain images.</summary>
@@ -20,8 +20,8 @@ public sealed unsafe partial class VulkanWindow
     /// <summary>The current extent (width and height) of the swapchain images.</summary>
     public Extent2D Extent { get; private set; }
 
-    /// <summary>The color output textures for each swapchain image.</summary>
-    internal VulkanSwapchainTexture?[] ColorOutputs => _colorOutputs!;
+    /// <summary>The color output texture views for each swapchain image.</summary>
+    internal VulkanSwapchainTextureView?[] ColorOutputs => _colorOutputs!;
 
     /// <summary>Acquires the next swapchain image for rendering.</summary>
     /// <param name="imageAvailableSemaphore">The semaphore to signal when the image is available.</param>
@@ -180,9 +180,9 @@ public sealed unsafe partial class VulkanWindow
     private void CreateImageViews()
     {
         var images = _images!;
-        var imageViews = new ImageView[images.Length];
-        var colorOutputs = new VulkanSwapchainTexture?[images.Length];
-        _imageViews = imageViews;
+        var colorOutputTextures = new VulkanSwapchainTexture?[images.Length];
+        var colorOutputs = new VulkanSwapchainTextureView?[images.Length];
+        _colorOutputTextures = colorOutputTextures;
         _colorOutputs = colorOutputs;
         var colorFormat = VulkanMapping.FromVulkanFormat(ImageFormat);
 
@@ -190,6 +190,8 @@ public sealed unsafe partial class VulkanWindow
         {
             for (var i = 0; i < images.Length; i++)
             {
+                var texture = new VulkanSwapchainTexture(images[i], colorFormat, Extent.Width, Extent.Height);
+                colorOutputTextures[i] = texture;
                 ImageViewCreateInfo createInfo = new()
                 {
                     SType = StructureType.ImageViewCreateInfo,
@@ -217,9 +219,7 @@ public sealed unsafe partial class VulkanWindow
                     Result.Success)
                     throw new InvalidOperationException("Failed to create image views.");
 
-                imageViews[i] = imageView;
-                colorOutputs[i] = new VulkanSwapchainTexture(images[i], imageView, colorFormat,
-                    Extent.Width, Extent.Height);
+                colorOutputs[i] = new VulkanSwapchainTextureView(texture, imageView);
             }
         }
         catch
@@ -278,20 +278,24 @@ public sealed unsafe partial class VulkanWindow
         if (_colorOutputs is not null)
         {
             foreach (var colorOutput in _colorOutputs)
-                colorOutput?.Invalidate();
+            {
+                if (colorOutput is null)
+                    continue;
+
+                colorOutput.Invalidate();
+                if (colorOutput.ImageView.Handle != 0)
+                    VulkanContext.Vk.DestroyImageView(VulkanContext.Device, colorOutput.ImageView, null);
+            }
+
             _colorOutputs = null;
         }
 
-        if (_imageViews is null)
-            return;
-
-        foreach (var imageView in _imageViews)
+        if (_colorOutputTextures is not null)
         {
-            if (imageView.Handle != 0)
-                VulkanContext.Vk.DestroyImageView(VulkanContext.Device, imageView, null);
+            foreach (var texture in _colorOutputTextures)
+                texture?.Invalidate();
+            _colorOutputTextures = null;
         }
-
-        _imageViews = null;
     }
 
     /// <summary>Destroys the window swapchain.</summary>

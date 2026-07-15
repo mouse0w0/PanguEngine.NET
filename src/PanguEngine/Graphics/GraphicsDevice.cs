@@ -33,6 +33,16 @@ public abstract class GraphicsDevice
     public abstract Texture CreateTexture(in TextureDescription description);
 
     /// <summary>
+    /// Creates a view over a texture subresource range.
+    /// </summary>
+    /// <param name="texture">The texture referenced by the view.</param>
+    /// <param name="description">The texture view description.</param>
+    /// <returns>The created texture view.</returns>
+    public abstract TextureView CreateTextureView(
+        Texture texture,
+        in TextureViewDescription description);
+
+    /// <summary>
     /// Queues data for upload into a texture.
     /// </summary>
     /// <param name="destination">The destination texture.</param>

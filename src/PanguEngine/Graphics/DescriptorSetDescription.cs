@@ -24,7 +24,7 @@ public readonly record struct DescriptorSetBinding
 
     public ulong Size { get; }
 
-    public Texture? Texture { get; }
+    public TextureView? TextureView { get; }
 
     public Sampler? Sampler { get; }
 
@@ -42,18 +42,18 @@ public readonly record struct DescriptorSetBinding
         Buffer = buffer;
         Offset = offset;
         Size = size;
-        Texture = null;
+        TextureView = null;
         Sampler = null;
     }
 
-    private DescriptorSetBinding(uint binding, Texture texture, Sampler sampler)
+    private DescriptorSetBinding(uint binding, TextureView textureView, Sampler sampler)
     {
         Binding = binding;
         Type = DescriptorType.CombinedImageSampler;
         Buffer = null;
         Offset = 0;
         Size = 0;
-        Texture = texture;
+        TextureView = textureView;
         Sampler = sampler;
     }
 
@@ -62,8 +62,8 @@ public readonly record struct DescriptorSetBinding
         return new DescriptorSetBinding(binding, buffer, offset, size);
     }
 
-    public static DescriptorSetBinding CombinedImageSampler(uint binding, Texture texture, Sampler sampler)
+    public static DescriptorSetBinding CombinedImageSampler(uint binding, TextureView textureView, Sampler sampler)
     {
-        return new DescriptorSetBinding(binding, texture, sampler);
+        return new DescriptorSetBinding(binding, textureView, sampler);
     }
 }
