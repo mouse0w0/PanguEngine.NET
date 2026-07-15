@@ -47,16 +47,12 @@ internal sealed class CameraController
     /// <param name="right">The signed right input.</param>
     internal void Move(double forward, double right)
     {
-        _camera.BeginFixedUpdate();
-
         var rightDirection = Vector3D.Normalize(Vector3D.Cross(_camera.Forward, Vector3D<double>.UnitY));
         var movement = _camera.Forward * forward + rightDirection * right;
         var lengthSquared = Vector3D.Dot(movement, movement);
-        if (lengthSquared <= 0)
-            return;
-
-        _camera.SetPosition(
-            _camera.CurrentPosition
-            + movement / Math.Sqrt(lengthSquared) * MoveDistancePerTick);
+        var delta = lengthSquared <= 0
+            ? Vector3D<double>.Zero
+            : movement / Math.Sqrt(lengthSquared) * MoveDistancePerTick;
+        _camera.MoveBy(delta);
     }
 }

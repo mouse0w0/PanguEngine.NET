@@ -70,19 +70,32 @@ internal sealed class Camera
     }
 
     /// <summary>
-    /// Captures the current position as the previous fixed-update position.
+    /// Teleports the camera without preserving position interpolation.
     /// </summary>
-    internal void BeginFixedUpdate()
+    /// <param name="position">The new camera position.</param>
+    internal void Teleport(Vector3D<double> position)
     {
-        PreviousPosition = CurrentPosition;
+        PreviousPosition = position;
+        CurrentPosition = position;
     }
 
     /// <summary>
-    /// Sets the current camera position.
+    /// Moves the camera by a relative offset and preserves position interpolation.
     /// </summary>
-    /// <param name="position">The new current position.</param>
-    internal void SetPosition(Vector3D<double> position)
+    /// <param name="delta">The relative position offset.</param>
+    internal void MoveBy(Vector3D<double> delta)
     {
+        PreviousPosition = CurrentPosition;
+        CurrentPosition += delta;
+    }
+
+    /// <summary>
+    /// Moves the camera to an absolute position and preserves position interpolation.
+    /// </summary>
+    /// <param name="position">The new camera position.</param>
+    internal void MoveTo(Vector3D<double> position)
+    {
+        PreviousPosition = CurrentPosition;
         CurrentPosition = position;
     }
 

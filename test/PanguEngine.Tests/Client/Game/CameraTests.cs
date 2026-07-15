@@ -29,12 +29,36 @@ public sealed class CameraTests
     public void InterpolatedPositionClampsAlpha(double alpha, double expectedFraction)
     {
         var camera = CreateCamera();
-        camera.BeginFixedUpdate();
-        camera.SetPosition(camera.CurrentPosition + new Vector3D<double>(1, 0, 0));
+        camera.MoveTo(camera.CurrentPosition + new Vector3D<double>(1, 0, 0));
         var expected = camera.PreviousPosition
                        + (camera.CurrentPosition - camera.PreviousPosition) * expectedFraction;
 
         AssertVector(expected, camera.GetInterpolatedPosition(alpha));
+    }
+
+    [Fact]
+    public void MoveToPreservesPreviousPositionAndSetsAbsoluteCurrentPosition()
+    {
+        var camera = CreateCamera();
+        var target = new Vector3D<double>(1, 2, 3);
+
+        camera.MoveTo(target);
+
+        AssertVector(Vector3D<double>.Zero, camera.PreviousPosition);
+        AssertVector(target, camera.CurrentPosition);
+    }
+
+    [Fact]
+    public void TeleportSynchronizesPreviousAndCurrentPositions()
+    {
+        var camera = CreateCamera();
+        var target = new Vector3D<double>(1, 2, 3);
+
+        camera.MoveBy(new Vector3D<double>(4, 0, 0));
+        camera.Teleport(target);
+
+        AssertVector(target, camera.PreviousPosition);
+        AssertVector(target, camera.CurrentPosition);
     }
 
     [Fact]
