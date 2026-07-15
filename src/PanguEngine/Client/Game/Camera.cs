@@ -10,12 +10,21 @@ internal sealed class Camera
     private const double DegreesToRadians = Math.PI / 180d;
     private const double DirectionComponentEpsilon = 0.000001d;
 
-    internal Camera()
+    /// <summary>
+    /// Creates a camera with the specified initial transform.
+    /// </summary>
+    /// <param name="position">The initial camera position.</param>
+    /// <param name="yaw">The initial horizontal angle in degrees.</param>
+    /// <param name="pitch">The initial vertical angle in degrees.</param>
+    internal Camera(
+        Vector3D<double> position = default,
+        double yaw = 0,
+        double pitch = 0)
     {
-        PreviousPosition = new Vector3D<double>(8, 6, 24);
-        CurrentPosition = PreviousPosition;
-        Yaw = -90;
-        Pitch = -20;
+        PreviousPosition = position;
+        CurrentPosition = position;
+        Yaw = yaw;
+        Pitch = pitch;
     }
 
     /// <summary>The position from the previous fixed update.</summary>
@@ -25,10 +34,10 @@ internal sealed class Camera
     internal Vector3D<double> CurrentPosition { get; private set; }
 
     /// <summary>The horizontal camera angle in degrees.</summary>
-    internal double Yaw { get; private set; }
+    internal double Yaw { get; set; }
 
     /// <summary>The vertical camera angle in degrees.</summary>
-    internal double Pitch { get; private set; }
+    internal double Pitch { get; set; }
 
     /// <summary>The presentation width divided by height.</summary>
     internal double AspectRatio { get; set; } = 1;

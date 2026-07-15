@@ -19,7 +19,7 @@ public sealed class ClientGame
 
     internal ClientGame(ClientEngine engine)
     {
-        _camera = new Camera();
+        _camera = new Camera(new Vector3D<double>(8, 6, 24), -90, -20);
         _cameraController = new CameraController(_camera);
         _input = new ClientInputState(engine.PrimaryWindow);
         _input.MouseDelta += _cameraController.ApplyMouseDelta;

@@ -8,7 +8,7 @@ public sealed class CameraControllerTests
     [Fact]
     public void MouseDeltaUpdatesYawPitchAndClampsPitch()
     {
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera);
 
         controller.ApplyMouseDelta(new Vector2D<float>(10, -2000));
@@ -20,7 +20,7 @@ public sealed class CameraControllerTests
     [Fact]
     public void DiagonalMovementHasFixedTickDistance()
     {
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera);
 
         controller.Move(1, 1);
@@ -34,7 +34,7 @@ public sealed class CameraControllerTests
     [Fact]
     public void MovementUsesMoveDistancePerTickProperty()
     {
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera)
         {
             MoveDistancePerTick = 1.25d
@@ -48,7 +48,7 @@ public sealed class CameraControllerTests
     [Fact]
     public void MouseRotationUsesMouseSensitivityProperty()
     {
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera)
         {
             MouseSensitivity = 0.5d
@@ -62,12 +62,12 @@ public sealed class CameraControllerTests
     [Fact]
     public void PitchUsesConfigurableBounds()
     {
-        var defaultController = new CameraController(new Camera());
+        var defaultController = new CameraController(CreateCamera());
 
         Assert.Equal(-89d, defaultController.MinPitch);
         Assert.Equal(89d, defaultController.MaxPitch);
 
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera)
         {
             MinPitch = -10d,
@@ -87,7 +87,7 @@ public sealed class CameraControllerTests
     [Fact]
     public void OpposingInputDoesNotMove()
     {
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera);
         var initial = camera.CurrentPosition;
 
@@ -100,7 +100,7 @@ public sealed class CameraControllerTests
     [Fact]
     public void StationaryTickSynchronizesPreviousToCurrent()
     {
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera);
         controller.Move(1, 0);
         var current = camera.CurrentPosition;
@@ -114,7 +114,7 @@ public sealed class CameraControllerTests
     [Fact]
     public void ConsecutiveTicksMaintainPreviousAndCurrentPositions()
     {
-        var camera = new Camera();
+        var camera = CreateCamera();
         var controller = new CameraController(camera);
         controller.Move(1, 0);
         var first = camera.CurrentPosition;
@@ -131,7 +131,8 @@ public sealed class CameraControllerTests
     [Fact]
     public void ViewProjectionUsesLatestRotationWithoutInterpolation()
     {
-        var camera = new Camera { AspectRatio = 1 };
+        var camera = CreateCamera();
+        camera.AspectRatio = 1;
         var controller = new CameraController(camera);
         controller.Move(1, 0);
         var before = camera.CreateViewProjection(0.5);
@@ -146,6 +147,11 @@ public sealed class CameraControllerTests
     {
         var delta = right - left;
         return Math.Sqrt(delta.X * delta.X + delta.Y * delta.Y + delta.Z * delta.Z);
+    }
+
+    private static Camera CreateCamera()
+    {
+        return new Camera(Vector3D<double>.Zero, -90, -20);
     }
 
     private static void AssertVector(Vector3D<double> expected, Vector3D<double> actual)
