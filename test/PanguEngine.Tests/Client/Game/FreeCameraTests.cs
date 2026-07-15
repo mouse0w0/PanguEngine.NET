@@ -10,7 +10,7 @@ public sealed class FreeCameraTests
     {
         var camera = new FreeCamera();
 
-        AssertVector(new Vector3D<float>(8, 6, 24), camera.CurrentPosition);
+        AssertVector(new Vector3D<double>(8, 6, 24), camera.CurrentPosition);
         Assert.Equal(0, camera.Forward.X);
         Assert.True(camera.Forward.Y < 0);
         Assert.True(camera.Forward.Z < 0);
@@ -84,7 +84,7 @@ public sealed class FreeCameraTests
     [InlineData(0.5, 0.5)]
     [InlineData(1, 1)]
     [InlineData(2, 1)]
-    public void InterpolatedPositionClampsAlpha(double alpha, float expectedFraction)
+    public void InterpolatedPositionClampsAlpha(double alpha, double expectedFraction)
     {
         var camera = new FreeCamera();
         camera.Move(1, 0);
@@ -97,10 +97,10 @@ public sealed class FreeCameraTests
     [Fact]
     public void ProjectionMapsNearAndFarPlanesToVulkanDepthRange()
     {
-        var projection = FreeCamera.CreateProjectionMatrix(16f / 9f);
+        var projection = FreeCamera.CreateProjectionMatrix(16d / 9d);
 
-        var nearClip = new Vector4D<float>(0, 0, -FreeCamera.NearPlane, 1) * projection;
-        var farClip = new Vector4D<float>(0, 0, -FreeCamera.FarPlane, 1) * projection;
+        var nearClip = new Vector4D<double>(0, 0, -FreeCamera.NearPlane, 1) * projection;
+        var farClip = new Vector4D<double>(0, 0, -FreeCamera.FarPlane, 1) * projection;
 
         Assert.Equal(0, nearClip.Z / nearClip.W, 4);
         Assert.Equal(1, farClip.Z / farClip.W, 4);
@@ -121,7 +121,7 @@ public sealed class FreeCameraTests
     {
         var projection = FreeCamera.CreateProjectionMatrix(1);
 
-        var clip = new Vector4D<float>(0, 1, -1, 1) * projection;
+        var clip = new Vector4D<double>(0, 1, -1, 1) * projection;
 
         Assert.True(clip.Y / clip.W < 0);
     }
@@ -132,8 +132,8 @@ public sealed class FreeCameraTests
         var camera = new FreeCamera();
         var view = camera.CreateViewMatrix(1);
 
-        var cameraInView = new Vector4D<float>(camera.CurrentPosition, 1) * view;
-        var pointInView = new Vector4D<float>(camera.CurrentPosition + camera.Forward, 1) * view;
+        var cameraInView = new Vector4D<double>(camera.CurrentPosition, 1) * view;
+        var pointInView = new Vector4D<double>(camera.CurrentPosition + camera.Forward, 1) * view;
 
         Assert.Equal(0, cameraInView.X, 4);
         Assert.Equal(0, cameraInView.Y, 4);
@@ -156,13 +156,13 @@ public sealed class FreeCameraTests
         Assert.NotEqual(before, after);
     }
 
-    private static float Distance(Vector3D<float> left, Vector3D<float> right)
+    private static double Distance(Vector3D<double> left, Vector3D<double> right)
     {
         var delta = right - left;
-        return MathF.Sqrt(delta.X * delta.X + delta.Y * delta.Y + delta.Z * delta.Z);
+        return Math.Sqrt(delta.X * delta.X + delta.Y * delta.Y + delta.Z * delta.Z);
     }
 
-    private static void AssertVector(Vector3D<float> expected, Vector3D<float> actual)
+    private static void AssertVector(Vector3D<double> expected, Vector3D<double> actual)
     {
         Assert.Equal(expected.X, actual.X, 4);
         Assert.Equal(expected.Y, actual.Y, 4);

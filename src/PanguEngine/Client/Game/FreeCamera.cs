@@ -7,58 +7,58 @@ namespace PanguEngine.Client.Game;
 /// </summary>
 internal sealed class FreeCamera
 {
-    internal const float MoveDistancePerTick = 0.4f;
-    internal const float MouseSensitivity = 0.08f;
-    internal const float MinPitch = -89f;
-    internal const float MaxPitch = 89f;
-    internal const float FieldOfView = 70f;
-    internal const float NearPlane = 0.05f;
-    internal const float FarPlane = 1000f;
+    internal const double MoveDistancePerTick = 0.4d;
+    internal const double MouseSensitivity = 0.08d;
+    internal const double MinPitch = -89d;
+    internal const double MaxPitch = 89d;
+    internal const double FieldOfView = 70d;
+    internal const double NearPlane = 0.05d;
+    internal const double FarPlane = 1000d;
 
-    private const float DegreesToRadians = MathF.PI / 180f;
-    private const float DirectionComponentEpsilon = 0.000001f;
+    private const double DegreesToRadians = Math.PI / 180d;
+    private const double DirectionComponentEpsilon = 0.000001d;
 
     internal FreeCamera()
     {
-        PreviousPosition = new Vector3D<float>(8, 6, 24);
+        PreviousPosition = new Vector3D<double>(8, 6, 24);
         CurrentPosition = PreviousPosition;
         Yaw = -90;
         Pitch = -20;
     }
 
     /// <summary>The position from the previous fixed update.</summary>
-    internal Vector3D<float> PreviousPosition { get; private set; }
+    internal Vector3D<double> PreviousPosition { get; private set; }
 
     /// <summary>The position from the current fixed update.</summary>
-    internal Vector3D<float> CurrentPosition { get; private set; }
+    internal Vector3D<double> CurrentPosition { get; private set; }
 
     /// <summary>The horizontal camera angle in degrees.</summary>
-    internal float Yaw { get; private set; }
+    internal double Yaw { get; private set; }
 
     /// <summary>The vertical camera angle in degrees.</summary>
-    internal float Pitch { get; private set; }
+    internal double Pitch { get; private set; }
 
     /// <summary>The current normalized camera forward direction.</summary>
-    internal Vector3D<float> Forward
+    internal Vector3D<double> Forward
     {
         get
         {
             var yaw = Yaw * DegreesToRadians;
             var pitch = Pitch * DegreesToRadians;
-            var direction = Vector3D.Normalize(new Vector3D<float>(
-                MathF.Cos(pitch) * MathF.Cos(yaw),
-                MathF.Sin(pitch),
-                MathF.Cos(pitch) * MathF.Sin(yaw)));
-            return Vector3D.Normalize(new Vector3D<float>(
+            var direction = Vector3D.Normalize(new Vector3D<double>(
+                Math.Cos(pitch) * Math.Cos(yaw),
+                Math.Sin(pitch),
+                Math.Cos(pitch) * Math.Sin(yaw)));
+            return Vector3D.Normalize(new Vector3D<double>(
                 SnapDirectionComponent(direction.X),
                 SnapDirectionComponent(direction.Y),
                 SnapDirectionComponent(direction.Z)));
         }
     }
 
-    private static float SnapDirectionComponent(float value)
+    private static double SnapDirectionComponent(double value)
     {
-        return MathF.Abs(value) < DirectionComponentEpsilon ? 0 : value;
+        return Math.Abs(value) < DirectionComponentEpsilon ? 0 : value;
     }
 
     /// <summary>
@@ -67,8 +67,8 @@ internal sealed class FreeCamera
     /// <param name="delta">The relative movement in screen coordinates.</param>
     internal void ApplyMouseDelta(Vector2D<float> delta)
     {
-        Yaw += delta.X * MouseSensitivity;
-        Pitch = Math.Clamp(Pitch - delta.Y * MouseSensitivity, MinPitch, MaxPitch);
+        Yaw += (double)delta.X * MouseSensitivity;
+        Pitch = Math.Clamp(Pitch - (double)delta.Y * MouseSensitivity, MinPitch, MaxPitch);
     }
 
     /// <summary>
@@ -76,17 +76,17 @@ internal sealed class FreeCamera
     /// </summary>
     /// <param name="forward">The signed forward input.</param>
     /// <param name="right">The signed right input.</param>
-    internal void Move(float forward, float right)
+    internal void Move(double forward, double right)
     {
         PreviousPosition = CurrentPosition;
 
-        var rightDirection = Vector3D.Normalize(Vector3D.Cross(Forward, Vector3D<float>.UnitY));
+        var rightDirection = Vector3D.Normalize(Vector3D.Cross(Forward, Vector3D<double>.UnitY));
         var movement = Forward * forward + rightDirection * right;
         var lengthSquared = Vector3D.Dot(movement, movement);
         if (lengthSquared <= 0)
             return;
 
-        CurrentPosition += movement / MathF.Sqrt(lengthSquared) * MoveDistancePerTick;
+        CurrentPosition += movement / Math.Sqrt(lengthSquared) * MoveDistancePerTick;
     }
 
     /// <summary>
@@ -94,21 +94,10 @@ internal sealed class FreeCamera
     /// </summary>
     /// <param name="alpha">The interpolation factor.</param>
     /// <returns>The interpolated position.</returns>
-    internal Vector3D<float> GetInterpolatedPosition(double alpha)
+    internal Vector3D<double> GetInterpolatedPosition(double alpha)
     {
-        var amount = (float)Math.Clamp(alpha, 0, 1);
+        var amount = Math.Clamp(alpha, 0, 1);
         return PreviousPosition + (CurrentPosition - PreviousPosition) * amount;
-    }
-
-    /// <summary>
-    /// Creates the interpolated right-handed view matrix.
-    /// </summary>
-    /// <param name="alpha">The fixed-update interpolation factor.</param>
-    /// <returns>The view matrix.</returns>
-    internal Matrix4X4<float> CreateViewMatrix(double alpha)
-    {
-        var position = GetInterpolatedPosition(alpha);
-        return Matrix4X4.CreateLookAt(position, position + Forward, Vector3D<float>.UnitY);
     }
 
     /// <summary>
@@ -116,9 +105,9 @@ internal sealed class FreeCamera
     /// </summary>
     /// <param name="aspectRatio">The presentation width divided by height.</param>
     /// <returns>The projection matrix.</returns>
-    internal static Matrix4X4<float> CreateProjectionMatrix(float aspectRatio)
+    internal static Matrix4X4<double> CreateProjectionMatrix(double aspectRatio)
     {
-        if (!float.IsFinite(aspectRatio) || aspectRatio <= 0)
+        if (!double.IsFinite(aspectRatio) || aspectRatio <= 0)
             throw new ArgumentOutOfRangeException(nameof(aspectRatio));
 
         var projection = Matrix4X4.CreatePerspectiveFieldOfView(
@@ -131,13 +120,24 @@ internal sealed class FreeCamera
     }
 
     /// <summary>
+    /// Creates the interpolated right-handed view matrix.
+    /// </summary>
+    /// <param name="alpha">The fixed-update interpolation factor.</param>
+    /// <returns>The view matrix.</returns>
+    internal Matrix4X4<double> CreateViewMatrix(double alpha)
+    {
+        var position = GetInterpolatedPosition(alpha);
+        return Matrix4X4.CreateLookAt(position, position + Forward, Vector3D<double>.UnitY);
+    }
+
+    /// <summary>
     /// Creates the interpolated view-projection matrix.
     /// </summary>
     /// <param name="aspectRatio">The presentation width divided by height.</param>
     /// <param name="alpha">The fixed-update interpolation factor.</param>
     /// <returns>The view-projection matrix.</returns>
-    internal Matrix4X4<float> CreateViewProjection(float aspectRatio, double alpha)
+    internal Matrix4X4<float> CreateViewProjection(double aspectRatio, double alpha)
     {
-        return CreateViewMatrix(alpha) * CreateProjectionMatrix(aspectRatio);
+        return (Matrix4X4<float>)(CreateViewMatrix(alpha) * CreateProjectionMatrix(aspectRatio));
     }
 }

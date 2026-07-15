@@ -118,7 +118,7 @@ internal sealed class WorldRenderer
 
             var frameIndex = checked((int)frame.FrameSlot);
             var depthStencilAttachment = EnsureDepthStencilAttachment(frame.FrameSlot);
-            var aspectRatio = (float)frame.Width / frame.Height;
+            var aspectRatio = (double)frame.Width / frame.Height;
             var cameraUniform = new CameraUniform(camera.CreateViewProjection(aspectRatio, alpha));
             _cameraBuffer.Write(cameraUniform, checked(frame.FrameSlot * _cameraUniformStride));
             if (uploadFailure is null)

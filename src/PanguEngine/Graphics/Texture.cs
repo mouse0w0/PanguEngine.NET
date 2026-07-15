@@ -6,11 +6,6 @@ namespace PanguEngine.Graphics;
 public abstract class Texture : GraphicsResource
 {
     /// <summary>
-    /// Gets whether the texture has been destroyed.
-    /// </summary>
-    public abstract override bool IsDestroyed { get; }
-
-    /// <summary>
     /// Gets the texture dimensional shape.
     /// </summary>
     public abstract TextureDimension Dimension { get; }

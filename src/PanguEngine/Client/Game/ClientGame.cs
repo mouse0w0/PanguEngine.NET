@@ -88,12 +88,9 @@ public sealed class ClientGame
         return true;
     }
 
-    private BlockHit? RaycastSelection(Vector3D<float> position)
+    private BlockHit? RaycastSelection(Vector3D<double> position)
     {
-        var direction = _camera.Forward;
-        var ray = new Ray3D<double>(
-            new Vector3D<double>(position.X, position.Y, position.Z),
-            new Vector3D<double>(direction.X, direction.Y, direction.Z));
+        var ray = new Ray3D<double>(position, _camera.Forward);
         return BlockRaycaster.TryRaycast(
             World,
             ray,
