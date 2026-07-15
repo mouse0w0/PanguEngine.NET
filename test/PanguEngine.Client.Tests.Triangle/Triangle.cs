@@ -42,20 +42,20 @@ internal sealed class TriangleScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "triangle.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "triangle.frag");
 
-        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Vertex,
-            vertBytecode,
-            Name: "triangle.vert"));
-        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Fragment,
-            fragBytecode,
-            Name: "triangle.frag"));
+        _vertShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode,
+                "triangle.vert"));
+        _fragShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode,
+                "triangle.frag"));
 
-        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            [_vertShader, _fragShader],
-            VertexInputDescription.Empty,
-            ColorAttachmentFormats: [_presenter.ColorFormat],
-            DescriptorSetLayouts: []));
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription
+        {
+            Shaders = [_vertShader, _fragShader],
+            VertexInput = VertexInputDescription.Empty,
+            ColorAttachmentFormats = [_presenter.ColorFormat],
+            DescriptorSetLayouts = []
+        });
 
         window.Render += (_, _) => DrawFrame();
     }
@@ -77,12 +77,15 @@ internal sealed class TriangleScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.BeginRecording();
-            commands.BeginRendering(new RenderingDescription(
-                frame.Width,
-                frame.Height,
+            commands.BeginRendering(new RenderingDescription
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                ColorAttachments =
                 [
-                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0, 0, 0, 1)),
-                ]));
+                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0, 0, 0, 1))
+                ]
+            });
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);

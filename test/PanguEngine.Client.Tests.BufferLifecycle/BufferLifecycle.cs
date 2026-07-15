@@ -61,12 +61,17 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.BeginRecording();
-            commands.BeginRendering(new RenderingDescription(
-                frame.Width,
-                frame.Height,
+            commands.BeginRendering(new RenderingDescription
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                ColorAttachments =
                 [
-                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1)),
-                ]));
+                    new ColorAttachmentDescription(
+                        frame.ColorOutput,
+                        new ClearColor(0.008f, 0.01f, 0.016f, 1))
+                ]
+            });
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
@@ -131,31 +136,29 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "buffer_lifecycle.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "buffer_lifecycle.frag");
 
-        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Vertex,
-            vertBytecode,
-            Name: "buffer_lifecycle.vert"));
-        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Fragment,
-            fragBytecode,
-            Name: "buffer_lifecycle.frag"));
+        _vertShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode,
+                "buffer_lifecycle.vert"));
+        _fragShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode,
+                "buffer_lifecycle.frag"));
     }
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            [_vertShader, _fragShader],
-            CreateVertexInputDescription(),
-            ColorAttachmentFormats: [colorFormat],
-            DescriptorSetLayouts: []));
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription
+        {
+            Shaders = [_vertShader, _fragShader],
+            VertexInput = CreateVertexInputDescription(),
+            ColorAttachmentFormats = [colorFormat],
+            DescriptorSetLayouts = []
+        });
     }
 
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            [
-                new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            ],
+            [new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())],
             [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 8)

@@ -128,16 +128,16 @@ internal sealed class WorldRenderer
             _crosshairRenderer.Prepare(frame.FrameSlot, frame.Width, frame.Height);
 
             commandList.BeginRecording();
-            commandList.BeginRendering(new RenderingDescription(
-                frame.Width,
-                frame.Height,
+            commandList.BeginRendering(new RenderingDescription
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                ColorAttachments =
                 [
                     new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.008f, 0.01f, 0.016f, 1))
                 ],
-                new DepthStencilAttachmentDescription(
-                    depthStencilAttachment,
-                    DepthClearValue: 1,
-                    StencilClearValue: 0)));
+                DepthStencilAttachment = new DepthStencilAttachmentDescription(depthStencilAttachment)
+            });
             commandList.SetViewport(0, 0, frame.Width, frame.Height);
             commandList.SetScissor(0, 0, frame.Width, frame.Height);
 
@@ -226,15 +226,17 @@ internal sealed class WorldRenderer
         if (_depthStencilAttachments[frameIndex] is { } existingAttachment)
             return existingAttachment;
 
-        var texture = _device.CreateTexture(new TextureDescription(
-            TextureDimension.Type2D,
-            DepthStencilFormat,
-            _depthStencilWidth,
-            _depthStencilHeight,
-            1,
-            1,
-            1,
-            TextureUsage.DepthStencilAttachment));
+        var texture = _device.CreateTexture(new TextureDescription
+        {
+            Dimension = TextureDimension.Type2D,
+            Format = DepthStencilFormat,
+            Width = _depthStencilWidth,
+            Height = _depthStencilHeight,
+            Depth = 1,
+            MipLevels = 1,
+            ArrayLayers = 1,
+            Usage = TextureUsage.DepthStencilAttachment
+        });
         try
         {
             var attachment = _device.CreateTextureView(texture, new TextureViewDescription(

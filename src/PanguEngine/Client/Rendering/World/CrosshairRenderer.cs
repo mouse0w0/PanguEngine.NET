@@ -60,25 +60,32 @@ internal sealed class CrosshairRenderer
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "crosshair.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "crosshair.frag");
 
-        _vertexShader = device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode,
-            Name: "crosshair.vert"));
-        _fragmentShader = device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode,
-            Name: "crosshair.frag"));
-        _pipeline = device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            [_vertexShader, _fragmentShader],
-            CrosshairVertex.VertexInput,
-            ColorAttachmentFormats: [colorFormat],
-            DescriptorSetLayouts: [_descriptorLayout],
-            Rasterizer: new RasterizerDescription(CullMode: CullMode.None),
-            ColorBlend: new ColorBlendDescription(AlphaBlend: false),
-            DepthStencil: new DepthStencilDescription(
-                DepthTestEnabled: false,
-                DepthWriteEnabled: false,
-                DepthCompareOperation: CompareOperation.Always,
-                StencilTestEnabled: false,
-                FrontFace: default,
-                BackFace: default),
-            DepthStencilAttachmentFormat: depthStencilFormat));
+        _vertexShader = device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode, "crosshair.vert"));
+        _fragmentShader =
+            device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode, "crosshair.frag"));
+        _pipeline = device.CreateGraphicsPipeline(new GraphicsPipelineDescription
+        {
+            Shaders = [_vertexShader, _fragmentShader],
+            VertexInput = CrosshairVertex.VertexInput,
+            ColorAttachmentFormats = [colorFormat],
+            DescriptorSetLayouts = [_descriptorLayout],
+            Rasterizer = new RasterizerDescription
+            {
+                CullMode = CullMode.None
+            },
+            ColorBlend = new ColorBlendDescription
+            {
+                AlphaBlend = false
+            },
+            DepthStencil = new DepthStencilDescription(
+                false,
+                false,
+                CompareOperation.Always,
+                false,
+                default,
+                default),
+            DepthStencilAttachmentFormat = depthStencilFormat
+        });
     }
 
     internal void Prepare(uint frameSlot, uint width, uint height)

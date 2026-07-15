@@ -34,23 +34,28 @@ internal sealed class SelectionRenderer
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "world_color.frag");
 
         _vertexShader =
-            _device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode, Name: "world_color.vert"));
+            _device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode, "world_color.vert"));
         _fragmentShader =
-            _device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode, Name: "world_color.frag"));
-        _pipeline = _device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            [_vertexShader, _fragmentShader],
-            ChunkVertex.VertexInput,
-            ColorAttachmentFormats: [colorFormat],
-            DescriptorSetLayouts: [cameraLayout],
-            Rasterizer: new RasterizerDescription(CullMode: CullMode.None),
-            DepthStencil: new DepthStencilDescription(
-                DepthTestEnabled: true,
-                DepthWriteEnabled: false,
-                DepthCompareOperation: CompareOperation.LessOrEqual,
-                StencilTestEnabled: false,
-                FrontFace: default,
-                BackFace: default),
-            DepthStencilAttachmentFormat: depthStencilFormat));
+            _device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode, "world_color.frag"));
+        _pipeline = _device.CreateGraphicsPipeline(new GraphicsPipelineDescription
+        {
+            Shaders = [_vertexShader, _fragmentShader],
+            VertexInput = ChunkVertex.VertexInput,
+            ColorAttachmentFormats = [colorFormat],
+            DescriptorSetLayouts = [cameraLayout],
+            Rasterizer = new RasterizerDescription
+            {
+                CullMode = CullMode.None
+            },
+            DepthStencil = new DepthStencilDescription(
+                true,
+                false,
+                CompareOperation.LessOrEqual,
+                false,
+                default,
+                default),
+            DepthStencilAttachmentFormat = depthStencilFormat
+        });
     }
 
     internal void Prepare(uint frameSlot, BlockHit? selection)

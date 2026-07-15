@@ -3,26 +3,64 @@ namespace PanguEngine.Graphics;
 /// <summary>
 /// Describes a graphics pipeline resource to create.
 /// </summary>
-/// <param name="Shaders">The shaders used by the pipeline.</param>
-/// <param name="VertexInput">The vertex input layout.</param>
-/// <param name="Topology">The primitive topology.</param>
-/// <param name="Rasterizer">The rasterization state.</param>
-/// <param name="ColorBlend">The color blend state.</param>
-/// <param name="ColorAttachmentFormats">The color attachment formats.</param>
-/// <param name="DynamicViewport">Whether viewport state is dynamic.</param>
-/// <param name="DynamicScissor">Whether scissor state is dynamic.</param>
-/// <param name="DescriptorSetLayouts">The descriptor set layouts used by the pipeline.</param>
-/// <param name="DepthStencil">The depth and stencil state.</param>
-/// <param name="DepthStencilAttachmentFormat">The depth/stencil attachment format, or <see cref="TextureFormat.Undefined" /> when the pipeline does not use one.</param>
-public readonly record struct GraphicsPipelineDescription(
-    Shader[] Shaders,
-    VertexInputDescription VertexInput,
-    TextureFormat[] ColorAttachmentFormats,
-    DescriptorSetLayout[] DescriptorSetLayouts,
-    PrimitiveTopology Topology = PrimitiveTopology.TriangleList,
-    RasterizerDescription Rasterizer = default,
-    ColorBlendDescription ColorBlend = default,
-    bool DynamicViewport = true,
-    bool DynamicScissor = true,
-    DepthStencilDescription DepthStencil = default,
-    TextureFormat DepthStencilAttachmentFormat = TextureFormat.Undefined);
+public readonly record struct GraphicsPipelineDescription
+{
+    public GraphicsPipelineDescription()
+    {
+    }
+
+    /// <summary>
+    /// The shaders used by the pipeline.
+    /// </summary>
+    public required Shader[] Shaders { get; init; }
+
+    /// <summary>
+    /// The vertex input layout.
+    /// </summary>
+    public required VertexInputDescription VertexInput { get; init; }
+
+    /// <summary>
+    /// The color attachment formats.
+    /// </summary>
+    public required TextureFormat[] ColorAttachmentFormats { get; init; }
+
+    /// <summary>
+    /// The descriptor set layouts used by the pipeline.
+    /// </summary>
+    public required DescriptorSetLayout[] DescriptorSetLayouts { get; init; }
+
+    /// <summary>
+    /// The primitive topology.
+    /// </summary>
+    public PrimitiveTopology Topology { get; init; } = PrimitiveTopology.TriangleList;
+
+    /// <summary>
+    /// The rasterization state.
+    /// </summary>
+    public RasterizerDescription Rasterizer { get; init; } = default;
+
+    /// <summary>
+    /// The color blend state.
+    /// </summary>
+    public ColorBlendDescription ColorBlend { get; init; } = default;
+
+    /// <summary>
+    /// Whether viewport state is dynamic.
+    /// </summary>
+    public bool DynamicViewport { get; init; } = true;
+
+    /// <summary>
+    /// Whether scissor state is dynamic.
+    /// </summary>
+    public bool DynamicScissor { get; init; } = true;
+
+    /// <summary>
+    /// The depth and stencil state.
+    /// </summary>
+    public DepthStencilDescription DepthStencil { get; init; } = default;
+
+    /// <summary>
+    /// The depth/stencil attachment format, or <see cref="TextureFormat.Undefined" /> when the pipeline does not use one.
+    /// </summary>
+    public TextureFormat DepthStencilAttachmentFormat { get; init; } = TextureFormat.Undefined;
+}

@@ -1,18 +1,24 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace PanguEngine.Graphics;
 
 /// <summary>
 /// Describes a descriptor set layout resource to create.
 /// </summary>
-/// <param name="Bindings">The descriptor set layout bindings.</param>
-public readonly record struct DescriptorSetLayoutDescription(DescriptorSetLayoutBinding[] Bindings);
+public readonly record struct DescriptorSetLayoutDescription
+{
+    /// <summary>
+    /// Creates a descriptor set layout description.
+    /// </summary>
+    /// <param name="bindings">The descriptor set layout bindings.</param>
+    [SetsRequiredMembers]
+    public DescriptorSetLayoutDescription(DescriptorSetLayoutBinding[] bindings)
+    {
+        Bindings = bindings;
+    }
 
-/// <summary>
-/// Describes a single descriptor set layout binding.
-/// </summary>
-/// <param name="Binding">The shader binding index.</param>
-/// <param name="Type">The descriptor type.</param>
-/// <param name="StageFlags">The shader stages that can access the binding.</param>
-public readonly record struct DescriptorSetLayoutBinding(
-    uint Binding,
-    DescriptorType Type,
-    ShaderStageFlags StageFlags);
+    /// <summary>
+    /// The descriptor set layout bindings.
+    /// </summary>
+    public required DescriptorSetLayoutBinding[] Bindings { get; init; }
+}

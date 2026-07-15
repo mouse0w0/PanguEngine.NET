@@ -45,12 +45,17 @@ internal sealed class ClearOnlyScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.BeginRecording();
-            commands.BeginRendering(new RenderingDescription(
-                frame.Width,
-                frame.Height,
+            commands.BeginRendering(new RenderingDescription
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                ColorAttachments =
                 [
-                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.02f, 0.04f, 0.08f, 1)),
-                ]));
+                    new ColorAttachmentDescription(
+                        frame.ColorOutput,
+                        new ClearColor(0.02f, 0.04f, 0.08f, 1))
+                ]
+            });
             commands.EndRendering();
             commands.PrepareForPresent(frame.ColorOutput);
             commands.EndRecording();

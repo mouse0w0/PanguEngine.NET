@@ -85,12 +85,17 @@ internal sealed class TextureMipUploadScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.BeginRecording();
-            commands.BeginRendering(new RenderingDescription(
-                frame.Width,
-                frame.Height,
+            commands.BeginRendering(new RenderingDescription
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                ColorAttachments =
                 [
-                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
-                ]));
+                    new ColorAttachmentDescription(
+                        frame.ColorOutput,
+                        new ClearColor(0.01f, 0.01f, 0.015f, 1))
+                ]
+            });
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
@@ -119,15 +124,17 @@ internal sealed class TextureMipUploadScene : IClientTestScene
 
     private void CreateTexture()
     {
-        _texture = ClientTestApp.Current.Device.CreateTexture(new TextureDescription(
-            TextureDimension.Type2D,
-            TextureFormat.R8G8B8A8Unorm,
-            8,
-            8,
-            1,
-            3,
-            1,
-            TextureUsage.TransferDestination | TextureUsage.Sampled));
+        _texture = ClientTestApp.Current.Device.CreateTexture(new TextureDescription
+        {
+            Dimension = TextureDimension.Type2D,
+            Format = TextureFormat.R8G8B8A8Unorm,
+            Width = 8,
+            Height = 8,
+            Depth = 1,
+            MipLevels = 3,
+            ArrayLayers = 1,
+            Usage = TextureUsage.TransferDestination | TextureUsage.Sampled
+        });
         _textureView = ClientTestApp.Current.Device.CreateTextureView(_texture, new TextureViewDescription(
             TextureViewDimension.Type2D,
             0,
@@ -190,31 +197,29 @@ internal sealed class TextureMipUploadScene : IClientTestScene
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, File.ReadAllText(fragPath),
             name: "texture_mip_upload.frag");
 
-        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Vertex,
-            vertBytecode,
-            Name: "texture_mip_upload.vert"));
-        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Fragment,
-            fragBytecode,
-            Name: "texture_mip_upload.frag"));
+        _vertShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode,
+                "texture_mip_upload.vert"));
+        _fragShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode,
+                "texture_mip_upload.frag"));
     }
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            [_vertShader, _fragShader],
-            CreateVertexInputDescription(),
-            ColorAttachmentFormats: [colorFormat],
-            DescriptorSetLayouts: [_descriptorSetLayout]));
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription
+        {
+            Shaders = [_vertShader, _fragShader],
+            VertexInput = CreateVertexInputDescription(),
+            ColorAttachmentFormats = [colorFormat],
+            DescriptorSetLayouts = [_descriptorSetLayout]
+        });
     }
 
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            [
-                new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            ],
+            [new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())],
             [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x2, 8)

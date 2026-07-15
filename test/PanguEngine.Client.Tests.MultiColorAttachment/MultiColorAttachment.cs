@@ -76,13 +76,18 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.BeginRecording();
-            commands.BeginRendering(new RenderingDescription(
-                frame.Width,
-                frame.Height,
+            commands.BeginRendering(new RenderingDescription
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                ColorAttachments =
                 [
-                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.02f, 0.03f, 0.05f, 1)),
-                    new ColorAttachmentDescription(offscreenAttachment, new ClearColor(0, 0, 0, 1)),
-                ]));
+                    new ColorAttachmentDescription(
+                        frame.ColorOutput,
+                        new ClearColor(0.02f, 0.03f, 0.05f, 1)),
+                    new ColorAttachmentDescription(offscreenAttachment, new ClearColor(0, 0, 0, 1))
+                ]
+            });
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
@@ -123,15 +128,17 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
             return existingAttachment;
 
         var device = ClientTestApp.Current.Device;
-        var texture = device.CreateTexture(new TextureDescription(
-            TextureDimension.Type2D,
-            _presenter.ColorFormat,
-            _attachmentWidth,
-            _attachmentHeight,
-            1,
-            1,
-            1,
-            TextureUsage.ColorAttachment));
+        var texture = device.CreateTexture(new TextureDescription
+        {
+            Dimension = TextureDimension.Type2D,
+            Format = _presenter.ColorFormat,
+            Width = _attachmentWidth,
+            Height = _attachmentHeight,
+            Depth = 1,
+            MipLevels = 1,
+            ArrayLayers = 1,
+            Usage = TextureUsage.ColorAttachment
+        });
         try
         {
             var attachment = device.CreateTextureView(texture, new TextureViewDescription(
@@ -173,31 +180,29 @@ internal sealed class MultiColorAttachmentScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "multi_color.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "multi_color.frag");
 
-        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Vertex,
-            vertBytecode,
-            Name: "multi_color.vert"));
-        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Fragment,
-            fragBytecode,
-            Name: "multi_color.frag"));
+        _vertShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode,
+                "multi_color.vert"));
+        _fragShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode,
+                "multi_color.frag"));
     }
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            [_vertShader, _fragShader],
-            CreateVertexInputDescription(),
-            ColorAttachmentFormats: [colorFormat, colorFormat],
-            DescriptorSetLayouts: []));
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription
+        {
+            Shaders = [_vertShader, _fragShader],
+            VertexInput = CreateVertexInputDescription(),
+            ColorAttachmentFormats = [colorFormat, colorFormat],
+            DescriptorSetLayouts = []
+        });
     }
 
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            [
-                new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            ],
+            [new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())],
             [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 8)

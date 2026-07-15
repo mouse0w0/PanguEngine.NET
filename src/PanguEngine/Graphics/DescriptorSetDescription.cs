@@ -1,13 +1,34 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace PanguEngine.Graphics;
 
 /// <summary>
 /// Describes a descriptor set resource to create.
 /// </summary>
-/// <param name="Layout">The descriptor set layout.</param>
-/// <param name="Bindings">The concrete descriptor bindings.</param>
-public readonly record struct DescriptorSetDescription(
-    DescriptorSetLayout Layout,
-    DescriptorSetBinding[] Bindings);
+public readonly record struct DescriptorSetDescription
+{
+    /// <summary>
+    /// Creates a descriptor set description.
+    /// </summary>
+    /// <param name="layout">The descriptor set layout.</param>
+    /// <param name="bindings">The concrete descriptor bindings.</param>
+    [SetsRequiredMembers]
+    public DescriptorSetDescription(DescriptorSetLayout layout, DescriptorSetBinding[] bindings)
+    {
+        Layout = layout;
+        Bindings = bindings;
+    }
+
+    /// <summary>
+    /// The descriptor set layout.
+    /// </summary>
+    public required DescriptorSetLayout Layout { get; init; }
+
+    /// <summary>
+    /// The concrete descriptor bindings.
+    /// </summary>
+    public required DescriptorSetBinding[] Bindings { get; init; }
+}
 
 /// <summary>
 /// Describes a single descriptor binding.

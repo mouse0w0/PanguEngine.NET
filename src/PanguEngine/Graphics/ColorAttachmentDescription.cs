@@ -1,14 +1,45 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace PanguEngine.Graphics;
 
 /// <summary>
 /// Describes a color attachment used by a rendering operation.
 /// </summary>
-/// <param name="Attachment">The color attachment texture view.</param>
-/// <param name="ClearColor">The clear color.</param>
-/// <param name="LoadOperation">The color attachment load operation.</param>
-/// <param name="StoreOperation">The color attachment store operation.</param>
-public readonly record struct ColorAttachmentDescription(
-    TextureView Attachment,
-    ClearColor ClearColor,
-    LoadOperation LoadOperation = LoadOperation.Clear,
-    StoreOperation StoreOperation = StoreOperation.Store);
+public readonly record struct ColorAttachmentDescription
+{
+    public ColorAttachmentDescription()
+    {
+    }
+
+    /// <summary>
+    /// Creates a color attachment description.
+    /// </summary>
+    /// <param name="attachment">The color attachment texture view.</param>
+    /// <param name="clearColor">The clear color.</param>
+    [SetsRequiredMembers]
+    public ColorAttachmentDescription(TextureView attachment, ClearColor clearColor)
+    {
+        Attachment = attachment;
+        ClearColor = clearColor;
+    }
+
+    /// <summary>
+    /// The color attachment texture view.
+    /// </summary>
+    public required TextureView Attachment { get; init; }
+
+    /// <summary>
+    /// The clear color.
+    /// </summary>
+    public required ClearColor ClearColor { get; init; }
+
+    /// <summary>
+    /// The color attachment load operation.
+    /// </summary>
+    public LoadOperation LoadOperation { get; init; } = LoadOperation.Clear;
+
+    /// <summary>
+    /// The color attachment store operation.
+    /// </summary>
+    public StoreOperation StoreOperation { get; init; } = StoreOperation.Store;
+}

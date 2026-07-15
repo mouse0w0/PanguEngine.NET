@@ -102,16 +102,22 @@ internal sealed class DepthStencilScene : IClientTestScene
         {
             var commands = frame.CommandList;
             commands.BeginRecording();
-            commands.BeginRendering(new RenderingDescription(
-                frame.Width,
-                frame.Height,
+            commands.BeginRendering(new RenderingDescription
+            {
+                Width = frame.Width,
+                Height = frame.Height,
+                ColorAttachments =
                 [
-                    new ColorAttachmentDescription(frame.ColorOutput, new ClearColor(0.01f, 0.01f, 0.015f, 1)),
+                    new ColorAttachmentDescription(
+                        frame.ColorOutput,
+                        new ClearColor(0.01f, 0.01f, 0.015f, 1))
                 ],
-                new DepthStencilAttachmentDescription(
-                    depthStencilAttachment,
-                    DepthClearValue: 1,
-                    StencilClearValue: 0)));
+                DepthStencilAttachment = new DepthStencilAttachmentDescription(depthStencilAttachment)
+                {
+                    DepthClearValue = 1,
+                    StencilClearValue = 0
+                }
+            });
             commands.SetGraphicsPipeline(_pipeline);
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
@@ -153,15 +159,17 @@ internal sealed class DepthStencilScene : IClientTestScene
             return existingAttachment;
 
         var device = ClientTestApp.Current.Device;
-        var texture = device.CreateTexture(new TextureDescription(
-            TextureDimension.Type2D,
-            TextureFormat.Depth24UnormStencil8,
-            _depthStencilWidth,
-            _depthStencilHeight,
-            1,
-            1,
-            1,
-            TextureUsage.DepthStencilAttachment));
+        var texture = device.CreateTexture(new TextureDescription
+        {
+            Dimension = TextureDimension.Type2D,
+            Format = TextureFormat.Depth24UnormStencil8,
+            Width = _depthStencilWidth,
+            Height = _depthStencilHeight,
+            Depth = 1,
+            MipLevels = 1,
+            ArrayLayers = 1,
+            Usage = TextureUsage.DepthStencilAttachment
+        });
         try
         {
             var attachment = device.CreateTextureView(texture, new TextureViewDescription(
@@ -210,39 +218,37 @@ internal sealed class DepthStencilScene : IClientTestScene
         var vertBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Vertex, vertSource, name: "depth_stencil.vert");
         var fragBytecode = ShaderCompiler.CompileGlsl(ShaderStage.Fragment, fragSource, name: "depth_stencil.frag");
 
-        _vertShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Vertex,
-            vertBytecode,
-            Name: "depth_stencil.vert"));
-        _fragShader = ClientTestApp.Current.Device.CreateShader(new ShaderDescription(
-            ShaderStage.Fragment,
-            fragBytecode,
-            Name: "depth_stencil.frag"));
+        _vertShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertBytecode,
+                "depth_stencil.vert"));
+        _fragShader =
+            ClientTestApp.Current.Device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragBytecode,
+                "depth_stencil.frag"));
     }
 
     private void CreatePipeline(TextureFormat colorFormat)
     {
-        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription(
-            [_vertShader, _fragShader],
-            CreateVertexInputDescription(),
-            ColorAttachmentFormats: [colorFormat],
-            DescriptorSetLayouts: [],
-            DepthStencil: new DepthStencilDescription(
-                DepthTestEnabled: true,
-                DepthWriteEnabled: true,
-                DepthCompareOperation: CompareOperation.LessOrEqual,
-                StencilTestEnabled: true,
-                FrontFace: new(CompareOperation.Always),
-                BackFace: new(CompareOperation.Always)),
-            DepthStencilAttachmentFormat: TextureFormat.Depth24UnormStencil8));
+        _pipeline = ClientTestApp.Current.Device.CreateGraphicsPipeline(new GraphicsPipelineDescription
+        {
+            Shaders = [_vertShader, _fragShader],
+            VertexInput = CreateVertexInputDescription(),
+            ColorAttachmentFormats = [colorFormat],
+            DescriptorSetLayouts = [],
+            DepthStencil = new DepthStencilDescription(
+                true,
+                true,
+                CompareOperation.LessOrEqual,
+                true,
+                new StencilFaceDescription(),
+                new StencilFaceDescription()),
+            DepthStencilAttachmentFormat = TextureFormat.Depth24UnormStencil8
+        });
     }
 
     private static VertexInputDescription CreateVertexInputDescription()
     {
         return new VertexInputDescription(
-            [
-                new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())
-            ],
+            [new VertexBufferLayoutDescription(0, (uint)Marshal.SizeOf<Vertex>())],
             [
                 new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x3, 0),
                 new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x3, 12)
