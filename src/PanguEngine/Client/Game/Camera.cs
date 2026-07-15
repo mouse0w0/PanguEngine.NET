@@ -7,10 +7,6 @@ namespace PanguEngine.Client.Game;
 /// </summary>
 internal sealed class Camera
 {
-    internal const double FieldOfView = 70d;
-    internal const double NearPlane = 0.05d;
-    internal const double FarPlane = 1000d;
-
     private const double DegreesToRadians = Math.PI / 180d;
     private const double DirectionComponentEpsilon = 0.000001d;
 
@@ -36,6 +32,15 @@ internal sealed class Camera
 
     /// <summary>The presentation width divided by height.</summary>
     internal double AspectRatio { get; set; } = 1;
+
+    /// <summary>The vertical field of view in degrees.</summary>
+    internal double FieldOfView { get; set; } = 70d;
+
+    /// <summary>The distance to the near clipping plane.</summary>
+    internal double NearPlane { get; set; } = 0.05d;
+
+    /// <summary>The distance to the far clipping plane.</summary>
+    internal double FarPlane { get; set; } = 1000d;
 
     /// <summary>The current normalized camera forward direction.</summary>
     internal Vector3D<double> Forward

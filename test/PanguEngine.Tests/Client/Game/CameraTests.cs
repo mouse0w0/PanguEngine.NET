@@ -39,8 +39,8 @@ public sealed class CameraTests
         var camera = new Camera { AspectRatio = 16d / 9d };
         var projection = camera.CreateProjectionMatrix();
 
-        var nearClip = new Vector4D<double>(0, 0, -Camera.NearPlane, 1) * projection;
-        var farClip = new Vector4D<double>(0, 0, -Camera.FarPlane, 1) * projection;
+        var nearClip = new Vector4D<double>(0, 0, -camera.NearPlane, 1) * projection;
+        var farClip = new Vector4D<double>(0, 0, -camera.FarPlane, 1) * projection;
 
         Assert.Equal(0, nearClip.Z / nearClip.W, 4);
         Assert.Equal(1, farClip.Z / farClip.W, 4);
@@ -59,6 +59,20 @@ public sealed class CameraTests
 
         Assert.Equal(square.M11 / 2, wide.M11, 4);
         Assert.Equal(square.M22, wide.M22, 4);
+    }
+
+    [Fact]
+    public void ProjectionUsesFieldOfViewProperty()
+    {
+        var camera = new Camera();
+
+        Assert.Equal(70d, camera.FieldOfView);
+        var defaultProjection = camera.CreateProjectionMatrix();
+
+        camera.FieldOfView = 35d;
+        var narrowProjection = camera.CreateProjectionMatrix();
+
+        Assert.NotEqual(defaultProjection.M11, narrowProjection.M11);
     }
 
     [Fact]

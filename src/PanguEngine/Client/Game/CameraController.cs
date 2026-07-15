@@ -7,17 +7,24 @@ namespace PanguEngine.Client.Game;
 /// </summary>
 internal sealed class CameraController
 {
-    internal const double MoveDistancePerTick = 0.4d;
-    internal const double MouseSensitivity = 0.08d;
-    internal const double MinPitch = -89d;
-    internal const double MaxPitch = 89d;
-
     private readonly Camera _camera;
 
     internal CameraController(Camera camera)
     {
         _camera = camera;
     }
+
+    /// <summary>The movement distance applied per fixed update.</summary>
+    internal double MoveDistancePerTick { get; set; } = 0.4d;
+
+    /// <summary>The mouse rotation sensitivity.</summary>
+    internal double MouseSensitivity { get; set; } = 0.08d;
+
+    /// <summary>The minimum vertical camera angle in degrees.</summary>
+    internal double MinPitch { get; set; } = -89d;
+
+    /// <summary>The maximum vertical camera angle in degrees.</summary>
+    internal double MaxPitch { get; set; } = 89d;
 
     /// <summary>
     /// Applies a relative mouse movement to the controlled camera orientation.

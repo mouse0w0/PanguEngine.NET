@@ -13,8 +13,8 @@ public sealed class CameraControllerTests
 
         controller.ApplyMouseDelta(new Vector2D<float>(10, -2000));
 
-        Assert.Equal(-90 + 10 * CameraController.MouseSensitivity, camera.Yaw, 4);
-        Assert.Equal(CameraController.MaxPitch, camera.Pitch, 4);
+        Assert.Equal(-90 + 10 * controller.MouseSensitivity, camera.Yaw, 4);
+        Assert.Equal(controller.MaxPitch, camera.Pitch, 4);
     }
 
     [Fact]
@@ -26,9 +26,62 @@ public sealed class CameraControllerTests
         controller.Move(1, 1);
 
         Assert.Equal(
-            CameraController.MoveDistancePerTick,
+            controller.MoveDistancePerTick,
             Distance(camera.PreviousPosition, camera.CurrentPosition),
             4);
+    }
+
+    [Fact]
+    public void MovementUsesMoveDistancePerTickProperty()
+    {
+        var camera = new Camera();
+        var controller = new CameraController(camera)
+        {
+            MoveDistancePerTick = 1.25d
+        };
+
+        controller.Move(1, 0);
+
+        Assert.Equal(1.25d, Distance(camera.PreviousPosition, camera.CurrentPosition), 4);
+    }
+
+    [Fact]
+    public void MouseRotationUsesMouseSensitivityProperty()
+    {
+        var camera = new Camera();
+        var controller = new CameraController(camera)
+        {
+            MouseSensitivity = 0.5d
+        };
+
+        controller.ApplyMouseDelta(new Vector2D<float>(2, 0));
+
+        Assert.Equal(-89d, camera.Yaw, 4);
+    }
+
+    [Fact]
+    public void PitchUsesConfigurableBounds()
+    {
+        var defaultController = new CameraController(new Camera());
+
+        Assert.Equal(-89d, defaultController.MinPitch);
+        Assert.Equal(89d, defaultController.MaxPitch);
+
+        var camera = new Camera();
+        var controller = new CameraController(camera)
+        {
+            MinPitch = -10d,
+            MaxPitch = 10d
+        };
+
+        Assert.Equal(-10d, controller.MinPitch);
+        Assert.Equal(10d, controller.MaxPitch);
+
+        controller.ApplyMouseDelta(new Vector2D<float>(0, 1000));
+        Assert.Equal(-10d, camera.Pitch, 4);
+
+        controller.ApplyMouseDelta(new Vector2D<float>(0, -1000));
+        Assert.Equal(10d, camera.Pitch, 4);
     }
 
     [Fact]
@@ -70,7 +123,7 @@ public sealed class CameraControllerTests
 
         AssertVector(first, camera.PreviousPosition);
         Assert.Equal(
-            CameraController.MoveDistancePerTick,
+            controller.MoveDistancePerTick,
             Distance(first, camera.CurrentPosition),
             4);
     }
