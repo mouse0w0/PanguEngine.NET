@@ -38,6 +38,9 @@ internal sealed class FreeCamera
     /// <summary>The vertical camera angle in degrees.</summary>
     internal double Pitch { get; private set; }
 
+    /// <summary>The presentation width divided by height.</summary>
+    internal double AspectRatio { get; set; } = 1;
+
     /// <summary>The current normalized camera forward direction.</summary>
     internal Vector3D<double> Forward
     {
@@ -103,16 +106,12 @@ internal sealed class FreeCamera
     /// <summary>
     /// Creates a right-handed perspective matrix with Vulkan depth range.
     /// </summary>
-    /// <param name="aspectRatio">The presentation width divided by height.</param>
     /// <returns>The projection matrix.</returns>
-    internal static Matrix4X4<double> CreateProjectionMatrix(double aspectRatio)
+    internal Matrix4X4<double> CreateProjectionMatrix()
     {
-        if (!double.IsFinite(aspectRatio) || aspectRatio <= 0)
-            throw new ArgumentOutOfRangeException(nameof(aspectRatio));
-
         var projection = Matrix4X4.CreatePerspectiveFieldOfView(
             FieldOfView * DegreesToRadians,
-            aspectRatio,
+            AspectRatio,
             NearPlane,
             FarPlane);
         projection.M22 = -projection.M22;
@@ -133,11 +132,10 @@ internal sealed class FreeCamera
     /// <summary>
     /// Creates the interpolated view-projection matrix.
     /// </summary>
-    /// <param name="aspectRatio">The presentation width divided by height.</param>
     /// <param name="alpha">The fixed-update interpolation factor.</param>
     /// <returns>The view-projection matrix.</returns>
-    internal Matrix4X4<float> CreateViewProjection(double aspectRatio, double alpha)
+    internal Matrix4X4<float> CreateViewProjection(double alpha)
     {
-        return (Matrix4X4<float>)(CreateViewMatrix(alpha) * CreateProjectionMatrix(aspectRatio));
+        return (Matrix4X4<float>)(CreateViewMatrix(alpha) * CreateProjectionMatrix());
     }
 }

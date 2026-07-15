@@ -97,7 +97,8 @@ public sealed class FreeCameraTests
     [Fact]
     public void ProjectionMapsNearAndFarPlanesToVulkanDepthRange()
     {
-        var projection = FreeCamera.CreateProjectionMatrix(16d / 9d);
+        var camera = new FreeCamera { AspectRatio = 16d / 9d };
+        var projection = camera.CreateProjectionMatrix();
 
         var nearClip = new Vector4D<double>(0, 0, -FreeCamera.NearPlane, 1) * projection;
         var farClip = new Vector4D<double>(0, 0, -FreeCamera.FarPlane, 1) * projection;
@@ -107,10 +108,15 @@ public sealed class FreeCameraTests
     }
 
     [Fact]
-    public void ProjectionUsesProvidedAspectRatio()
+    public void ProjectionUsesAspectRatioProperty()
     {
-        var square = FreeCamera.CreateProjectionMatrix(1);
-        var wide = FreeCamera.CreateProjectionMatrix(2);
+        var camera = new FreeCamera();
+
+        Assert.Equal(1, camera.AspectRatio);
+
+        var square = camera.CreateProjectionMatrix();
+        camera.AspectRatio = 2;
+        var wide = camera.CreateProjectionMatrix();
 
         Assert.Equal(square.M11 / 2, wide.M11, 4);
         Assert.Equal(square.M22, wide.M22, 4);
@@ -119,7 +125,8 @@ public sealed class FreeCameraTests
     [Fact]
     public void ProjectionMapsPositiveViewYTowardTopOfVulkanViewport()
     {
-        var projection = FreeCamera.CreateProjectionMatrix(1);
+        var camera = new FreeCamera { AspectRatio = 1 };
+        var projection = camera.CreateProjectionMatrix();
 
         var clip = new Vector4D<double>(0, 1, -1, 1) * projection;
 
@@ -146,12 +153,12 @@ public sealed class FreeCameraTests
     [Fact]
     public void ViewProjectionUsesLatestRotationWithoutInterpolation()
     {
-        var camera = new FreeCamera();
+        var camera = new FreeCamera { AspectRatio = 1 };
         camera.Move(1, 0);
-        var before = camera.CreateViewProjection(1, 0.5);
+        var before = camera.CreateViewProjection(0.5);
 
         camera.ApplyMouseDelta(new Vector2D<float>(10, 0));
-        var after = camera.CreateViewProjection(1, 0.5);
+        var after = camera.CreateViewProjection(0.5);
 
         Assert.NotEqual(before, after);
     }
