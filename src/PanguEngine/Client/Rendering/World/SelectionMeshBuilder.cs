@@ -1,5 +1,4 @@
 using PanguEngine.World.Blocks;
-using PanguEngine.World.Chunking;
 
 namespace PanguEngine.Client.Rendering.World;
 
@@ -10,18 +9,18 @@ internal static class SelectionMeshBuilder
 
     private const float HalfThickness = Thickness / 2;
 
-    internal static ChunkVertex[] Build(BlockPos position, IBlockShape shape)
+    internal static ChunkVertex[] Build(IBlockShape shape)
     {
         var selectionBoxes = shape.GetSelectionBoxes();
         var vertices = new List<ChunkVertex>(selectionBoxes.Count * 432);
         foreach (var box in selectionBoxes)
         {
-            var minX = position.X + (float)box.Min.X - Expansion;
-            var minY = position.Y + (float)box.Min.Y - Expansion;
-            var minZ = position.Z + (float)box.Min.Z - Expansion;
-            var maxX = position.X + (float)box.Max.X + Expansion;
-            var maxY = position.Y + (float)box.Max.Y + Expansion;
-            var maxZ = position.Z + (float)box.Max.Z + Expansion;
+            var minX = (float)box.Min.X - Expansion;
+            var minY = (float)box.Min.Y - Expansion;
+            var minZ = (float)box.Min.Z - Expansion;
+            var maxX = (float)box.Max.X + Expansion;
+            var maxY = (float)box.Max.Y + Expansion;
+            var maxZ = (float)box.Max.Z + Expansion;
 
             AddXEdge(vertices, minX, maxX, minY, minZ);
             AddXEdge(vertices, minX, maxX, minY, maxZ);
@@ -42,19 +41,55 @@ internal static class SelectionMeshBuilder
         return vertices.ToArray();
     }
 
-    private static void AddXEdge(List<ChunkVertex> vertices, float minX, float maxX, float y, float z)
+    private static void AddXEdge(
+        List<ChunkVertex> vertices,
+        float minX,
+        float maxX,
+        float y,
+        float z)
     {
-        AddCuboid(vertices, minX, y - HalfThickness, z - HalfThickness, maxX, y + HalfThickness, z + HalfThickness);
+        AddCuboid(
+            vertices,
+            minX,
+            y - HalfThickness,
+            z - HalfThickness,
+            maxX,
+            y + HalfThickness,
+            z + HalfThickness);
     }
 
-    private static void AddYEdge(List<ChunkVertex> vertices, float minY, float maxY, float x, float z)
+    private static void AddYEdge(
+        List<ChunkVertex> vertices,
+        float minY,
+        float maxY,
+        float x,
+        float z)
     {
-        AddCuboid(vertices, x - HalfThickness, minY, z - HalfThickness, x + HalfThickness, maxY, z + HalfThickness);
+        AddCuboid(
+            vertices,
+            x - HalfThickness,
+            minY,
+            z - HalfThickness,
+            x + HalfThickness,
+            maxY,
+            z + HalfThickness);
     }
 
-    private static void AddZEdge(List<ChunkVertex> vertices, float minZ, float maxZ, float x, float y)
+    private static void AddZEdge(
+        List<ChunkVertex> vertices,
+        float minZ,
+        float maxZ,
+        float x,
+        float y)
     {
-        AddCuboid(vertices, x - HalfThickness, y - HalfThickness, minZ, x + HalfThickness, y + HalfThickness, maxZ);
+        AddCuboid(
+            vertices,
+            x - HalfThickness,
+            y - HalfThickness,
+            minZ,
+            x + HalfThickness,
+            y + HalfThickness,
+            maxZ);
     }
 
     private static void AddCuboid(

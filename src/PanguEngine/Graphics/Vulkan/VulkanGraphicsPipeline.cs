@@ -249,6 +249,11 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             MaxDepthBounds = 1
         };
 
+        var pushConstantRangeDescriptions = description.PushConstantRanges;
+        var pushConstantRanges = stackalloc PushConstantRange[pushConstantRangeDescriptions.Length];
+        for (var i = 0; i < pushConstantRangeDescriptions.Length; i++)
+            pushConstantRanges[i] = VulkanMapping.ToVulkanPushConstantRange(pushConstantRangeDescriptions[i]);
+
         fixed (VKDescriptorSetLayout* descriptorLayouts = descriptorSetLayouts)
         fixed (PipelineShaderStageCreateInfo* stages = stageInfos)
         {
@@ -257,7 +262,8 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
                 SType = StructureType.PipelineLayoutCreateInfo,
                 SetLayoutCount = (uint)descriptorSetLayouts.Length,
                 PSetLayouts = descriptorSetLayouts.Length == 0 ? null : descriptorLayouts,
-                PushConstantRangeCount = 0
+                PushConstantRangeCount = (uint)pushConstantRangeDescriptions.Length,
+                PPushConstantRanges = pushConstantRangeDescriptions.Length == 0 ? null : pushConstantRanges
             };
 
             if (VulkanContext.Vk.CreatePipelineLayout(VulkanContext.Device, in pipelineLayoutInfo, null,

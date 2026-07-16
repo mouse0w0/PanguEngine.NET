@@ -1,6 +1,8 @@
+using PanguEngine.Client.Game;
 using PanguEngine.Client.World;
 using PanguEngine.Graphics;
 using PanguEngine.World.Chunking;
+using Silk.NET.Maths;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Client.Rendering.World;
@@ -52,6 +54,10 @@ internal sealed class ChunkRenderer
             VertexInput = ChunkVertex.VertexInput,
             ColorAttachmentFormats = [colorFormat],
             DescriptorSetLayouts = [cameraLayout],
+            PushConstantRanges =
+            [
+                new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, 16)
+            ],
             Rasterizer = new RasterizerDescription
             {
                 CullMode = CullMode.Back,
@@ -112,15 +118,26 @@ internal sealed class ChunkRenderer
     /// </summary>
     /// <param name="commandList">The active command list.</param>
     /// <param name="cameraDescriptorSet">The camera descriptor set for the active frame slot.</param>
-    public void Draw(CommandList commandList, DescriptorSet cameraDescriptorSet)
+    /// <param name="worldRenderState">The camera state for the active world frame.</param>
+    public void Draw(
+        CommandList commandList,
+        DescriptorSet cameraDescriptorSet,
+        WorldRenderState worldRenderState)
     {
         ArgumentNullException.ThrowIfNull(commandList);
         ArgumentNullException.ThrowIfNull(cameraDescriptorSet);
 
         commandList.SetGraphicsPipeline(_pipeline);
         commandList.SetDescriptorSet(0, cameraDescriptorSet);
-        foreach (var mesh in _meshes.Values)
+        foreach (var (chunkPosition, mesh) in _meshes)
         {
+            var worldOrigin = new Vector3D<double>(
+                (double)chunkPosition.X * Chunk.SizeX,
+                (double)chunkPosition.Y * Chunk.SizeY,
+                (double)chunkPosition.Z * Chunk.SizeZ);
+            var translatedWorldPosition = worldRenderState.ToTranslatedWorldPosition(worldOrigin);
+
+            commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, translatedWorldPosition);
             commandList.SetVertexBuffer(0, mesh.Buffer);
             commandList.Draw(mesh.VertexCount);
         }

@@ -157,6 +157,19 @@ internal sealed class Camera
         return (Matrix4X4<float>)(CreateViewMatrix(alpha) * CreateProjectionMatrix());
     }
 
+    /// <summary>
+    /// Creates the state used by camera-relative world rendering.
+    /// </summary>
+    /// <param name="alpha">The fixed-update interpolation factor.</param>
+    /// <returns>The world rendering state.</returns>
+    internal WorldRenderState CreateWorldRenderState(double alpha)
+    {
+        var position = GetInterpolatedPosition(alpha);
+        var view = Matrix4X4.CreateLookAt(Vector3D<double>.Zero, Forward, Vector3D<double>.UnitY);
+        var viewProjection = (Matrix4X4<float>)(view * CreateProjectionMatrix());
+        return new WorldRenderState(position, viewProjection);
+    }
+
     private static double SnapDirectionComponent(double value)
     {
         return Math.Abs(value) < DirectionComponentEpsilon ? 0 : value;

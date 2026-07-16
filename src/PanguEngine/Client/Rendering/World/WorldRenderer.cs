@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.World;
 using PanguEngine.Graphics;
@@ -44,7 +44,7 @@ internal sealed class WorldRenderer
         _cameraDescriptorLayout = _device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
             [new DescriptorSetLayoutBinding(0, DescriptorType.UniformBuffer, ShaderStageFlags.Vertex)]));
 
-        var cameraUniformSize = (ulong)Marshal.SizeOf<CameraUniform>();
+        var cameraUniformSize = (ulong)Unsafe.SizeOf<Matrix4X4<float>>();
         _cameraUniformStride = _device.GetAlignedUniformSize(cameraUniformSize);
         _cameraBuffer = _device.CreateBuffer(new BufferDescription(
             checked(_cameraUniformStride * _presenter.MaxFramesInFlight),
@@ -121,8 +121,10 @@ internal sealed class WorldRenderer
             var frameIndex = checked((int)frame.FrameSlot);
             var depthStencilAttachment = EnsureDepthStencilAttachment(frame.FrameSlot);
             camera.AspectRatio = (double)frame.Width / frame.Height;
-            var cameraUniform = new CameraUniform(camera.CreateViewProjection(alpha));
-            _cameraBuffer.Write(cameraUniform, checked(frame.FrameSlot * _cameraUniformStride));
+            var worldRenderState = camera.CreateWorldRenderState(alpha);
+            _cameraBuffer.Write(
+                worldRenderState.ViewProjection,
+                checked(frame.FrameSlot * _cameraUniformStride));
             if (uploadFailure is null)
                 _selectionRenderer.Prepare(frame.FrameSlot, selection);
             _crosshairRenderer.Prepare(frame.FrameSlot, frame.Width, frame.Height);
@@ -143,8 +145,15 @@ internal sealed class WorldRenderer
 
             if (uploadFailure is null)
             {
-                _chunkRenderer.Draw(commandList, _cameraDescriptorSets[frameIndex]);
-                _selectionRenderer.Draw(commandList, _cameraDescriptorSets[frameIndex], frame.FrameSlot);
+                _chunkRenderer.Draw(
+                    commandList,
+                    _cameraDescriptorSets[frameIndex],
+                    worldRenderState);
+                _selectionRenderer.Draw(
+                    commandList,
+                    _cameraDescriptorSets[frameIndex],
+                    frame.FrameSlot,
+                    worldRenderState);
                 _crosshairRenderer.Draw(commandList, frame.FrameSlot);
             }
 
@@ -255,7 +264,4 @@ internal sealed class WorldRenderer
             throw;
         }
     }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private readonly record struct CameraUniform(Matrix4X4<float> ViewProjection);
 }

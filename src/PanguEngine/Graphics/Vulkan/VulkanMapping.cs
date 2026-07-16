@@ -134,6 +134,16 @@ internal static class VulkanMapping
         return result;
     }
 
+    internal static PushConstantRange ToVulkanPushConstantRange(PushConstantRangeDescription description)
+    {
+        return new PushConstantRange
+        {
+            StageFlags = ToVulkanShaderStageFlags(description.Stages),
+            Offset = description.Offset,
+            Size = description.Size
+        };
+    }
+
     internal static VkVertexInputRate ToVulkanVertexInputRate(VertexInputRate inputRate)
     {
         return inputRate switch

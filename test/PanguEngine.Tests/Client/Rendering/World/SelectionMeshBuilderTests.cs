@@ -1,6 +1,5 @@
 ﻿using PanguEngine.Client.Rendering.World;
 using PanguEngine.World.Blocks;
-using PanguEngine.World.Chunking;
 using Silk.NET.Maths;
 
 namespace PanguEngine.Tests.Client.Rendering.World;
@@ -10,13 +9,13 @@ public sealed class SelectionMeshBuilderTests
     [Fact]
     public void EmptyShapeProducesNoVertices()
     {
-        Assert.Empty(SelectionMeshBuilder.Build(default, BlockShape.Empty));
+        Assert.Empty(SelectionMeshBuilder.Build(BlockShape.Empty));
     }
 
     [Fact]
     public void FullBlockProducesTwelveSolidEdges()
     {
-        var vertices = SelectionMeshBuilder.Build(default, BlockShape.FullBlock);
+        var vertices = SelectionMeshBuilder.Build(BlockShape.FullBlock);
 
         Assert.Equal(432, vertices.Length);
     }
@@ -28,15 +27,15 @@ public sealed class SelectionMeshBuilderTests
             new Box3D<double>(0, 0, 0, 0.5, 1, 1),
             new Box3D<double>(0.5, 0, 0, 1, 1, 1));
 
-        var vertices = SelectionMeshBuilder.Build(default, shape);
+        var vertices = SelectionMeshBuilder.Build(shape);
 
         Assert.Equal(864, vertices.Length);
     }
 
     [Fact]
-    public void FullBlockFrameIncludesExpansionAndThickness()
+    public void FullBlockVerticesAreRelativeToBlockOrigin()
     {
-        var vertices = SelectionMeshBuilder.Build(default, BlockShape.FullBlock);
+        var vertices = SelectionMeshBuilder.Build(BlockShape.FullBlock);
 
         Assert.Equal(-0.007f, vertices.Min(vertex => vertex.X), 4);
         Assert.Equal(-0.007f, vertices.Min(vertex => vertex.Y), 4);
@@ -47,22 +46,12 @@ public sealed class SelectionMeshBuilderTests
     }
 
     [Fact]
-    public void BlockPositionOffsetsFrameVertices()
-    {
-        var vertices = SelectionMeshBuilder.Build(new BlockPos(2, 3, 4), BlockShape.FullBlock);
-
-        Assert.Equal(1.993f, vertices.Min(vertex => vertex.X), 4);
-        Assert.Equal(2.993f, vertices.Min(vertex => vertex.Y), 4);
-        Assert.Equal(3.993f, vertices.Min(vertex => vertex.Z), 4);
-    }
-
-    [Fact]
     public void CustomSelectionBoxProducesFiniteSolidEdges()
     {
         var shape = new SelectionBoxShape(
             new Box3D<double>(0.1, 0.2, 0.3, 0.9, 0.8, 0.7));
 
-        var vertices = SelectionMeshBuilder.Build(default, shape);
+        var vertices = SelectionMeshBuilder.Build(shape);
 
         Assert.Equal(432, vertices.Length);
         Assert.All(vertices, vertex =>

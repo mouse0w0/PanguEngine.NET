@@ -64,6 +64,16 @@ public abstract class CommandList
     public abstract void SetDescriptorSet(uint slot, DescriptorSet descriptorSet);
 
     /// <summary>
+    /// Sets push constant data for the bound graphics pipeline.
+    /// </summary>
+    /// <typeparam name="T">The unmanaged push constant payload type.</typeparam>
+    /// <param name="stages">The shader stages that consume the data.</param>
+    /// <param name="offset">The byte offset within the push constant block.</param>
+    /// <param name="value">The push constant data.</param>
+    public abstract void SetPushConstants<T>(ShaderStageFlags stages, uint offset, in T value)
+        where T : unmanaged;
+
+    /// <summary>
     /// Records a non-indexed draw command.
     /// </summary>
     /// <param name="vertexCount">The number of vertices to draw.</param>

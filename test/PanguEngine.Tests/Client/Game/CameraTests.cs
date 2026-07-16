@@ -133,6 +133,31 @@ public sealed class CameraTests
         Assert.Equal(-1, pointInView.Z, 4);
     }
 
+    [Fact]
+    public void WorldRenderStatePreservesInterpolatedWorldOrigin()
+    {
+        var start = new Vector3D<double>(1_000_000_000_000, -32.5, -1_000_000_000_000);
+        var end = new Vector3D<double>(1_000_000_000_001, -30.5, -999_999_999_997);
+        var camera = new Camera(start, -90, -20);
+        camera.MoveTo(end);
+
+        var state = camera.CreateWorldRenderState(0.25);
+
+        Assert.Equal(camera.GetInterpolatedPosition(0.25), state.WorldOrigin);
+    }
+
+    [Fact]
+    public void WorldRenderStateViewProjectionDoesNotDependOnWorldOrigin()
+    {
+        var originCamera = new Camera(Vector3D<double>.Zero, -90, -20);
+        var distantCamera = new Camera(new Vector3D<double>(1_000_000_000, -500, -1_000_000_000), -90, -20);
+
+        var originState = originCamera.CreateWorldRenderState(1);
+        var distantState = distantCamera.CreateWorldRenderState(1);
+
+        Assert.Equal(originState.ViewProjection, distantState.ViewProjection);
+    }
+
     private static void AssertVector(Vector3D<double> expected, Vector3D<double> actual)
     {
         Assert.Equal(expected.X, actual.X, 4);

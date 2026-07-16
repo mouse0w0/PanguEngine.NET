@@ -19,12 +19,12 @@ public sealed class ChunkMeshBuilderTests
 
         Assert.False(mesh.IsEmpty);
         Assert.Equal(36, mesh.VertexCount);
-        Assert.Equal(32f, mesh.Vertices.Min(vertex => vertex.X));
-        Assert.Equal(33f, mesh.Vertices.Max(vertex => vertex.X));
-        Assert.Equal(32f, mesh.Vertices.Min(vertex => vertex.Y));
-        Assert.Equal(33f, mesh.Vertices.Max(vertex => vertex.Y));
-        Assert.Equal(32f, mesh.Vertices.Min(vertex => vertex.Z));
-        Assert.Equal(33f, mesh.Vertices.Max(vertex => vertex.Z));
+        Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.X));
+        Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.X));
+        Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.Y));
+        Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.Y));
+        Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.Z));
+        Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.Z));
         Assert.Contains(mesh.Vertices, vertex =>
             vertex.R == 0.55f && vertex.G == 0.55f && vertex.B == 0.55f && vertex.A == 1f);
     }

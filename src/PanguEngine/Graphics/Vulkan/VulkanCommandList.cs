@@ -312,6 +312,24 @@ internal sealed unsafe class VulkanCommandList : CommandList
     }
 
     /// <inheritdoc/>
+    public override void SetPushConstants<T>(ShaderStageFlags stages, uint offset, in T value)
+    {
+        EnsureRecording();
+        var pipeline = _graphicsPipeline
+                       ?? throw new InvalidOperationException(
+                           "A graphics pipeline must be bound before setting push constants.");
+
+        var copy = value;
+        VulkanContext.Vk.CmdPushConstants(
+            _commandBuffer,
+            pipeline.Layout,
+            VulkanMapping.ToVulkanShaderStageFlags(stages),
+            offset,
+            (uint)sizeof(T),
+            &copy);
+    }
+
+    /// <inheritdoc/>
     public override void Draw(uint vertexCount, uint instanceCount = 1, uint firstVertex = 0, uint firstInstance = 0)
     {
         EnsureRecording();

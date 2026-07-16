@@ -23,7 +23,14 @@ internal readonly struct ChunkVertex
     public readonly float B;
     public readonly float A;
 
-    public ChunkVertex(float x, float y, float z, float r, float g, float b, float a)
+    public ChunkVertex(
+        float x,
+        float y,
+        float z,
+        float r,
+        float g,
+        float b,
+        float a)
     {
         X = x;
         Y = y;

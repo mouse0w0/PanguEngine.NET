@@ -8,10 +8,16 @@ layout(set = 0, binding = 0, std140) uniform CameraUniform
     mat4 viewProjection;
 } camera;
 
+layout(push_constant) uniform ObjectPushConstants
+{
+    vec4 translatedWorldPosition;
+} objectData;
+
 layout(location = 0) out vec4 fragColor;
 
 void main()
 {
-    gl_Position = camera.viewProjection * vec4(inPosition, 1.0);
+    vec3 translatedVertexPosition = inPosition + objectData.translatedWorldPosition.xyz;
+    gl_Position = camera.viewProjection * vec4(translatedVertexPosition, 1.0);
     fragColor = inColor;
 }

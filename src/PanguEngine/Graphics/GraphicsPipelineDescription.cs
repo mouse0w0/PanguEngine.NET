@@ -30,6 +30,11 @@ public readonly record struct GraphicsPipelineDescription
     public required DescriptorSetLayout[] DescriptorSetLayouts { get; init; }
 
     /// <summary>
+    /// The push constant ranges used by the pipeline.
+    /// </summary>
+    public PushConstantRangeDescription[] PushConstantRanges { get; init; } = [];
+
+    /// <summary>
     /// The primitive topology.
     /// </summary>
     public PrimitiveTopology Topology { get; init; } = PrimitiveTopology.TriangleList;

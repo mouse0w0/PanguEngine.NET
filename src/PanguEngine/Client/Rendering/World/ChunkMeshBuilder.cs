@@ -18,7 +18,7 @@ internal sealed class ChunkMeshBuilder
                 continue;
 
             var worldPosition = ToWorldPosition(chunk.Position, localPosition);
-            AddVisibleFaces(vertices, world, worldPosition, state);
+            AddVisibleFaces(vertices, world, worldPosition, state, chunk.Position);
         }
 
         return vertices.Count == 0
@@ -38,31 +38,33 @@ internal sealed class ChunkMeshBuilder
         List<ChunkVertex> vertices,
         ClientWorld world,
         BlockPos position,
-        BlockState state)
+        BlockState state,
+        ChunkPos chunkPosition)
     {
         if (world.GetBlock(position.Offset(0, -1, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.Down);
+            AddFace(vertices, position, state, Direction.Down, chunkPosition);
         if (world.GetBlock(position.Offset(0, 1, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.Up);
+            AddFace(vertices, position, state, Direction.Up, chunkPosition);
         if (world.GetBlock(position.Offset(0, 0, -1)).IsAir)
-            AddFace(vertices, position, state, Direction.North);
+            AddFace(vertices, position, state, Direction.North, chunkPosition);
         if (world.GetBlock(position.Offset(0, 0, 1)).IsAir)
-            AddFace(vertices, position, state, Direction.South);
+            AddFace(vertices, position, state, Direction.South, chunkPosition);
         if (world.GetBlock(position.Offset(-1, 0, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.West);
+            AddFace(vertices, position, state, Direction.West, chunkPosition);
         if (world.GetBlock(position.Offset(1, 0, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.East);
+            AddFace(vertices, position, state, Direction.East, chunkPosition);
     }
 
     private static void AddFace(
         List<ChunkVertex> vertices,
         BlockPos position,
         BlockState state,
-        Direction direction)
+        Direction direction,
+        ChunkPos chunkPosition)
     {
-        var x0 = position.X;
-        var y0 = position.Y;
-        var z0 = position.Z;
+        var x0 = position.X - chunkPosition.X * Chunk.SizeX;
+        var y0 = position.Y - chunkPosition.Y * Chunk.SizeY;
+        var z0 = position.Z - chunkPosition.Z * Chunk.SizeZ;
         var x1 = x0 + 1;
         var y1 = y0 + 1;
         var z1 = z0 + 1;
@@ -113,7 +115,14 @@ internal sealed class ChunkMeshBuilder
         (float X, float Y, float Z) position,
         (float R, float G, float B, float A) color)
     {
-        return new ChunkVertex(position.X, position.Y, position.Z, color.R, color.G, color.B, color.A);
+        return new ChunkVertex(
+            position.X,
+            position.Y,
+            position.Z,
+            color.R,
+            color.G,
+            color.B,
+            color.A);
     }
 
     private static (float R, float G, float B, float A) GetColor(BlockState state)
