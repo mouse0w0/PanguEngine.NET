@@ -7,7 +7,6 @@ namespace PanguEngine.Client.Game;
 /// </summary>
 internal sealed class Camera
 {
-    private const double DegreesToRadians = Math.PI / 180d;
     private const double DirectionComponentEpsilon = 0.000001d;
 
     /// <summary>
@@ -56,8 +55,8 @@ internal sealed class Camera
     {
         get
         {
-            var yaw = Yaw * DegreesToRadians;
-            var pitch = Pitch * DegreesToRadians;
+            var yaw = double.DegreesToRadians(Yaw);
+            var pitch = double.DegreesToRadians(Pitch);
             var direction = Vector3D.Normalize(new Vector3D<double>(
                 Math.Cos(pitch) * Math.Cos(yaw),
                 Math.Sin(pitch),
@@ -128,7 +127,7 @@ internal sealed class Camera
     internal Matrix4X4<double> CreateProjectionMatrix()
     {
         var projection = Matrix4X4.CreatePerspectiveFieldOfView(
-            FieldOfView * DegreesToRadians,
+            double.DegreesToRadians(FieldOfView),
             AspectRatio,
             NearPlane,
             FarPlane);
