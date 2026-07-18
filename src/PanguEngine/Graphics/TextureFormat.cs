@@ -16,6 +16,11 @@ public enum TextureFormat
     R8G8B8A8Unorm,
 
     /// <summary>
+    /// Four 8-bit normalized SRGB channels in RGBA order.
+    /// </summary>
+    R8G8B8A8Srgb,
+
+    /// <summary>
     /// Four 8-bit unsigned normalized channels in BGRA order.
     /// </summary>
     B8G8R8A8Unorm,

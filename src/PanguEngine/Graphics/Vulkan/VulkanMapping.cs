@@ -14,6 +14,7 @@ internal static class VulkanMapping
         {
             TextureFormat.Undefined => Format.Undefined,
             TextureFormat.R8G8B8A8Unorm => Format.R8G8B8A8Unorm,
+            TextureFormat.R8G8B8A8Srgb => Format.R8G8B8A8Srgb,
             TextureFormat.B8G8R8A8Unorm => Format.B8G8R8A8Unorm,
             TextureFormat.B8G8R8A8Srgb => Format.B8G8R8A8Srgb,
             TextureFormat.R8Unorm => Format.R8Unorm,
@@ -29,6 +30,7 @@ internal static class VulkanMapping
         {
             Format.Undefined => TextureFormat.Undefined,
             Format.R8G8B8A8Unorm => TextureFormat.R8G8B8A8Unorm,
+            Format.R8G8B8A8Srgb => TextureFormat.R8G8B8A8Srgb,
             Format.B8G8R8A8Unorm => TextureFormat.B8G8R8A8Unorm,
             Format.B8G8R8A8Srgb => TextureFormat.B8G8R8A8Srgb,
             Format.R8Unorm => TextureFormat.R8Unorm,
@@ -43,6 +45,7 @@ internal static class VulkanMapping
         return format switch
         {
             TextureFormat.R8G8B8A8Unorm => 4,
+            TextureFormat.R8G8B8A8Srgb => 4,
             TextureFormat.B8G8R8A8Unorm => 4,
             TextureFormat.B8G8R8A8Srgb => 4,
             TextureFormat.R8Unorm => 1,
@@ -71,6 +74,7 @@ internal static class VulkanMapping
         {
             TextureFormat.Undefined => ImageAspectFlags.None,
             TextureFormat.R8G8B8A8Unorm => ImageAspectFlags.ColorBit,
+            TextureFormat.R8G8B8A8Srgb => ImageAspectFlags.ColorBit,
             TextureFormat.B8G8R8A8Unorm => ImageAspectFlags.ColorBit,
             TextureFormat.B8G8R8A8Srgb => ImageAspectFlags.ColorBit,
             TextureFormat.R8Unorm => ImageAspectFlags.ColorBit,
