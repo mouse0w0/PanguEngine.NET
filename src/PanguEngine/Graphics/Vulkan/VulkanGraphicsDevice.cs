@@ -560,6 +560,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             ValidateDepthStencilAttachmentFormat(description.Format);
         else if (VulkanMapping.IsDepthStencilFormat(description.Format))
             throw new InvalidOperationException("Depth/stencil texture formats require DepthStencilAttachment usage.");
+        ValidateSampledAndTransferFormat(description);
         if (description.ArrayLayers > VulkanContext.MaxImageArrayLayers)
             throw new ArgumentOutOfRangeException(nameof(description),
                 "Texture array layers exceed the device limit.");
@@ -616,6 +617,30 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             if (description.ArrayLayers < 6)
                 throw new ArgumentException("Cube-compatible textures must have at least six array layers.",
                     nameof(description));
+        }
+    }
+
+    private static void ValidateSampledAndTransferFormat(in TextureDescription description)
+    {
+        var required = FormatFeatureFlags.None;
+        if (description.Usage.HasFlag(TextureUsage.Sampled))
+            required |= FormatFeatureFlags.SampledImageBit;
+        if (description.Usage.HasFlag(TextureUsage.TransferSource))
+            required |= FormatFeatureFlags.TransferSrcBit;
+        if (description.Usage.HasFlag(TextureUsage.TransferDestination))
+            required |= FormatFeatureFlags.TransferDstBit;
+        if (required == FormatFeatureFlags.None)
+            return;
+
+        var format = VulkanMapping.ToVulkanFormat(description.Format);
+        VulkanContext.Vk.GetPhysicalDeviceFormatProperties(
+            VulkanContext.PhysicalDevice,
+            format,
+            out var properties);
+        if ((properties.OptimalTilingFeatures & required) != required)
+        {
+            throw new InvalidOperationException(
+                $"Texture format '{description.Format}' does not support the requested sampled/transfer usage.");
         }
     }
 
