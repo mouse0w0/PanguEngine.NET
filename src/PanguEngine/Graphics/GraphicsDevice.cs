@@ -6,6 +6,11 @@ namespace PanguEngine.Graphics;
 public abstract class GraphicsDevice
 {
     /// <summary>
+    /// Gets the maximum supported width or height of a two-dimensional texture.
+    /// </summary>
+    public abstract uint MaxTextureDimension2D { get; }
+
+    /// <summary>
     /// Creates a buffer with the given description.
     /// </summary>
     /// <param name="description">The buffer description.</param>

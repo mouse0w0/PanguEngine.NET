@@ -22,6 +22,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     }
 
     /// <inheritdoc/>
+    public override uint MaxTextureDimension2D => VulkanContext.MaxImageDimension2D;
+
+    /// <inheritdoc/>
     public override void WaitIdle()
     {
         VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
