@@ -313,13 +313,31 @@ public sealed unsafe partial class VulkanWindow
     /// <returns>The selected surface format.</returns>
     private static SurfaceFormatKHR ChooseSwapSurfaceFormat(SurfaceFormatKHR[] availableFormats)
     {
+        if (availableFormats.Length == 1 && availableFormats[0].Format == Format.Undefined)
+        {
+            if (availableFormats[0].ColorSpace != ColorSpaceKHR.SpaceSrgbNonlinearKhr)
+                throw new NotSupportedException("The surface does not support the SRGB nonlinear color space.");
+
+            return new SurfaceFormatKHR
+            {
+                Format = Format.B8G8R8A8Srgb,
+                ColorSpace = availableFormats[0].ColorSpace
+            };
+        }
+
         foreach (var format in availableFormats)
         {
             if (format is { Format: Format.B8G8R8A8Srgb, ColorSpace: ColorSpaceKHR.SpaceSrgbNonlinearKhr })
                 return format;
         }
 
-        return availableFormats[0];
+        foreach (var format in availableFormats)
+        {
+            if (format is { Format: Format.R8G8B8A8Srgb, ColorSpace: ColorSpaceKHR.SpaceSrgbNonlinearKhr })
+                return format;
+        }
+
+        throw new NotSupportedException("The surface does not support an sRGB swapchain format.");
     }
 
     /// <summary>Selects a swapchain present mode.</summary>
