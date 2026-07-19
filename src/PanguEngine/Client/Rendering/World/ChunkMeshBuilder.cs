@@ -1,30 +1,40 @@
+using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.World;
 using PanguEngine.World;
-using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
+using Silk.NET.Maths;
 
 namespace PanguEngine.Client.Rendering.World;
 
 internal sealed class ChunkMeshBuilder
 {
+    private readonly BlockModelManager _models;
+
+    internal ChunkMeshBuilder(BlockModelManager models)
+    {
+        _models = models;
+    }
+
     public ChunkMesh Build(ClientWorld world, Chunk chunk)
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(chunk);
 
-        var vertices = new List<ChunkVertex>();
+        var writer = new ChunkMeshWriter();
         foreach (var (localPosition, state) in chunk.EnumerateBlocks())
         {
             if (state.IsAir)
                 continue;
 
             var worldPosition = ToWorldPosition(chunk.Position, localPosition);
-            AddVisibleFaces(vertices, world, worldPosition, state, chunk.Position);
+            var cullMask = GetCullMask(world, worldPosition);
+            _models.Get(state).Emit(
+                new Vector3D<float>(localPosition.X, localPosition.Y, localPosition.Z),
+                cullMask,
+                writer);
         }
 
-        return vertices.Count == 0
-            ? new ChunkMesh(Array.Empty<ChunkVertex>())
-            : new ChunkMesh(vertices.ToArray());
+        return new ChunkMesh(writer.Vertices.ToArray(), writer.Indices.ToArray());
     }
 
     private static BlockPos ToWorldPosition(ChunkPos chunkPosition, BlockPos localPosition)
@@ -35,125 +45,48 @@ internal sealed class ChunkMeshBuilder
             chunkPosition.Z * Chunk.SizeZ + localPosition.Z);
     }
 
-    private static void AddVisibleFaces(
-        List<ChunkVertex> vertices,
+    private static DirectionFlags GetCullMask(
         ClientWorld world,
-        BlockPos position,
-        BlockState state,
-        ChunkPos chunkPosition)
+        BlockPos position)
     {
-        if (world.GetBlock(position.Offset(0, -1, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.Down, chunkPosition);
-        if (world.GetBlock(position.Offset(0, 1, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.Up, chunkPosition);
-        if (world.GetBlock(position.Offset(0, 0, -1)).IsAir)
-            AddFace(vertices, position, state, Direction.North, chunkPosition);
-        if (world.GetBlock(position.Offset(0, 0, 1)).IsAir)
-            AddFace(vertices, position, state, Direction.South, chunkPosition);
-        if (world.GetBlock(position.Offset(-1, 0, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.West, chunkPosition);
-        if (world.GetBlock(position.Offset(1, 0, 0)).IsAir)
-            AddFace(vertices, position, state, Direction.East, chunkPosition);
-    }
-
-    private static void AddFace(
-        List<ChunkVertex> vertices,
-        BlockPos position,
-        BlockState state,
-        Direction direction,
-        ChunkPos chunkPosition)
-    {
-        var x0 = position.X - chunkPosition.X * Chunk.SizeX;
-        var y0 = position.Y - chunkPosition.Y * Chunk.SizeY;
-        var z0 = position.Z - chunkPosition.Z * Chunk.SizeZ;
-        var x1 = x0 + 1;
-        var y1 = y0 + 1;
-        var z1 = z0 + 1;
-        var color = ApplyShade(GetColor(state), GetFaceShade(direction));
-
-        switch (direction)
+        var result = DirectionFlags.None;
+        foreach (var direction in Enum.GetValues<Direction>())
         {
-            case Direction.Down:
-                AddQuad(vertices, color, (x0, y0, z0), (x0, y0, z1), (x1, y0, z1), (x1, y0, z0));
-                break;
-            case Direction.Up:
-                AddQuad(vertices, color, (x0, y1, z0), (x1, y1, z0), (x1, y1, z1), (x0, y1, z1));
-                break;
-            case Direction.North:
-                AddQuad(vertices, color, (x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0));
-                break;
-            case Direction.South:
-                AddQuad(vertices, color, (x0, y0, z1), (x0, y1, z1), (x1, y1, z1), (x1, y0, z1));
-                break;
-            case Direction.West:
-                AddQuad(vertices, color, (x0, y0, z0), (x0, y1, z0), (x0, y1, z1), (x0, y0, z1));
-                break;
-            case Direction.East:
-                AddQuad(vertices, color, (x1, y0, z0), (x1, y0, z1), (x1, y1, z1), (x1, y1, z0));
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(direction), direction, null);
+            var neighbor = world.GetBlock(position.Offset(direction));
+            if (neighbor.CanOccludeFace(direction.Opposite()))
+                result |= direction.ToFlag();
         }
+
+        return result;
     }
 
-    private static void AddQuad(
-        List<ChunkVertex> vertices,
-        (float R, float G, float B, float A) color,
-        (float X, float Y, float Z) first,
-        (float X, float Y, float Z) second,
-        (float X, float Y, float Z) third,
-        (float X, float Y, float Z) fourth)
+    private sealed class ChunkMeshWriter : IBlockMeshWriter
     {
-        vertices.Add(CreateVertex(first, color));
-        vertices.Add(CreateVertex(fourth, color));
-        vertices.Add(CreateVertex(third, color));
-        vertices.Add(CreateVertex(first, color));
-        vertices.Add(CreateVertex(third, color));
-        vertices.Add(CreateVertex(second, color));
-    }
+        internal List<ChunkVertex> Vertices { get; } = [];
 
-    private static ChunkVertex CreateVertex(
-        (float X, float Y, float Z) position,
-        (float R, float G, float B, float A) color)
-    {
-        return new ChunkVertex(
-            position.X,
-            position.Y,
-            position.Z,
-            color.R,
-            color.G,
-            color.B,
-            color.A);
-    }
+        internal List<uint> Indices { get; } = [];
 
-    private static (float R, float G, float B, float A) GetColor(BlockState state)
-    {
-        if (ReferenceEquals(state.Block, BuiltinBlocks.Grass))
-            return (0.2f, 0.72f, 0.25f, 1f);
-        if (ReferenceEquals(state.Block, BuiltinBlocks.Dirt))
-            return (0.45f, 0.28f, 0.12f, 1f);
-        if (ReferenceEquals(state.Block, BuiltinBlocks.Stone))
-            return (0.55f, 0.55f, 0.55f, 1f);
+        public uint VertexCount => checked((uint)Vertices.Count);
 
-        return (1f, 1f, 1f, 1f);
-    }
-
-    private static float GetFaceShade(Direction direction)
-    {
-        return direction switch
+        public void WriteVertex(
+            Vector3D<float> position,
+            Vector2D<float> texCoord,
+            Vector3D<float> normal)
         {
-            Direction.Down => 0.5f,
-            Direction.Up => 1f,
-            Direction.North or Direction.South => 0.8f,
-            Direction.West or Direction.East => 0.6f,
-            _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
-        };
-    }
+            Vertices.Add(new ChunkVertex(
+                position.X,
+                position.Y,
+                position.Z,
+                texCoord.X,
+                texCoord.Y,
+                normal.X,
+                normal.Y,
+                normal.Z));
+        }
 
-    private static (float R, float G, float B, float A) ApplyShade(
-        (float R, float G, float B, float A) color,
-        float shade)
-    {
-        return (color.R * shade, color.G * shade, color.B * shade, color.A);
+        public void WriteIndex(uint index)
+        {
+            Indices.Add(index);
+        }
     }
 }

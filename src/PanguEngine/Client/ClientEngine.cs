@@ -1,5 +1,7 @@
 using PanguEngine.Client.Game;
+using PanguEngine.Client.Resources.Models;
 using PanguEngine.Graphics;
+using PanguEngine.Registries;
 using PanguEngine.Windowing;
 using Silk.NET.Maths;
 using Window = PanguEngine.Windowing.Window;
@@ -45,6 +47,8 @@ public sealed class ClientEngine
 
     private ClientGame Game { get; set; } = null!;
 
+    internal BlockModelManager BlockModelManager { get; private set; } = null!;
+
     private GraphicsBackend GraphicsBackend { get; set; } = null!;
 
     /// <summary>
@@ -87,6 +91,12 @@ public sealed class ClientEngine
             OnUpdate,
             WindowManager.RenderWindows);
         Engine.ModManager.RunClientSetup();
+        BlockModelManager = new BlockModelManager(
+            Engine.ResourceManager,
+            BuiltinRegistries.Block,
+            Device.MaxTextureDimension2D,
+            Log.CreateLogger("BlockModels"));
+        BlockModelManager.Load();
         Engine.ModManager.RunReady();
 
         Game = new ClientGame(this);

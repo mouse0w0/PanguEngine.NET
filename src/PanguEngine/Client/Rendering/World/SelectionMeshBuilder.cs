@@ -9,10 +9,10 @@ internal static class SelectionMeshBuilder
 
     private const float HalfThickness = Thickness / 2;
 
-    internal static ChunkVertex[] Build(IBlockShape shape)
+    internal static SelectionVertex[] Build(IBlockShape shape)
     {
         var selectionBoxes = shape.GetSelectionBoxes();
-        var vertices = new List<ChunkVertex>(selectionBoxes.Count * 432);
+        var vertices = new List<SelectionVertex>(selectionBoxes.Count * 432);
         foreach (var box in selectionBoxes)
         {
             var minX = (float)box.Min.X - Expansion;
@@ -42,7 +42,7 @@ internal static class SelectionMeshBuilder
     }
 
     private static void AddXEdge(
-        List<ChunkVertex> vertices,
+        List<SelectionVertex> vertices,
         float minX,
         float maxX,
         float y,
@@ -59,7 +59,7 @@ internal static class SelectionMeshBuilder
     }
 
     private static void AddYEdge(
-        List<ChunkVertex> vertices,
+        List<SelectionVertex> vertices,
         float minY,
         float maxY,
         float x,
@@ -76,7 +76,7 @@ internal static class SelectionMeshBuilder
     }
 
     private static void AddZEdge(
-        List<ChunkVertex> vertices,
+        List<SelectionVertex> vertices,
         float minZ,
         float maxZ,
         float x,
@@ -93,7 +93,7 @@ internal static class SelectionMeshBuilder
     }
 
     private static void AddCuboid(
-        List<ChunkVertex> vertices,
+        List<SelectionVertex> vertices,
         float minX,
         float minY,
         float minZ,
@@ -110,7 +110,7 @@ internal static class SelectionMeshBuilder
     }
 
     private static void AddQuad(
-        List<ChunkVertex> vertices,
+        List<SelectionVertex> vertices,
         (float X, float Y, float Z) first,
         (float X, float Y, float Z) second,
         (float X, float Y, float Z) third,
@@ -124,8 +124,8 @@ internal static class SelectionMeshBuilder
         vertices.Add(CreateVertex(second));
     }
 
-    private static ChunkVertex CreateVertex((float X, float Y, float Z) position)
+    private static SelectionVertex CreateVertex((float X, float Y, float Z) position)
     {
-        return new ChunkVertex(position.X, position.Y, position.Z, 0, 0, 0, 1);
+        return new SelectionVertex(position.X, position.Y, position.Z, 0, 0, 0, 1);
     }
 }

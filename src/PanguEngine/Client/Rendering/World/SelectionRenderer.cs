@@ -45,7 +45,7 @@ internal sealed class SelectionRenderer
         _pipeline = _device.CreateGraphicsPipeline(new GraphicsPipelineDescription
         {
             Shaders = [_vertexShader, _fragmentShader],
-            VertexInput = ChunkVertex.VertexInput,
+            VertexInput = SelectionVertex.VertexInput,
             ColorAttachmentFormats = [colorFormat],
             DescriptorSetLayouts = [cameraLayout],
             PushConstantRanges =
@@ -84,7 +84,7 @@ internal sealed class SelectionRenderer
         if (vertices.Length == 0)
             return;
 
-        var requiredSize = checked((ulong)vertices.Length * ChunkVertex.SizeInBytes);
+        var requiredSize = checked((ulong)vertices.Length * SelectionVertex.SizeInBytes);
         var buffer = _buffers[frameIndex];
         if (buffer is null || buffer.Size < requiredSize)
         {
@@ -114,9 +114,9 @@ internal sealed class SelectionRenderer
         commandList.SetDescriptorSet(0, cameraDescriptorSet);
         var blockPosition = _blockPositions[frameIndex];
         var worldOrigin = new Vector3D<double>(
-            (double)blockPosition.X,
-            (double)blockPosition.Y,
-            (double)blockPosition.Z);
+            blockPosition.X,
+            blockPosition.Y,
+            blockPosition.Z);
         var translatedWorldPosition = worldRenderState.ToTranslatedWorldPosition(worldOrigin);
         commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, translatedWorldPosition);
         commandList.SetVertexBuffer(0, _buffers[frameIndex]!);

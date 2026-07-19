@@ -1,5 +1,9 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Client.Rendering.World;
+using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.World;
+using PanguEngine.Registries;
+using PanguEngine.Resources;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
 
@@ -8,25 +12,38 @@ namespace PanguEngine.Tests.Client.Rendering.World;
 public sealed class ChunkMeshBuilderTests
 {
     [Fact]
-    public void BuildSingleSolidBlockEmitsSixFaces()
+    public void BuildSingleSolidBlockEmitsIndexedSixFaces()
     {
         var world = new ClientWorld();
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, position.ToChunkPos());
+        using var resources = new ResourceManager([]);
+        var models = CreateModels(resources);
 
-        var mesh = new ChunkMeshBuilder().Build(world, chunk);
+        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
         Assert.False(mesh.IsEmpty);
-        Assert.Equal(36, mesh.VertexCount);
+        Assert.Equal(24, mesh.VertexCount);
+        Assert.Equal(36, mesh.IndexCount);
+        Assert.Equal(
+            Enumerable.Range(0, 6)
+                .SelectMany(face => new uint[]
+                {
+                    (uint)(face * 4),
+                    (uint)(face * 4 + 1),
+                    (uint)(face * 4 + 2),
+                    (uint)(face * 4),
+                    (uint)(face * 4 + 2),
+                    (uint)(face * 4 + 3)
+                }),
+            mesh.Indices);
         Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.X));
         Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.X));
         Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.Y));
         Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.Y));
         Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.Z));
         Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.Z));
-        Assert.Contains(mesh.Vertices, vertex =>
-            vertex.R == 0.55f && vertex.G == 0.55f && vertex.B == 0.55f && vertex.A == 1f);
     }
 
     [Fact]
@@ -38,46 +55,40 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(first, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(second, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, first.ToChunkPos());
+        using var resources = new ResourceManager([]);
+        var models = CreateModels(resources);
 
-        var mesh = new ChunkMeshBuilder().Build(world, chunk);
+        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
-        Assert.Equal(60, mesh.VertexCount);
+        Assert.Equal(40, mesh.VertexCount);
+        Assert.Equal(60, mesh.IndexCount);
     }
 
     [Fact]
-    public void BuildSingleSolidBlockAppliesDirectionalFaceShading()
+    public void BuildUsesOutwardNormalsAndChunkLocalPosition()
     {
         var world = new ClientWorld();
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, position.ToChunkPos());
+        using var resources = new ResourceManager([]);
+        var models = CreateModels(resources);
 
-        var mesh = new ChunkMeshBuilder().Build(world, chunk);
+        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
-        AssertFaceColor(mesh, 0, 0.275f);
-        AssertFaceColor(mesh, 1, 0.55f);
-        AssertFaceColor(mesh, 2, 0.44f);
-        AssertFaceColor(mesh, 3, 0.44f);
-        AssertFaceColor(mesh, 4, 0.33f);
-        AssertFaceColor(mesh, 5, 0.33f);
-    }
-
-    [Fact]
-    public void BuildSingleSolidBlockUsesOutwardFaceWinding()
-    {
-        var world = new ClientWorld();
-        var position = new BlockPos(32, 32, 32);
-        world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
-        var chunk = GetChunk(world, position.ToChunkPos());
-
-        var mesh = new ChunkMeshBuilder().Build(world, chunk);
-
-        AssertFaceNormal(mesh, 0, 0, -1, 0);
-        AssertFaceNormal(mesh, 1, 0, 1, 0);
-        AssertFaceNormal(mesh, 2, 0, 0, -1);
-        AssertFaceNormal(mesh, 3, 0, 0, 1);
-        AssertFaceNormal(mesh, 4, -1, 0, 0);
-        AssertFaceNormal(mesh, 5, 1, 0, 0);
+        Assert.Equal(new[]
+            {
+                (0f, -1f, 0f), (0f, 1f, 0f), (0f, 0f, -1f),
+                (0f, 0f, 1f), (-1f, 0f, 0f), (1f, 0f, 0f)
+            },
+            mesh.Vertices.Chunk(4).Select(group =>
+                (group[0].NX, group[0].NY, group[0].NZ)).ToArray());
+        Assert.All(mesh.Vertices, vertex =>
+        {
+            Assert.InRange(vertex.X, 0f, 1f);
+            Assert.InRange(vertex.Y, 0f, 1f);
+            Assert.InRange(vertex.Z, 0f, 1f);
+        });
     }
 
     [Fact]
@@ -89,49 +100,29 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(boundary, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(neighbor, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, boundary.ToChunkPos());
+        using var resources = new ResourceManager([]);
+        var models = CreateModels(resources);
 
-        var mesh = new ChunkMeshBuilder().Build(world, chunk);
+        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
-        Assert.Equal(30, mesh.VertexCount);
+        Assert.Equal(20, mesh.VertexCount);
+        Assert.Equal(30, mesh.IndexCount);
+    }
+
+    private static BlockModelManager CreateModels(ResourceManager resources)
+    {
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("pangu", "air"), BuiltinBlocks.Air);
+        registry.Register(ResourceKey.Create("pangu", "stone"), BuiltinBlocks.Stone);
+        registry.Register(ResourceKey.Create("pangu", "grass"), BuiltinBlocks.Grass);
+        registry.Register(ResourceKey.Create("pangu", "dirt"), BuiltinBlocks.Dirt);
+        var models = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+        models.Load();
+        return models;
     }
 
     private static Chunk GetChunk(ClientWorld world, ChunkPos position)
     {
         return world.Chunks.EnumerateChunks().Single(chunk => chunk.Position == position);
-    }
-
-    private static void AssertFaceColor(ChunkMesh mesh, int faceIndex, float expectedRgb)
-    {
-        var faceVertices = mesh.Vertices.Skip(faceIndex * 6).Take(6);
-
-        Assert.All(faceVertices, vertex =>
-        {
-            Assert.InRange(vertex.R, expectedRgb - 0.0001f, expectedRgb + 0.0001f);
-            Assert.InRange(vertex.G, expectedRgb - 0.0001f, expectedRgb + 0.0001f);
-            Assert.InRange(vertex.B, expectedRgb - 0.0001f, expectedRgb + 0.0001f);
-            Assert.Equal(1f, vertex.A);
-        });
-    }
-
-    private static void AssertFaceNormal(
-        ChunkMesh mesh,
-        int faceIndex,
-        float expectedX,
-        float expectedY,
-        float expectedZ)
-    {
-        var first = mesh.Vertices[faceIndex * 6];
-        var second = mesh.Vertices[faceIndex * 6 + 1];
-        var third = mesh.Vertices[faceIndex * 6 + 2];
-        var ab = (X: second.X - first.X, Y: second.Y - first.Y, Z: second.Z - first.Z);
-        var ac = (X: third.X - first.X, Y: third.Y - first.Y, Z: third.Z - first.Z);
-        var normal = (
-            X: ab.Y * ac.Z - ab.Z * ac.Y,
-            Y: ab.Z * ac.X - ab.X * ac.Z,
-            Z: ab.X * ac.Y - ab.Y * ac.X);
-
-        Assert.Equal(expectedX, normal.X);
-        Assert.Equal(expectedY, normal.Y);
-        Assert.Equal(expectedZ, normal.Z);
     }
 }

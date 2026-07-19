@@ -1,0 +1,11 @@
+{
+  "parent": "pangu:block/cube",
+  "textures": {
+    "down": "#bottom",
+    "up": "#top",
+    "north": "#side",
+    "south": "#side",
+    "west": "#side",
+    "east": "#side"
+  }
+}

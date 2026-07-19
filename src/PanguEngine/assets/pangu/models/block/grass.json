@@ -1,0 +1,8 @@
+{
+  "parent": "pangu:block/cube_bottom_top",
+  "textures": {
+    "bottom": "pangu:block/dirt",
+    "top": "pangu:block/grass_top",
+    "side": "pangu:block/grass_side"
+  }
+}

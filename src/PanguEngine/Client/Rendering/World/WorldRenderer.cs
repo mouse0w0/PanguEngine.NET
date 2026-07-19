@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using PanguEngine.Client.Game;
+using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.World;
 using PanguEngine.Graphics;
 using PanguEngine.World.Interaction;
@@ -35,7 +36,12 @@ internal sealed class WorldRenderer
     /// <param name="device">The graphics device.</param>
     /// <param name="presenter">The presentation target.</param>
     /// <param name="world">The client world to render.</param>
-    public WorldRenderer(GraphicsDevice device, Presenter presenter, ClientWorld world)
+    /// <param name="models">The loaded block models.</param>
+    public WorldRenderer(
+        GraphicsDevice device,
+        Presenter presenter,
+        ClientWorld world,
+        BlockModelManager models)
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
         _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
@@ -73,7 +79,8 @@ internal sealed class WorldRenderer
             _presenter.ColorFormat,
             _cameraDescriptorLayout,
             DepthStencilFormat,
-            world);
+            world,
+            models);
         _selectionRenderer = new SelectionRenderer(
             _device,
             _presenter.ColorFormat,

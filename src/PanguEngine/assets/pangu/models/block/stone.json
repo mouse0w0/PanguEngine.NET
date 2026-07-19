@@ -1,0 +1,6 @@
+{
+  "parent": "pangu:block/cube_all",
+  "textures": {
+    "all": "pangu:block/stone"
+  }
+}

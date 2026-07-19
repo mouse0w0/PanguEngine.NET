@@ -24,7 +24,7 @@ public sealed class ClientGame
         _input = new ClientInputState(engine.PrimaryWindow);
         _input.MouseDelta += _cameraController.ApplyMouseDelta;
         World = new ClientWorld();
-        _renderer = new WorldRenderer(engine.Device, engine.PrimaryWindow.Presenter, World);
+        _renderer = new WorldRenderer(engine.Device, engine.PrimaryWindow.Presenter, World, engine.BlockModelManager);
     }
 
     /// <summary>The local client world state.</summary>
