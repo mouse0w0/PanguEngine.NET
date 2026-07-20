@@ -107,6 +107,7 @@ internal sealed class JsonBlockModelLoader
                     $"Block model '{modelKey}' element {elementIndex} face '{direction}' is missing texture.");
 
             var uv = ParseUv(face.Uv, modelKey, elementIndex, direction);
+            var rotation = ParseRotation(face.Rotation, modelKey, elementIndex, direction);
             var cull = face.Cull ?? [];
             foreach (var cullDirection in cull)
             {
@@ -115,7 +116,11 @@ internal sealed class JsonBlockModelLoader
                         $"Block model '{modelKey}' element {elementIndex} face '{direction}' has unknown cull direction '{cullDirection}'.");
             }
 
-            faces.Add(direction, new UnbakedFace(ParseTextureValue(face.Texture, modelKey), uv, cull));
+            faces.Add(direction, new UnbakedFace(
+                ParseTextureValue(face.Texture, modelKey),
+                uv,
+                rotation,
+                cull));
         }
 
         return faces;
@@ -135,6 +140,25 @@ internal sealed class JsonBlockModelLoader
             ? ResourceKey.Parse(value)
             : ResourceKey.Create(modelKey.Namespace, value);
         return new BlockTextureValue.Resource(key);
+    }
+
+    private static int ParseRotation(
+        JsonElement value,
+        ResourceKey modelKey,
+        int elementIndex,
+        string direction)
+    {
+        if (value.ValueKind == JsonValueKind.Undefined)
+            return 0;
+        if (value.ValueKind != JsonValueKind.Number ||
+            !value.TryGetInt32(out var rotation) ||
+            rotation is not (0 or 90 or 180 or 270))
+        {
+            throw new InvalidDataException(
+                $"Block model '{modelKey}' element {elementIndex} face '{direction}' rotation must be 0, 90, 180, or 270.");
+        }
+
+        return rotation;
     }
 
     private static Vector3D<float> ParseVector(

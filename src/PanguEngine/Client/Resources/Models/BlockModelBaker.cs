@@ -50,11 +50,13 @@ internal sealed class BlockModelBaker
                     new Vector2D<float>(uv[2], uv[3]),
                     new Vector2D<float>(uv[2], uv[1])
                 };
+                var rotationOffset = face.Rotation / 90;
                 for (var index = 0; index < 4; index++)
                 {
                     var position = positions[index];
-                    var localU = textureCoordinates[index].X * ModelScale;
-                    var localV = textureCoordinates[index].Y * ModelScale;
+                    var textureCoordinate = textureCoordinates[(index - rotationOffset + 4) % 4];
+                    var localU = textureCoordinate.X * ModelScale;
+                    var localV = textureCoordinate.Y * ModelScale;
                     vertices.Add(new BakedVertex(
                         new Vector3D<float>(
                             position.X * ModelScale,

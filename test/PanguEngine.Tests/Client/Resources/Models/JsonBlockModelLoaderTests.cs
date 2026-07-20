@@ -42,7 +42,73 @@ public sealed class JsonBlockModelLoaderTests
         var element = Assert.Single(model.Elements!);
         var face = element.Faces["up"];
         Assert.Equal(new BlockTextureValue.Variable("all"), face.Texture);
+        Assert.Equal(0, face.Rotation);
         Assert.Equal(["up"], face.Cull);
+    }
+
+    [Theory]
+    [InlineData("0", 0)]
+    [InlineData("90", 90)]
+    [InlineData("180", 180)]
+    [InlineData("270", 270)]
+    public void LoadsFaceRotation(string jsonRotation, int expectedRotation)
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/models/block/model.json", $$"""
+              {
+                "elements": [
+                  {
+                    "from": [0, 0, 0],
+                    "to": [16, 16, 16],
+                    "faces": {
+                      "up": { "texture": "block/test", "rotation": {{jsonRotation}} }
+                    }
+                  }
+                ]
+              }
+              """);
+        using var resources = CreateResources(directory.Path);
+
+        var model = new JsonBlockModelLoader(resources)
+            .Load(ResourceKey.Create("pangu", "block/model"));
+
+        Assert.Equal(expectedRotation, model.Elements!.Single().Faces["up"].Rotation);
+    }
+
+    [Theory]
+    [InlineData("-90")]
+    [InlineData("45")]
+    [InlineData("90.0")]
+    [InlineData("90.5")]
+    [InlineData("null")]
+    [InlineData("\"90\"")]
+    [InlineData("{}")]
+    [InlineData("[]")]
+    [InlineData("true")]
+    public void RejectsInvalidFaceRotation(string jsonRotation)
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/models/block/invalid.json", $$"""
+              {
+                "elements": [
+                  {
+                    "from": [0, 0, 0],
+                    "to": [16, 16, 16],
+                    "faces": {
+                      "up": { "texture": "block/test", "rotation": {{jsonRotation}} }
+                    }
+                  }
+                ]
+              }
+              """);
+        using var resources = CreateResources(directory.Path);
+
+        var exception = Assert.Throws<InvalidDataException>(() => new JsonBlockModelLoader(resources)
+            .Load(ResourceKey.Create("pangu", "block/invalid")));
+
+        Assert.Contains("Block model 'pangu:block/invalid'", exception.Message);
+        Assert.Contains("element 0", exception.Message);
+        Assert.Contains("face 'up'", exception.Message);
     }
 
     [Fact]

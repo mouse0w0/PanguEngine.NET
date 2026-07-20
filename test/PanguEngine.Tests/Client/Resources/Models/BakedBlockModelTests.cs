@@ -56,7 +56,7 @@ public sealed class BakedBlockModelTests
                     new Vector3D<float>(16, 16, 16),
                     faces.ToDictionary(
                         face => face.Direction,
-                        face => new UnbakedFace(texture, null, face.Cull),
+                        face => new UnbakedFace(texture, null, 0, face.Cull),
                         StringComparer.Ordinal))
             ]);
     }

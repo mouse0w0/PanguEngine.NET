@@ -173,6 +173,7 @@ internal sealed class BlockModelManager
                 direction => new UnbakedFace(
                     new BlockTextureValue.Resource(MissingTextureKey),
                     null,
+                    0,
                     [direction]),
                 StringComparer.Ordinal);
         return new UnbakedBlockModel(

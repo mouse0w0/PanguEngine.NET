@@ -17,4 +17,5 @@ internal sealed record UnbakedElement(
 internal sealed record UnbakedFace(
     BlockTextureValue Texture,
     float[]? Uv,
+    int Rotation,
     IReadOnlyList<string> Cull);

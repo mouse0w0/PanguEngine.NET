@@ -68,7 +68,7 @@ public sealed class BlockModelManagerTests
     }
 
     [Fact]
-    public void InheritsParentGeometryAndFallsBackOnlyTheMissingTexture()
+    public void InheritsParentGeometryAndPreservesRotationThroughMissingTextureReplacement()
     {
         using var directory = TestDirectory.Create();
         TestDirectory.WriteResource(directory, "test/models/block/base.json", """
@@ -78,7 +78,7 @@ public sealed class BlockModelManagerTests
                                                                                   {
                                                                                     "from": [0, 0, 0],
                                                                                     "to": [16, 16, 16],
-                                                                                    "faces": { "up": { "texture": "#all" } }
+                                                                                    "faces": { "up": { "texture": "#all", "rotation": 90 } }
                                                                                   }
                                                                                 ]
                                                                               }
@@ -100,6 +100,18 @@ public sealed class BlockModelManagerTests
         manager.Get(block.DefaultState).Emit(default, DirectionFlags.None, writer);
         Assert.Equal(4, writer.Vertices.Count);
         Assert.Equal(6, writer.Indices.Count);
+        var u0 = writer.TexCoords.Min(value => value.X);
+        var u1 = writer.TexCoords.Max(value => value.X);
+        var v0 = writer.TexCoords.Min(value => value.Y);
+        var v1 = writer.TexCoords.Max(value => value.Y);
+        Assert.Equal(
+            [
+                new Vector2D<float>(u1, v0),
+                new Vector2D<float>(u0, v0),
+                new Vector2D<float>(u0, v1),
+                new Vector2D<float>(u1, v1)
+            ],
+            writer.TexCoords);
     }
 
     [Fact]
@@ -254,8 +266,8 @@ public sealed class BlockModelManagerTests
         TestDirectory.WriteResource(directory, "test/models/block/model.json", """
                                                                                {
                                                                                  "textures": {
-                                                                                   "unused": "#missing",
-                                                                                   "all": "block/stone"
+                                                                                    "unused": "#missing",
+                                                                                    "all": "block/stone"
                                                                                  },
                                                                                  "elements": [
                                                                                    {
@@ -348,6 +360,8 @@ public sealed class BlockModelManagerTests
     {
         public List<(float X, float Y, float Z)> Vertices { get; } = [];
 
+        public List<Vector2D<float>> TexCoords { get; } = [];
+
         public List<uint> Indices { get; } = [];
 
         public uint VertexCount => checked((uint)Vertices.Count);
@@ -358,6 +372,7 @@ public sealed class BlockModelManagerTests
             Vector3D<float> normal)
         {
             Vertices.Add((position.X, position.Y, position.Z));
+            TexCoords.Add(texCoord);
         }
 
         public void WriteIndex(uint index)
