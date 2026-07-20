@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.World;
@@ -16,12 +17,18 @@ internal sealed class WorldRenderer
 {
     private const TextureFormat DepthStencilFormat = TextureFormat.Depth24UnormStencil8;
 
+    private static readonly Vector3D<float> LightDirection =
+        Vector3D.Normalize(new Vector3D<float>(1, 2, 1));
+
+    private static readonly Vector3D<float> LightColor = new(0.8f, 0.8f, 0.8f);
+    private static readonly Vector3D<float> AmbientColor = new(0.2f, 0.2f, 0.2f);
+
     private readonly GraphicsDevice _device;
     private readonly Presenter _presenter;
-    private readonly DescriptorSetLayout _cameraDescriptorLayout;
-    private readonly GraphicsBuffer _cameraBuffer;
-    private readonly ulong _cameraUniformStride;
-    private readonly DescriptorSet[] _cameraDescriptorSets;
+    private readonly DescriptorSetLayout _worldDescriptorLayout;
+    private readonly GraphicsBuffer _worldBuffer;
+    private readonly ulong _worldUniformStride;
+    private readonly DescriptorSet[] _worldDescriptorSets;
     private readonly Texture?[] _depthStencilTextures;
     private readonly TextureView?[] _depthStencilAttachments;
     private readonly ChunkRenderer _chunkRenderer;
@@ -47,28 +54,33 @@ internal sealed class WorldRenderer
         _presenter = presenter ?? throw new ArgumentNullException(nameof(presenter));
         ArgumentNullException.ThrowIfNull(world);
 
-        _cameraDescriptorLayout = _device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
-            [new DescriptorSetLayoutBinding(0, DescriptorType.UniformBuffer, ShaderStageFlags.Vertex)]));
+        _worldDescriptorLayout = _device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
+        [
+            new DescriptorSetLayoutBinding(
+                0,
+                DescriptorType.UniformBuffer,
+                ShaderStageFlags.Vertex | ShaderStageFlags.Fragment)
+        ]));
 
-        var cameraUniformSize = (ulong)Unsafe.SizeOf<Matrix4X4<float>>();
-        _cameraUniformStride = _device.GetAlignedUniformSize(cameraUniformSize);
-        _cameraBuffer = _device.CreateBuffer(new BufferDescription(
-            checked(_cameraUniformStride * _presenter.MaxFramesInFlight),
+        var worldUniformSize = (ulong)Unsafe.SizeOf<WorldUniform>();
+        _worldUniformStride = _device.GetAlignedUniformSize(worldUniformSize);
+        _worldBuffer = _device.CreateBuffer(new BufferDescription(
+            checked(_worldUniformStride * _presenter.MaxFramesInFlight),
             BufferUsage.Uniform,
             MemoryUsage.CpuToGpu));
 
         var frameSlotCount = checked((int)_presenter.MaxFramesInFlight);
-        _cameraDescriptorSets = new DescriptorSet[frameSlotCount];
-        for (var i = 0; i < _cameraDescriptorSets.Length; i++)
+        _worldDescriptorSets = new DescriptorSet[frameSlotCount];
+        for (var i = 0; i < _worldDescriptorSets.Length; i++)
         {
-            _cameraDescriptorSets[i] = _device.CreateDescriptorSet(new DescriptorSetDescription(
-                _cameraDescriptorLayout,
+            _worldDescriptorSets[i] = _device.CreateDescriptorSet(new DescriptorSetDescription(
+                _worldDescriptorLayout,
                 [
                     DescriptorSetBinding.UniformBuffer(
                         0,
-                        _cameraBuffer,
-                        checked((ulong)i * _cameraUniformStride),
-                        cameraUniformSize)
+                        _worldBuffer,
+                        checked((ulong)i * _worldUniformStride),
+                        worldUniformSize)
                 ]));
         }
 
@@ -77,7 +89,7 @@ internal sealed class WorldRenderer
         _chunkRenderer = new ChunkRenderer(
             _device,
             _presenter.ColorFormat,
-            _cameraDescriptorLayout,
+            _worldDescriptorLayout,
             DepthStencilFormat,
             world,
             models);
@@ -85,7 +97,7 @@ internal sealed class WorldRenderer
             _device,
             _presenter.ColorFormat,
             DepthStencilFormat,
-            _cameraDescriptorLayout,
+            _worldDescriptorLayout,
             world,
             _presenter.MaxFramesInFlight);
         _crosshairRenderer = new CrosshairRenderer(
@@ -129,9 +141,14 @@ internal sealed class WorldRenderer
             var depthStencilAttachment = EnsureDepthStencilAttachment(frame.FrameSlot);
             camera.AspectRatio = (double)frame.Width / frame.Height;
             var worldRenderState = camera.CreateWorldRenderState(alpha);
-            _cameraBuffer.Write(
+            var worldUniform = new WorldUniform(
                 worldRenderState.ViewProjection,
-                checked(frame.FrameSlot * _cameraUniformStride));
+                LightDirection,
+                LightColor,
+                AmbientColor);
+            _worldBuffer.Write(
+                worldUniform,
+                checked(frame.FrameSlot * _worldUniformStride));
             if (uploadFailure is null)
                 _selectionRenderer.Prepare(frame.FrameSlot, selection);
             _crosshairRenderer.Prepare(frame.FrameSlot, frame.Width, frame.Height);
@@ -154,11 +171,11 @@ internal sealed class WorldRenderer
             {
                 _chunkRenderer.Draw(
                     commandList,
-                    _cameraDescriptorSets[frameIndex],
+                    _worldDescriptorSets[frameIndex],
                     worldRenderState);
                 _selectionRenderer.Draw(
                     commandList,
-                    _cameraDescriptorSets[frameIndex],
+                    _worldDescriptorSets[frameIndex],
                     frame.FrameSlot,
                     worldRenderState);
                 _crosshairRenderer.Draw(commandList, frame.FrameSlot);
@@ -190,10 +207,10 @@ internal sealed class WorldRenderer
         _selectionRenderer.Destroy();
         _crosshairRenderer.Destroy();
         _chunkRenderer.Destroy();
-        foreach (var descriptorSet in _cameraDescriptorSets)
+        foreach (var descriptorSet in _worldDescriptorSets)
             descriptorSet.Destroy();
-        _cameraDescriptorLayout.Destroy();
-        _cameraBuffer.Destroy();
+        _worldDescriptorLayout.Destroy();
+        _worldBuffer.Destroy();
     }
 
     /// <summary>
@@ -271,4 +288,23 @@ internal sealed class WorldRenderer
             throw;
         }
     }
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal readonly struct WorldUniform(
+    Matrix4X4<float> viewProjection,
+    Vector3D<float> lightDirection,
+    Vector3D<float> lightColor,
+    Vector3D<float> ambientColor)
+{
+    internal readonly Matrix4X4<float> ViewProjection = viewProjection;
+
+    internal readonly Vector4D<float> LightDirection = new(
+        lightDirection.X,
+        lightDirection.Y,
+        lightDirection.Z,
+        0);
+
+    internal readonly Vector4D<float> LightColor = new(lightColor.X, lightColor.Y, lightColor.Z, 0);
+    internal readonly Vector4D<float> AmbientColor = new(ambientColor.X, ambientColor.Y, ambientColor.Z, 0);
 }
