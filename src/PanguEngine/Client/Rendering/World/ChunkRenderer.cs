@@ -2,6 +2,7 @@ using PanguEngine.Client.Game;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.World;
 using PanguEngine.Graphics;
+using PanguEngine.Maths;
 using PanguEngine.World.Chunking;
 using Silk.NET.Maths;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
@@ -133,6 +134,7 @@ internal sealed class ChunkRenderer
         commandList.SetGraphicsPipeline(_pipeline);
         commandList.SetDescriptorSet(0, cameraDescriptorSet);
         commandList.SetDescriptorSet(1, _atlasDescriptorSet);
+        var frustum = Frustum<float>.CreateFromZeroToOne(worldRenderState.ViewProjection);
         foreach (var (chunkPosition, mesh) in _meshes)
         {
             var worldOrigin = new Vector3D<double>(
@@ -140,6 +142,15 @@ internal sealed class ChunkRenderer
                 (double)chunkPosition.Y * Chunk.SizeY,
                 (double)chunkPosition.Z * Chunk.SizeZ);
             var translatedWorldPosition = worldRenderState.ToTranslatedWorldPosition(worldOrigin);
+            var bounds = new Box3D<float>(
+                translatedWorldPosition.X,
+                translatedWorldPosition.Y,
+                translatedWorldPosition.Z,
+                translatedWorldPosition.X + Chunk.SizeX,
+                translatedWorldPosition.Y + Chunk.SizeY,
+                translatedWorldPosition.Z + Chunk.SizeZ);
+            if (!frustum.Intersects(bounds))
+                continue;
 
             commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, translatedWorldPosition);
             commandList.SetVertexBuffer(0, mesh.VertexBuffer);
