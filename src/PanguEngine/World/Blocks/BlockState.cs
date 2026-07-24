@@ -89,11 +89,8 @@ public sealed class BlockState
     /// <param name="blockAccessor">The block state accessor.</param>
     /// <param name="position">The world block position.</param>
     /// <returns>The selection shape.</returns>
-    public IBlockShape GetSelectionShape(IReadOnlyBlockAccessor blockAccessor, BlockPos position)
-    {
-        ArgumentNullException.ThrowIfNull(blockAccessor);
-        return Block.GetSelectionShape(this, blockAccessor, position);
-    }
+    public IBlockShape GetSelectionShape(IReadOnlyBlockAccessor blockAccessor, BlockPos position) =>
+        Block.GetSelectionShape(this, blockAccessor, position);
 
     /// <summary>
     /// Returns a string representation of this block state in the format "BlockType[prop1=value1,prop2=value2]".
