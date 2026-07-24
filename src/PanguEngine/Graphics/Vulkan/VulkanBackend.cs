@@ -72,7 +72,17 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             var device = new VulkanGraphicsDevice();
             var displayManager = new VulkanDisplayManager(silkWindow);
 
-            primaryWindow = new VulkanWindow(silkWindow, surface, true, options.PrimaryWindow.FramesPerSecond);
+            try
+            {
+                primaryWindow = new VulkanWindow(silkWindow, surface, true, options.PrimaryWindow.FramesPerSecond);
+            }
+            catch
+            {
+                surface = default;
+                silkWindow = null;
+                throw;
+            }
+
             if (options.PrimaryWindow.Icons.Length > 0)
                 primaryWindow.SetWindowIcons(options.PrimaryWindow.Icons);
 

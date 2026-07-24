@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Silk.NET.Vulkan;
 using Vma;
 using VkBuffer = Silk.NET.Vulkan.Buffer;
@@ -19,6 +20,11 @@ public static unsafe class VulkanAllocator
     /// </summary>
     public static void Initialize()
     {
+        if (_allocator != null)
+            throw new InvalidOperationException("VulkanAllocator is already initialized.");
+        if (_destroyed)
+            throw new ObjectDisposedException(nameof(VulkanAllocator));
+
         var createInfo = new AllocatorCreateInfo
         {
             Flags = 0,
@@ -49,8 +55,7 @@ public static unsafe class VulkanAllocator
         in BufferCreateInfo bufferInfo,
         in AllocationCreateInfo allocInfo = default)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, typeof(VulkanAllocator));
-
+        var allocator = RequireInitialized();
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)
             actualAllocInfo.Usage = VmaMemoryUsage.Auto;
@@ -61,7 +66,7 @@ public static unsafe class VulkanAllocator
 
         var pAllocInfo = &actualAllocInfo;
         var pBufInfo = &bufInfo;
-        var result = Apis.CreateBuffer(_allocator, pBufInfo, pAllocInfo,
+        var result = Apis.CreateBuffer(allocator, pBufInfo, pAllocInfo,
             &buffer, &allocation, null);
         if (result != Result.Success)
             throw new InvalidOperationException($"Failed to allocate buffer: {result}");
@@ -82,8 +87,7 @@ public static unsafe class VulkanAllocator
         out VkImage image,
         out Allocation* allocation)
     {
-        ObjectDisposedException.ThrowIf(_destroyed, typeof(VulkanAllocator));
-
+        var allocator = RequireInitialized();
         var actualAllocInfo = allocInfo;
         if (actualAllocInfo.Usage == 0)
             actualAllocInfo.Usage = VmaMemoryUsage.Auto;
@@ -94,7 +98,7 @@ public static unsafe class VulkanAllocator
 
         var pAllocInfo = &actualAllocInfo;
         var pImgInfo = &imgInfo;
-        var result = Apis.CreateImage(_allocator, pImgInfo, pAllocInfo, &createdImage, &createdAllocation, null);
+        var result = Apis.CreateImage(allocator, pImgInfo, pAllocInfo, &createdImage, &createdAllocation, null);
         if (result != Result.Success)
             throw new InvalidOperationException($"Failed to allocate image: {result}");
 
@@ -111,11 +115,24 @@ public static unsafe class VulkanAllocator
     internal static T* Map<T>(Allocation* allocation) where T : unmanaged
     {
         void* data;
-        var result = Apis.MapMemory(_allocator, allocation, &data);
+        var result = Apis.MapMemory(RequireInitialized(), allocation, &data);
         if (result != Result.Success)
             throw new InvalidOperationException($"Failed to map memory: {result}");
 
         return (T*)data;
+    }
+
+    /// <summary>
+    /// Flushes CPU writes to a mapped allocation so they are visible to the device.
+    /// </summary>
+    /// <param name="allocation">The VMA allocation to flush.</param>
+    /// <param name="offset">The byte offset relative to the allocation.</param>
+    /// <param name="size">The number of bytes to flush.</param>
+    internal static void Flush(Allocation* allocation, ulong offset, ulong size)
+    {
+        var result = Apis.FlushAllocation(RequireInitialized(), allocation, offset, size);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"Failed to flush memory: {result}");
     }
 
     /// <summary>
@@ -124,7 +141,10 @@ public static unsafe class VulkanAllocator
     /// <param name="allocation">The VMA allocation to unmap.</param>
     internal static void Unmap(Allocation* allocation)
     {
-        Apis.UnmapMemory(_allocator, allocation);
+        if (!TryGetAllocatorForRelease(out var allocator))
+            return;
+
+        Apis.UnmapMemory(allocator, allocation);
     }
 
     /// <summary>
@@ -134,7 +154,10 @@ public static unsafe class VulkanAllocator
     /// <param name="allocation">The VMA allocation to free.</param>
     internal static void DestroyBuffer(VkBuffer buffer, Allocation* allocation)
     {
-        Apis.DestroyBuffer(_allocator, buffer, allocation);
+        if (!TryGetAllocatorForRelease(out var allocator))
+            return;
+
+        Apis.DestroyBuffer(allocator, buffer, allocation);
     }
 
     /// <summary>
@@ -144,7 +167,32 @@ public static unsafe class VulkanAllocator
     /// <param name="allocation">The VMA allocation to free.</param>
     internal static void DestroyImage(VkImage image, Allocation* allocation)
     {
-        Apis.DestroyImage(_allocator, image, allocation);
+        if (!TryGetAllocatorForRelease(out var allocator))
+            return;
+
+        Apis.DestroyImage(allocator, image, allocation);
+    }
+
+    private static Allocator* RequireInitialized()
+    {
+        if (_destroyed)
+            throw new ObjectDisposedException(nameof(VulkanAllocator));
+        if (_allocator == null)
+            throw new InvalidOperationException("VulkanAllocator is not initialized.");
+        return _allocator;
+    }
+
+    private static bool TryGetAllocatorForRelease(out Allocator* allocator)
+    {
+        if (_destroyed)
+        {
+            Debug.Assert(false, "A Vulkan allocation was released after VulkanAllocator was destroyed.");
+            allocator = null;
+            return false;
+        }
+
+        allocator = _allocator;
+        return true;
     }
 
     /// <summary>
@@ -153,11 +201,14 @@ public static unsafe class VulkanAllocator
     /// </summary>
     public static void Destroy()
     {
-        if (_destroyed) return;
+        if (_allocator == null)
+            return;
+
+        var allocator = _allocator;
+        _allocator = null;
         _destroyed = true;
 
-        if (_allocator == null) return;
         VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
-        Apis.DestroyAllocator(_allocator);
+        Apis.DestroyAllocator(allocator);
     }
 }

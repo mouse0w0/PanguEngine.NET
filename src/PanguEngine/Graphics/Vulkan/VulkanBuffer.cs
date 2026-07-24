@@ -58,6 +58,18 @@ public sealed unsafe class VulkanBuffer : Buffer
         VulkanAllocator.Unmap(_allocation);
     }
 
+    /// <summary>
+    /// Flushes CPU writes to the buffer allocation so they are visible to the device.
+    /// </summary>
+    /// <param name="offset">The byte offset relative to the allocation.</param>
+    /// <param name="size">The number of bytes to flush.</param>
+    internal void Flush(ulong offset, ulong size)
+    {
+        ObjectDisposedException.ThrowIf(IsDestroyed, this);
+
+        VulkanAllocator.Flush(_allocation, offset, size);
+    }
+
     internal void PersistentlyMapForWrite()
     {
         ObjectDisposedException.ThrowIf(IsDestroyed, this);
@@ -102,13 +114,15 @@ public sealed unsafe class VulkanBuffer : Buffer
     public override void Destroy()
     {
         if (IsDestroyed) return;
-        MarkDestroyed();
 
         if (_persistentlyMapped)
         {
+            VulkanAllocator.Unmap(_allocation);
             _mappedData = null;
             _persistentlyMapped = false;
         }
+
+        MarkDestroyed();
 
         var buffer = Buffer;
         var allocation = _allocation;

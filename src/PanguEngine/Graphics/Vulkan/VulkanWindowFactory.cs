@@ -19,7 +19,7 @@ public static unsafe class VulkanWindowFactory
     /// <returns>The managed window handle.</returns>
     public static Window CreateWindow(WindowOptions options)
     {
-        var silkWindow = CreateSilkWindow(options);
+        SilkWindow? silkWindow = CreateSilkWindow(options);
         SurfaceKHR surface = default;
         VulkanWindow? window = null;
 
@@ -32,7 +32,17 @@ public static unsafe class VulkanWindowFactory
             surface = silkWindow.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
                 .ToSurface();
 
-            window = new VulkanWindow(silkWindow, surface, false, options.FramesPerSecond);
+            try
+            {
+                window = new VulkanWindow(silkWindow, surface, false, options.FramesPerSecond);
+            }
+            catch
+            {
+                surface = default;
+                silkWindow = null;
+                throw;
+            }
+
             if (options.Icons.Length > 0)
                 window.SetWindowIcons(options.Icons);
 
@@ -44,7 +54,7 @@ public static unsafe class VulkanWindowFactory
             if (window is null && surface.Handle != 0)
                 VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, surface, null);
             if (window is null)
-                silkWindow.Dispose();
+                silkWindow?.Dispose();
             throw;
         }
     }

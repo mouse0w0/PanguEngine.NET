@@ -101,63 +101,82 @@ public static unsafe class VulkanUploader
                 throw new ArgumentOutOfRangeException(nameof(initialSize),
                     "Initial staging buffer size must be greater than zero.");
 
-            _size = initialSize;
-
             BufferCreateInfo bufferInfo = new()
             {
                 SType = StructureType.BufferCreateInfo,
-                Size = _size,
+                Size = initialSize,
                 Usage = BufferUsageFlags.TransferSrcBit,
                 SharingMode = SharingMode.Exclusive
             };
 
-            AllocationCreateInfo allocInfo = new()
+            CommandPool commandPool = default;
+            Fence fence = default;
+            var commandPoolCreated = false;
+            var fenceCreated = false;
+
+            try
             {
-                Usage = VmaMemoryUsage.CpuToGpu
-            };
+                CommandPoolCreateInfo poolInfo = new()
+                {
+                    SType = StructureType.CommandPoolCreateInfo,
+                    Flags = CommandPoolCreateFlags.ResetCommandBufferBit,
+                    QueueFamilyIndex = VulkanContext.GraphicsQueueFamily
+                };
 
-            _stagingBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
-
-            CommandPoolCreateInfo poolInfo = new()
-            {
-                SType = StructureType.CommandPoolCreateInfo,
-                Flags = CommandPoolCreateFlags.ResetCommandBufferBit,
-                QueueFamilyIndex = VulkanContext.GraphicsQueueFamily
-            };
-
-            if (VulkanContext.Vk.CreateCommandPool(VulkanContext.Device, in poolInfo, null, out _commandPool) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to create staging upload command pool.");
-
-            CommandBufferAllocateInfo allocInfo2 = new()
-            {
-                SType = StructureType.CommandBufferAllocateInfo,
-                CommandPool = _commandPool,
-                Level = CommandBufferLevel.Primary,
-                CommandBufferCount = 1
-            };
-
-            var tempBuffer = new CommandBuffer[1];
-            fixed (CommandBuffer* ptr = tempBuffer)
-            {
-                if (VulkanContext.Vk.AllocateCommandBuffers(VulkanContext.Device, in allocInfo2, ptr) !=
+                if (VulkanContext.Vk.CreateCommandPool(VulkanContext.Device, in poolInfo, null, out commandPool) !=
                     Result.Success)
-                    throw new InvalidOperationException("Failed to allocate staging upload command buffer.");
+                    throw new InvalidOperationException("Failed to create staging upload command pool.");
+                commandPoolCreated = true;
+
+                CommandBufferAllocateInfo commandBufferAllocInfo = new()
+                {
+                    SType = StructureType.CommandBufferAllocateInfo,
+                    CommandPool = commandPool,
+                    Level = CommandBufferLevel.Primary,
+                    CommandBufferCount = 1
+                };
+
+                var tempBuffer = new CommandBuffer[1];
+                fixed (CommandBuffer* ptr = tempBuffer)
+                {
+                    if (VulkanContext.Vk.AllocateCommandBuffers(
+                            VulkanContext.Device, in commandBufferAllocInfo, ptr) != Result.Success)
+                        throw new InvalidOperationException("Failed to allocate staging upload command buffer.");
+                }
+
+                FenceCreateInfo fenceInfo = new()
+                {
+                    SType = StructureType.FenceCreateInfo,
+                    Flags = FenceCreateFlags.SignaledBit
+                };
+
+                if (VulkanContext.Vk.CreateFence(VulkanContext.Device, in fenceInfo, null, out fence) !=
+                    Result.Success)
+                    throw new InvalidOperationException("Failed to create staging upload fence.");
+                fenceCreated = true;
+
+                AllocationCreateInfo allocInfo = new()
+                {
+                    Usage = VmaMemoryUsage.Auto,
+                    Flags = AllocationCreateFlags.HostAccessSequentialWriteBit
+                };
+                var stagingBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
+
+                _size = initialSize;
+                _stagingBuffer = stagingBuffer;
+                _commandPool = commandPool;
+                _commandBuffer = tempBuffer[0];
+                _fence = fence;
+                _initialized = true;
             }
-
-            _commandBuffer = tempBuffer[0];
-
-            FenceCreateInfo fenceInfo = new()
+            catch
             {
-                SType = StructureType.FenceCreateInfo,
-                Flags = FenceCreateFlags.SignaledBit
-            };
-
-            if (VulkanContext.Vk.CreateFence(VulkanContext.Device, in fenceInfo, null, out _fence) !=
-                Result.Success)
-                throw new InvalidOperationException("Failed to create staging upload fence.");
-
-            _initialized = true;
+                if (fenceCreated)
+                    VulkanContext.Vk.DestroyFence(VulkanContext.Device, fence, null);
+                if (commandPoolCreated)
+                    VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, commandPool, null);
+                throw;
+            }
         }
     }
 
@@ -426,21 +445,35 @@ public static unsafe class VulkanUploader
         }
 
         ulong stagingOffset = 0;
-        foreach (var upload in batch.Buffers)
+        try
         {
-            stagingOffset = AlignStagingOffset(stagingOffset);
-            upload.Data.AsSpan().CopyTo(new Span<byte>(mapped + stagingOffset, (int)upload.Size));
-            stagingOffset += upload.Size;
-        }
+            foreach (var upload in batch.Buffers)
+            {
+                stagingOffset = AlignStagingOffset(stagingOffset);
+                upload.Data.AsSpan().CopyTo(new Span<byte>(mapped + stagingOffset, upload.Data.Length));
+                stagingOffset += upload.Size;
+            }
 
-        foreach (var upload in batch.Textures)
+            foreach (var upload in batch.Textures)
+            {
+                stagingOffset = AlignStagingOffset(stagingOffset);
+                upload.Data.AsSpan().CopyTo(new Span<byte>(mapped + stagingOffset, upload.Data.Length));
+                stagingOffset += upload.Size;
+            }
+
+            if (totalSize > 0)
+                _stagingBuffer.Flush(0, totalSize);
+        }
+        catch (Exception ex)
         {
-            stagingOffset = AlignStagingOffset(stagingOffset);
-            upload.Data.AsSpan().CopyTo(new Span<byte>(mapped + stagingOffset, (int)upload.Size));
-            stagingOffset += upload.Size;
+            EnterFaulted(ex);
+            FailBatch(batch, ex);
+            return;
         }
-
-        _stagingBuffer.Unmap();
+        finally
+        {
+            _stagingBuffer.Unmap();
+        }
 
         if (VulkanContext.Vk.ResetCommandBuffer(_commandBuffer, 0) != Result.Success)
         {
@@ -768,7 +801,8 @@ public static unsafe class VulkanUploader
 
         AllocationCreateInfo allocInfo = new()
         {
-            Usage = VmaMemoryUsage.CpuToGpu
+            Usage = VmaMemoryUsage.Auto,
+            Flags = AllocationCreateFlags.HostAccessSequentialWriteBit
         };
 
         var newBuffer = VulkanAllocator.CreateBuffer(in bufferInfo, in allocInfo);
