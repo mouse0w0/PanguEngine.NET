@@ -7,21 +7,11 @@ namespace PanguEngine.World.Blocks;
 /// </summary>
 public sealed class AirBlock : Block
 {
-    /// <summary>
-    /// Creates an air block.
-    /// </summary>
-    public AirBlock()
-    {
-    }
-
     /// <inheritdoc/>
     public override bool IsAir => true;
 
     /// <inheritdoc/>
-    public override bool CanOccludeFace(Direction direction)
-    {
-        return false;
-    }
+    public override bool CanOccludeFace(BlockState state, Direction direction) => false;
 
     /// <inheritdoc/>
     public override IBlockShape GetSelectionShape(
