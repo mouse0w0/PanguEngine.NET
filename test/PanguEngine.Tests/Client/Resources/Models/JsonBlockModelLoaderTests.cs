@@ -75,6 +75,62 @@ public sealed class JsonBlockModelLoaderTests
         Assert.Equal(expectedRotation, model.Elements!.Single().Faces["up"].Rotation);
     }
 
+    [Fact]
+    public void LoadsExplicitAndMissingFaceUv()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/models/block/model.json", """
+            {
+              "elements": [
+                {
+                  "from": [0, 0, 0],
+                  "to": [16, 16, 16],
+                  "faces": {
+                    "up": { "texture": "block/test", "uv": [1, 2, 15, 14] },
+                    "down": { "texture": "block/test" }
+                  }
+                }
+              ]
+            }
+            """);
+        using var resources = CreateResources(directory.Path);
+
+        var model = new JsonBlockModelLoader(resources)
+            .Load(ResourceKey.Create("pangu", "block/model"));
+        var faces = model.Elements!.Single().Faces;
+
+        Assert.Equal<BlockFaceUv?>(new BlockFaceUv(1, 2, 15, 14), faces["up"].Uv);
+        Assert.Null(faces["down"].Uv);
+    }
+
+    [Theory]
+    [InlineData("[0, 0, 16]")]
+    [InlineData("[-1, 0, 16, 16]")]
+    [InlineData("[0, 0, 17, 16]")]
+    public void RejectsInvalidFaceUv(string jsonUv)
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/models/block/invalid.json", $$"""
+              {
+                "elements": [
+                  {
+                    "from": [0, 0, 0],
+                    "to": [16, 16, 16],
+                    "faces": {
+                      "up": { "texture": "block/test", "uv": {{jsonUv}} }
+                    }
+                  }
+                ]
+              }
+              """);
+        using var resources = CreateResources(directory.Path);
+
+        var exception = Assert.Throws<InvalidDataException>(() => new JsonBlockModelLoader(resources)
+            .Load(ResourceKey.Create("pangu", "block/invalid")));
+
+        Assert.Contains("face 'up' uv must contain four values from 0 to 16", exception.Message);
+    }
+
     [Theory]
     [InlineData("-90")]
     [InlineData("45")]

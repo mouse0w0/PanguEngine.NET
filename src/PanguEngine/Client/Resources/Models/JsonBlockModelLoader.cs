@@ -174,7 +174,7 @@ internal sealed class JsonBlockModelLoader
         return new Vector3D<float>(values[0], values[1], values[2]);
     }
 
-    private static float[]? ParseUv(
+    private static BlockFaceUv? ParseUv(
         float[]? values,
         ResourceKey modelKey,
         int elementIndex,
@@ -186,6 +186,6 @@ internal sealed class JsonBlockModelLoader
             throw new InvalidDataException(
                 $"Block model '{modelKey}' element {elementIndex} face '{direction}' uv must contain four values from 0 to 16.");
 
-        return values.ToArray();
+        return new BlockFaceUv(values[0], values[1], values[2], values[3]);
     }
 }

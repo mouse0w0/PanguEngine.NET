@@ -15,6 +15,6 @@ internal sealed record ResolvedBlockElement(
 
 internal sealed record ResolvedBlockFace(
     ResourceKey Texture,
-    float[] Uv,
+    BlockFaceUv Uv,
     int Rotation,
     DirectionFlags Cull);

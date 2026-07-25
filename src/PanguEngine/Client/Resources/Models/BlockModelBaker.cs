@@ -40,10 +40,10 @@ internal sealed class BlockModelBaker
                 var normal = RotateVector(GetNormal(direction), rotation);
                 var textureCoordinates = new[]
                 {
-                    new Vector2D<float>(uv[0], uv[1]),
-                    new Vector2D<float>(uv[0], uv[3]),
-                    new Vector2D<float>(uv[2], uv[3]),
-                    new Vector2D<float>(uv[2], uv[1])
+                    new Vector2D<float>(uv.U0, uv.V0),
+                    new Vector2D<float>(uv.U0, uv.V1),
+                    new Vector2D<float>(uv.U1, uv.V1),
+                    new Vector2D<float>(uv.U1, uv.V0)
                 };
                 var rotationOffset = face.Rotation / 90;
                 for (var index = 0; index < 4; index++)

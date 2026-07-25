@@ -59,7 +59,7 @@ public sealed class BakedBlockModelTests
                         face => face.Direction,
                         face => new ResolvedBlockFace(
                             texture,
-                            [0, 0, 16, 16],
+                            new BlockFaceUv(0, 0, 16, 16),
                             0,
                             face.Cull)))
             ]);

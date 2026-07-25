@@ -16,7 +16,7 @@ internal sealed record UnresolvedBlockElement(
 
 internal sealed record UnresolvedBlockFace(
     BlockTextureValue Texture,
-    float[]? Uv,
+    BlockFaceUv? Uv,
     int Rotation,
     IReadOnlyList<string> Cull);
 

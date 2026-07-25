@@ -49,7 +49,7 @@ public sealed class BlockModelBakerTests
         var baker = new BlockModelBaker(builder.Build());
         var source = CreateModel(
             texture,
-            [0, 0, 16, 16],
+            new BlockFaceUv(0, 0, 16, 16),
             0,
             (Direction.Up, DirectionFlags.Up));
         var unrotated = new RecordingWriter();
@@ -127,12 +127,12 @@ public sealed class BlockModelBakerTests
         var baker = new BlockModelBaker(builder.Build());
         var rotatedModel = baker.Bake(CreateModel(
             texture,
-            [0, 0, 16, 16],
+            new BlockFaceUv(0, 0, 16, 16),
             rotation,
             (Direction.Up, DirectionFlags.None)));
         var unrotatedModel = baker.Bake(CreateModel(
             texture,
-            [0, 0, 16, 16],
+            new BlockFaceUv(0, 0, 16, 16),
             0,
             (Direction.Up, DirectionFlags.None)));
         var rotatedWriter = new RecordingWriter();
@@ -165,7 +165,7 @@ public sealed class BlockModelBakerTests
         var baker = new BlockModelBaker(builder.Build());
         var model = baker.Bake(CreateModel(
             texture,
-            [16, 4, 0, 12],
+            new BlockFaceUv(16, 4, 0, 12),
             90,
             (Direction.Up, DirectionFlags.None)));
         var writer = new RecordingWriter();
@@ -191,7 +191,7 @@ public sealed class BlockModelBakerTests
         var baker = new BlockModelBaker(builder.Build());
         var model = baker.Bake(CreateModel(
             texture,
-            [8, 12, 8, 4],
+            new BlockFaceUv(8, 12, 8, 4),
             90,
             (Direction.Up, DirectionFlags.None)));
         var writer = new RecordingWriter();
@@ -223,12 +223,12 @@ public sealed class BlockModelBakerTests
         ResourceKey texture,
         params (Direction Direction, DirectionFlags Cull)[] faces)
     {
-        return CreateModel(texture, [0, 0, 16, 16], 0, faces);
+        return CreateModel(texture, new BlockFaceUv(0, 0, 16, 16), 0, faces);
     }
 
     private static ResolvedBlockModel CreateModel(
         ResourceKey texture,
-        float[] uv,
+        BlockFaceUv uv,
         int rotation,
         params (Direction Direction, DirectionFlags Cull)[] faces)
     {

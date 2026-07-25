@@ -129,6 +129,46 @@ public sealed class BlockModelManagerTests
     }
 
     [Fact]
+    public void ResolvesExplicitUvFromJson()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/models/block/model.json", """
+                                                                               {
+                                                                                 "elements": [
+                                                                                   {
+                                                                                     "from": [0, 0, 0],
+                                                                                     "to": [16, 16, 16],
+                                                                                     "faces": {
+                                                                                       "up": { "texture": "block/stone", "uv": [2, 4, 10, 12] }
+                                                                                     }
+                                                                                   }
+                                                                                 ]
+                                                                               }
+                                                                               """);
+        TestDirectory.WriteResource(directory, "test/textures/block/stone.png", OnePixelPng);
+        WriteAppearance(directory, "test", "model", "test:block/model");
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "model"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        var writer = new RecordingWriter();
+        manager.Get(block.DefaultState, default).Emit(default, DirectionFlags.None, writer);
+        var region = manager.Atlas.GetRegion(ResourceKey.Create("test", "block/stone"));
+
+        Vector2D<float> Map(float u, float v) => new(
+            region.U0 + u / 16 * (region.U1 - region.U0),
+            region.V0 + v / 16 * (region.V1 - region.V0));
+
+        Assert.Equal(
+            [Map(2, 4), Map(2, 12), Map(10, 12), Map(10, 4)],
+            writer.TexCoords);
+    }
+
+    [Fact]
     public void InheritsParentGeometryAndPreservesRotationThroughMissingTextureReplacement()
     {
         using var directory = TestDirectory.Create();

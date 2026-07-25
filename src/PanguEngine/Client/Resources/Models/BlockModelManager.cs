@@ -271,7 +271,7 @@ internal sealed class BlockModelManager
                 direction => direction,
                 direction => new ResolvedBlockFace(
                     MissingTextureKey,
-                    [0, 0, 16, 16],
+                    new BlockFaceUv(0, 0, 16, 16),
                     0,
                     direction.ToFlag()));
         return new ResolvedBlockModel(
@@ -418,19 +418,19 @@ internal sealed class BlockModelManager
         return result;
     }
 
-    private static float[] GetAutomaticUv(
+    private static BlockFaceUv GetAutomaticUv(
         Vector3D<float> from,
         Vector3D<float> to,
         Direction direction)
     {
         return direction switch
         {
-            Direction.Down => [from.X, 16 - to.Z, to.X, 16 - from.Z],
-            Direction.Up => [from.X, from.Z, to.X, to.Z],
-            Direction.North => [16 - to.X, 16 - to.Y, 16 - from.X, 16 - from.Y],
-            Direction.South => [from.X, 16 - to.Y, to.X, 16 - from.Y],
-            Direction.West => [from.Z, 16 - to.Y, to.Z, 16 - from.Y],
-            Direction.East => [16 - to.Z, 16 - to.Y, 16 - from.Z, 16 - from.Y],
+            Direction.Down => new BlockFaceUv(from.X, 16 - to.Z, to.X, 16 - from.Z),
+            Direction.Up => new BlockFaceUv(from.X, from.Z, to.X, to.Z),
+            Direction.North => new BlockFaceUv(16 - to.X, 16 - to.Y, 16 - from.X, 16 - from.Y),
+            Direction.South => new BlockFaceUv(from.X, 16 - to.Y, to.X, 16 - from.Y),
+            Direction.West => new BlockFaceUv(from.Z, 16 - to.Y, to.Z, 16 - from.Y),
+            Direction.East => new BlockFaceUv(16 - to.Z, 16 - to.Y, 16 - from.Z, 16 - from.Y),
             _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
         };
     }
