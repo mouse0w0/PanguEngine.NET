@@ -15,7 +15,7 @@ public sealed class BakedBlockModelTests
         var atlasBuilder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
         atlasBuilder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var model = new BlockModelBaker(atlasBuilder.Build()).Bake(
-            CreateModel(new BlockTextureValue.Resource(texture), ("up", ["up", "north"])));
+            CreateModel(texture, (Direction.Up, DirectionFlags.Up | DirectionFlags.North)));
 
         var partial = new RecordingWriter();
         model.Emit(default, DirectionFlags.Up, partial);
@@ -33,7 +33,10 @@ public sealed class BakedBlockModelTests
         var atlasBuilder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
         atlasBuilder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var model = new BlockModelBaker(atlasBuilder.Build()).Bake(
-            CreateModel(new BlockTextureValue.Resource(texture), ("up", []), ("down", [])));
+            CreateModel(
+                texture,
+                (Direction.Up, DirectionFlags.None),
+                (Direction.Down, DirectionFlags.None)));
         var writer = new RecordingWriter();
         writer.AddExistingVertices(3);
 
@@ -42,22 +45,23 @@ public sealed class BakedBlockModelTests
         Assert.Equal([3u, 4u, 5u, 3u, 5u, 6u, 7u, 8u, 9u, 7u, 9u, 10u], writer.Indices);
     }
 
-    private static UnbakedBlockModel CreateModel(
-        BlockTextureValue texture,
-        params (string Direction, string[] Cull)[] faces)
+    private static ResolvedBlockModel CreateModel(
+        ResourceKey texture,
+        params (Direction Direction, DirectionFlags Cull)[] faces)
     {
-        return new UnbakedBlockModel(
+        return new ResolvedBlockModel(
             ResourceKey.Create("test", "block/model"),
-            null,
-            new Dictionary<string, BlockTextureValue>(StringComparer.Ordinal),
             [
-                new UnbakedElement(
+                new ResolvedBlockElement(
                     new Vector3D<float>(0, 0, 0),
                     new Vector3D<float>(16, 16, 16),
                     faces.ToDictionary(
                         face => face.Direction,
-                        face => new UnbakedFace(texture, null, 0, face.Cull),
-                        StringComparer.Ordinal))
+                        face => new ResolvedBlockFace(
+                            texture,
+                            [0, 0, 16, 16],
+                            0,
+                            face.Cull)))
             ]);
     }
 

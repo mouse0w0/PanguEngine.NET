@@ -79,6 +79,55 @@ public sealed class BlockModelManagerTests
         Assert.Equal(24, unknownWriter.Vertices.Count);
     }
 
+    [Theory]
+    [InlineData("down", 1f, 5f, 9f, 13f)]
+    [InlineData("up", 1f, 3f, 9f, 11f)]
+    [InlineData("north", 7f, 6f, 15f, 14f)]
+    [InlineData("south", 1f, 6f, 9f, 14f)]
+    [InlineData("west", 3f, 6f, 11f, 14f)]
+    [InlineData("east", 5f, 6f, 13f, 14f)]
+    public void ResolvesAutomaticUv(
+        string direction,
+        float u0,
+        float v0,
+        float u1,
+        float v1)
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/models/block/model.json", $$"""
+                                                                                 {
+                                                                                   "elements": [
+                                                                                     {
+                                                                                       "from": [1, 2, 3],
+                                                                                       "to": [9, 10, 11],
+                                                                                       "faces": { "{{direction}}": { "texture": "block/stone" } }
+                                                                                     }
+                                                                                   ]
+                                                                                 }
+                                                                                 """);
+        TestDirectory.WriteResource(directory, "test/textures/block/stone.png", OnePixelPng);
+        WriteAppearance(directory, "test", "model", "test:block/model");
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "model"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        var writer = new RecordingWriter();
+        manager.Get(block.DefaultState, default).Emit(default, DirectionFlags.None, writer);
+        var region = manager.Atlas.GetRegion(ResourceKey.Create("test", "block/stone"));
+
+        Vector2D<float> Map(float u, float v) => new(
+            region.U0 + u / 16 * (region.U1 - region.U0),
+            region.V0 + v / 16 * (region.V1 - region.V0));
+
+        Assert.Equal(
+            [Map(u0, v0), Map(u0, v1), Map(u1, v1), Map(u1, v0)],
+            writer.TexCoords);
+    }
+
     [Fact]
     public void InheritsParentGeometryAndPreservesRotationThroughMissingTextureReplacement()
     {

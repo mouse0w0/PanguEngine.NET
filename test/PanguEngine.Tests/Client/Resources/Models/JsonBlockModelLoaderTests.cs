@@ -166,6 +166,52 @@ public sealed class JsonBlockModelLoaderTests
     }
 
     [Fact]
+    public void RejectsUnknownFaceDirection()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/models/block/invalid.json", """
+            {
+              "elements": [
+                {
+                  "from": [0, 0, 0],
+                  "to": [16, 16, 16],
+                  "faces": { "invalid": { "texture": "block/test" } }
+                }
+              ]
+            }
+            """);
+        using var resources = CreateResources(directory.Path);
+
+        var exception = Assert.Throws<InvalidDataException>(() => new JsonBlockModelLoader(resources)
+            .Load(ResourceKey.Create("pangu", "block/invalid")));
+
+        Assert.Contains("unknown face direction 'invalid'", exception.Message);
+    }
+
+    [Fact]
+    public void RejectsUnknownCullDirection()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/models/block/invalid.json", """
+            {
+              "elements": [
+                {
+                  "from": [0, 0, 0],
+                  "to": [16, 16, 16],
+                  "faces": { "up": { "texture": "block/test", "cull": ["invalid"] } }
+                }
+              ]
+            }
+            """);
+        using var resources = CreateResources(directory.Path);
+
+        var exception = Assert.Throws<InvalidDataException>(() => new JsonBlockModelLoader(resources)
+            .Load(ResourceKey.Create("pangu", "block/invalid")));
+
+        Assert.Contains("face 'up' has unknown cull direction 'invalid'", exception.Message);
+    }
+
+    [Fact]
     public void RejectsEmptyTextureVariable()
     {
         using var directory = TestDirectory.Create();

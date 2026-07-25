@@ -3,6 +3,7 @@ using PanguEngine.Graphics;
 using PanguEngine.Registries;
 using PanguEngine.Resources;
 using PanguEngine.Resources.Images;
+using PanguEngine.World;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
 using Silk.NET.Maths;
@@ -14,7 +15,16 @@ internal sealed class BlockModelManager
     private const int AtlasGutter = 1;
     private static readonly ResourceKey MissingTextureKey = ResourceKey.Create("pangu", "missing");
     private static readonly ResourceKey MissingModelKey = ResourceKey.Create("pangu", "missing_model");
-    private static readonly string[] FaceDirections = ["down", "up", "north", "south", "west", "east"];
+
+    private static readonly Direction[] FaceDirections =
+    [
+        Direction.Down,
+        Direction.Up,
+        Direction.North,
+        Direction.South,
+        Direction.West,
+        Direction.East
+    ];
 
     private static readonly Action<ILogger, ResourceKey, ResourceKey, Exception?> LogMissingBlockAppearance =
         LoggerMessage.Define<ResourceKey, ResourceKey>(
@@ -61,7 +71,7 @@ internal sealed class BlockModelManager
         var appearanceLoader = new JsonBlockAppearanceLoader(_resources);
         var modelLoader = new JsonBlockModelLoader(_resources);
         var layerCache = new Dictionary<ResourceKey, UnbakedBlockModel>();
-        var resolvedModelCache = new Dictionary<ResourceKey, UnbakedBlockModel>();
+        var resolvedModelCache = new Dictionary<ResourceKey, ResolvedBlockModel>();
         var failedModels = new Dictionary<ResourceKey, Exception>();
         var resolvedAppearances = new Dictionary<Block, ResolvedBlockAppearance>();
         var textureKeys = new HashSet<ResourceKey> { MissingTextureKey };
@@ -254,41 +264,38 @@ internal sealed class BlockModelManager
         return pixels;
     }
 
-    private static UnbakedBlockModel CreateMissingModel()
+    private static ResolvedBlockModel CreateMissingModel()
     {
         var faces = FaceDirections
             .ToDictionary(
                 direction => direction,
-                direction => new UnbakedFace(
-                    new BlockTextureValue.Resource(MissingTextureKey),
-                    null,
+                direction => new ResolvedBlockFace(
+                    MissingTextureKey,
+                    [0, 0, 16, 16],
                     0,
-                    [direction]),
-                StringComparer.Ordinal);
-        return new UnbakedBlockModel(
+                    direction.ToFlag()));
+        return new ResolvedBlockModel(
             MissingModelKey,
-            null,
-            new Dictionary<string, BlockTextureValue>(StringComparer.Ordinal),
             [
-                new UnbakedElement(
+                new ResolvedBlockElement(
                     new Vector3D<float>(0, 0, 0),
                     new Vector3D<float>(16, 16, 16),
                     faces)
             ]);
     }
 
-    private static IEnumerable<ResourceKey> GetTextureKeys(UnbakedBlockModel model)
+    private static IEnumerable<ResourceKey> GetTextureKeys(ResolvedBlockModel model)
     {
-        return model.Elements!
+        return model.Elements
             .SelectMany(element => element.Faces.Values)
-            .Select(face => GetTextureKey(face.Texture, model.SourceKey));
+            .Select(face => face.Texture);
     }
 
     private static ResolvedBlockAppearance CreateMissingAppearance(
         ResourceKey blockKey,
         ResourceKey appearanceKey,
         Block block,
-        UnbakedBlockModel missingModel)
+        ResolvedBlockModel missingModel)
     {
         IReadOnlyList<ResolvedBlockCandidate> candidates =
             [new(MissingModelKey, default, 1, missingModel)];
@@ -310,21 +317,16 @@ internal sealed class BlockModelManager
             _ => entries);
     }
 
-    private static UnbakedBlockModel ResolveModel(
+    private static ResolvedBlockModel ResolveModel(
         JsonBlockModelLoader loader,
         ResourceKey modelKey,
         IReadOnlyList<ResourceKey> parentChain,
         Dictionary<ResourceKey, UnbakedBlockModel> layerCache)
     {
         var layer = ResolveLayer(loader, modelKey, parentChain, layerCache);
-        var textures = new Dictionary<string, BlockTextureValue>(layer.Textures, StringComparer.Ordinal);
-        var elements = ResolveElementTextures(layer.Elements!, textures, modelKey);
-        return layer with
-        {
-            ParentReference = null,
-            Textures = textures,
-            Elements = elements
-        };
+        return new ResolvedBlockModel(
+            layer.SourceKey,
+            ResolveElements(layer.Elements!, layer.Textures, modelKey));
     }
 
     private static UnbakedBlockModel ResolveLayer(
@@ -387,56 +389,68 @@ internal sealed class BlockModelManager
         }
     }
 
-    private static UnbakedElement[] ResolveElementTextures(
+    private static ResolvedBlockElement[] ResolveElements(
         IReadOnlyList<UnbakedElement> elements,
         IReadOnlyDictionary<string, BlockTextureValue> textures,
         ResourceKey modelKey)
     {
-        return elements
-            .Select(element => element with
+        var result = new ResolvedBlockElement[elements.Count];
+        for (var elementIndex = 0; elementIndex < elements.Count; elementIndex++)
+        {
+            var element = elements[elementIndex];
+            var faces = new Dictionary<Direction, ResolvedBlockFace>(element.Faces.Count);
+            foreach (var (directionName, face) in element.Faces)
             {
-                Faces = element.Faces.ToDictionary(
-                    pair => pair.Key,
-                    pair => pair.Value with
-                    {
-                        Texture = ResolveTexture(pair.Value.Texture, textures, modelKey)
-                    },
-                    StringComparer.Ordinal)
-            })
-            .ToArray();
+                var direction = ParseDirection(directionName, modelKey);
+                faces.Add(direction, new ResolvedBlockFace(
+                    ResolveTexture(face.Texture, textures, modelKey).Key,
+                    face.Uv ?? GetAutomaticUv(element.From, element.To, direction),
+                    face.Rotation,
+                    ResolveCull(face.Cull, modelKey)));
+            }
+
+            result[elementIndex] = new ResolvedBlockElement(
+                element.From,
+                element.To,
+                faces);
+        }
+
+        return result;
     }
 
-    private static UnbakedBlockModel ReplaceTextures(
-        UnbakedBlockModel model,
+    private static float[] GetAutomaticUv(
+        Vector3D<float> from,
+        Vector3D<float> to,
+        Direction direction)
+    {
+        return direction switch
+        {
+            Direction.Down => [from.X, 16 - to.Z, to.X, 16 - from.Z],
+            Direction.Up => [from.X, from.Z, to.X, to.Z],
+            Direction.North => [16 - to.X, 16 - to.Y, 16 - from.X, 16 - from.Y],
+            Direction.South => [from.X, 16 - to.Y, to.X, 16 - from.Y],
+            Direction.West => [from.Z, 16 - to.Y, to.Z, 16 - from.Y],
+            Direction.East => [16 - to.Z, 16 - to.Y, 16 - from.Z, 16 - from.Y],
+            _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
+        };
+    }
+
+    private static ResolvedBlockModel ReplaceTextures(
+        ResolvedBlockModel model,
         HashSet<ResourceKey> failedTextures,
         ResourceKey replacementTexture)
     {
-        var elements = model.Elements!
+        var elements = model.Elements
             .Select(element => element with
             {
                 Faces = element.Faces.ToDictionary(
                     pair => pair.Key,
-                    pair =>
-                    {
-                        var texture = GetTextureKey(pair.Value.Texture, model.SourceKey);
-                        return failedTextures.Contains(texture)
-                            ? pair.Value with
-                            {
-                                Texture = new BlockTextureValue.Resource(replacementTexture)
-                            }
-                            : pair.Value;
-                    },
-                    StringComparer.Ordinal)
+                    pair => failedTextures.Contains(pair.Value.Texture)
+                        ? pair.Value with { Texture = replacementTexture }
+                        : pair.Value)
             })
             .ToArray();
         return model with { Elements = elements };
-    }
-
-    private static ResourceKey GetTextureKey(BlockTextureValue value, ResourceKey modelKey)
-    {
-        return value is BlockTextureValue.Resource resource
-            ? resource.Key
-            : throw new InvalidDataException($"Block model '{modelKey}' has an unresolved texture variable.");
     }
 
     private static ResourceKey ResolveModelReference(string value, ResourceKey declaringModel)
@@ -444,6 +458,31 @@ internal sealed class BlockModelManager
         if (value.Contains(':'))
             return ResourceKey.Parse(value);
         return ResourceKey.Create(declaringModel.Namespace, value);
+    }
+
+    private static DirectionFlags ResolveCull(
+        IReadOnlyList<string> values,
+        ResourceKey modelKey)
+    {
+        var result = DirectionFlags.None;
+        foreach (var value in values)
+            result |= ParseDirection(value, modelKey).ToFlag();
+        return result;
+    }
+
+    private static Direction ParseDirection(string value, ResourceKey modelKey)
+    {
+        return value switch
+        {
+            "down" => Direction.Down,
+            "up" => Direction.Up,
+            "north" => Direction.North,
+            "south" => Direction.South,
+            "west" => Direction.West,
+            "east" => Direction.East,
+            _ => throw new InvalidDataException(
+                $"Block model '{modelKey}' has unknown direction '{value}'.")
+        };
     }
 
     private static BlockTextureValue.Resource ResolveTexture(

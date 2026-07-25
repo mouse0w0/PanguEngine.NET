@@ -9,13 +9,13 @@ namespace PanguEngine.Tests.Client.Resources.Models;
 public sealed class BlockModelBakerTests
 {
     [Fact]
-    public void BakesUnitCubeCoordinatesAndAutomaticUv()
+    public void BakesUnitCubeCoordinatesAndUv()
     {
         var texture = ResourceKey.Create("test", "block/stone");
         var builder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
         builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var baker = new BlockModelBaker(builder.Build());
-        var model = baker.Bake(CreateModel(new BlockTextureValue.Resource(texture), ("up", [])));
+        var model = baker.Bake(CreateModel(texture, (Direction.Up, DirectionFlags.None)));
         var writer = new RecordingWriter();
 
         model.Emit(default, DirectionFlags.None, writer);
@@ -48,10 +48,10 @@ public sealed class BlockModelBakerTests
         builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var baker = new BlockModelBaker(builder.Build());
         var source = CreateModel(
-            new BlockTextureValue.Resource(texture),
+            texture,
             [0, 0, 16, 16],
             0,
-            ("up", ["up"]));
+            (Direction.Up, DirectionFlags.Up));
         var unrotated = new RecordingWriter();
         var rotated = new RecordingWriter();
 
@@ -73,32 +73,13 @@ public sealed class BlockModelBakerTests
         Assert.Equal(unrotated.Indices, rotated.Indices);
     }
 
-    [Fact]
-    public void RotatesAutomaticUvWithModelVertices()
-    {
-        var texture = ResourceKey.Create("test", "block/stone");
-        var builder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
-        builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
-        var baker = new BlockModelBaker(builder.Build());
-        var source = CreateModel(new BlockTextureValue.Resource(texture), ("north", []));
-        var unrotated = new RecordingWriter();
-        var rotated = new RecordingWriter();
-
-        baker.Bake(source).Emit(default, DirectionFlags.None, unrotated);
-        baker.Bake(source, new BlockModelRotation(0, 90, 0))
-            .Emit(default, DirectionFlags.None, rotated);
-
-        Assert.Equal(unrotated.TexCoords, rotated.TexCoords);
-        Assert.NotEqual(unrotated.Positions, rotated.Positions);
-    }
-
     [Theory]
-    [InlineData("up", 90, 0, 0, DirectionFlags.Up, DirectionFlags.South, 0f, 0f, 1f)]
-    [InlineData("north", 0, 90, 0, DirectionFlags.North, DirectionFlags.West, -1f, 0f, 0f)]
-    [InlineData("east", 0, 0, 90, DirectionFlags.East, DirectionFlags.Up, 0f, 1f, 0f)]
-    [InlineData("north", 90, 90, 90, DirectionFlags.North, DirectionFlags.West, -1f, 0f, 0f)]
+    [InlineData(Direction.Up, 90, 0, 0, DirectionFlags.Up, DirectionFlags.South, 0f, 0f, 1f)]
+    [InlineData(Direction.North, 0, 90, 0, DirectionFlags.North, DirectionFlags.West, -1f, 0f, 0f)]
+    [InlineData(Direction.East, 0, 0, 90, DirectionFlags.East, DirectionFlags.Up, 0f, 1f, 0f)]
+    [InlineData(Direction.North, 90, 90, 90, DirectionFlags.North, DirectionFlags.West, -1f, 0f, 0f)]
     public void RotatesNormalAndCullDirection(
-        string direction,
+        Direction direction,
         int x,
         int y,
         int z,
@@ -113,8 +94,8 @@ public sealed class BlockModelBakerTests
         builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var model = new BlockModelBaker(builder.Build()).Bake(
             CreateModel(
-                new BlockTextureValue.Resource(texture),
-                (direction, [direction])),
+                texture,
+                (direction, originalCull)),
             new BlockModelRotation(x, y, z));
         var visible = new RecordingWriter();
         var culled = new RecordingWriter();
@@ -145,15 +126,15 @@ public sealed class BlockModelBakerTests
         builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var baker = new BlockModelBaker(builder.Build());
         var rotatedModel = baker.Bake(CreateModel(
-            new BlockTextureValue.Resource(texture),
+            texture,
             [0, 0, 16, 16],
             rotation,
-            ("up", [])));
+            (Direction.Up, DirectionFlags.None)));
         var unrotatedModel = baker.Bake(CreateModel(
-            new BlockTextureValue.Resource(texture),
+            texture,
             [0, 0, 16, 16],
             0,
-            ("up", [])));
+            (Direction.Up, DirectionFlags.None)));
         var rotatedWriter = new RecordingWriter();
         var unrotatedWriter = new RecordingWriter();
 
@@ -175,38 +156,6 @@ public sealed class BlockModelBakerTests
         Assert.Equal(unrotatedWriter.Indices, rotatedWriter.Indices);
     }
 
-    [Theory]
-    [InlineData("down")]
-    [InlineData("up")]
-    [InlineData("north")]
-    [InlineData("south")]
-    [InlineData("west")]
-    [InlineData("east")]
-    public void RotatesAutomaticUvCounterclockwiseFromEveryFace(string direction)
-    {
-        var texture = ResourceKey.Create("test", "block/stone");
-        var builder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
-        builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
-        var baker = new BlockModelBaker(builder.Build());
-        var model = baker.Bake(CreateModel(
-            new BlockTextureValue.Resource(texture),
-            null,
-            90,
-            (direction, [])));
-        var writer = new RecordingWriter();
-
-        model.Emit(default, DirectionFlags.None, writer);
-
-        Assert.Equal(
-            [
-                new Vector2D<float>(1, 0),
-                new Vector2D<float>(0, 0),
-                new Vector2D<float>(0, 1),
-                new Vector2D<float>(1, 1)
-            ],
-            writer.TexCoords);
-    }
-
     [Fact]
     public void RotatesMirroredExplicitUvByCornerOrder()
     {
@@ -215,10 +164,10 @@ public sealed class BlockModelBakerTests
         builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var baker = new BlockModelBaker(builder.Build());
         var model = baker.Bake(CreateModel(
-            new BlockTextureValue.Resource(texture),
+            texture,
             [16, 4, 0, 12],
             90,
-            ("up", [])));
+            (Direction.Up, DirectionFlags.None)));
         var writer = new RecordingWriter();
 
         model.Emit(default, DirectionFlags.None, writer);
@@ -241,10 +190,10 @@ public sealed class BlockModelBakerTests
         builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
         var baker = new BlockModelBaker(builder.Build());
         var model = baker.Bake(CreateModel(
-            new BlockTextureValue.Resource(texture),
+            texture,
             [8, 12, 8, 4],
             90,
-            ("up", [])));
+            (Direction.Up, DirectionFlags.None)));
         var writer = new RecordingWriter();
 
         model.Emit(default, DirectionFlags.None, writer);
@@ -267,44 +216,31 @@ public sealed class BlockModelBakerTests
         var baker = new BlockModelBaker(atlas);
 
         Assert.Throws<KeyNotFoundException>(() => baker.Bake(
-            CreateModel(new BlockTextureValue.Resource(texture), ("up", []))));
+            CreateModel(texture, (Direction.Up, DirectionFlags.None))));
     }
 
-    [Fact]
-    public void UnresolvedTextureVariableIsConsistencyError()
+    private static ResolvedBlockModel CreateModel(
+        ResourceKey texture,
+        params (Direction Direction, DirectionFlags Cull)[] faces)
     {
-        var atlas = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32).Build();
-        var baker = new BlockModelBaker(atlas);
-
-        Assert.Throws<InvalidDataException>(() => baker.Bake(
-            CreateModel(new BlockTextureValue.Variable("all"), ("up", []))));
+        return CreateModel(texture, [0, 0, 16, 16], 0, faces);
     }
 
-    private static UnbakedBlockModel CreateModel(
-        BlockTextureValue texture,
-        params (string Direction, string[] Cull)[] faces)
-    {
-        return CreateModel(texture, null, 0, faces);
-    }
-
-    private static UnbakedBlockModel CreateModel(
-        BlockTextureValue texture,
-        float[]? uv,
+    private static ResolvedBlockModel CreateModel(
+        ResourceKey texture,
+        float[] uv,
         int rotation,
-        params (string Direction, string[] Cull)[] faces)
+        params (Direction Direction, DirectionFlags Cull)[] faces)
     {
-        return new UnbakedBlockModel(
+        return new ResolvedBlockModel(
             ResourceKey.Create("test", "block/model"),
-            null,
-            new Dictionary<string, BlockTextureValue>(StringComparer.Ordinal),
             [
-                new UnbakedElement(
+                new ResolvedBlockElement(
                     new Vector3D<float>(0, 0, 0),
                     new Vector3D<float>(16, 16, 16),
                     faces.ToDictionary(
                         face => face.Direction,
-                        face => new UnbakedFace(texture, uv, rotation, face.Cull),
-                        StringComparer.Ordinal))
+                        face => new ResolvedBlockFace(texture, uv, rotation, face.Cull)))
             ]);
     }
 

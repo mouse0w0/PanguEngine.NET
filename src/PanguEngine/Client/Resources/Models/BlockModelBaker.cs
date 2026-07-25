@@ -18,10 +18,10 @@ internal sealed class BlockModelBaker
     }
 
     internal BakedBlockModel Bake(
-        UnbakedBlockModel model,
+        ResolvedBlockModel model,
         BlockModelRotation rotation = default)
     {
-        var elements = model.Elements!;
+        var elements = model.Elements;
         var faceCount = elements.Sum(element => element.Faces.Count);
         var vertices = new List<BakedVertex>(faceCount * 4);
         var indices = new List<uint>(faceCount * FaceIndices.Length);
@@ -29,21 +29,13 @@ internal sealed class BlockModelBaker
 
         foreach (var element in elements)
         {
-            foreach (var (directionName, face) in element.Faces)
+            foreach (var (direction, face) in element.Faces)
             {
-                var direction = ParseDirection(directionName, model.SourceKey);
-                var texture = face.Texture is BlockTextureValue.Resource resource
-                    ? resource.Key
-                    : throw new InvalidDataException(
-                        $"Block model '{model.SourceKey}' face '{directionName}' has an unresolved texture variable.");
-                var cull = DirectionFlags.None;
-                foreach (var value in face.Cull)
-                    cull |= ParseDirection(value, model.SourceKey).ToFlag();
-                cull = RotateCull(cull, rotation);
+                var cull = RotateCull(face.Cull, rotation);
 
                 var vertexStart = vertices.Count;
-                var uv = face.Uv ?? GetAutomaticUv(element.From, element.To, direction);
-                var region = _atlas.GetRegion(texture);
+                var uv = face.Uv;
+                var region = _atlas.GetRegion(face.Texture);
                 var positions = GetFacePositions(element.From, element.To, direction);
                 var normal = RotateVector(GetNormal(direction), rotation);
                 var textureCoordinates = new[]
@@ -79,37 +71,6 @@ internal sealed class BlockModelBaker
         }
 
         return new BakedBlockModel(vertices.ToArray(), indices.ToArray(), faces.ToArray());
-    }
-
-    private static Direction ParseDirection(string value, ResourceKey modelKey)
-    {
-        return value switch
-        {
-            "down" => Direction.Down,
-            "up" => Direction.Up,
-            "north" => Direction.North,
-            "south" => Direction.South,
-            "west" => Direction.West,
-            "east" => Direction.East,
-            _ => throw new InvalidDataException($"Block model '{modelKey}' has unknown direction '{value}'.")
-        };
-    }
-
-    private static float[] GetAutomaticUv(
-        Vector3D<float> from,
-        Vector3D<float> to,
-        Direction direction)
-    {
-        return direction switch
-        {
-            Direction.Down => [from.X, 16 - to.Z, to.X, 16 - from.Z],
-            Direction.Up => [from.X, from.Z, to.X, to.Z],
-            Direction.North => [16 - to.X, 16 - to.Y, 16 - from.X, 16 - from.Y],
-            Direction.South => [from.X, 16 - to.Y, to.X, 16 - from.Y],
-            Direction.West => [from.Z, 16 - to.Y, to.Z, 16 - from.Y],
-            Direction.East => [16 - to.Z, 16 - to.Y, 16 - from.Z, 16 - from.Y],
-            _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
-        };
     }
 
     private static Vector3D<float>[] GetFacePositions(
