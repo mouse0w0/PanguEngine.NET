@@ -7,3 +7,9 @@ internal sealed record ResolvedBlockAppearance(
     ResourceKey BlockKey,
     ResourceKey SourceKey,
     IReadOnlyDictionary<BlockState, IReadOnlyList<ResolvedBlockCandidate>> Variants);
+
+internal sealed record ResolvedBlockCandidate(
+    ResourceKey ModelKey,
+    BlockModelRotation Rotation,
+    int Weight,
+    ResolvedBlockModel Model);

@@ -19,3 +19,10 @@ internal sealed record UnbakedFace(
     float[]? Uv,
     int Rotation,
     IReadOnlyList<string> Cull);
+
+internal abstract record BlockTextureValue
+{
+    internal sealed record Variable(string Name) : BlockTextureValue;
+
+    internal sealed record Resource(ResourceKey Key) : BlockTextureValue;
+}

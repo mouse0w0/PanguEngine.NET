@@ -94,3 +94,7 @@ internal sealed class BakedBlockAppearance
         BakedBlockModel Model,
         int CumulativeWeight);
 }
+
+internal readonly record struct BakedBlockAppearanceEntry(
+    BakedBlockModel Model,
+    int Weight);
