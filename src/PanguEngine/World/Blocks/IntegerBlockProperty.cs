@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace PanguEngine.World.Blocks;
 
 internal sealed class IntegerBlockProperty : BlockProperty<int>
@@ -9,7 +11,8 @@ internal sealed class IntegerBlockProperty : BlockProperty<int>
 
     internal override int ValueCount => Values.Count;
 
-    internal override string GetValueString(int valueIndex) => Values[valueIndex].ToString();
+    internal override string GetValueString(int valueIndex) =>
+        Values[valueIndex].ToString(CultureInfo.InvariantCulture);
 
     internal override int IndexOf(int value)
     {

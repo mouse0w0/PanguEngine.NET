@@ -1,3 +1,4 @@
+using System.Globalization;
 using PanguEngine.World;
 using PanguEngine.World.Blocks;
 
@@ -77,6 +78,25 @@ public sealed class BlockPropertyTests
         var prop = BlockProperty.CreateInteger("big", 0, 65535);
 
         Assert.Equal(65536, prop.Values.Count);
+    }
+
+    [Fact]
+    public void IntegerPropertyValueStringUsesInvariantNegativeSign()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        var culture = (CultureInfo)CultureInfo.InvariantCulture.Clone();
+        culture.NumberFormat.NegativeSign = "~";
+        try
+        {
+            CultureInfo.CurrentCulture = culture;
+            var prop = BlockProperty.CreateInteger("level", -1, 0);
+
+            Assert.Equal("-1", prop.GetValueString(0));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
     }
 
     // --- Validation errors ---

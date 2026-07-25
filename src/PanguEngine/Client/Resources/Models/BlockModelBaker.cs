@@ -17,7 +17,9 @@ internal sealed class BlockModelBaker
         _atlas = atlas;
     }
 
-    internal BakedBlockModel Bake(UnbakedBlockModel model)
+    internal BakedBlockModel Bake(
+        UnbakedBlockModel model,
+        BlockModelRotation rotation = default)
     {
         var elements = model.Elements!;
         var faceCount = elements.Sum(element => element.Faces.Count);
@@ -37,12 +39,13 @@ internal sealed class BlockModelBaker
                 var cull = DirectionFlags.None;
                 foreach (var value in face.Cull)
                     cull |= ParseDirection(value, model.SourceKey).ToFlag();
+                cull = RotateCull(cull, rotation);
 
                 var vertexStart = vertices.Count;
                 var uv = face.Uv ?? GetAutomaticUv(element.From, element.To, direction);
                 var region = _atlas.GetRegion(texture);
                 var positions = GetFacePositions(element.From, element.To, direction);
-                var normal = GetNormal(direction);
+                var normal = RotateVector(GetNormal(direction), rotation);
                 var textureCoordinates = new[]
                 {
                     new Vector2D<float>(uv[0], uv[1]),
@@ -57,11 +60,12 @@ internal sealed class BlockModelBaker
                     var textureCoordinate = textureCoordinates[(index - rotationOffset + 4) % 4];
                     var localU = textureCoordinate.X * ModelScale;
                     var localV = textureCoordinate.Y * ModelScale;
+                    var scaledPosition = new Vector3D<float>(
+                        position.X * ModelScale,
+                        position.Y * ModelScale,
+                        position.Z * ModelScale);
                     vertices.Add(new BakedVertex(
-                        new Vector3D<float>(
-                            position.X * ModelScale,
-                            position.Y * ModelScale,
-                            position.Z * ModelScale),
+                        RotatePosition(scaledPosition, rotation),
                         new Vector2D<float>(
                             region.U0 + localU * (region.U1 - region.U0),
                             region.V0 + localV * (region.V1 - region.V0)),
@@ -172,6 +176,64 @@ internal sealed class BlockModelBaker
             Direction.West => new Vector3D<float>(-1, 0, 0),
             Direction.East => new Vector3D<float>(1, 0, 0),
             _ => throw new ArgumentOutOfRangeException(nameof(direction), direction, null)
+        };
+    }
+
+    private static Vector3D<float> RotatePosition(
+        Vector3D<float> position,
+        BlockModelRotation rotation)
+    {
+        var rotated = RotateVector(
+            new Vector3D<float>(
+                position.X - 0.5f,
+                position.Y - 0.5f,
+                position.Z - 0.5f),
+            rotation);
+        return new Vector3D<float>(
+            rotated.X + 0.5f,
+            rotated.Y + 0.5f,
+            rotated.Z + 0.5f);
+    }
+
+    private static Vector3D<float> RotateVector(
+        Vector3D<float> value,
+        BlockModelRotation rotation)
+    {
+        for (var turn = 0; turn < rotation.X / 90; turn++)
+            value = new Vector3D<float>(value.X, -value.Z, value.Y);
+        for (var turn = 0; turn < rotation.Y / 90; turn++)
+            value = new Vector3D<float>(value.Z, value.Y, -value.X);
+        for (var turn = 0; turn < rotation.Z / 90; turn++)
+            value = new Vector3D<float>(-value.Y, value.X, value.Z);
+        return value;
+    }
+
+    private static DirectionFlags RotateCull(
+        DirectionFlags cull,
+        BlockModelRotation rotation)
+    {
+        var result = DirectionFlags.None;
+        foreach (var direction in Enum.GetValues<Direction>())
+        {
+            if ((cull & direction.ToFlag()) == DirectionFlags.None)
+                continue;
+            result |= GetDirection(RotateVector(GetNormal(direction), rotation)).ToFlag();
+        }
+
+        return result;
+    }
+
+    private static Direction GetDirection(Vector3D<float> value)
+    {
+        return value switch
+        {
+            { X: 0, Y: -1, Z: 0 } => Direction.Down,
+            { X: 0, Y: 1, Z: 0 } => Direction.Up,
+            { X: 0, Y: 0, Z: -1 } => Direction.North,
+            { X: 0, Y: 0, Z: 1 } => Direction.South,
+            { X: -1, Y: 0, Z: 0 } => Direction.West,
+            { X: 1, Y: 0, Z: 0 } => Direction.East,
+            _ => throw new InvalidOperationException("Rotated block model direction is not axis-aligned.")
         };
     }
 }

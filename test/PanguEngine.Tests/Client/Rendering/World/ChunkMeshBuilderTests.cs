@@ -11,6 +11,11 @@ namespace PanguEngine.Tests.Client.Rendering.World;
 
 public sealed class ChunkMeshBuilderTests
 {
+    private static readonly byte[] OnePixelPng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+
+    private static readonly BlockProperty<bool> Powered = BlockProperty.CreateBoolean("powered");
+
     [Fact]
     public void BuildSingleSolidBlockEmitsIndexedSixFaces()
     {
@@ -18,8 +23,7 @@ public sealed class ChunkMeshBuilderTests
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, position.ToChunkPos());
-        using var resources = new ResourceManager([]);
-        var models = CreateModels(resources);
+        var models = CreateModels();
 
         var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
@@ -55,8 +59,7 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(first, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(second, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, first.ToChunkPos());
-        using var resources = new ResourceManager([]);
-        var models = CreateModels(resources);
+        var models = CreateModels();
 
         var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
@@ -71,8 +74,7 @@ public sealed class ChunkMeshBuilderTests
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, position.ToChunkPos());
-        using var resources = new ResourceManager([]);
-        var models = CreateModels(resources);
+        var models = CreateModels();
 
         var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
@@ -100,8 +102,7 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(boundary, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(neighbor, BuiltinBlocks.Stone.DefaultState);
         var chunk = GetChunk(world, boundary.ToChunkPos());
-        using var resources = new ResourceManager([]);
-        var models = CreateModels(resources);
+        var models = CreateModels();
 
         var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
 
@@ -109,16 +110,147 @@ public sealed class ChunkMeshBuilderTests
         Assert.Equal(30, mesh.IndexCount);
     }
 
-    private static BlockModelManager CreateModels(ResourceManager resources)
+    [Fact]
+    public void BuildSelectsAppearanceFromWorldPosition()
     {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/appearances/block/stone.json", """
+            {
+              "variants": {
+                "": [
+                  { "model": "pangu:block/one_face" },
+                  { "model": "pangu:block/two_faces" }
+                ]
+              }
+            }
+            """);
+        WriteModel(directory, "one_face", "\"up\": { \"texture\": \"pangu:block/test\" }");
+        WriteModel(
+            directory,
+            "two_faces",
+            "\"up\": { \"texture\": \"pangu:block/test\" }, \"down\": { \"texture\": \"pangu:block/test\" }");
+        TestDirectory.WriteResource(
+            directory,
+            "pangu/textures/block/test.png",
+            OnePixelPng);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var registry = new Registry<Block>(RegistryKeys.Block);
-        registry.Register(ResourceKey.Create("pangu", "air"), BuiltinBlocks.Air);
         registry.Register(ResourceKey.Create("pangu", "stone"), BuiltinBlocks.Stone);
-        registry.Register(ResourceKey.Create("pangu", "grass"), BuiltinBlocks.Grass);
-        registry.Register(ResourceKey.Create("pangu", "dirt"), BuiltinBlocks.Dirt);
+        var models = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+        models.Load();
+        var world = new ClientWorld();
+        var firstPosition = new BlockPos(32, 0, 32);
+        var secondPosition = new BlockPos(48, 0, 32);
+        world.SetBlock(firstPosition, BuiltinBlocks.Stone.DefaultState);
+        world.SetBlock(secondPosition, BuiltinBlocks.Stone.DefaultState);
+
+        var firstMesh = new ChunkMeshBuilder(models)
+            .Build(world, GetChunk(world, firstPosition.ToChunkPos()));
+        var secondMesh = new ChunkMeshBuilder(models)
+            .Build(world, GetChunk(world, secondPosition.ToChunkPos()));
+
+        Assert.Equal(4, firstMesh.VertexCount);
+        Assert.Equal(8, secondMesh.VertexCount);
+    }
+
+    [Fact]
+    public void BuildSelectsAppearanceFromCanonicalBlockState()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/appearances/block/machine.json", """
+            {
+              "variants": {
+                "powered=false": [
+                  { "model": "pangu:block/one_face" }
+                ],
+                "powered=true": [
+                  { "model": "pangu:block/two_faces" }
+                ]
+              }
+            }
+            """);
+        WriteModel(directory, "one_face", "\"up\": { \"texture\": \"pangu:block/test\" }");
+        WriteModel(
+            directory,
+            "two_faces",
+            "\"up\": { \"texture\": \"pangu:block/test\" }, \"down\": { \"texture\": \"pangu:block/test\" }");
+        TestDirectory.WriteResource(
+            directory,
+            "pangu/textures/block/test.png",
+            OnePixelPng);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var block = new Block(Powered);
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("pangu", "machine"), block);
+        var models = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+        models.Load();
+        var world = new ClientWorld();
+        var offPosition = new BlockPos(32, 0, 32);
+        var onPosition = new BlockPos(48, 0, 32);
+        world.SetBlock(offPosition, block.DefaultState);
+        world.SetBlock(onPosition, block.DefaultState.With(Powered, true));
+
+        var offMesh = new ChunkMeshBuilder(models)
+            .Build(world, GetChunk(world, offPosition.ToChunkPos()));
+        var onMesh = new ChunkMeshBuilder(models)
+            .Build(world, GetChunk(world, onPosition.ToChunkPos()));
+
+        Assert.Equal(4, offMesh.VertexCount);
+        Assert.Equal(8, onMesh.VertexCount);
+    }
+
+    private static BlockModelManager CreateModels()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "pangu/appearances/block/stone.json", """
+            {
+              "variants": {
+                "": [
+                  { "model": "pangu:block/stone" }
+                ]
+              }
+            }
+            """);
+        WriteModel(
+            directory,
+            "stone",
+            "\"down\": { \"texture\": \"pangu:block/stone\", \"cull\": [\"down\"] }, " +
+            "\"up\": { \"texture\": \"pangu:block/stone\", \"cull\": [\"up\"] }, " +
+            "\"north\": { \"texture\": \"pangu:block/stone\", \"cull\": [\"north\"] }, " +
+            "\"south\": { \"texture\": \"pangu:block/stone\", \"cull\": [\"south\"] }, " +
+            "\"west\": { \"texture\": \"pangu:block/stone\", \"cull\": [\"west\"] }, " +
+            "\"east\": { \"texture\": \"pangu:block/stone\", \"cull\": [\"east\"] }");
+        TestDirectory.WriteResource(
+            directory,
+            "pangu/textures/block/stone.png",
+            OnePixelPng);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("pangu", "stone"), BuiltinBlocks.Stone);
         var models = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
         models.Load();
         return models;
+    }
+
+    private static void WriteModel(
+        TestDirectory directory,
+        string name,
+        string faces)
+    {
+        TestDirectory.WriteResource(
+            directory,
+            $"pangu/models/block/{name}.json",
+            $$"""
+              {
+                "elements": [
+                  {
+                    "from": [0, 0, 0],
+                    "to": [16, 16, 16],
+                    "faces": { {{faces}} }
+                  }
+                ]
+              }
+              """);
     }
 
     private static Chunk GetChunk(ClientWorld world, ChunkPos position)

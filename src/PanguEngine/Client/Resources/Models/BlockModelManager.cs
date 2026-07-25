@@ -4,6 +4,7 @@ using PanguEngine.Registries;
 using PanguEngine.Resources;
 using PanguEngine.Resources.Images;
 using PanguEngine.World.Blocks;
+using PanguEngine.World.Chunking;
 using Silk.NET.Maths;
 
 namespace PanguEngine.Client.Resources.Models;
@@ -15,17 +16,11 @@ internal sealed class BlockModelManager
     private static readonly ResourceKey MissingModelKey = ResourceKey.Create("pangu", "missing_model");
     private static readonly string[] FaceDirections = ["down", "up", "north", "south", "west", "east"];
 
-    private static readonly UnbakedBlockModel EmptyModel = new(
-        ResourceKey.Create("pangu", "empty"),
-        null,
-        new Dictionary<string, BlockTextureValue>(StringComparer.Ordinal),
-        []);
-
-    private static readonly Action<ILogger, ResourceKey, ResourceKey, Exception?> LogMissingBlockModel =
+    private static readonly Action<ILogger, ResourceKey, ResourceKey, Exception?> LogMissingBlockAppearance =
         LoggerMessage.Define<ResourceKey, ResourceKey>(
             LogLevel.Error,
-            new EventId(1, nameof(LogMissingBlockModel)),
-            "Falling back to missing block model for block '{BlockKey}' after model '{ModelKey}' failed");
+            new EventId(1, nameof(LogMissingBlockAppearance)),
+            "Falling back to missing block model for block '{BlockKey}' after appearance '{AppearanceKey}' failed");
 
     private static readonly Action<ILogger, ResourceKey, Exception?> LogMissingTexture =
         LoggerMessage.Define<ResourceKey>(
@@ -53,51 +48,87 @@ internal sealed class BlockModelManager
 
     internal TextureAtlas<ResourceKey> Atlas => GetSnapshot().Atlas;
 
-    internal BakedBlockModel Get(BlockState state)
+    internal BakedBlockModel Get(BlockState state, BlockPos position)
     {
-        if (state.IsAir)
-            return GetSnapshot().AirModel;
-
         var snapshot = GetSnapshot();
-        return snapshot.Models.TryGetValue(state.Block, out var model)
-            ? model
+        return snapshot.Appearances.TryGetValue(state.Block, out var appearance)
+            ? appearance.Get(state, position)
             : snapshot.MissingModel;
     }
 
     internal void Load()
     {
-        var loader = new JsonBlockModelLoader(_resources);
-        var unbakedModels = new Dictionary<Block, UnbakedBlockModel>();
+        var appearanceLoader = new JsonBlockAppearanceLoader(_resources);
+        var modelLoader = new JsonBlockModelLoader(_resources);
         var layerCache = new Dictionary<ResourceKey, UnbakedBlockModel>();
+        var resolvedModelCache = new Dictionary<ResourceKey, UnbakedBlockModel>();
+        var failedModels = new Dictionary<ResourceKey, Exception>();
+        var resolvedAppearances = new Dictionary<Block, ResolvedBlockAppearance>();
+        var textureKeys = new HashSet<ResourceKey> { MissingTextureKey };
         var missingModel = CreateMissingModel();
 
         foreach (var entry in _blocks.Entries)
         {
-            if (entry.Value.IsAir)
-            {
-                unbakedModels.Add(entry.Value, EmptyModel);
-                continue;
-            }
-
-            var modelKey = ResourceKey.Create(entry.Key.Namespace, $"block/{entry.Key.Path}");
+            var appearanceKey = ResourceKey.Create(
+                entry.Key.Namespace,
+                $"appearances/block/{entry.Key.Path}");
             try
             {
-                unbakedModels.Add(entry.Value, ResolveModel(loader, modelKey, [], layerCache));
+                var definition = appearanceLoader.Load(entry.Key, entry.Value);
+                var variants = new Dictionary<BlockState, IReadOnlyList<ResolvedBlockCandidate>>();
+                var localTextureKeys = new HashSet<ResourceKey>();
+                foreach (var (state, variantCandidates) in definition.Variants)
+                {
+                    var candidates = new List<ResolvedBlockCandidate>(variantCandidates.Count);
+                    foreach (var candidate in variantCandidates)
+                    {
+                        if (failedModels.TryGetValue(candidate.ModelKey, out var previousFailure))
+                        {
+                            throw new InvalidDataException(
+                                $"Block model '{candidate.ModelKey}' previously failed to resolve.",
+                                previousFailure);
+                        }
+
+                        if (!resolvedModelCache.TryGetValue(candidate.ModelKey, out var model))
+                        {
+                            try
+                            {
+                                model = ResolveModel(modelLoader, candidate.ModelKey, [], layerCache);
+                                resolvedModelCache.Add(candidate.ModelKey, model);
+                            }
+                            catch (Exception exception) when (IsRecoverableModelException(exception))
+                            {
+                                failedModels.Add(candidate.ModelKey, exception);
+                                throw;
+                            }
+                        }
+
+                        foreach (var textureKey in GetTextureKeys(model))
+                            localTextureKeys.Add(textureKey);
+                        candidates.Add(new ResolvedBlockCandidate(
+                            candidate.ModelKey,
+                            candidate.Rotation,
+                            candidate.Weight,
+                            model));
+                    }
+
+                    variants.Add(state, candidates);
+                }
+
+                textureKeys.UnionWith(localTextureKeys);
+                resolvedAppearances.Add(
+                    entry.Value,
+                    new ResolvedBlockAppearance(entry.Key, appearanceKey, variants));
             }
             catch (Exception exception) when (IsRecoverableModelException(exception))
             {
-                LogMissingBlockModel(_logger, entry.Key, modelKey, exception);
-                unbakedModels.Add(entry.Value, missingModel);
+                LogMissingBlockAppearance(_logger, entry.Key, appearanceKey, exception);
+                resolvedAppearances.Add(
+                    entry.Value,
+                    CreateMissingAppearance(entry.Key, appearanceKey, entry.Value, missingModel));
             }
         }
 
-        var textureKeys = unbakedModels.Values
-            .SelectMany(model => model.Elements!
-                .SelectMany(element => element.Faces.Values)
-                .Select(face => GetTextureKey(face.Texture, model.SourceKey)))
-            .Append(MissingTextureKey)
-            .Distinct()
-            .ToArray();
         var failedTextures = new HashSet<ResourceKey>();
         var textures = new Dictionary<ResourceKey, RgbaImage>();
         foreach (var key in textureKeys)
@@ -132,18 +163,76 @@ internal sealed class BlockModelManager
         var atlas = builder.Build();
 
         var baker = new BlockModelBaker(atlas);
-        var models = new Dictionary<Block, BakedBlockModel>();
-        foreach (var (block, unbakedModel) in unbakedModels)
+        var bakedCache = new Dictionary<BakeKey, BakedBlockModel>();
+        var failedBakes = new Dictionary<BakeKey, Exception>();
+        var appearances = new Dictionary<Block, BakedBlockAppearance>();
+        var bakedMissingModel = baker.Bake(missingModel);
+        bakedCache.Add(new BakeKey(MissingModelKey, default), bakedMissingModel);
+        foreach (var (block, resolved) in resolvedAppearances)
         {
-            var model = ReplaceTextures(unbakedModel, failedTextures, MissingTextureKey);
-            models.Add(block, baker.Bake(model));
+            try
+            {
+                var variants = new Dictionary<BlockState, IReadOnlyList<BakedBlockAppearanceEntry>>();
+                foreach (var (state, candidates) in resolved.Variants)
+                {
+                    var entries = new List<BakedBlockAppearanceEntry>(candidates.Count);
+                    foreach (var candidate in candidates)
+                    {
+                        var key = new BakeKey(candidate.ModelKey, candidate.Rotation);
+                        if (failedBakes.TryGetValue(key, out var previousFailure))
+                        {
+                            throw new InvalidDataException(
+                                $"Block model '{candidate.ModelKey}' previously failed to bake.",
+                                previousFailure);
+                        }
+
+                        if (!bakedCache.TryGetValue(key, out var bakedModel))
+                        {
+                            try
+                            {
+                                var model = ReplaceTextures(
+                                    candidate.Model,
+                                    failedTextures,
+                                    MissingTextureKey);
+                                bakedModel = baker.Bake(model, candidate.Rotation);
+                                bakedCache.Add(key, bakedModel);
+                            }
+                            catch (Exception exception) when (IsRecoverableBakeException(exception))
+                            {
+                                failedBakes.Add(key, exception);
+                                throw;
+                            }
+                        }
+
+                        entries.Add(new BakedBlockAppearanceEntry(bakedModel, candidate.Weight));
+                    }
+
+                    variants.Add(state, entries);
+                }
+
+                appearances.Add(
+                    block,
+                    new BakedBlockAppearance(resolved.BlockKey, variants));
+            }
+            catch (Exception exception) when (IsRecoverableBakeException(exception))
+            {
+                LogMissingBlockAppearance(
+                    _logger,
+                    resolved.BlockKey,
+                    resolved.SourceKey,
+                    exception);
+                appearances.Add(
+                    block,
+                    new BakedBlockAppearance(
+                        resolved.BlockKey,
+                        CreateMissingBakedVariants(block, bakedMissingModel)));
+            }
         }
 
         _snapshot = new Snapshot(
             atlas,
-            models,
-            baker.Bake(EmptyModel),
-            baker.Bake(missingModel));
+            appearances,
+            bakedMissingModel);
     }
 
     private static byte[] CreateMissingTexture()
@@ -186,6 +275,39 @@ internal sealed class BlockModelManager
                     new Vector3D<float>(16, 16, 16),
                     faces)
             ]);
+    }
+
+    private static IEnumerable<ResourceKey> GetTextureKeys(UnbakedBlockModel model)
+    {
+        return model.Elements!
+            .SelectMany(element => element.Faces.Values)
+            .Select(face => GetTextureKey(face.Texture, model.SourceKey));
+    }
+
+    private static ResolvedBlockAppearance CreateMissingAppearance(
+        ResourceKey blockKey,
+        ResourceKey appearanceKey,
+        Block block,
+        UnbakedBlockModel missingModel)
+    {
+        IReadOnlyList<ResolvedBlockCandidate> candidates =
+            [new(MissingModelKey, default, 1, missingModel)];
+        return new ResolvedBlockAppearance(
+            blockKey,
+            appearanceKey,
+            block.StateDefinition.States.ToDictionary(
+                state => state,
+                _ => candidates));
+    }
+
+    private static Dictionary<BlockState, IReadOnlyList<BakedBlockAppearanceEntry>>
+        CreateMissingBakedVariants(Block block, BakedBlockModel missingModel)
+    {
+        IReadOnlyList<BakedBlockAppearanceEntry> entries =
+            [new(missingModel, 1)];
+        return block.StateDefinition.States.ToDictionary(
+            state => state,
+            _ => entries);
     }
 
     private static UnbakedBlockModel ResolveModel(
@@ -358,9 +480,17 @@ internal sealed class BlockModelManager
         return exception is IOException or InvalidDataException or InvalidOperationException or ArgumentException;
     }
 
+    private static bool IsRecoverableBakeException(Exception exception)
+    {
+        return exception is InvalidDataException or ArgumentException or KeyNotFoundException;
+    }
+
     private sealed record Snapshot(
         TextureAtlas<ResourceKey> Atlas,
-        IReadOnlyDictionary<Block, BakedBlockModel> Models,
-        BakedBlockModel AirModel,
+        IReadOnlyDictionary<Block, BakedBlockAppearance> Appearances,
         BakedBlockModel MissingModel);
+
+    private readonly record struct BakeKey(
+        ResourceKey ModelKey,
+        BlockModelRotation Rotation);
 }

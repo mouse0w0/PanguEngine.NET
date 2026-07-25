@@ -28,7 +28,7 @@ internal sealed class ChunkMeshBuilder
 
             var worldPosition = ToWorldPosition(chunk.Position, localPosition);
             var cullMask = GetCullMask(world, worldPosition);
-            _models.Get(state).Emit(
+            _models.Get(state, worldPosition).Emit(
                 new Vector3D<float>(localPosition.X, localPosition.Y, localPosition.Z),
                 cullMask,
                 writer);

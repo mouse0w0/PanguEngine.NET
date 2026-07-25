@@ -40,6 +40,94 @@ public sealed class BlockModelBakerTests
         Assert.Equal([0u, 1u, 2u, 0u, 2u, 3u], writer.Indices);
     }
 
+    [Fact]
+    public void RotatesModelAroundBlockCenterWithoutChangingUv()
+    {
+        var texture = ResourceKey.Create("test", "block/stone");
+        var builder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
+        builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
+        var baker = new BlockModelBaker(builder.Build());
+        var source = CreateModel(
+            new BlockTextureValue.Resource(texture),
+            [0, 0, 16, 16],
+            0,
+            ("up", ["up"]));
+        var unrotated = new RecordingWriter();
+        var rotated = new RecordingWriter();
+
+        baker.Bake(source).Emit(default, DirectionFlags.None, unrotated);
+        baker.Bake(source, new BlockModelRotation(90, 0, 0))
+            .Emit(default, DirectionFlags.None, rotated);
+
+        Assert.Equal(
+            [
+                new Vector3D<float>(0, 1, 1),
+                new Vector3D<float>(0, 0, 1),
+                new Vector3D<float>(1, 0, 1),
+                new Vector3D<float>(1, 1, 1)
+            ],
+            rotated.Positions);
+        Assert.All(rotated.Normals, normal =>
+            Assert.Equal(new Vector3D<float>(0, 0, 1), normal));
+        Assert.Equal(unrotated.TexCoords, rotated.TexCoords);
+        Assert.Equal(unrotated.Indices, rotated.Indices);
+    }
+
+    [Fact]
+    public void RotatesAutomaticUvWithModelVertices()
+    {
+        var texture = ResourceKey.Create("test", "block/stone");
+        var builder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
+        builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
+        var baker = new BlockModelBaker(builder.Build());
+        var source = CreateModel(new BlockTextureValue.Resource(texture), ("north", []));
+        var unrotated = new RecordingWriter();
+        var rotated = new RecordingWriter();
+
+        baker.Bake(source).Emit(default, DirectionFlags.None, unrotated);
+        baker.Bake(source, new BlockModelRotation(0, 90, 0))
+            .Emit(default, DirectionFlags.None, rotated);
+
+        Assert.Equal(unrotated.TexCoords, rotated.TexCoords);
+        Assert.NotEqual(unrotated.Positions, rotated.Positions);
+    }
+
+    [Theory]
+    [InlineData("up", 90, 0, 0, DirectionFlags.Up, DirectionFlags.South, 0f, 0f, 1f)]
+    [InlineData("north", 0, 90, 0, DirectionFlags.North, DirectionFlags.West, -1f, 0f, 0f)]
+    [InlineData("east", 0, 0, 90, DirectionFlags.East, DirectionFlags.Up, 0f, 1f, 0f)]
+    [InlineData("north", 90, 90, 90, DirectionFlags.North, DirectionFlags.West, -1f, 0f, 0f)]
+    public void RotatesNormalAndCullDirection(
+        string direction,
+        int x,
+        int y,
+        int z,
+        DirectionFlags originalCull,
+        DirectionFlags rotatedCull,
+        float normalX,
+        float normalY,
+        float normalZ)
+    {
+        var texture = ResourceKey.Create("test", "block/stone");
+        var builder = new MaxRectsTextureAtlasBuilder<ResourceKey>(32, 32);
+        builder.Add(texture, 16, 16, new byte[16 * 16 * 4]);
+        var model = new BlockModelBaker(builder.Build()).Bake(
+            CreateModel(
+                new BlockTextureValue.Resource(texture),
+                (direction, [direction])),
+            new BlockModelRotation(x, y, z));
+        var visible = new RecordingWriter();
+        var culled = new RecordingWriter();
+
+        model.Emit(default, originalCull, visible);
+        model.Emit(default, rotatedCull, culled);
+
+        Assert.Equal(4u, visible.VertexCount);
+        Assert.Equal(0u, culled.VertexCount);
+        Assert.All(visible.Normals, normal =>
+            Assert.Equal(new Vector3D<float>(normalX, normalY, normalZ), normal));
+    }
+
     [Theory]
     [InlineData(0, 0, 1, 2, 3)]
     [InlineData(90, 3, 0, 1, 2)]
