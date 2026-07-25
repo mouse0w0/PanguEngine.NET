@@ -22,7 +22,7 @@ internal sealed class JsonBlockAppearanceLoader
         _resources = resources;
     }
 
-    internal UnbakedBlockAppearance Load(ResourceKey blockKey, Block block)
+    internal UnresolvedBlockAppearance Load(ResourceKey blockKey, Block block)
     {
         var appearanceKey = ResourceKey.Create(
             blockKey.Namespace,
@@ -49,8 +49,8 @@ internal sealed class JsonBlockAppearanceLoader
                 $"Block appearance '{appearanceKey}' variants must be an object.");
 
         var stateLookup = CreateStateLookup(block, appearanceKey);
-        var exactVariants = new Dictionary<BlockState, IReadOnlyList<UnbakedBlockAppearanceEntry>>();
-        IReadOnlyList<UnbakedBlockAppearanceEntry>? fallback = null;
+        var exactVariants = new Dictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
+        IReadOnlyList<UnresolvedBlockAppearanceEntry>? fallback = null;
         var variantKeys = new HashSet<string>(StringComparer.Ordinal);
         var hasVariants = false;
         foreach (var variant in definition.Variants.EnumerateObject())
@@ -77,7 +77,7 @@ internal sealed class JsonBlockAppearanceLoader
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variants must contain at least one entry.");
 
-        var variants = new Dictionary<BlockState, IReadOnlyList<UnbakedBlockAppearanceEntry>>();
+        var variants = new Dictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
         var states = block.StateDefinition.States;
         for (var stateIndex = 0; stateIndex < states.Count; stateIndex++)
         {
@@ -94,7 +94,7 @@ internal sealed class JsonBlockAppearanceLoader
             variants.Add(state, fallback);
         }
 
-        return new UnbakedBlockAppearance(appearanceKey, variants);
+        return new UnresolvedBlockAppearance(appearanceKey, variants);
     }
 
     private static Dictionary<string, BlockState> CreateStateLookup(
@@ -127,7 +127,7 @@ internal sealed class JsonBlockAppearanceLoader
         return string.Join(",", properties);
     }
 
-    private static List<UnbakedBlockAppearanceEntry> ParseCandidates(
+    private static List<UnresolvedBlockAppearanceEntry> ParseCandidates(
         JsonElement value,
         ResourceKey appearanceKey,
         string variantKey)
@@ -167,7 +167,7 @@ internal sealed class JsonBlockAppearanceLoader
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variant '{variantKey}' must contain at least one model.");
 
-        var models = new List<UnbakedBlockAppearanceEntry>(candidates.Length);
+        var models = new List<UnresolvedBlockAppearanceEntry>(candidates.Length);
         long totalWeight = 0;
         for (var index = 0; index < candidates.Length; index++)
         {
@@ -184,7 +184,7 @@ internal sealed class JsonBlockAppearanceLoader
                 throw new InvalidDataException(
                     $"Block appearance '{appearanceKey}' variant '{variantKey}' total weight exceeds Int32.MaxValue.");
 
-            models.Add(new UnbakedBlockAppearanceEntry(
+            models.Add(new UnresolvedBlockAppearanceEntry(
                 ResolveModelReference(modelReference, appearanceKey),
                 weight,
                 ParseRotation(candidate.Rotation, appearanceKey, variantKey, index)));

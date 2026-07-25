@@ -70,7 +70,7 @@ internal sealed class BlockModelManager
     {
         var appearanceLoader = new JsonBlockAppearanceLoader(_resources);
         var modelLoader = new JsonBlockModelLoader(_resources);
-        var layerCache = new Dictionary<ResourceKey, UnbakedBlockModel>();
+        var layerCache = new Dictionary<ResourceKey, UnresolvedBlockModel>();
         var resolvedModelCache = new Dictionary<ResourceKey, ResolvedBlockModel>();
         var failedModels = new Dictionary<ResourceKey, Exception>();
         var resolvedAppearances = new Dictionary<Block, ResolvedBlockAppearance>();
@@ -321,7 +321,7 @@ internal sealed class BlockModelManager
         JsonBlockModelLoader loader,
         ResourceKey modelKey,
         IReadOnlyList<ResourceKey> parentChain,
-        Dictionary<ResourceKey, UnbakedBlockModel> layerCache)
+        Dictionary<ResourceKey, UnresolvedBlockModel> layerCache)
     {
         var layer = ResolveLayer(loader, modelKey, parentChain, layerCache);
         return new ResolvedBlockModel(
@@ -329,11 +329,11 @@ internal sealed class BlockModelManager
             ResolveElements(layer.Elements!, layer.Textures, modelKey));
     }
 
-    private static UnbakedBlockModel ResolveLayer(
+    private static UnresolvedBlockModel ResolveLayer(
         JsonBlockModelLoader loader,
         ResourceKey modelKey,
         IReadOnlyList<ResourceKey> parentChain,
-        Dictionary<ResourceKey, UnbakedBlockModel> layerCache)
+        Dictionary<ResourceKey, UnresolvedBlockModel> layerCache)
     {
         if (parentChain.Contains(modelKey))
         {
@@ -372,7 +372,7 @@ internal sealed class BlockModelManager
         return layer;
     }
 
-    private static UnbakedBlockModel LoadDefinition(
+    private static UnresolvedBlockModel LoadDefinition(
         JsonBlockModelLoader loader,
         ResourceKey modelKey,
         IReadOnlyList<ResourceKey> parentChain)
@@ -390,7 +390,7 @@ internal sealed class BlockModelManager
     }
 
     private static ResolvedBlockElement[] ResolveElements(
-        IReadOnlyList<UnbakedElement> elements,
+        IReadOnlyList<UnresolvedBlockElement> elements,
         IReadOnlyDictionary<string, BlockTextureValue> textures,
         ResourceKey modelKey)
     {

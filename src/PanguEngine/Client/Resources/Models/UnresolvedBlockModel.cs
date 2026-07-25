@@ -3,18 +3,18 @@ using Silk.NET.Maths;
 
 namespace PanguEngine.Client.Resources.Models;
 
-internal sealed record UnbakedBlockModel(
+internal sealed record UnresolvedBlockModel(
     ResourceKey SourceKey,
     string? ParentReference,
     IReadOnlyDictionary<string, BlockTextureValue> Textures,
-    IReadOnlyList<UnbakedElement>? Elements);
+    IReadOnlyList<UnresolvedBlockElement>? Elements);
 
-internal sealed record UnbakedElement(
+internal sealed record UnresolvedBlockElement(
     Vector3D<float> From,
     Vector3D<float> To,
-    IReadOnlyDictionary<string, UnbakedFace> Faces);
+    IReadOnlyDictionary<string, UnresolvedBlockFace> Faces);
 
-internal sealed record UnbakedFace(
+internal sealed record UnresolvedBlockFace(
     BlockTextureValue Texture,
     float[]? Uv,
     int Rotation,

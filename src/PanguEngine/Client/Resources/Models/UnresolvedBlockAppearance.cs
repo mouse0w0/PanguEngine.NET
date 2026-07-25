@@ -3,11 +3,11 @@ using PanguEngine.World.Blocks;
 
 namespace PanguEngine.Client.Resources.Models;
 
-internal sealed record UnbakedBlockAppearance(
+internal sealed record UnresolvedBlockAppearance(
     ResourceKey SourceKey,
-    IReadOnlyDictionary<BlockState, IReadOnlyList<UnbakedBlockAppearanceEntry>> Variants);
+    IReadOnlyDictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>> Variants);
 
-internal sealed record UnbakedBlockAppearanceEntry(
+internal sealed record UnresolvedBlockAppearanceEntry(
     ResourceKey ModelKey,
     int Weight,
     BlockModelRotation Rotation);

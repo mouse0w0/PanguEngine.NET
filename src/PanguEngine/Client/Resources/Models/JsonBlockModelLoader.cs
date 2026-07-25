@@ -27,7 +27,7 @@ internal sealed class JsonBlockModelLoader
         _resources = resources;
     }
 
-    internal UnbakedBlockModel Load(ResourceKey modelKey)
+    internal UnresolvedBlockModel Load(ResourceKey modelKey)
     {
         var resourceKey = ResourceKey.Create(modelKey.Namespace, $"models/{modelKey.Path}.json");
         JsonBlockModel definition;
@@ -47,7 +47,7 @@ internal sealed class JsonBlockModelLoader
             ? null
             : ParseElements(definition.Elements, modelKey);
 
-        return new UnbakedBlockModel(modelKey, definition.Parent, textures, elements);
+        return new UnresolvedBlockModel(modelKey, definition.Parent, textures, elements);
     }
 
     private static Dictionary<string, BlockTextureValue> ParseTextures(
@@ -69,11 +69,11 @@ internal sealed class JsonBlockModelLoader
         return textures;
     }
 
-    private static List<UnbakedElement> ParseElements(
+    private static List<UnresolvedBlockElement> ParseElements(
         JsonBlockModelElement?[] values,
         ResourceKey modelKey)
     {
-        var elements = new List<UnbakedElement>(values.Length);
+        var elements = new List<UnresolvedBlockElement>(values.Length);
         for (var index = 0; index < values.Length; index++)
         {
             var element = values[index]
@@ -82,18 +82,18 @@ internal sealed class JsonBlockModelLoader
             var from = ParseVector(element.From, modelKey, index, "from");
             var to = ParseVector(element.To, modelKey, index, "to");
             var faces = ParseFaces(element.Faces, modelKey, index);
-            elements.Add(new UnbakedElement(from, to, faces));
+            elements.Add(new UnresolvedBlockElement(from, to, faces));
         }
 
         return elements;
     }
 
-    private static Dictionary<string, UnbakedFace> ParseFaces(
+    private static Dictionary<string, UnresolvedBlockFace> ParseFaces(
         Dictionary<string, JsonBlockModelFace?>? values,
         ResourceKey modelKey,
         int elementIndex)
     {
-        var faces = new Dictionary<string, UnbakedFace>(StringComparer.Ordinal);
+        var faces = new Dictionary<string, UnresolvedBlockFace>(StringComparer.Ordinal);
         if (values is null)
             return faces;
 
@@ -116,7 +116,7 @@ internal sealed class JsonBlockModelLoader
                         $"Block model '{modelKey}' element {elementIndex} face '{direction}' has unknown cull direction '{cullDirection}'.");
             }
 
-            faces.Add(direction, new UnbakedFace(
+            faces.Add(direction, new UnresolvedBlockFace(
                 ParseTextureValue(face.Texture, modelKey),
                 uv,
                 rotation,
