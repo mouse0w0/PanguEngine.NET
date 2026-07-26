@@ -20,6 +20,7 @@ public abstract class BlockProperty
 
     internal abstract int ValueCount { get; }
     internal abstract string GetValueString(int valueIndex);
+    internal abstract int GetValueIndex(string value);
 
     /// <summary>
     /// Creates a boolean property with allowed values <c>false</c> then <c>true</c>.
@@ -29,6 +30,7 @@ public abstract class BlockProperty
 
     /// <summary>
     /// Creates an enum property with the explicitly supplied allowed values in declaration order.
+    /// Enum types marked with <see cref="FlagsAttribute"/> are not supported.
     /// </summary>
     public static BlockProperty<TEnum> CreateEnum<TEnum>(string name, params TEnum[] values)
         where TEnum : struct, Enum =>

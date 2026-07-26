@@ -49,7 +49,6 @@ internal sealed class JsonBlockAppearanceLoader
                 $"Block appearance '{appearanceKey}' variants must be an object.");
 
         var stateDefinition = block.StateDefinition;
-        ValidatePropertyValueKeys(stateDefinition, appearanceKey);
         var exactVariants = new Dictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
         var variantSources = new Dictionary<BlockState, string>();
         IReadOnlyList<UnresolvedBlockAppearanceEntry>? fallback = null;
@@ -110,31 +109,6 @@ internal sealed class JsonBlockAppearanceLoader
         return new UnresolvedBlockAppearance(appearanceKey, variants);
     }
 
-    private static void ValidatePropertyValueKeys(
-        BlockStateDefinition definition,
-        ResourceKey appearanceKey)
-    {
-        foreach (var property in definition.Properties)
-        {
-            var values = new HashSet<string>(StringComparer.Ordinal);
-            for (var valueIndex = 0; valueIndex < property.ValueCount; valueIndex++)
-            {
-                var value = property.GetValueString(valueIndex);
-                if (value.Contains(',') || value.Contains('='))
-                {
-                    throw new InvalidDataException(
-                        $"Block appearance '{appearanceKey}' property '{property.Name}' value key '{value}' contains a reserved separator.");
-                }
-
-                if (!values.Add(value))
-                {
-                    throw new InvalidDataException(
-                        $"Block appearance '{appearanceKey}' property '{property.Name}' contains duplicate value key '{value}'.");
-                }
-            }
-        }
-    }
-
     private static (int PropertyIndex, int ValueIndex)[] ParseStateConditions(
         BlockStateDefinition definition,
         ResourceKey appearanceKey,
@@ -157,7 +131,7 @@ internal sealed class JsonBlockAppearanceLoader
 
             var propertyName = part[..separatorIndex];
             var value = part[(separatorIndex + 1)..];
-            var propertyIndex = FindPropertyIndex(definition, propertyName);
+            var propertyIndex = definition.GetPropertyIndex(propertyName);
             if (propertyIndex < 0)
             {
                 throw new InvalidDataException(
@@ -171,7 +145,7 @@ internal sealed class JsonBlockAppearanceLoader
             }
 
             var property = definition.Properties[propertyIndex];
-            var valueIndex = FindValueIndex(property, value);
+            var valueIndex = property.GetValueIndex(value);
             if (valueIndex < 0)
             {
                 throw new InvalidDataException(
@@ -182,22 +156,6 @@ internal sealed class JsonBlockAppearanceLoader
         }
 
         return conditions;
-    }
-
-    private static int FindPropertyIndex(BlockStateDefinition definition, string propertyName)
-    {
-        for (var index = 0; index < definition.Properties.Count; index++)
-            if (string.Equals(definition.Properties[index].Name, propertyName, StringComparison.Ordinal))
-                return index;
-        return -1;
-    }
-
-    private static int FindValueIndex(BlockProperty property, string value)
-    {
-        for (var index = 0; index < property.ValueCount; index++)
-            if (string.Equals(property.GetValueString(index), value, StringComparison.Ordinal))
-                return index;
-        return -1;
     }
 
     private static bool MatchesState(

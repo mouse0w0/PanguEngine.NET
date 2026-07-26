@@ -26,6 +26,27 @@ public sealed class BlockPropertyTests
         Assert.Equal("open", prop.Name);
     }
 
+    [Theory]
+    [InlineData("false", 0)]
+    [InlineData("true", 1)]
+    public void BooleanPropertyFindsCanonicalValueIndex(string value, int expectedIndex)
+    {
+        var property = BlockProperty.CreateBoolean("powered");
+
+        Assert.Equal(expectedIndex, property.GetValueIndex(value));
+    }
+
+    [Theory]
+    [InlineData("False")]
+    [InlineData("TRUE")]
+    [InlineData("1")]
+    public void BooleanPropertyRejectsNonCanonicalValueString(string value)
+    {
+        var property = BlockProperty.CreateBoolean("powered");
+
+        Assert.Equal(-1, property.GetValueIndex(value));
+    }
+
     // --- Enum property ---
 
     [Fact]
@@ -46,6 +67,18 @@ public sealed class BlockPropertyTests
             Direction.North, Direction.East);
 
         Assert.Equal(2, prop.Values.Count);
+    }
+
+    [Fact]
+    public void EnumPropertyFindsCanonicalValueIndex()
+    {
+        var property = BlockProperty.CreateEnum(
+            "facing",
+            Direction.North,
+            Direction.South);
+
+        Assert.Equal(1, property.GetValueIndex("south"));
+        Assert.Equal(-1, property.GetValueIndex("South"));
     }
 
     // --- Integer property ---
@@ -69,6 +102,30 @@ public sealed class BlockPropertyTests
 
         Assert.Single(prop.Values);
         Assert.Equal(5, prop.Values[0]);
+    }
+
+    [Theory]
+    [InlineData("-1", 0)]
+    [InlineData("0", 1)]
+    [InlineData("1", 2)]
+    public void IntegerPropertyFindsCanonicalValueIndex(string value, int expectedIndex)
+    {
+        var property = BlockProperty.CreateInteger("level", -1, 1);
+
+        Assert.Equal(expectedIndex, property.GetValueIndex(value));
+    }
+
+    [Theory]
+    [InlineData("01")]
+    [InlineData("+1")]
+    [InlineData("-0")]
+    [InlineData("2")]
+    [InlineData("value")]
+    public void IntegerPropertyRejectsNonCanonicalOrOutOfRangeValueString(string value)
+    {
+        var property = BlockProperty.CreateInteger("level", -1, 1);
+
+        Assert.Equal(-1, property.GetValueIndex(value));
     }
 
     [Fact]
@@ -149,6 +206,20 @@ public sealed class BlockPropertyTests
     }
 
     [Fact]
+    public void FlagsEnumThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            BlockProperty.CreateEnum("mode", FlagValue.First));
+    }
+
+    [Fact]
+    public void DuplicateCanonicalEnumValueStringThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            BlockProperty.CreateEnum("mode", AmbiguousValue.Value, AmbiguousValue.VALUE));
+    }
+
+    [Fact]
     public void IntegerMinGreaterThanMaxThrowsArgumentOutOfRangeException()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() =>
@@ -184,5 +255,18 @@ public sealed class BlockPropertyTests
         var p2 = BlockProperty.CreateBoolean("powered");
 
         Assert.NotSame(p1, p2);
+    }
+
+    [Flags]
+    private enum FlagValue
+    {
+        First = 1,
+        Second = 2
+    }
+
+    private enum AmbiguousValue
+    {
+        Value,
+        VALUE
     }
 }

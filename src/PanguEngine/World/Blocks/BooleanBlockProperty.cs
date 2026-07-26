@@ -12,5 +12,18 @@ internal sealed class BooleanBlockProperty : BlockProperty<bool>
 
     internal override string GetValueString(int valueIndex) => valueIndex == 0 ? "false" : "true";
 
+    internal override int GetValueIndex(string value)
+    {
+        switch (value)
+        {
+            case "false":
+                return 0;
+            case "true":
+                return 1;
+            default:
+                return -1;
+        }
+    }
+
     internal override int IndexOf(bool value) => value ? 1 : 0;
 }

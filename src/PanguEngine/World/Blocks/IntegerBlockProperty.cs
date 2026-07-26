@@ -14,6 +14,29 @@ internal sealed class IntegerBlockProperty : BlockProperty<int>
     internal override string GetValueString(int valueIndex) =>
         Values[valueIndex].ToString(CultureInfo.InvariantCulture);
 
+    internal override int GetValueIndex(string value)
+    {
+        if (!int.TryParse(
+                value,
+                NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture,
+                out var parsed) ||
+            !string.Equals(
+                parsed.ToString(CultureInfo.InvariantCulture),
+                value,
+                StringComparison.Ordinal))
+        {
+            return -1;
+        }
+
+        var min = Values[0];
+        var max = Values[^1];
+        if (parsed < min || parsed > max)
+            return -1;
+
+        return parsed - min;
+    }
+
     internal override int IndexOf(int value)
     {
         int min = Values[0];

@@ -31,6 +31,30 @@ public sealed class BlockStateTests
         Assert.Empty(block.StateDefinition.Properties);
     }
 
+    [Fact]
+    public void StateDefinitionFindsPropertyIndexesByNameAndReference()
+    {
+        var block = new Block(Powered, Level);
+        var definition = block.StateDefinition;
+
+        Assert.Equal(0, definition.GetPropertyIndex("powered"));
+        Assert.Equal(0, definition.GetPropertyIndex(Powered));
+        Assert.Equal(1, definition.GetPropertyIndex("level"));
+        Assert.Equal(-1, definition.GetPropertyIndex("Powered"));
+        Assert.Equal(-1, definition.GetPropertyIndex("missing"));
+    }
+
+    [Fact]
+    public void StateDefinitionRejectsForeignPropertyReferenceWithSameName()
+    {
+        var block = new Block(Powered);
+        var foreign = BlockProperty.CreateBoolean("powered");
+
+        Assert.Equal(-1, block.StateDefinition.GetPropertyIndex(foreign));
+        Assert.False(block.DefaultState.Contains(foreign));
+        Assert.Throws<ArgumentException>(() => block.DefaultState.Get(foreign));
+    }
+
     // --- State count and cartesian product order ---
 
     [Fact]

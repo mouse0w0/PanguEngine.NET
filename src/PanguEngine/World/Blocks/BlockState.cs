@@ -29,10 +29,7 @@ public sealed class BlockState
     public bool Contains(BlockProperty property)
     {
         ArgumentNullException.ThrowIfNull(property);
-        foreach (var p in Block.StateDefinition.Properties)
-            if (ReferenceEquals(p, property))
-                return true;
-        return false;
+        return Block.StateDefinition.GetPropertyIndex(property) >= 0;
     }
 
     /// <summary>
@@ -45,8 +42,8 @@ public sealed class BlockState
     {
         ArgumentNullException.ThrowIfNull(property);
         var definition = Block.StateDefinition;
-        var propIndex = definition.GetPropertyIndex(property);
-        var valueIndex = _stateIndex / definition.Strides[propIndex] % property.Values.Count;
+        var propIndex = GetPropertyIndex(definition, property);
+        var valueIndex = _stateIndex / definition.Strides[propIndex] % property.ValueCount;
         return property.Values[valueIndex];
     }
 
@@ -62,17 +59,27 @@ public sealed class BlockState
     {
         ArgumentNullException.ThrowIfNull(property);
         var definition = Block.StateDefinition;
-        var propIndex = definition.GetPropertyIndex(property);
+        var propIndex = GetPropertyIndex(definition, property);
         var newValueIndex = property.IndexOf(value);
         if (newValueIndex < 0)
             throw new ArgumentException(
                 $"Value '{value}' is not an allowed value for property '{property.Name}'.",
                 nameof(value));
-        var oldValueIndex = _stateIndex / definition.Strides[propIndex] % property.Values.Count;
+        var oldValueIndex = _stateIndex / definition.Strides[propIndex] % property.ValueCount;
         if (newValueIndex == oldValueIndex)
             return this;
         var newStateIndex = _stateIndex + (newValueIndex - oldValueIndex) * definition.Strides[propIndex];
         return definition.States[newStateIndex];
+    }
+
+    private static int GetPropertyIndex(BlockStateDefinition definition, BlockProperty property)
+    {
+        var propertyIndex = definition.GetPropertyIndex(property);
+        if (propertyIndex >= 0)
+            return propertyIndex;
+        throw new ArgumentException(
+            $"Property '{property.Name}' does not belong to this block's state definition.",
+            nameof(property));
     }
 
     /// <summary>
