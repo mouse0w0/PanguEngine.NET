@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Registries;
@@ -14,6 +15,11 @@ public sealed class BlockModelManagerTests
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
 
     private static readonly BlockProperty<bool> Powered = BlockProperty.CreateBoolean("powered");
+
+    private static readonly BlockProperty<Direction> Facing = BlockProperty.CreateEnum(
+        "facing",
+        Direction.North,
+        Direction.South);
 
     [Fact]
     public void MissingAppearanceUsesMissingCube()
@@ -685,6 +691,39 @@ public sealed class BlockModelManagerTests
         }
     }
 
+    [Fact]
+    public void OverlappingVariantsLogErrorAndFallBackEntireAppearance()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/machine.json", """
+            {
+              "variants": {
+                "facing=north": { "model": "test:block/north" },
+                "powered=true": { "model": "test:block/on" },
+                "": { "model": "test:block/fallback" }
+              }
+            }
+            """);
+        var block = new Block(Facing, Powered);
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "machine"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var logger = new CapturingLogger();
+        var manager = new BlockModelManager(resources, registry, 4096u, logger);
+
+        manager.Load();
+
+        var entry = Assert.Single(logger.Entries.Where(entry => entry.Level == LogLevel.Error));
+        Assert.Contains("Falling back to missing block model", entry.Message);
+        foreach (var state in block.StateDefinition.States)
+        {
+            var writer = new RecordingWriter();
+            manager.Get(state, default).Emit(default, DirectionFlags.None, writer);
+            Assert.Equal(24, writer.Vertices.Count);
+            Assert.Equal(36, writer.Indices.Count);
+        }
+    }
+
     private static void WriteAppearance(
         TestDirectory directory,
         string ns,
@@ -703,6 +742,27 @@ public sealed class BlockModelManagerTests
                 }
               }
               """);
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        private readonly List<(LogLevel Level, string Message)> _entries = [];
+
+        internal IReadOnlyList<(LogLevel Level, string Message)> Entries => _entries;
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            _entries.Add((logLevel, formatter(state, exception)));
+        }
     }
 
     private sealed class RecordingWriter : IBlockMeshWriter

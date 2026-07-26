@@ -16,7 +16,7 @@ public sealed class JsonBlockAppearanceLoaderTests
     private static readonly BlockProperty<bool> Powered = BlockProperty.CreateBoolean("powered");
 
     [Fact]
-    public void BindsExactAndDefaultVariantsToCanonicalStates()
+    public void BindsPartialAndDefaultVariantsToCanonicalStates()
     {
         using var directory = TestDirectory.Create();
         TestDirectory.WriteResource(directory, "test/appearances/block/machine.json", """
@@ -25,9 +25,9 @@ public sealed class JsonBlockAppearanceLoaderTests
                 "": [
                   { "model": "block/fallback" }
                 ],
-                "facing=north,powered=true": [
+                "facing=north": [
                   {
-                    "model": "other:block/on",
+                    "model": "other:block/north",
                     "weight": 3,
                     "rotation": { "x": 90, "y": 180, "z": 270 }
                   }
@@ -41,15 +41,98 @@ public sealed class JsonBlockAppearanceLoaderTests
         var appearance = new JsonBlockAppearanceLoader(resources)
             .Load(ResourceKey.Create("test", "machine"), block);
 
-        var exact = block.DefaultState.With(Powered, true);
-        var fallback = block.DefaultState.With(Facing, Direction.South);
-        Assert.Equal(ResourceKey.Create("other", "block/on"), appearance.Variants[exact][0].ModelKey);
-        Assert.Equal(3, appearance.Variants[exact][0].Weight);
-        Assert.Equal(new BlockModelRotation(90, 180, 270), appearance.Variants[exact][0].Rotation);
-        Assert.Equal(ResourceKey.Create("test", "block/fallback"), appearance.Variants[fallback][0].ModelKey);
-        Assert.Equal(1, appearance.Variants[fallback][0].Weight);
-        Assert.Equal(default, appearance.Variants[fallback][0].Rotation);
+        var northOff = block.DefaultState;
+        var northOn = northOff.With(Powered, true);
+        var south = northOff.With(Facing, Direction.South);
+        Assert.Equal(ResourceKey.Create("other", "block/north"), appearance.Variants[northOff][0].ModelKey);
+        Assert.Equal(ResourceKey.Create("other", "block/north"), appearance.Variants[northOn][0].ModelKey);
+        Assert.Equal(3, appearance.Variants[northOn][0].Weight);
+        Assert.Equal(new BlockModelRotation(90, 180, 270), appearance.Variants[northOn][0].Rotation);
+        Assert.Equal(ResourceKey.Create("test", "block/fallback"), appearance.Variants[south][0].ModelKey);
         Assert.Equal(block.StateDefinition.States.Count, appearance.Variants.Count);
+    }
+
+    [Fact]
+    public void AcceptsConditionsInAnyPropertyOrder()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/machine.json", """
+            {
+              "variants": {
+                "powered=true,facing=north": { "model": "block/on" },
+                "": { "model": "block/fallback" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var block = new Block(Facing, Powered);
+
+        var appearance = new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "machine"), block);
+
+        var state = block.DefaultState.With(Powered, true);
+        Assert.Equal(ResourceKey.Create("test", "block/on"), appearance.Variants[state][0].ModelKey);
+    }
+
+    [Fact]
+    public void RejectsOverlappingPartialVariants()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/invalid.json", """
+            {
+              "variants": {
+                "facing=north": { "model": "block/north" },
+                "powered=true": { "model": "block/on" },
+                "": { "model": "block/fallback" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+
+        var exception = Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
+
+        Assert.Contains("facing=north", exception.Message);
+        Assert.Contains("powered=true", exception.Message);
+        Assert.Contains("facing=north,powered=true", exception.Message);
+    }
+
+    [Fact]
+    public void RejectsOverlappingPartialAndCompleteVariants()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/invalid.json", """
+            {
+              "variants": {
+                "facing=north": { "model": "block/north" },
+                "facing=north,powered=true": { "model": "block/north_on" },
+                "": { "model": "block/fallback" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+
+        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
+    }
+
+    [Fact]
+    public void RejectsEquivalentVariantsWithDifferentConditionOrder()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/invalid.json", """
+            {
+              "variants": {
+                "facing=north,powered=true": { "model": "block/first" },
+                "powered=true,facing=north": { "model": "block/second" },
+                "": { "model": "block/fallback" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+
+        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
     }
 
     [Fact]
@@ -167,6 +250,12 @@ public sealed class JsonBlockAppearanceLoaderTests
     [InlineData("{ \"variants\": { \"powered=false,facing=north\": [{ \"model\": \"block/a\" }] } }")]
     [InlineData("{ \"variants\": { \"facing=north,powered=false,extra=true\": [{ \"model\": \"block/a\" }] } }")]
     [InlineData("{ \"variants\": { \"facing=up,powered=false\": [{ \"model\": \"block/a\" }] } }")]
+    [InlineData(
+        "{ \"variants\": { \"facing=north,facing=south\": [{ \"model\": \"block/a\" }], \"\": [{ \"model\": \"block/fallback\" }] } }")]
+    [InlineData(
+        "{ \"variants\": { \"facing=north,\": [{ \"model\": \"block/a\" }], \"\": [{ \"model\": \"block/fallback\" }] } }")]
+    [InlineData(
+        "{ \"variants\": { \"facing==north\": [{ \"model\": \"block/a\" }], \"\": [{ \"model\": \"block/fallback\" }] } }")]
     [InlineData("{ \"variants\": { \"\": null } }")]
     [InlineData("{ \"variants\": { \"\": \"block/a\" } }")]
     [InlineData("{ \"variants\": { \"\": 1 } }")]
@@ -196,6 +285,24 @@ public sealed class JsonBlockAppearanceLoaderTests
 
         Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
             .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
+    }
+
+    [Fact]
+    public void RejectsConditionForStatelessBlock()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/invalid.json", """
+            {
+              "variants": {
+                "powered=true": { "model": "block/on" },
+                "": { "model": "block/fallback" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+
+        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "invalid"), new Block()));
     }
 
     [Fact]
@@ -282,7 +389,7 @@ public sealed class JsonBlockAppearanceLoaderTests
     }
 
     [Fact]
-    public void RejectsAmbiguousCanonicalStateKeys()
+    public void RejectsAmbiguousPropertyValueKeysEvenWithOnlyFallback()
     {
         using var directory = TestDirectory.Create();
         TestDirectory.WriteResource(directory, "test/appearances/block/invalid.json", """
@@ -299,9 +406,34 @@ public sealed class JsonBlockAppearanceLoaderTests
             .Load(ResourceKey.Create("test", "invalid"), new Block(mode)));
     }
 
+    [Fact]
+    public void RejectsPropertyValueKeyContainingSeparatorEvenWithOnlyFallback()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/invalid.json", """
+            {
+              "variants": {
+                "": { "model": "block/fallback" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var mode = BlockProperty.CreateEnum("mode", CombinedValue.First | CombinedValue.Second);
+
+        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "invalid"), new Block(mode)));
+    }
+
     private enum AmbiguousValue
     {
         Value,
         VALUE
+    }
+
+    [Flags]
+    private enum CombinedValue
+    {
+        First = 1,
+        Second = 2
     }
 }

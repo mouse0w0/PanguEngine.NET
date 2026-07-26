@@ -48,8 +48,10 @@ internal sealed class JsonBlockAppearanceLoader
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variants must be an object.");
 
-        var stateLookup = CreateStateLookup(block, appearanceKey);
+        var stateDefinition = block.StateDefinition;
+        ValidatePropertyValueKeys(stateDefinition, appearanceKey);
         var exactVariants = new Dictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
+        var variantSources = new Dictionary<BlockState, string>();
         IReadOnlyList<UnresolvedBlockAppearanceEntry>? fallback = null;
         var variantKeys = new HashSet<string>(StringComparer.Ordinal);
         var hasVariants = false;
@@ -61,16 +63,27 @@ internal sealed class JsonBlockAppearanceLoader
                     $"Block appearance '{appearanceKey}' contains duplicate variant key '{variant.Name}'.");
 
             var candidates = ParseCandidates(variant.Value, appearanceKey, variant.Name);
-            if (variant.Name.Length == 0 && block.StateDefinition.Properties.Count > 0)
+            if (variant.Name.Length == 0)
             {
                 fallback = candidates;
                 continue;
             }
 
-            if (!stateLookup.TryGetValue(variant.Name, out var state))
-                throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' variant key '{variant.Name}' is not a complete canonical state key.");
-            exactVariants.Add(state, candidates);
+            var conditions = ParseStateConditions(stateDefinition, appearanceKey, variant.Name);
+            for (var stateIndex = 0; stateIndex < stateDefinition.States.Count; stateIndex++)
+            {
+                if (!MatchesState(stateDefinition, stateIndex, conditions))
+                    continue;
+
+                var state = stateDefinition.States[stateIndex];
+                if (!exactVariants.TryAdd(state, candidates))
+                {
+                    throw new InvalidDataException(
+                        $"Block appearance '{appearanceKey}' variant key '{variant.Name}' overlaps variant key '{variantSources[state]}' at state '{GetStateKey(stateDefinition, stateIndex)}'.");
+                }
+
+                variantSources.Add(state, variant.Name);
+            }
         }
 
         if (!hasVariants)
@@ -78,7 +91,7 @@ internal sealed class JsonBlockAppearanceLoader
                 $"Block appearance '{appearanceKey}' variants must contain at least one entry.");
 
         var variants = new Dictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
-        var states = block.StateDefinition.States;
+        var states = stateDefinition.States;
         for (var stateIndex = 0; stateIndex < states.Count; stateIndex++)
         {
             var state = states[stateIndex];
@@ -90,28 +103,117 @@ internal sealed class JsonBlockAppearanceLoader
 
             if (fallback is null)
                 throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' does not cover state '{GetStateKey(block.StateDefinition, stateIndex)}'.");
+                    $"Block appearance '{appearanceKey}' does not cover state '{GetStateKey(stateDefinition, stateIndex)}'.");
             variants.Add(state, fallback);
         }
 
         return new UnresolvedBlockAppearance(appearanceKey, variants);
     }
 
-    private static Dictionary<string, BlockState> CreateStateLookup(
-        Block block,
+    private static void ValidatePropertyValueKeys(
+        BlockStateDefinition definition,
         ResourceKey appearanceKey)
     {
-        var definition = block.StateDefinition;
-        var result = new Dictionary<string, BlockState>(StringComparer.Ordinal);
-        for (var stateIndex = 0; stateIndex < definition.States.Count; stateIndex++)
+        foreach (var property in definition.Properties)
         {
-            var key = GetStateKey(definition, stateIndex);
-            if (!result.TryAdd(key, definition.States[stateIndex]))
+            var values = new HashSet<string>(StringComparer.Ordinal);
+            for (var valueIndex = 0; valueIndex < property.ValueCount; valueIndex++)
+            {
+                var value = property.GetValueString(valueIndex);
+                if (value.Contains(',') || value.Contains('='))
+                {
+                    throw new InvalidDataException(
+                        $"Block appearance '{appearanceKey}' property '{property.Name}' value key '{value}' contains a reserved separator.");
+                }
+
+                if (!values.Add(value))
+                {
+                    throw new InvalidDataException(
+                        $"Block appearance '{appearanceKey}' property '{property.Name}' contains duplicate value key '{value}'.");
+                }
+            }
+        }
+    }
+
+    private static (int PropertyIndex, int ValueIndex)[] ParseStateConditions(
+        BlockStateDefinition definition,
+        ResourceKey appearanceKey,
+        string variantKey)
+    {
+        var parts = variantKey.Split(',');
+        var conditions = new (int PropertyIndex, int ValueIndex)[parts.Length];
+        var propertyIndexes = new HashSet<int>();
+        for (var index = 0; index < parts.Length; index++)
+        {
+            var part = parts[index];
+            var separatorIndex = part.IndexOf('=');
+            if (separatorIndex <= 0 ||
+                separatorIndex != part.LastIndexOf('=') ||
+                separatorIndex == part.Length - 1)
+            {
                 throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' cannot distinguish duplicate canonical state key '{key}'.");
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' contains invalid condition '{part}'.");
+            }
+
+            var propertyName = part[..separatorIndex];
+            var value = part[(separatorIndex + 1)..];
+            var propertyIndex = FindPropertyIndex(definition, propertyName);
+            if (propertyIndex < 0)
+            {
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' contains unknown property '{propertyName}'.");
+            }
+
+            if (!propertyIndexes.Add(propertyIndex))
+            {
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' repeats property '{propertyName}'.");
+            }
+
+            var property = definition.Properties[propertyIndex];
+            var valueIndex = FindValueIndex(property, value);
+            if (valueIndex < 0)
+            {
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' contains unknown value '{value}' for property '{propertyName}'.");
+            }
+
+            conditions[index] = (propertyIndex, valueIndex);
         }
 
-        return result;
+        return conditions;
+    }
+
+    private static int FindPropertyIndex(BlockStateDefinition definition, string propertyName)
+    {
+        for (var index = 0; index < definition.Properties.Count; index++)
+            if (string.Equals(definition.Properties[index].Name, propertyName, StringComparison.Ordinal))
+                return index;
+        return -1;
+    }
+
+    private static int FindValueIndex(BlockProperty property, string value)
+    {
+        for (var index = 0; index < property.ValueCount; index++)
+            if (string.Equals(property.GetValueString(index), value, StringComparison.Ordinal))
+                return index;
+        return -1;
+    }
+
+    private static bool MatchesState(
+        BlockStateDefinition definition,
+        int stateIndex,
+        IReadOnlyList<(int PropertyIndex, int ValueIndex)> conditions)
+    {
+        foreach (var condition in conditions)
+        {
+            var property = definition.Properties[condition.PropertyIndex];
+            var valueIndex = stateIndex / definition.Strides[condition.PropertyIndex] % property.ValueCount;
+            if (valueIndex != condition.ValueIndex)
+                return false;
+        }
+
+        return true;
     }
 
     private static string GetStateKey(BlockStateDefinition definition, int stateIndex)
