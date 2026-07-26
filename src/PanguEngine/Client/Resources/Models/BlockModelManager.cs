@@ -70,6 +70,7 @@ internal sealed class BlockModelManager
     {
         var appearanceLoader = new JsonBlockAppearanceLoader(_resources);
         var modelLoader = new JsonBlockModelLoader(_resources);
+        var appearanceCache = new Dictionary<ResourceKey, UnresolvedBlockAppearance>();
         var layerCache = new Dictionary<ResourceKey, UnresolvedBlockModel>();
         var resolvedModelCache = new Dictionary<ResourceKey, ResolvedBlockModel>();
         var failedModels = new Dictionary<ResourceKey, Exception>();
@@ -81,42 +82,60 @@ internal sealed class BlockModelManager
         {
             var appearanceKey = ResourceKey.Create(
                 entry.Key.Namespace,
-                $"appearances/block/{entry.Key.Path}");
+                $"block/{entry.Key.Path}");
             try
             {
-                var definition = appearanceLoader.Load(entry.Key, entry.Value);
-                var variants = new Dictionary<BlockState, IReadOnlyList<ResolvedBlockCandidate>>();
+                var unresolvedAppearance = ResolveAppearance(
+                    appearanceLoader,
+                    appearanceKey,
+                    [],
+                    appearanceCache);
+                var unresolvedVariants = unresolvedAppearance.Variants
+                                         ?? throw new InvalidDataException(
+                                             $"Block appearance '{appearanceKey}' for block '{entry.Key}' does not define variants.");
+                var resolvedVariantDefinitions = ResolveAppearanceVariants(
+                    appearanceKey,
+                    entry.Key,
+                    unresolvedVariants,
+                    unresolvedAppearance.Models);
+                var expandedVariants = appearanceLoader.ExpandVariants(
+                    entry.Key,
+                    entry.Value,
+                    unresolvedAppearance.SourceKey,
+                    resolvedVariantDefinitions);
+                var variants = new Dictionary<BlockState, IReadOnlyList<ResolvedBlockAppearanceEntry>>();
                 var localTextureKeys = new HashSet<ResourceKey>();
-                foreach (var (state, variantCandidates) in definition.Variants)
+                foreach (var (state, variantCandidates) in expandedVariants)
                 {
-                    var candidates = new List<ResolvedBlockCandidate>(variantCandidates.Count);
+                    var candidates = new List<ResolvedBlockAppearanceEntry>(variantCandidates.Count);
                     foreach (var candidate in variantCandidates)
                     {
-                        if (failedModels.TryGetValue(candidate.ModelKey, out var previousFailure))
+                        var modelKey = ((BlockModelValue.Resource)candidate.Model).Key;
+                        if (failedModels.TryGetValue(modelKey, out var previousFailure))
                         {
                             throw new InvalidDataException(
-                                $"Block model '{candidate.ModelKey}' previously failed to resolve.",
+                                $"Block model '{modelKey}' previously failed to resolve.",
                                 previousFailure);
                         }
 
-                        if (!resolvedModelCache.TryGetValue(candidate.ModelKey, out var model))
+                        if (!resolvedModelCache.TryGetValue(modelKey, out var model))
                         {
                             try
                             {
-                                model = ResolveModel(modelLoader, candidate.ModelKey, [], layerCache);
-                                resolvedModelCache.Add(candidate.ModelKey, model);
+                                model = ResolveModel(modelLoader, modelKey, [], layerCache);
+                                resolvedModelCache.Add(modelKey, model);
                             }
                             catch (Exception exception) when (IsRecoverableModelException(exception))
                             {
-                                failedModels.Add(candidate.ModelKey, exception);
+                                failedModels.Add(modelKey, exception);
                                 throw;
                             }
                         }
 
                         foreach (var textureKey in GetTextureKeys(model))
                             localTextureKeys.Add(textureKey);
-                        candidates.Add(new ResolvedBlockCandidate(
-                            candidate.ModelKey,
+                        candidates.Add(new ResolvedBlockAppearanceEntry(
+                            modelKey,
                             candidate.Rotation,
                             candidate.Weight,
                             model));
@@ -297,7 +316,7 @@ internal sealed class BlockModelManager
         Block block,
         ResolvedBlockModel missingModel)
     {
-        IReadOnlyList<ResolvedBlockCandidate> candidates =
+        IReadOnlyList<ResolvedBlockAppearanceEntry> candidates =
             [new(MissingModelKey, default, 1, missingModel)];
         return new ResolvedBlockAppearance(
             blockKey,
@@ -315,6 +334,150 @@ internal sealed class BlockModelManager
         return block.StateDefinition.States.ToDictionary(
             state => state,
             _ => entries);
+    }
+
+    private static UnresolvedBlockAppearance ResolveAppearance(
+        JsonBlockAppearanceLoader loader,
+        ResourceKey appearanceKey,
+        IReadOnlyList<ResourceKey> parentChain,
+        Dictionary<ResourceKey, UnresolvedBlockAppearance> appearanceCache)
+    {
+        if (parentChain.Contains(appearanceKey))
+        {
+            var chain = parentChain.Append(appearanceKey);
+            throw new InvalidDataException(
+                $"Block appearance parent cycle: {string.Join(" -> ", chain)}.");
+        }
+
+        if (appearanceCache.TryGetValue(appearanceKey, out var cachedAppearance))
+            return cachedAppearance;
+
+        var chainWithCurrent = parentChain.Append(appearanceKey).ToArray();
+        var definition = LoadAppearanceDefinition(loader, appearanceKey, chainWithCurrent);
+        UnresolvedBlockAppearance? parent = null;
+        if (definition.ParentReference is not null)
+        {
+            ResourceKey parentKey;
+            try
+            {
+                parentKey = ResolveAppearanceReference(
+                    definition.ParentReference,
+                    appearanceKey);
+            }
+            catch (Exception exception) when (exception is FormatException or ArgumentException)
+            {
+                throw new InvalidDataException(
+                    $"Failed to resolve block appearance parent '{definition.ParentReference}' for '{appearanceKey}' while resolving parent chain '{string.Join(" -> ", chainWithCurrent)}'.",
+                    exception);
+            }
+
+            parent = ResolveAppearance(
+                loader,
+                parentKey,
+                chainWithCurrent,
+                appearanceCache);
+        }
+
+        var models = parent is null
+            ? new Dictionary<string, BlockModelValue>(StringComparer.Ordinal)
+            : new Dictionary<string, BlockModelValue>(parent.Models, StringComparer.Ordinal);
+        foreach (var model in definition.Models)
+            models[model.Key] = model.Value;
+
+        var appearance = definition with
+        {
+            ParentReference = null,
+            Models = models,
+            Variants = definition.Variants ?? parent?.Variants
+        };
+        appearanceCache.Add(appearanceKey, appearance);
+        return appearance;
+    }
+
+    private static UnresolvedBlockAppearance LoadAppearanceDefinition(
+        JsonBlockAppearanceLoader loader,
+        ResourceKey appearanceKey,
+        IReadOnlyList<ResourceKey> parentChain)
+    {
+        try
+        {
+            return loader.Load(appearanceKey);
+        }
+        catch (Exception exception) when (IsRecoverableModelException(exception))
+        {
+            throw new InvalidDataException(
+                $"Failed to load block appearance '{appearanceKey}' while resolving parent chain '{string.Join(" -> ", parentChain)}'.",
+                exception);
+        }
+    }
+
+    private static ResourceKey ResolveAppearanceReference(
+        string value,
+        ResourceKey declaringAppearance)
+    {
+        return value.Contains(':')
+            ? ResourceKey.Parse(value)
+            : ResourceKey.Create(declaringAppearance.Namespace, value);
+    }
+
+    private static IReadOnlyDictionary<string, IReadOnlyList<UnresolvedBlockAppearanceEntry>>
+        ResolveAppearanceVariants(
+            ResourceKey appearanceKey,
+            ResourceKey blockKey,
+            IReadOnlyDictionary<string, IReadOnlyList<UnresolvedBlockAppearanceEntry>> variants,
+            IReadOnlyDictionary<string, BlockModelValue> models)
+    {
+        var resolvedVariants = new Dictionary<string, IReadOnlyList<UnresolvedBlockAppearanceEntry>>(
+            StringComparer.Ordinal);
+        foreach (var variant in variants)
+        {
+            var candidates = new UnresolvedBlockAppearanceEntry[variant.Value.Count];
+            for (var index = 0; index < variant.Value.Count; index++)
+            {
+                var candidate = variant.Value[index];
+                candidates[index] = new UnresolvedBlockAppearanceEntry(
+                    ResolveAppearanceModelValue(
+                        candidate.Model,
+                        models,
+                        appearanceKey,
+                        blockKey),
+                    candidate.Weight,
+                    candidate.Rotation);
+            }
+
+            resolvedVariants.Add(variant.Key, candidates);
+        }
+
+        return resolvedVariants;
+    }
+
+    private static BlockModelValue.Resource ResolveAppearanceModelValue(
+        BlockModelValue value,
+        IReadOnlyDictionary<string, BlockModelValue> models,
+        ResourceKey appearanceKey,
+        ResourceKey blockKey)
+    {
+        var chain = new List<string>();
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (value is BlockModelValue.Variable variable)
+        {
+            chain.Add(variable.Name);
+            if (!visited.Add(variable.Name))
+            {
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' for block '{blockKey}' has a model alias cycle '{string.Join(" -> ", chain)}'.");
+            }
+
+            if (!models.TryGetValue(variable.Name, out var nextValue))
+            {
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' for block '{blockKey}' has an unknown model alias '#{variable.Name}' in chain '{string.Join(" -> ", chain)}'.");
+            }
+
+            value = nextValue;
+        }
+
+        return (BlockModelValue.Resource)value;
     }
 
     private static ResolvedBlockModel ResolveModel(

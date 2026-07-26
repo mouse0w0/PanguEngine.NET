@@ -22,14 +22,11 @@ internal sealed class JsonBlockAppearanceLoader
         _resources = resources;
     }
 
-    internal UnresolvedBlockAppearance Load(ResourceKey blockKey, Block block)
+    internal UnresolvedBlockAppearance Load(ResourceKey appearanceKey)
     {
-        var appearanceKey = ResourceKey.Create(
-            blockKey.Namespace,
-            $"appearances/block/{blockKey.Path}");
         var resourceKey = ResourceKey.Create(
             appearanceKey.Namespace,
-            $"{appearanceKey.Path}.json");
+            $"appearances/{appearanceKey.Path}.json");
         JsonBlockAppearance definition;
         try
         {
@@ -44,74 +41,143 @@ internal sealed class JsonBlockAppearanceLoader
                 $"Failed to parse block appearance '{appearanceKey}'.", exception);
         }
 
-        if (definition.Variants.ValueKind != JsonValueKind.Object)
+        if (definition.Parent is not null && definition.Parent.Length == 0)
             throw new InvalidDataException(
-                $"Block appearance '{appearanceKey}' variants must be an object.");
+                $"Block appearance '{appearanceKey}' parent reference must be a non-empty string.");
 
+        var variants = definition.Variants.ValueKind switch
+        {
+            JsonValueKind.Undefined => null,
+            JsonValueKind.Object => ParseVariants(definition.Variants, appearanceKey),
+            JsonValueKind.Null => throw new InvalidDataException(
+                $"Block appearance '{appearanceKey}' variants cannot be null."),
+            _ => throw new InvalidDataException(
+                $"Block appearance '{appearanceKey}' variants must be an object.")
+        };
+
+        return new UnresolvedBlockAppearance(
+            appearanceKey,
+            definition.Parent,
+            ParseModels(definition.Models, appearanceKey),
+            variants);
+    }
+
+    internal IReadOnlyDictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>
+        ExpandVariants(
+            ResourceKey blockKey,
+            Block block,
+            ResourceKey sourceKey,
+            IReadOnlyDictionary<
+                string,
+                IReadOnlyList<UnresolvedBlockAppearanceEntry>> variantDefinitions)
+    {
         var stateDefinition = block.StateDefinition;
-        var exactVariants = new Dictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
+        var exactVariants = new Dictionary<
+            BlockState,
+            IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
         var variantSources = new Dictionary<BlockState, string>();
         IReadOnlyList<UnresolvedBlockAppearanceEntry>? fallback = null;
-        var variantKeys = new HashSet<string>(StringComparer.Ordinal);
-        var hasVariants = false;
-        foreach (var variant in definition.Variants.EnumerateObject())
+        foreach (var variant in variantDefinitions)
         {
-            hasVariants = true;
-            if (!variantKeys.Add(variant.Name))
-                throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' contains duplicate variant key '{variant.Name}'.");
-
-            var candidates = ParseCandidates(variant.Value, appearanceKey, variant.Name);
-            if (variant.Name.Length == 0)
+            if (variant.Key.Length == 0)
             {
-                fallback = candidates;
+                fallback = variant.Value;
                 continue;
             }
 
-            var conditions = ParseStateConditions(stateDefinition, appearanceKey, variant.Name);
+            var conditions = ParseStateConditions(
+                stateDefinition,
+                sourceKey,
+                blockKey,
+                variant.Key);
             for (var stateIndex = 0; stateIndex < stateDefinition.States.Count; stateIndex++)
             {
                 if (!MatchesState(stateDefinition, stateIndex, conditions))
                     continue;
 
                 var state = stateDefinition.States[stateIndex];
-                if (!exactVariants.TryAdd(state, candidates))
+                if (!exactVariants.TryAdd(state, variant.Value))
                 {
                     throw new InvalidDataException(
-                        $"Block appearance '{appearanceKey}' variant key '{variant.Name}' overlaps variant key '{variantSources[state]}' at state '{GetStateKey(stateDefinition, stateIndex)}'.");
+                        $"Block appearance '{sourceKey}' variant key '{variant.Key}' for block '{blockKey}' overlaps variant key '{variantSources[state]}' at state '{GetStateKey(stateDefinition, stateIndex)}'.");
                 }
 
-                variantSources.Add(state, variant.Name);
+                variantSources.Add(state, variant.Key);
             }
         }
 
-        if (!hasVariants)
-            throw new InvalidDataException(
-                $"Block appearance '{appearanceKey}' variants must contain at least one entry.");
-
-        var variants = new Dictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
+        var expandedVariants = new Dictionary<
+            BlockState,
+            IReadOnlyList<UnresolvedBlockAppearanceEntry>>();
         var states = stateDefinition.States;
         for (var stateIndex = 0; stateIndex < states.Count; stateIndex++)
         {
             var state = states[stateIndex];
             if (exactVariants.TryGetValue(state, out var candidates))
             {
-                variants.Add(state, candidates);
+                expandedVariants.Add(state, candidates);
                 continue;
             }
 
             if (fallback is null)
                 throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' does not cover state '{GetStateKey(stateDefinition, stateIndex)}'.");
-            variants.Add(state, fallback);
+                    $"Block appearance '{sourceKey}' for block '{blockKey}' does not cover state '{GetStateKey(stateDefinition, stateIndex)}'.");
+            expandedVariants.Add(state, fallback);
         }
 
-        return new UnresolvedBlockAppearance(appearanceKey, variants);
+        return expandedVariants;
+    }
+
+    private static IReadOnlyDictionary<
+        string,
+        IReadOnlyList<UnresolvedBlockAppearanceEntry>> ParseVariants(
+        JsonElement value,
+        ResourceKey appearanceKey)
+    {
+        var variants = new Dictionary<
+            string,
+            IReadOnlyList<UnresolvedBlockAppearanceEntry>>(StringComparer.Ordinal);
+        var variantKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var variant in value.EnumerateObject())
+        {
+            if (!variantKeys.Add(variant.Name))
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' contains duplicate variant key '{variant.Name}'.");
+            variants.Add(
+                variant.Name,
+                ParseEntries(variant.Value, appearanceKey, variant.Name));
+        }
+
+        if (variants.Count == 0)
+            throw new InvalidDataException(
+                $"Block appearance '{appearanceKey}' variants must contain at least one entry.");
+
+        return variants;
+    }
+
+    private static Dictionary<string, BlockModelValue> ParseModels(
+        Dictionary<string, string?>? values,
+        ResourceKey appearanceKey)
+    {
+        var models = new Dictionary<string, BlockModelValue>(StringComparer.Ordinal);
+        if (values is null)
+            return models;
+
+        foreach (var (name, value) in values)
+        {
+            if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(value))
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' contains an empty model alias entry.");
+            models.Add(name, ParseModelValue(value, appearanceKey));
+        }
+
+        return models;
     }
 
     private static (int PropertyIndex, int ValueIndex)[] ParseStateConditions(
         BlockStateDefinition definition,
         ResourceKey appearanceKey,
+        ResourceKey blockKey,
         string variantKey)
     {
         var parts = variantKey.Split(',');
@@ -126,7 +192,7 @@ internal sealed class JsonBlockAppearanceLoader
                 separatorIndex == part.Length - 1)
             {
                 throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' contains invalid condition '{part}'.");
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' for block '{blockKey}' contains invalid condition '{part}'.");
             }
 
             var propertyName = part[..separatorIndex];
@@ -135,13 +201,13 @@ internal sealed class JsonBlockAppearanceLoader
             if (propertyIndex < 0)
             {
                 throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' contains unknown property '{propertyName}'.");
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' for block '{blockKey}' contains unknown property '{propertyName}'.");
             }
 
             if (!propertyIndexes.Add(propertyIndex))
             {
                 throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' repeats property '{propertyName}'.");
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' for block '{blockKey}' repeats property '{propertyName}'.");
             }
 
             var property = definition.Properties[propertyIndex];
@@ -149,7 +215,7 @@ internal sealed class JsonBlockAppearanceLoader
             if (valueIndex < 0)
             {
                 throw new InvalidDataException(
-                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' contains unknown value '{value}' for property '{propertyName}'.");
+                    $"Block appearance '{appearanceKey}' variant key '{variantKey}' for block '{blockKey}' contains unknown value '{value}' for property '{propertyName}'.");
             }
 
             conditions[index] = (propertyIndex, valueIndex);
@@ -187,7 +253,7 @@ internal sealed class JsonBlockAppearanceLoader
         return string.Join(",", properties);
     }
 
-    private static List<UnresolvedBlockAppearanceEntry> ParseCandidates(
+    private static List<UnresolvedBlockAppearanceEntry> ParseEntries(
         JsonElement value,
         ResourceKey appearanceKey,
         string variantKey)
@@ -196,14 +262,14 @@ internal sealed class JsonBlockAppearanceLoader
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variant '{variantKey}' must be a model object or an array.");
 
-        JsonBlockAppearanceCandidate?[] candidates;
+        JsonBlockAppearanceEntry?[] entries;
         try
         {
             if (value.ValueKind == JsonValueKind.Object)
             {
-                candidates =
+                entries =
                 [
-                    JsonSerializer.Deserialize<JsonBlockAppearanceCandidate>(
+                    JsonSerializer.Deserialize<JsonBlockAppearanceEntry>(
                         value.GetRawText(), JsonOptions)
                     ?? throw new InvalidDataException(
                         $"Block appearance '{appearanceKey}' variant '{variantKey}' is empty.")
@@ -211,10 +277,10 @@ internal sealed class JsonBlockAppearanceLoader
             }
             else
             {
-                candidates = JsonSerializer.Deserialize<JsonBlockAppearanceCandidate?[]>(
-                                 value.GetRawText(), JsonOptions)
-                             ?? throw new InvalidDataException(
-                                 $"Block appearance '{appearanceKey}' variant '{variantKey}' is empty.");
+                entries = JsonSerializer.Deserialize<JsonBlockAppearanceEntry?[]>(
+                              value.GetRawText(), JsonOptions)
+                          ?? throw new InvalidDataException(
+                              $"Block appearance '{appearanceKey}' variant '{variantKey}' is empty.");
             }
         }
         catch (JsonException exception)
@@ -223,19 +289,19 @@ internal sealed class JsonBlockAppearanceLoader
                 $"Failed to parse block appearance '{appearanceKey}' variant '{variantKey}'.", exception);
         }
 
-        if (candidates.Length == 0)
+        if (entries.Length == 0)
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variant '{variantKey}' must contain at least one model.");
 
-        var models = new List<UnresolvedBlockAppearanceEntry>(candidates.Length);
+        var result = new List<UnresolvedBlockAppearanceEntry>(entries.Length);
         long totalWeight = 0;
-        for (var index = 0; index < candidates.Length; index++)
+        for (var index = 0; index < entries.Length; index++)
         {
-            var candidate = candidates[index]
-                            ?? throw new InvalidDataException(
-                                $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} is null.");
-            var modelReference = ParseModel(candidate.Model, appearanceKey, variantKey, index);
-            var weight = ParseInteger(candidate.Weight, 1, appearanceKey, variantKey, index, "weight");
+            var entry = entries[index]
+                        ?? throw new InvalidDataException(
+                            $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} is null.");
+            var modelValue = ParseModel(entry.Model, appearanceKey, variantKey, index);
+            var weight = ParseInteger(entry.Weight, 1, appearanceKey, variantKey, index, "weight");
             if (weight <= 0)
                 throw new InvalidDataException(
                     $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} weight must be positive.");
@@ -244,13 +310,13 @@ internal sealed class JsonBlockAppearanceLoader
                 throw new InvalidDataException(
                     $"Block appearance '{appearanceKey}' variant '{variantKey}' total weight exceeds Int32.MaxValue.");
 
-            models.Add(new UnresolvedBlockAppearanceEntry(
-                ResolveModelReference(modelReference, appearanceKey),
+            result.Add(new UnresolvedBlockAppearanceEntry(
+                ParseModelValue(modelValue, appearanceKey),
                 weight,
-                ParseRotation(candidate.Rotation, appearanceKey, variantKey, index)));
+                ParseRotation(entry.Rotation, appearanceKey, variantKey, index)));
         }
 
-        return models;
+        return result;
     }
 
     private static string ParseModel(
@@ -267,6 +333,25 @@ internal sealed class JsonBlockAppearanceLoader
         }
 
         return value.GetString()!;
+    }
+
+    private static BlockModelValue ParseModelValue(
+        string value,
+        ResourceKey appearanceKey)
+    {
+        if (value.StartsWith('#'))
+        {
+            var name = value[1..];
+            if (name.Length == 0)
+                throw new InvalidDataException(
+                    $"Block appearance '{appearanceKey}' contains an empty model alias reference.");
+            return new BlockModelValue.Variable(name);
+        }
+
+        var key = value.Contains(':')
+            ? ResourceKey.Parse(value)
+            : ResourceKey.Create(appearanceKey.Namespace, value);
+        return new BlockModelValue.Resource(key);
     }
 
     private static BlockModelRotation ParseRotation(
@@ -338,14 +423,5 @@ internal sealed class JsonBlockAppearanceLoader
         }
 
         return result;
-    }
-
-    private static ResourceKey ResolveModelReference(
-        string value,
-        ResourceKey appearanceKey)
-    {
-        return value.Contains(':')
-            ? ResourceKey.Parse(value)
-            : ResourceKey.Create(appearanceKey.Namespace, value);
     }
 }

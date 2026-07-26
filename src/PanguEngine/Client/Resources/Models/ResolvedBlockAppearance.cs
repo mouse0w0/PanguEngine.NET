@@ -6,9 +6,9 @@ namespace PanguEngine.Client.Resources.Models;
 internal sealed record ResolvedBlockAppearance(
     ResourceKey BlockKey,
     ResourceKey SourceKey,
-    IReadOnlyDictionary<BlockState, IReadOnlyList<ResolvedBlockCandidate>> Variants);
+    IReadOnlyDictionary<BlockState, IReadOnlyList<ResolvedBlockAppearanceEntry>> Variants);
 
-internal sealed record ResolvedBlockCandidate(
+internal sealed record ResolvedBlockAppearanceEntry(
     ResourceKey ModelKey,
     BlockModelRotation Rotation,
     int Weight,

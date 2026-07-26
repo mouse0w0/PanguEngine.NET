@@ -5,10 +5,14 @@ namespace PanguEngine.Client.Resources.Models;
 
 internal sealed class JsonBlockAppearance
 {
+    [JsonPropertyName("parent")] public string? Parent { get; init; }
+
+    [JsonPropertyName("models")] public Dictionary<string, string?>? Models { get; init; }
+
     [JsonPropertyName("variants")] public JsonElement Variants { get; init; }
 }
 
-internal sealed class JsonBlockAppearanceCandidate
+internal sealed class JsonBlockAppearanceEntry
 {
     [JsonPropertyName("model")] public JsonElement Model { get; init; }
 

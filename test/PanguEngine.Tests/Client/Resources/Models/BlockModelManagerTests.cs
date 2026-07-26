@@ -248,6 +248,353 @@ public sealed class BlockModelManagerTests
     }
 
     [Fact]
+    public void InheritedVariantsUseChildModelOverride()
+    {
+        using var directory = TestDirectory.Create();
+        WriteSingleFaceModel(directory, "test", "block/a");
+        WriteSingleFaceModel(directory, "test", "block/b");
+        TestDirectory.WriteResource(directory, "test/appearances/block/base.json", """
+            {
+              "models": {
+                "base": "test:block/a",
+                "display": "#base"
+              },
+              "variants": { "": { "model": "#display" } }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "test/appearances/block/child.json", """
+            {
+              "parent": "block/base",
+              "models": { "base": "test:block/b" }
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "child"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("test", "block/b")).Width);
+        Assert.Throws<KeyNotFoundException>(() => manager.Atlas.GetRegion(ResourceKey.Create("test", "block/a")));
+    }
+
+    [Fact]
+    public void ChildVariantsReplaceInheritedVariants()
+    {
+        using var directory = TestDirectory.Create();
+        WriteSingleFaceModel(directory, "test", "block/a");
+        WriteSingleFaceModel(directory, "test", "block/b");
+        TestDirectory.WriteResource(directory, "test/appearances/block/base.json", """
+            {
+              "models": {
+                "base": "test:block/a",
+                "other": "test:block/a"
+              },
+              "variants": {
+                "powered=false": { "model": "#base" },
+                "powered=true": { "model": "#other" }
+              }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "test/appearances/block/child.json", """
+            {
+              "parent": "test:block/base",
+              "models": { "base": "test:block/b" },
+              "variants": { "": { "model": "#base" } }
+            }
+            """);
+        var block = new Block(Powered);
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "child"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("test", "block/b")).Width);
+        Assert.Throws<KeyNotFoundException>(() => manager.Atlas.GetRegion(ResourceKey.Create("test", "block/a")));
+        Assert.Equal(4, CountVertices(manager.Get(block.DefaultState, default)));
+        Assert.Equal(4, CountVertices(manager.Get(block.DefaultState.With(Powered, true), default)));
+    }
+
+    [Fact]
+    public void ResolvesThreeLevelAppearanceInheritance()
+    {
+        using var directory = TestDirectory.Create();
+        WriteSingleFaceModel(directory, "test", "block/a");
+        WriteSingleFaceModel(directory, "test", "block/b");
+        WriteSingleFaceModel(directory, "test", "block/c");
+        TestDirectory.WriteResource(directory, "test/appearances/block/root.json", """
+            {
+              "models": { "base": "test:block/a" },
+              "variants": { "": { "model": "#base" } }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "test/appearances/block/middle.json", """
+            {
+              "parent": "test:block/root",
+              "models": { "base": "test:block/b" }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "test/appearances/block/child.json", """
+            {
+              "parent": "test:block/middle",
+              "models": { "base": "test:block/c" }
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "child"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("test", "block/c")).Width);
+    }
+
+    [Fact]
+    public void InheritedAppearanceReferencesUseDeclaringAppearanceNamespace()
+    {
+        using var directory = TestDirectory.Create();
+        WriteSingleFaceModel(directory, "shared", "block/direct");
+        TestDirectory.WriteResource(directory, "shared/appearances/block/base.json", """
+            {
+              "variants": { "": { "model": "block/direct" } }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "child/appearances/block/stone.json", """
+            {
+              "parent": "shared:block/base"
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("child", "stone"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("shared", "block/direct")).Width);
+    }
+
+    [Fact]
+    public void AppearanceModelMapReferencesUseDeclaringAppearanceNamespace()
+    {
+        using var directory = TestDirectory.Create();
+        WriteSingleFaceModel(directory, "shared", "block/direct");
+        TestDirectory.WriteResource(directory, "shared/appearances/block/base.json", """
+            {
+              "models": { "base": "block/direct" },
+              "variants": { "": { "model": "#base" } }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "child/appearances/block/stone.json", """
+            {
+              "parent": "shared:block/base"
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("child", "stone"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("shared", "block/direct")).Width);
+    }
+
+    [Fact]
+    public void InheritedVariantErrorsUseChildAppearanceSource()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "shared/appearances/block/base.json", """
+            {
+              "variants": {
+                "powered=true": { "model": "block/on" },
+                "": { "model": "block/off" }
+              }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "child/appearances/block/stone.json", """
+            {
+              "parent": "shared:block/base"
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("child", "stone"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var logger = new CapturingLogger();
+        var manager = new BlockModelManager(resources, registry, 4096u, logger);
+
+        manager.Load();
+
+        var error = Assert.Single(logger.Entries.Where(entry => entry.Level == LogLevel.Error));
+        Assert.Contains("child:block/stone", error.Exception!.ToString());
+        Assert.Equal(24, CountVertices(manager.Get(block.DefaultState, default)));
+    }
+
+    [Fact]
+    public void SharedAppearanceParentCacheDoesNotShareModelOverrides()
+    {
+        using var directory = TestDirectory.Create();
+        WriteSingleFaceModel(directory, "first", "block/a");
+        WriteSingleFaceModel(directory, "second", "block/b");
+        TestDirectory.WriteResource(directory, "shared/appearances/block/base.json", """
+            {
+              "models": { "base": "shared:block/base" },
+              "variants": { "": { "model": "#base" } }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "first/appearances/block/one.json", """
+            {
+              "parent": "shared:block/base",
+              "models": { "base": "first:block/a" }
+            }
+            """);
+        TestDirectory.WriteResource(directory, "second/appearances/block/two.json", """
+            {
+              "parent": "shared:block/base",
+              "models": { "base": "second:block/b" }
+            }
+            """);
+        var first = new Block();
+        var second = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("first", "one"), first);
+        registry.Register(ResourceKey.Create("second", "two"), second);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("first", "block/a")).Width);
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("second", "block/b")).Width);
+    }
+
+    [Fact]
+    public void IgnoresUnusedMissingAppearanceAlias()
+    {
+        using var directory = TestDirectory.Create();
+        WriteSingleFaceModel(directory, "test", "block/a");
+        TestDirectory.WriteResource(directory, "test/appearances/block/stone.json", """
+            {
+              "models": {
+                "unused": "#missing",
+                "cycleA": "#cycleB",
+                "cycleB": "#cycleA",
+                "base": "test:block/a"
+              },
+              "variants": { "": { "model": "#base" } }
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "stone"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(1, manager.Atlas.GetRegion(ResourceKey.Create("test", "block/a")).Width);
+    }
+
+    [Fact]
+    public void AppearanceModelAliasCycleFallsBackToMissingCube()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/stone.json", """
+            {
+              "models": {
+                "a": "#b",
+                "b": "#a"
+              },
+              "variants": { "": { "model": "#a" } }
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "stone"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var logger = new CapturingLogger();
+        var manager = new BlockModelManager(resources, registry, 4096u, logger);
+
+        manager.Load();
+
+        Assert.Equal(24, CountVertices(manager.Get(block.DefaultState, default)));
+        var error = Assert.Single(logger.Entries.Where(entry => entry.Level == LogLevel.Error));
+        Assert.Contains("a -> b -> a", error.Exception!.ToString());
+    }
+
+    [Fact]
+    public void MissingAppearanceModelAliasFallsBackToMissingCube()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/stone.json", """
+            {
+              "variants": { "": { "model": "#missing" } }
+            }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "stone"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var logger = new CapturingLogger();
+        var manager = new BlockModelManager(resources, registry, 4096u, logger);
+
+        manager.Load();
+
+        Assert.Equal(24, CountVertices(manager.Get(block.DefaultState, default)));
+        var error = Assert.Single(logger.Entries.Where(entry => entry.Level == LogLevel.Error));
+        Assert.Contains("#missing", error.Exception!.ToString());
+    }
+
+    [Fact]
+    public void AppearanceParentCycleFallsBackToMissingCube()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/a.json", """
+            { "parent": "test:block/b" }
+            """);
+        TestDirectory.WriteResource(directory, "test/appearances/block/b.json", """
+            { "parent": "test:block/a" }
+            """);
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "a"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var logger = new CapturingLogger();
+        var manager = new BlockModelManager(resources, registry, 4096u, logger);
+
+        manager.Load();
+
+        Assert.Equal(24, CountVertices(manager.Get(block.DefaultState, default)));
+        var error = Assert.Single(logger.Entries.Where(entry => entry.Level == LogLevel.Error));
+        Assert.Contains("test:block/a -> test:block/b -> test:block/a", error.Exception!.ToString());
+    }
+
+    [Fact]
+    public void MissingInheritedVariantsFallsBackToMissingCube()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/stone.json", "{}");
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "stone"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        Assert.Equal(24, CountVertices(manager.Get(block.DefaultState, default)));
+    }
+
+    [Fact]
     public void InheritedReferencesUseDeclaringModelNamespace()
     {
         using var directory = TestDirectory.Create();
@@ -724,6 +1071,35 @@ public sealed class BlockModelManagerTests
         }
     }
 
+    private static void WriteSingleFaceModel(
+        TestDirectory directory,
+        string ns,
+        string modelPath)
+    {
+        TestDirectory.WriteResource(
+            directory,
+            $"{ns}/models/{modelPath}.json",
+            $$"""
+              {
+                "elements": [
+                  {
+                    "from": [0, 0, 0],
+                    "to": [16, 16, 16],
+                    "faces": { "up": { "texture": "{{modelPath}}" } }
+                  }
+                ]
+              }
+              """);
+        TestDirectory.WriteResource(directory, $"{ns}/textures/{modelPath}.png", OnePixelPng);
+    }
+
+    private static int CountVertices(BakedBlockModel model)
+    {
+        var writer = new RecordingWriter();
+        model.Emit(default, DirectionFlags.None, writer);
+        return writer.Vertices.Count;
+    }
+
     private static void WriteAppearance(
         TestDirectory directory,
         string ns,
@@ -746,9 +1122,9 @@ public sealed class BlockModelManagerTests
 
     private sealed class CapturingLogger : ILogger
     {
-        private readonly List<(LogLevel Level, string Message)> _entries = [];
+        private readonly List<(LogLevel Level, string Message, Exception? Exception)> _entries = [];
 
-        internal IReadOnlyList<(LogLevel Level, string Message)> Entries => _entries;
+        internal IReadOnlyList<(LogLevel Level, string Message, Exception? Exception)> Entries => _entries;
 
         public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
@@ -761,7 +1137,7 @@ public sealed class BlockModelManagerTests
             Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            _entries.Add((logLevel, formatter(state, exception)));
+            _entries.Add((logLevel, formatter(state, exception), exception));
         }
     }
 

@@ -16,6 +16,78 @@ public sealed class JsonBlockAppearanceLoaderTests
     private static readonly BlockProperty<bool> Powered = BlockProperty.CreateBoolean("powered");
 
     [Fact]
+    public void LoadsUnresolvedAppearanceWithParentModelsAndAliases()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/machine.json", """
+            {
+              "parent": "base",
+              "models": {
+                "base": "block/direct",
+                "display": "#base"
+              },
+              "variants": {
+                "": { "model": "#display" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+
+        var appearance = new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "block/machine"));
+
+        Assert.Equal("base", appearance.ParentReference);
+        var baseModel = Assert.IsType<BlockModelValue.Resource>(appearance.Models["base"]);
+        Assert.Equal(ResourceKey.Create("test", "block/direct"), baseModel.Key);
+        var displayModel = Assert.IsType<BlockModelValue.Variable>(appearance.Models["display"]);
+        Assert.Equal("base", displayModel.Name);
+        Assert.NotNull(appearance.Variants);
+        var candidate = Assert.Single(appearance.Variants[""]);
+        var candidateModel = Assert.IsType<BlockModelValue.Variable>(candidate.Model);
+        Assert.Equal("display", candidateModel.Name);
+        Assert.Equal(ResourceKey.Create("test", "block/machine"), appearance.SourceKey);
+    }
+
+    [Fact]
+    public void LoadsDirectCandidateUsingDeclaringNamespace()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/machine.json", """
+            {
+              "variants": {
+                "": { "model": "block/direct" }
+              }
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+
+        var appearance = new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "block/machine"));
+
+        Assert.NotNull(appearance.Variants);
+        var candidate = Assert.Single(appearance.Variants[""]);
+        var model = Assert.IsType<BlockModelValue.Resource>(candidate.Model);
+        Assert.Equal(ResourceKey.Create("test", "block/direct"), model.Key);
+    }
+
+    [Fact]
+    public void AllowsMissingVariantsInUnresolvedAppearance()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/appearances/block/child.json", """
+            {
+              "parent": "block/base"
+            }
+            """);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+
+        var appearance = new JsonBlockAppearanceLoader(resources)
+            .Load(ResourceKey.Create("test", "block/child"));
+
+        Assert.Null(appearance.Variants);
+    }
+
+    [Fact]
     public void BindsPartialAndDefaultVariantsToCanonicalStates()
     {
         using var directory = TestDirectory.Create();
@@ -38,18 +110,20 @@ public sealed class JsonBlockAppearanceLoaderTests
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var block = new Block(Facing, Powered);
 
-        var appearance = new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "machine"), block);
+        var appearance = LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "machine"),
+            block);
 
         var northOff = block.DefaultState;
         var northOn = northOff.With(Powered, true);
         var south = northOff.With(Facing, Direction.South);
-        Assert.Equal(ResourceKey.Create("other", "block/north"), appearance.Variants[northOff][0].ModelKey);
-        Assert.Equal(ResourceKey.Create("other", "block/north"), appearance.Variants[northOn][0].ModelKey);
-        Assert.Equal(3, appearance.Variants[northOn][0].Weight);
-        Assert.Equal(new BlockModelRotation(90, 180, 270), appearance.Variants[northOn][0].Rotation);
-        Assert.Equal(ResourceKey.Create("test", "block/fallback"), appearance.Variants[south][0].ModelKey);
-        Assert.Equal(block.StateDefinition.States.Count, appearance.Variants.Count);
+        Assert.Equal(ResourceKey.Create("other", "block/north"), GetModelKey(appearance[northOff][0]));
+        Assert.Equal(ResourceKey.Create("other", "block/north"), GetModelKey(appearance[northOn][0]));
+        Assert.Equal(3, appearance[northOn][0].Weight);
+        Assert.Equal(new BlockModelRotation(90, 180, 270), appearance[northOn][0].Rotation);
+        Assert.Equal(ResourceKey.Create("test", "block/fallback"), GetModelKey(appearance[south][0]));
+        Assert.Equal(block.StateDefinition.States.Count, appearance.Count);
     }
 
     [Fact]
@@ -67,11 +141,13 @@ public sealed class JsonBlockAppearanceLoaderTests
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var block = new Block(Facing, Powered);
 
-        var appearance = new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "machine"), block);
+        var appearance = LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "machine"),
+            block);
 
         var state = block.DefaultState.With(Powered, true);
-        Assert.Equal(ResourceKey.Create("test", "block/on"), appearance.Variants[state][0].ModelKey);
+        Assert.Equal(ResourceKey.Create("test", "block/on"), GetModelKey(appearance[state][0]));
     }
 
     [Fact]
@@ -89,8 +165,10 @@ public sealed class JsonBlockAppearanceLoaderTests
             """);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        var exception = Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
+        var exception = Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block(Facing, Powered)));
 
         Assert.Contains("facing=north", exception.Message);
         Assert.Contains("powered=true", exception.Message);
@@ -112,8 +190,10 @@ public sealed class JsonBlockAppearanceLoaderTests
             """);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
+        Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block(Facing, Powered)));
     }
 
     [Fact]
@@ -131,8 +211,10 @@ public sealed class JsonBlockAppearanceLoaderTests
             """);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
+        Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block(Facing, Powered)));
     }
 
     [Fact]
@@ -154,15 +236,17 @@ public sealed class JsonBlockAppearanceLoaderTests
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var block = new Block(Powered);
 
-        var appearance = new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "machine"), block);
+        var appearance = LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "machine"),
+            block);
 
         Assert.Equal(
             ResourceKey.Create("test", "block/off"),
-            appearance.Variants[block.DefaultState][0].ModelKey);
+            GetModelKey(appearance[block.DefaultState][0]));
         Assert.Equal(
             ResourceKey.Create("test", "block/on"),
-            appearance.Variants[block.DefaultState.With(Powered, true)][0].ModelKey);
+            GetModelKey(appearance[block.DefaultState.With(Powered, true)][0]));
     }
 
     [Fact]
@@ -183,11 +267,13 @@ public sealed class JsonBlockAppearanceLoaderTests
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var block = new Block();
 
-        var appearance = new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "stone"), block);
+        var appearance = LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "stone"),
+            block);
 
-        var candidate = Assert.Single(appearance.Variants[block.DefaultState]);
-        Assert.Equal(ResourceKey.Create("test", "block/a"), candidate.ModelKey);
+        var candidate = Assert.Single(appearance[block.DefaultState]);
+        Assert.Equal(ResourceKey.Create("test", "block/a"), GetModelKey(candidate));
         Assert.Equal(2, candidate.Weight);
         Assert.Equal(new BlockModelRotation(0, 90, 0), candidate.Rotation);
     }
@@ -208,10 +294,12 @@ public sealed class JsonBlockAppearanceLoaderTests
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var block = new Block();
 
-        var appearance = new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "stone"), block);
+        var appearance = LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "stone"),
+            block);
 
-        Assert.Equal(new BlockModelRotation(0, 90, 0), appearance.Variants[block.DefaultState][0].Rotation);
+        Assert.Equal(new BlockModelRotation(0, 90, 0), appearance[block.DefaultState][0].Rotation);
     }
 
     [Fact]
@@ -231,21 +319,24 @@ public sealed class JsonBlockAppearanceLoaderTests
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var block = new Block();
 
-        var appearance = new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "stone"), block);
+        var appearance = LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "stone"),
+            block);
 
-        var candidates = appearance.Variants[block.DefaultState];
+        var candidates = appearance[block.DefaultState];
         Assert.Equal(2, candidates.Count);
         Assert.Equal(2, candidates[0].Weight);
         Assert.Equal(5, candidates[1].Weight);
     }
 
     [Theory]
-    [InlineData("{}")]
     [InlineData("{ \"variants\": null }")]
     [InlineData("{ \"variants\": [] }")]
     [InlineData("{ \"variants\": {} }")]
     [InlineData("{ \"models\": [{ \"model\": \"block/a\" }] }")]
+    [InlineData("{ \"models\": { \"base\": \"#\" }, \"variants\": { \"\": { \"model\": \"block/a\" } } }")]
+    [InlineData("{ \"variants\": { \"\": { \"model\": \"#\" } } }")]
     [InlineData("{ \"variants\": { \"powered=false\": [{ \"model\": \"block/a\" }] } }")]
     [InlineData("{ \"variants\": { \"powered=false,facing=north\": [{ \"model\": \"block/a\" }] } }")]
     [InlineData("{ \"variants\": { \"facing=north,powered=false,extra=true\": [{ \"model\": \"block/a\" }] } }")]
@@ -283,8 +374,10 @@ public sealed class JsonBlockAppearanceLoaderTests
         TestDirectory.WriteResource(directory, "test/appearances/block/invalid.json", json);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block(Facing, Powered)));
+        Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block(Facing, Powered)));
     }
 
     [Fact]
@@ -301,8 +394,10 @@ public sealed class JsonBlockAppearanceLoaderTests
             """);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block()));
+        Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block()));
     }
 
     [Fact]
@@ -321,8 +416,10 @@ public sealed class JsonBlockAppearanceLoaderTests
             """);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block()));
+        Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block()));
     }
 
     [Fact]
@@ -344,13 +441,15 @@ public sealed class JsonBlockAppearanceLoaderTests
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
         var block = new Block(Powered);
 
-        var appearance = new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "machine"), block);
+        var appearance = LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "machine"),
+            block);
 
-        Assert.Equal(int.MaxValue, appearance.Variants[block.DefaultState][0].Weight);
+        Assert.Equal(int.MaxValue, appearance[block.DefaultState][0].Weight);
         Assert.Equal(
             int.MaxValue,
-            appearance.Variants[block.DefaultState.With(Powered, true)][0].Weight);
+            appearance[block.DefaultState.With(Powered, true)][0].Weight);
     }
 
     [Fact]
@@ -367,8 +466,10 @@ public sealed class JsonBlockAppearanceLoaderTests
             """);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block()));
+        Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block()));
     }
 
     [Fact]
@@ -384,7 +485,32 @@ public sealed class JsonBlockAppearanceLoaderTests
             """);
         using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
 
-        Assert.Throws<InvalidDataException>(() => new JsonBlockAppearanceLoader(resources)
-            .Load(ResourceKey.Create("test", "invalid"), new Block(Powered)));
+        Assert.Throws<InvalidDataException>(() => LoadDirectAppearance(
+            resources,
+            ResourceKey.Create("test", "invalid"),
+            new Block(Powered)));
+    }
+
+    private static IReadOnlyDictionary<BlockState, IReadOnlyList<UnresolvedBlockAppearanceEntry>>
+        LoadDirectAppearance(
+            ResourceManager resources,
+            ResourceKey blockKey,
+            Block block)
+    {
+        var loader = new JsonBlockAppearanceLoader(resources);
+        var appearanceKey = ResourceKey.Create(blockKey.Namespace, $"block/{blockKey.Path}");
+        var appearance = loader.Load(appearanceKey);
+        Assert.Null(appearance.ParentReference);
+        Assert.NotNull(appearance.Variants);
+        return loader.ExpandVariants(
+            blockKey,
+            block,
+            appearance.SourceKey,
+            appearance.Variants!);
+    }
+
+    private static ResourceKey GetModelKey(UnresolvedBlockAppearanceEntry candidate)
+    {
+        return Assert.IsType<BlockModelValue.Resource>(candidate.Model).Key;
     }
 }
