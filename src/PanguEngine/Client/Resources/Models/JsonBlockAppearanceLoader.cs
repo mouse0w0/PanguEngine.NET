@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using PanguEngine.Registries;
@@ -262,32 +261,9 @@ internal sealed class JsonBlockAppearanceLoader
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variant '{variantKey}' must be a model object or an array.");
 
-        JsonBlockAppearanceEntry?[] entries;
-        try
-        {
-            if (value.ValueKind == JsonValueKind.Object)
-            {
-                entries =
-                [
-                    JsonSerializer.Deserialize<JsonBlockAppearanceEntry>(
-                        value.GetRawText(), JsonOptions)
-                    ?? throw new InvalidDataException(
-                        $"Block appearance '{appearanceKey}' variant '{variantKey}' is empty.")
-                ];
-            }
-            else
-            {
-                entries = JsonSerializer.Deserialize<JsonBlockAppearanceEntry?[]>(
-                              value.GetRawText(), JsonOptions)
-                          ?? throw new InvalidDataException(
-                              $"Block appearance '{appearanceKey}' variant '{variantKey}' is empty.");
-            }
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidDataException(
-                $"Failed to parse block appearance '{appearanceKey}' variant '{variantKey}'.", exception);
-        }
+        JsonElement[] entries = value.ValueKind == JsonValueKind.Object
+            ? [value]
+            : value.EnumerateArray().ToArray();
 
         if (entries.Length == 0)
             throw new InvalidDataException(
@@ -297,11 +273,23 @@ internal sealed class JsonBlockAppearanceLoader
         long totalWeight = 0;
         for (var index = 0; index < entries.Length; index++)
         {
-            var entry = entries[index]
+            JsonBlockAppearanceEntry entry;
+            try
+            {
+                entry = JsonSerializer.Deserialize<JsonBlockAppearanceEntry>(
+                            entries[index].GetRawText(), JsonOptions)
                         ?? throw new InvalidDataException(
                             $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} is null.");
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    $"Failed to parse block appearance '{appearanceKey}' variant '{variantKey}' model {index} at JSON path '{exception.Path}'.",
+                    exception);
+            }
+
             var modelValue = ParseModel(entry.Model, appearanceKey, variantKey, index);
-            var weight = ParseInteger(entry.Weight, 1, appearanceKey, variantKey, index, "weight");
+            var weight = entry.Weight;
             if (weight <= 0)
                 throw new InvalidDataException(
                     $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} weight must be positive.");
@@ -320,19 +308,18 @@ internal sealed class JsonBlockAppearanceLoader
     }
 
     private static string ParseModel(
-        JsonElement value,
+        string? value,
         ResourceKey appearanceKey,
         string variantKey,
         int index)
     {
-        if (value.ValueKind != JsonValueKind.String ||
-            string.IsNullOrEmpty(value.GetString()))
+        if (string.IsNullOrEmpty(value))
         {
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} reference must be a non-empty string.");
         }
 
-        return value.GetString()!;
+        return value;
     }
 
     private static BlockModelValue ParseModelValue(
@@ -355,73 +342,27 @@ internal sealed class JsonBlockAppearanceLoader
     }
 
     private static BlockModelRotation ParseRotation(
-        JsonElement value,
+        JsonBlockAppearanceRotation value,
         ResourceKey appearanceKey,
         string variantKey,
         int index)
     {
-        if (value.ValueKind == JsonValueKind.Undefined)
-            return default;
-        if (value.ValueKind != JsonValueKind.Object)
-            throw new InvalidDataException(
-                $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} rotation must be an object.");
-
-        JsonBlockAppearanceRotation rotation;
-        try
-        {
-            rotation = JsonSerializer.Deserialize<JsonBlockAppearanceRotation>(
-                           value.GetRawText(), JsonOptions)
-                       ?? throw new InvalidDataException(
-                           $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} rotation is empty.");
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidDataException(
-                $"Failed to parse block appearance '{appearanceKey}' variant '{variantKey}' model {index} rotation.",
-                exception);
-        }
-
         return new BlockModelRotation(
-            ParseAngle(rotation.X, appearanceKey, variantKey, index, "x"),
-            ParseAngle(rotation.Y, appearanceKey, variantKey, index, "y"),
-            ParseAngle(rotation.Z, appearanceKey, variantKey, index, "z"));
+            ParseAngle(value.X, appearanceKey, variantKey, index, "x"),
+            ParseAngle(value.Y, appearanceKey, variantKey, index, "y"),
+            ParseAngle(value.Z, appearanceKey, variantKey, index, "z"));
     }
 
     private static int ParseAngle(
-        JsonElement value,
+        int value,
         ResourceKey appearanceKey,
         string variantKey,
         int index,
         string axis)
     {
-        var angle = ParseInteger(value, 0, appearanceKey, variantKey, index, $"rotation.{axis}");
-        if (angle is not (0 or 90 or 180 or 270))
+        if (value is not (0 or 90 or 180 or 270))
             throw new InvalidDataException(
                 $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} rotation.{axis} must be 0, 90, 180, or 270.");
-        return angle;
-    }
-
-    private static int ParseInteger(
-        JsonElement value,
-        int defaultValue,
-        ResourceKey appearanceKey,
-        string variantKey,
-        int index,
-        string propertyName)
-    {
-        if (value.ValueKind == JsonValueKind.Undefined)
-            return defaultValue;
-        if (value.ValueKind != JsonValueKind.Number ||
-            !int.TryParse(
-                value.GetRawText(),
-                NumberStyles.AllowLeadingSign,
-                CultureInfo.InvariantCulture,
-                out var result))
-        {
-            throw new InvalidDataException(
-                $"Block appearance '{appearanceKey}' variant '{variantKey}' model {index} {propertyName} must be an integer.");
-        }
-
-        return result;
+        return value;
     }
 }

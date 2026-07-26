@@ -14,18 +14,18 @@ internal sealed class JsonBlockAppearance
 
 internal sealed class JsonBlockAppearanceEntry
 {
-    [JsonPropertyName("model")] public JsonElement Model { get; init; }
+    [JsonPropertyName("model")] public string? Model { get; init; }
 
-    [JsonPropertyName("weight")] public JsonElement Weight { get; init; }
+    [JsonPropertyName("weight")] public int Weight { get; init; } = 1;
 
-    [JsonPropertyName("rotation")] public JsonElement Rotation { get; init; }
+    [JsonPropertyName("rotation")] public JsonBlockAppearanceRotation Rotation { get; init; }
 }
 
-internal sealed class JsonBlockAppearanceRotation
+internal struct JsonBlockAppearanceRotation
 {
-    [JsonPropertyName("x")] public JsonElement X { get; init; }
+    [JsonPropertyName("x")] public int X { get; init; }
 
-    [JsonPropertyName("y")] public JsonElement Y { get; init; }
+    [JsonPropertyName("y")] public int Y { get; init; }
 
-    [JsonPropertyName("z")] public JsonElement Z { get; init; }
+    [JsonPropertyName("z")] public int Z { get; init; }
 }
