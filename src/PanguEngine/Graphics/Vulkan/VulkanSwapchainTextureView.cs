@@ -68,6 +68,7 @@ internal sealed class VulkanSwapchainTextureView : TextureView, IVulkanTextureVi
     /// <exception cref="InvalidOperationException">Always thrown when called.</exception>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         throw new InvalidOperationException("Frame color output texture views are owned by the presenter.");
     }
 }

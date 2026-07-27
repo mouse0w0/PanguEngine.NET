@@ -15,19 +15,22 @@ internal sealed unsafe class VulkanSampler : Sampler
     internal VulkanSampler(VKSampler sampler)
     {
         Handle = sampler;
+        Lifetime = new VulkanResourceLifetime(
+            this,
+            () => VulkanContext.Vk.DestroySampler(VulkanContext.Device, sampler, null),
+            VulkanDeletionQueue.Enqueue);
     }
+
+    internal VulkanResourceLifetime Lifetime { get; }
 
     /// <summary>
     /// Destroys the sampler resource.
     /// </summary>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (IsDestroyed) return;
         MarkDestroyed();
-
-        var sampler = Handle;
-        var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
-        VulkanDeletionQueue.Enqueue(retireValue,
-            () => { VulkanContext.Vk.DestroySampler(VulkanContext.Device, sampler, null); });
+        Lifetime.RequestDestroy();
     }
 }

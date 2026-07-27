@@ -25,13 +25,22 @@ internal sealed unsafe class VulkanTextureView : TextureView, IVulkanTextureView
         MipLevels = description.MipLevels;
         BaseArrayLayer = description.BaseArrayLayer;
         ArrayLayers = description.ArrayLayers;
-        texture.RegisterView();
+        Lifetime = new VulkanResourceLifetime(
+            this,
+            () =>
+            {
+                VulkanContext.Vk.DestroyImageView(VulkanContext.Device, imageView, null);
+                texture.ReleaseNativeViewHold();
+            },
+            VulkanDeletionQueue.Enqueue);
     }
 
     /// <summary>
     /// Gets the Vulkan texture referenced by the view.
     /// </summary>
     internal VulkanTexture VulkanTexture { get; }
+
+    internal VulkanResourceLifetime Lifetime { get; }
 
     /// <inheritdoc cref="TextureView.Texture"/>
     public override Texture Texture => VulkanTexture;
@@ -72,13 +81,10 @@ internal sealed unsafe class VulkanTextureView : TextureView, IVulkanTextureView
     /// <inheritdoc cref="GraphicsResource.Destroy"/>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (IsDestroyed) return;
         MarkDestroyed();
-
-        var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
-        VulkanTexture.ReleaseView(retireValue);
-        var imageView = ImageView;
-        VulkanDeletionQueue.Enqueue(retireValue,
-            () => VulkanContext.Vk.DestroyImageView(VulkanContext.Device, imageView, null));
+        VulkanTexture.ReleaseView();
+        Lifetime.RequestDestroy();
     }
 }

@@ -29,6 +29,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     public override Window PrimaryWindow { get; }
 
     /// <inheritdoc/>
+    // ReSharper disable once ConvertToAutoPropertyWithPrivateSetter
     public override bool IsDestroyed => _isDestroyed;
 
     /// <summary>
@@ -37,6 +38,8 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     /// <param name="options">The backend initialization options.</param>
     internal VulkanBackend(GraphicsBackendOptions options)
     {
+        VulkanContext.BindRenderThread();
+
         SilkWindow? silkWindow = null;
         SurfaceKHR surface = default;
         VulkanWindow? primaryWindow = null;
@@ -119,6 +122,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     /// <inheritdoc/>
     internal override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (_isDestroyed) return;
         _isDestroyed = true;
 

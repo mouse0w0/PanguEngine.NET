@@ -102,6 +102,7 @@ public sealed partial class VulkanWindow
         get => _silkWindow.VSync;
         set
         {
+            VulkanContext.EnsureRenderThread();
             if (_silkWindow.VSync == value) return;
 
             _silkWindow.VSync = value;

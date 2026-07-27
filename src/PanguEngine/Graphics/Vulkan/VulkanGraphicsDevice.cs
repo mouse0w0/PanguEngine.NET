@@ -27,12 +27,15 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     /// <inheritdoc/>
     public override void WaitIdle()
     {
+        VulkanContext.EnsureRenderThread();
         VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
     }
 
     /// <inheritdoc/>
     public override Buffer CreateBuffer(in BufferDescription description)
     {
+        VulkanContext.EnsureRenderThread();
+
         if (description.Size == 0)
             throw new ArgumentOutOfRangeException(nameof(description), "Buffer size must be greater than zero.");
         if (description.Usage == BufferUsage.None)
@@ -96,6 +99,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         ReadOnlySpan<T> data,
         ulong destinationOffset = 0)
     {
+        VulkanContext.EnsureRenderThread();
         ArgumentNullException.ThrowIfNull(destination);
 
         var vulkanBuffer = RequireVulkanBuffer(destination);
@@ -119,6 +123,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     public override Texture CreateTexture(in TextureDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         ValidateTextureDescription(description);
 
         var imageType = VulkanMapping.ToVulkanImageType(description.Dimension);
@@ -163,44 +168,36 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         Texture texture,
         in TextureViewDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         ArgumentNullException.ThrowIfNull(texture);
 
         var vulkanTexture = RequireVulkanTexture(texture);
         vulkanTexture.ThrowIfDestroyed();
         ValidateTextureViewDescription(vulkanTexture, description);
 
-        ImageViewCreateInfo viewInfo = new()
+        var imageView = vulkanTexture.CreateImageView(description);
+
+        try
         {
-            SType = StructureType.ImageViewCreateInfo,
-            Image = vulkanTexture.Image,
-            ViewType = VulkanMapping.ToVulkanImageViewType(description.Dimension),
-            Format = VulkanMapping.ToVulkanFormat(vulkanTexture.Format),
-            SubresourceRange = new ImageSubresourceRange
-            {
-                AspectMask = VulkanMapping.ToVulkanImageAspect(vulkanTexture.Format),
-                BaseMipLevel = description.BaseMipLevel,
-                LevelCount = description.MipLevels,
-                BaseArrayLayer = description.BaseArrayLayer,
-                LayerCount = description.ArrayLayers
-            }
-        };
-
-        if (VulkanContext.Vk.CreateImageView(VulkanContext.Device, in viewInfo, null, out var imageView) !=
-            Result.Success)
-            throw new InvalidOperationException("Failed to create texture image view.");
-
-        var width = VulkanTexture.GetMipExtent(vulkanTexture.Width, description.BaseMipLevel);
-        var height = description.Dimension is TextureViewDimension.Type1D or TextureViewDimension.Type1DArray
-            ? 1
-            : VulkanTexture.GetMipExtent(vulkanTexture.Height, description.BaseMipLevel);
-        var depth = description.Dimension == TextureViewDimension.Type3D
-            ? VulkanTexture.GetMipExtent(vulkanTexture.Depth, description.BaseMipLevel)
-            : 1;
-        return new VulkanTextureView(vulkanTexture, imageView, description, width, height, depth);
+            var width = VulkanTexture.GetMipExtent(vulkanTexture.Width, description.BaseMipLevel);
+            var height = description.Dimension is TextureViewDimension.Type1D or TextureViewDimension.Type1DArray
+                ? 1
+                : VulkanTexture.GetMipExtent(vulkanTexture.Height, description.BaseMipLevel);
+            var depth = description.Dimension == TextureViewDimension.Type3D
+                ? VulkanTexture.GetMipExtent(vulkanTexture.Depth, description.BaseMipLevel)
+                : 1;
+            return new VulkanTextureView(vulkanTexture, imageView, description, width, height, depth);
+        }
+        catch
+        {
+            vulkanTexture.DestroyUnpublishedImageView(imageView);
+            throw;
+        }
     }
 
     public override UploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data)
     {
+        VulkanContext.EnsureRenderThread();
         ArgumentNullException.ThrowIfNull(destination);
 
         var texture = RequireVulkanTexture(destination);
@@ -215,6 +212,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
         ReadOnlySpan<byte> data,
         in TextureUploadRegion region)
     {
+        VulkanContext.EnsureRenderThread();
         ArgumentNullException.ThrowIfNull(destination);
 
         var texture = RequireVulkanTexture(destination);
@@ -237,6 +235,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     public override UploadHandle GenerateMipmaps(Texture texture)
     {
+        VulkanContext.EnsureRenderThread();
         ArgumentNullException.ThrowIfNull(texture);
 
         var vulkanTexture = RequireVulkanTexture(texture);
@@ -262,6 +261,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
     public override Sampler CreateSampler(in SamplerDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         ValidateSamplerDescription(description);
 
         var anisotropyEnable = description.MaxAnisotropy > 1;
@@ -295,6 +295,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     /// <inheritdoc/>
     public override Shader CreateShader(in ShaderDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         ValidateShaderDescription(description);
         return new VulkanShader(description);
     }
@@ -302,18 +303,21 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     /// <inheritdoc/>
     public override DescriptorSetLayout CreateDescriptorSetLayout(in DescriptorSetLayoutDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         return new VulkanDescriptorSetLayout(description);
     }
 
     /// <inheritdoc/>
     public override DescriptorSet CreateDescriptorSet(in DescriptorSetDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         return new VulkanDescriptorSet(description);
     }
 
     /// <inheritdoc/>
     public override ulong GetAlignedUniformSize(ulong rawSize)
     {
+        VulkanContext.EnsureRenderThread();
         if (rawSize == 0)
             throw new ArgumentOutOfRangeException(nameof(rawSize), "Raw size must be greater than zero.");
 
@@ -327,6 +331,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     /// <inheritdoc/>
     public override GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         ValidateGraphicsPipelineDescription(description);
         var descriptorSetLayouts = description.DescriptorSetLayouts;
         if (descriptorSetLayouts.Length == 0)

@@ -28,10 +28,21 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
         in GraphicsPipelineDescription description,
         ReadOnlySpan<VKDescriptorSetLayout> descriptorSetLayouts)
     {
+        VulkanContext.EnsureRenderThread();
         DescriptorSetLayouts = GetDescriptorSetLayouts(description);
-        ColorAttachmentFormats = description.ColorAttachmentFormats.ToArray();
+        ColorAttachmentFormats = [.. description.ColorAttachmentFormats];
         DepthStencilAttachmentFormat = description.DepthStencilAttachmentFormat;
         CreatePipeline(description, descriptorSetLayouts);
+        var pipeline = Pipeline;
+        var layout = Layout;
+        Lifetime = new VulkanResourceLifetime(
+            this,
+            () =>
+            {
+                VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, pipeline, null);
+                VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, layout, null);
+            },
+            VulkanDeletionQueue.Enqueue);
     }
 
     /// <summary>
@@ -59,28 +70,16 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
     /// </summary>
     internal IReadOnlyList<VulkanDescriptorSetLayout> DescriptorSetLayouts { get; }
 
+    internal VulkanResourceLifetime Lifetime { get; }
+
     /// <inheritdoc/>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (IsDestroyed)
             return;
         MarkDestroyed();
-
-        var pipeline = Pipeline;
-        var layout = Layout;
-        Pipeline = default;
-        Layout = default;
-        if (pipeline.Handle == 0 && layout.Handle == 0)
-            return;
-
-        var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
-        VulkanDeletionQueue.Enqueue(retireValue, () =>
-        {
-            if (pipeline.Handle != 0)
-                VulkanContext.Vk.DestroyPipeline(VulkanContext.Device, pipeline, null);
-            if (layout.Handle != 0)
-                VulkanContext.Vk.DestroyPipelineLayout(VulkanContext.Device, layout, null);
-        });
+        Lifetime.RequestDestroy();
     }
 
     private void CreatePipeline(

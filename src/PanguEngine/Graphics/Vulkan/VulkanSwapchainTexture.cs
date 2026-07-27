@@ -124,6 +124,7 @@ internal sealed class VulkanSwapchainTexture : Texture, IVulkanTexture
     /// <exception cref="InvalidOperationException">Always thrown when called.</exception>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         throw new InvalidOperationException("Frame color output textures are owned by the presenter.");
     }
 

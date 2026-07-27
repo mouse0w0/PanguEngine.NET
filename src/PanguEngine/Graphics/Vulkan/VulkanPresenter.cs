@@ -68,6 +68,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     /// <inheritdoc/>
     public override bool TryBeginFrame([MaybeNullWhen(false)] out Frame frame)
     {
+        VulkanContext.EnsureRenderThread();
         EnsureUsable();
         if (_currentFrame != null)
             throw new InvalidOperationException("A graphics frame is already active.");
@@ -112,6 +113,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     /// <inheritdoc/>
     public override void EndFrame(Frame frame)
     {
+        VulkanContext.EnsureRenderThread();
         EnsureUsable();
 
         var vulkanFrame = frame as VulkanFrame
@@ -133,6 +135,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
             context.ResetFenceForSubmit();
             Submit(context, renderFinishedSemaphore, timelineValue);
             context.MarkSubmitted();
+            vulkanFrame.VulkanCommandList.PublishSubmission(timelineValue);
             _window.PresentImage(vulkanFrame.ImageIndex, renderFinishedSemaphore);
 
             if (!vulkanFrame.VulkanColorOutput.IsDestroyed)
@@ -156,6 +159,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     /// <inheritdoc/>
     internal override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (_destroyed)
             return;
 

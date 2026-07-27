@@ -12,6 +12,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
 {
     public VulkanDescriptorSetLayout(in DescriptorSetLayoutDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         var bindings = description.Bindings;
         if (bindings.Length == 0)
             throw new ArgumentException("Descriptor set layout must contain at least one binding.",
@@ -53,7 +54,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             DescriptorSetLayout = layout;
         }
 
-        Bindings = bindings.ToArray();
+        Bindings = [.. bindings];
     }
 
     /// <summary>
@@ -69,6 +70,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
     /// <inheritdoc/>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (IsDestroyed)
             return;
         MarkDestroyed();

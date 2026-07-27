@@ -19,6 +19,8 @@ public static unsafe class VulkanWindowFactory
     /// <returns>The managed window handle.</returns>
     public static Window CreateWindow(WindowOptions options)
     {
+        VulkanContext.EnsureRenderThread();
+
         SilkWindow? silkWindow = CreateSilkWindow(options);
         SurfaceKHR surface = default;
         VulkanWindow? window = null;

@@ -34,7 +34,13 @@ public sealed unsafe class VulkanBuffer : Buffer
         _allocation = allocation;
         Size = size;
         Usage = usage;
+        Lifetime = new VulkanResourceLifetime(
+            this,
+            () => VulkanAllocator.DestroyBuffer(buffer, allocation),
+            VulkanDeletionQueue.Enqueue);
     }
+
+    internal VulkanResourceLifetime Lifetime { get; }
 
     /// <summary>
     /// Maps the buffer memory for CPU access.
@@ -90,6 +96,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// <inheritdoc/>
     public override void Write<T>(ReadOnlySpan<T> data, ulong destinationOffset = 0)
     {
+        VulkanContext.EnsureRenderThread();
         ObjectDisposedException.ThrowIf(IsDestroyed, this);
         if (!_persistentlyMapped)
             throw new InvalidOperationException(
@@ -113,6 +120,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     /// </summary>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (IsDestroyed) return;
 
         if (_persistentlyMapped)
@@ -123,10 +131,6 @@ public sealed unsafe class VulkanBuffer : Buffer
         }
 
         MarkDestroyed();
-
-        var buffer = Buffer;
-        var allocation = _allocation;
-        var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
-        VulkanDeletionQueue.Enqueue(retireValue, () => VulkanAllocator.DestroyBuffer(buffer, allocation));
+        Lifetime.RequestDestroy();
     }
 }

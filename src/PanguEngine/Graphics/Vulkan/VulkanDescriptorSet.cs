@@ -11,6 +11,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
 {
     public VulkanDescriptorSet(in DescriptorSetDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         var layout = description.Layout as VulkanDescriptorSetLayout
                      ?? throw new InvalidOperationException(
                          "Descriptor set layout was not created by the Vulkan backend.");
@@ -61,11 +62,16 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
 
             Handle = descriptorSet;
             UpdateDescriptorSet(layout, bindings);
+            ReferencedResources = GetReferencedResources(bindings);
+            var descriptorPool = DescriptorPool;
+            Lifetime = new VulkanResourceLifetime(
+                this,
+                () => VulkanContext.Vk.DestroyDescriptorPool(VulkanContext.Device, descriptorPool, null),
+                VulkanDeletionQueue.Enqueue);
         }
         catch
         {
             VulkanContext.Vk.DestroyDescriptorPool(VulkanContext.Device, DescriptorPool, null);
-            DescriptorPool = default;
             throw;
         }
     }
@@ -73,28 +79,53 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
     /// <summary>
     /// Gets the Vulkan descriptor set handle.
     /// </summary>
-    internal VkDescriptorSet Handle { get; private set; }
+    internal VkDescriptorSet Handle { get; }
 
     /// <summary>
     /// Gets the descriptor set layout used to create this descriptor set.
     /// </summary>
     internal VulkanDescriptorSetLayout Layout { get; }
 
-    private DescriptorPool DescriptorPool { get; set; }
+    internal VulkanResourceLifetime Lifetime { get; }
+
+    internal IReadOnlyList<VulkanResourceLifetime> ReferencedResources { get; }
+
+    private DescriptorPool DescriptorPool { get; }
 
     /// <inheritdoc/>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (IsDestroyed)
             return;
         MarkDestroyed();
+        Lifetime.RequestDestroy();
+    }
 
-        var descriptorPool = DescriptorPool;
-        DescriptorPool = default;
-        Handle = default;
-        var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
-        VulkanDeletionQueue.Enqueue(retireValue,
-            () => VulkanContext.Vk.DestroyDescriptorPool(VulkanContext.Device, descriptorPool, null));
+    private static VulkanResourceLifetime[] GetReferencedResources(ReadOnlySpan<DescriptorSetBinding> bindings)
+    {
+        var resources = new HashSet<VulkanResourceLifetime>(ReferenceEqualityComparer.Instance);
+        foreach (var binding in bindings)
+        {
+            switch (binding.Type)
+            {
+                case DescriptorType.UniformBuffer:
+                    resources.Add(((VulkanBuffer)binding.Buffer!).Lifetime);
+                    break;
+                case DescriptorType.CombinedImageSampler:
+                {
+                    var view = (VulkanTextureView)binding.TextureView!;
+                    resources.Add(view.Lifetime);
+                    resources.Add(view.VulkanTexture.Lifetime);
+                    resources.Add(((VulkanSampler)binding.Sampler!).Lifetime);
+                    break;
+                }
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(bindings), "Unsupported descriptor type.");
+            }
+        }
+
+        return [.. resources];
     }
 
     private void UpdateDescriptorSet(VulkanDescriptorSetLayout layout, ReadOnlySpan<DescriptorSetBinding> bindings)
@@ -192,7 +223,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
             }
         }
 
-        return poolSizes.ToArray();
+        return [.. poolSizes];
     }
 
     private static void WriteUniformBufferDescriptor(

@@ -13,9 +13,9 @@ internal sealed unsafe class VulkanShader : Shader
     /// <param name="description">The shader description containing SPIR-V bytecode.</param>
     public VulkanShader(in ShaderDescription description)
     {
+        VulkanContext.EnsureRenderThread();
         Stage = description.Stage;
         EntryPoint = description.EntryPoint;
-        Name = description.Name;
         Module = CreateShaderModule(description);
     }
 
@@ -26,11 +26,6 @@ internal sealed unsafe class VulkanShader : Shader
     public override string EntryPoint { get; }
 
     /// <summary>
-    /// Gets the shader name used for diagnostics.
-    /// </summary>
-    internal string Name { get; }
-
-    /// <summary>
     /// Gets the Vulkan shader module.
     /// </summary>
     internal ShaderModule Module { get; private set; }
@@ -38,6 +33,7 @@ internal sealed unsafe class VulkanShader : Shader
     /// <inheritdoc/>
     public override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (IsDestroyed)
             return;
         MarkDestroyed();

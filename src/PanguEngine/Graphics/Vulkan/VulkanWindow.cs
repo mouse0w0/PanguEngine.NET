@@ -29,6 +29,8 @@ public sealed unsafe partial class VulkanWindow : Window
     /// <summary>Creates a <see cref="VulkanWindow"/> from an existing window and surface.</summary>
     internal VulkanWindow(SilkWindow window, SurfaceKHR surface, bool isPrimary, double framesPerSecond = 60)
     {
+        VulkanContext.EnsureRenderThread();
+
         _silkWindow = window;
         Surface = surface;
         IsPrimary = isPrimary;
@@ -57,6 +59,7 @@ public sealed unsafe partial class VulkanWindow : Window
     /// <inheritdoc/>
     internal override void Destroy()
     {
+        VulkanContext.EnsureRenderThread();
         if (_isDestroyed) return;
         _isDestroyed = true;
 

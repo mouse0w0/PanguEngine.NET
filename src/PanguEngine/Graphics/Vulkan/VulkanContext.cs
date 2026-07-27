@@ -16,6 +16,7 @@ public static unsafe class VulkanContext
 {
     private static readonly string[] ValidationLayers = ["VK_LAYER_KHRONOS_validation"];
     private static readonly string[] DeviceExtensions = [KhrSwapchain.ExtensionName];
+    private static int _renderThreadId;
 
     private static bool _enableValidationLayers;
 
@@ -137,6 +138,17 @@ public static unsafe class VulkanContext
     public static ulong NextGlobalTimelineValue()
     {
         return Interlocked.Increment(ref _globalTimelineValue);
+    }
+
+    internal static void BindRenderThread()
+    {
+        _renderThreadId = Environment.CurrentManagedThreadId;
+    }
+
+    internal static void EnsureRenderThread()
+    {
+        if (_renderThreadId != Environment.CurrentManagedThreadId)
+            throw new InvalidOperationException("Vulkan graphics operations must run on the render thread.");
     }
 
     private static bool _instanceInitialized;
@@ -313,8 +325,8 @@ public static unsafe class VulkanContext
             ApiVersion = Vk.Version13
         };
 
-        var extensions = _enableValidationLayers
-            ? requiredExtensions.Append(ExtDebugUtils.ExtensionName).ToArray()
+        string[] extensions = _enableValidationLayers
+            ? [.. requiredExtensions, ExtDebugUtils.ExtensionName]
             : requiredExtensions;
 
         InstanceCreateInfo createInfo = new()

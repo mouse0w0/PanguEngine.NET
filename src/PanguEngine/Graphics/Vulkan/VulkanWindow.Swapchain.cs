@@ -29,6 +29,8 @@ public sealed unsafe partial class VulkanWindow
     /// <returns>The Vulkan acquisition result.</returns>
     public Result AcquireNextImage(Semaphore imageAvailableSemaphore, out uint imageIndex)
     {
+        VulkanContext.EnsureRenderThread();
+
         imageIndex = 0;
         var result = VulkanContext.KhrSwapchain.AcquireNextImage(
             VulkanContext.Device, _swapchain, ulong.MaxValue,
@@ -51,6 +53,8 @@ public sealed unsafe partial class VulkanWindow
     /// <param name="renderFinishedSemaphore">The semaphore signaled when rendering is complete.</param>
     public void PresentImage(uint imageIndex, Semaphore renderFinishedSemaphore)
     {
+        VulkanContext.EnsureRenderThread();
+
         var swapChains = stackalloc[] { _swapchain };
         var signalSemaphores = stackalloc[] { renderFinishedSemaphore };
 
