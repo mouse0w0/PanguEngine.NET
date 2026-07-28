@@ -10,12 +10,11 @@ namespace PanguEngine.Client.World;
 public sealed class ClientWorld : IReadOnlyBlockAccessor
 {
     /// <summary>
-    /// Creates a client world with the default platform.
+    /// Creates a client world.
     /// </summary>
     public ClientWorld()
     {
         Chunks = new ChunkManager();
-        GenerateDefaultPlatform();
     }
 
     /// <summary>The chunks that store this world's block state.</summary>
@@ -53,21 +52,5 @@ public sealed class ClientWorld : IReadOnlyBlockAccessor
     public bool IsAir(BlockPos position)
     {
         return GetBlock(position).IsAir;
-    }
-
-    private void GenerateDefaultPlatform()
-    {
-        for (var z = 0; z < Chunk.SizeZ; z++)
-        {
-            for (var x = 0; x < Chunk.SizeX; x++)
-            {
-                SetBlock(new BlockPos(x, 0, z), BuiltinBlocks.Grass.DefaultState);
-            }
-        }
-
-        for (var y = 1; y < 8; y++)
-        {
-            SetBlock(new BlockPos(8, y, 8), BuiltinBlocks.Stone.DefaultState);
-        }
     }
 }

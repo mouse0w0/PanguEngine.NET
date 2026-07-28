@@ -7,6 +7,14 @@ namespace PanguEngine.Tests.Client.World;
 public sealed class ClientWorldTests
 {
     [Fact]
+    public void ConstructorCreatesEmptyWorld()
+    {
+        var world = new ClientWorld();
+
+        Assert.Empty(world.Chunks.EnumerateChunks());
+    }
+
+    [Fact]
     public void IsAirReflectsStoredBlockState()
     {
         var world = new ClientWorld();

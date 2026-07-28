@@ -19,11 +19,12 @@ public sealed class ClientGame
 
     internal ClientGame(ClientEngine engine)
     {
-        _camera = new Camera(new Vector3D<double>(8, 6, 24), -90, -20);
+        _camera = new Camera(new Vector3D<double>(8, 22, 24), -90, -20);
         _cameraController = new CameraController(_camera);
         _input = new ClientInputState(engine.PrimaryWindow);
         _input.MouseDelta += _cameraController.ApplyMouseDelta;
         World = new ClientWorld();
+        FlatWorldGenerator.Generate(World);
         _renderer = new WorldRenderer(engine.Device, engine.PrimaryWindow.Presenter, World, engine.BlockModelManager);
     }
 
