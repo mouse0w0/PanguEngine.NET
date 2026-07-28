@@ -45,19 +45,19 @@ internal sealed class ChunkRenderer
         _atlasSampler = _device.CreateSampler(new SamplerDescription(
             FilterMode.Nearest,
             FilterMode.Nearest,
-            MipmapMode.Nearest,
+            MipmapMode.Linear,
             WrapMode.ClampToEdge,
             WrapMode.ClampToEdge,
             WrapMode.ClampToEdge,
             1,
             0,
-            0,
+            models.Atlas.MipLevels - 1,
             0));
         var atlas = CreateAtlasResources();
         _atlasTexture = atlas.Texture;
         _atlasView = atlas.View;
         _atlasDescriptorSet = atlas.DescriptorSet;
-        _pendingUploads.Add(atlas.Upload);
+        _pendingUploads.AddRange(atlas.Uploads);
 
         var vertSource = Engine.ResourceManager.ReadAllText("pangu/shaders/world_textured.vert");
         var fragSource = Engine.ResourceManager.ReadAllText("pangu/shaders/world_textured.frag");
@@ -186,7 +186,7 @@ internal sealed class ChunkRenderer
             Width = checked((uint)atlas.Width),
             Height = checked((uint)atlas.Height),
             Depth = 1,
-            MipLevels = 1,
+            MipLevels = checked((uint)atlas.MipLevels),
             ArrayLayers = 1,
             Usage = TextureUsage.TransferDestination | TextureUsage.Sampled
         });
@@ -197,14 +197,24 @@ internal sealed class ChunkRenderer
             view = _device.CreateTextureView(texture, new TextureViewDescription(
                 TextureViewDimension.Type2D,
                 0,
-                1,
+                checked((uint)atlas.MipLevels),
                 0,
                 1));
             descriptorSet = _device.CreateDescriptorSet(new DescriptorSetDescription(
                 _atlasDescriptorLayout,
                 [DescriptorSetBinding.CombinedImageSampler(0, view, _atlasSampler)]));
-            var upload = _device.UploadTexture(texture, atlas.Pixels.Span);
-            return new AtlasResources(texture, view, descriptorSet, upload);
+            var uploads = new UploadHandle[atlas.MipLevels];
+            for (var level = 0; level < atlas.MipLevels; level++)
+            {
+                var width = checked((uint)(atlas.Width >> level));
+                var height = checked((uint)(atlas.Height >> level));
+                uploads[level] = _device.UploadTexture(
+                    texture,
+                    atlas.GetMipPixels(level).Span,
+                    TextureUploadRegion.Mip2D(width, height, checked((uint)level)));
+            }
+
+            return new AtlasResources(texture, view, descriptorSet, uploads);
         }
         catch
         {
@@ -314,5 +324,5 @@ internal sealed class ChunkRenderer
         Texture Texture,
         TextureView View,
         DescriptorSet DescriptorSet,
-        UploadHandle Upload);
+        IReadOnlyList<UploadHandle> Uploads);
 }

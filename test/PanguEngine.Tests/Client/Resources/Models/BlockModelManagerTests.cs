@@ -57,6 +57,44 @@ public sealed class BlockModelManagerTests
     }
 
     [Fact]
+    public void LoadsFiveMipAlignedAtlasWithSafeUv()
+    {
+        using var directory = TestDirectory.Create();
+        TestDirectory.WriteResource(directory, "test/models/block/model.json", """
+                                                                               {
+                                                                                 "elements": [
+                                                                                   {
+                                                                                     "from": [0, 0, 0],
+                                                                                     "to": [16, 16, 16],
+                                                                                     "faces": {
+                                                                                       "up": { "texture": "block/stone" }
+                                                                                     }
+                                                                                   }
+                                                                                 ]
+                                                                               }
+                                                                               """);
+        TestDirectory.WriteResource(directory, "test/textures/block/stone.png", OnePixelPng);
+        WriteAppearance(directory, "test", "model", "test:block/model");
+        var block = new Block();
+        var registry = new Registry<Block>(RegistryKeys.Block);
+        registry.Register(ResourceKey.Create("test", "model"), block);
+        using var resources = new ResourceManager([new DirectoryResourceSource(directory.Path)]);
+        var manager = new BlockModelManager(resources, registry, 4096u, NullLogger.Instance);
+
+        manager.Load();
+
+        var atlas = manager.Atlas;
+        var region = atlas.GetRegion(ResourceKey.Create("test", "block/stone"));
+        Assert.Equal(5, atlas.MipLevels);
+        Assert.Equal(0, atlas.Width % 16);
+        Assert.Equal(0, atlas.Height % 16);
+        Assert.True(region.U0 > (float)region.X / atlas.Width);
+        Assert.True(region.V0 > (float)region.Y / atlas.Height);
+        Assert.True(region.U1 < (float)(region.X + region.Width) / atlas.Width);
+        Assert.True(region.V1 < (float)(region.Y + region.Height) / atlas.Height);
+    }
+
+    [Fact]
     public void AirUsesEmptyModelAndUnknownBlockUsesMissingModel()
     {
         using var directory = TestDirectory.Create();

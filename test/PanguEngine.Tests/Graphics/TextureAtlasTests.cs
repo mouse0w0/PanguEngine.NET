@@ -11,7 +11,9 @@ public sealed class TextureAtlasTests
 
         Assert.Equal(0, atlas.Width);
         Assert.Equal(0, atlas.Height);
+        Assert.Equal(1, atlas.MipLevels);
         Assert.Empty(atlas.Pixels.ToArray());
+        Assert.Empty(atlas.GetMipPixels(0).ToArray());
     }
 
     [Fact]
@@ -25,10 +27,158 @@ public sealed class TextureAtlasTests
 
         Assert.Equal(2, atlas.Width);
         Assert.Equal(1, atlas.Height);
+        Assert.Equal(1, atlas.MipLevels);
         Assert.Equal(
             new TextureAtlasRegion(0, 0, 2, 1, 0f, 0f, 1f, 1f),
             atlas.GetRegion("stone"));
         Assert.Equal(pixels, atlas.Pixels.ToArray());
+        Assert.Equal(pixels, atlas.GetMipPixels(0).ToArray());
+    }
+
+    [Fact]
+    public void BuildsMipmappedAtlasWithAlignedEdgeExtendedSlots()
+    {
+        var redPixels = SolidPixels(3, 5, 255, 0, 0, 255);
+        var bluePixels = SolidPixels(1, 1, 0, 0, 255, 255);
+        var builder = new MaxRectsTextureAtlasBuilder<string>(32, 32, gutter: 0, mipLevels: 4);
+        builder.Add("red", 3, 5, redPixels);
+        builder.Add("blue", 1, 1, bluePixels);
+
+        var atlas = builder.Build();
+        var red = atlas.GetRegion("red");
+        var blue = atlas.GetRegion("blue");
+
+        Assert.Equal(4, atlas.MipLevels);
+        Assert.Equal(0, atlas.Width % 8);
+        Assert.Equal(0, atlas.Height % 8);
+        Assert.Equal(0, red.X % 8);
+        Assert.Equal(0, red.Y % 8);
+        Assert.Equal(0, blue.X % 8);
+        Assert.Equal(0, blue.Y % 8);
+        Assert.Equal(atlas.Pixels.ToArray(), atlas.GetMipPixels(0).ToArray());
+
+        for (var level = 0; level < atlas.MipLevels; level++)
+        {
+            var mipWidth = atlas.Width >> level;
+            var mipHeight = atlas.Height >> level;
+            Assert.Equal(mipWidth * mipHeight * 4, atlas.GetMipPixels(level).Length);
+
+            var slotSize = 8 >> level;
+            AssertSolidMipSlot(atlas, level, red.X >> level, red.Y >> level, slotSize, 255, 0, 0, 255);
+            AssertSolidMipSlot(atlas, level, blue.X >> level, blue.Y >> level, slotSize, 0, 0, 255, 255);
+        }
+
+        Assert.True(red.U0 > (float)red.X / atlas.Width);
+        Assert.True(red.V0 > (float)red.Y / atlas.Height);
+        Assert.True(red.U1 < (float)(red.X + red.Width) / atlas.Width);
+        Assert.True(red.V1 < (float)(red.Y + red.Height) / atlas.Height);
+    }
+
+    [Fact]
+    public void MipmappedAtlasExtendsRightAndBottomEdgesWithoutScalingTheRegion()
+    {
+        var pixels = new byte[]
+        {
+            1, 0, 0, 255, 2, 0, 0, 255, 3, 0, 0, 255,
+            4, 0, 0, 255, 5, 0, 0, 255, 6, 0, 0, 255
+        };
+        var builder = new MaxRectsTextureAtlasBuilder<string>(8, 8, gutter: 0, mipLevels: 3);
+        builder.Add("image", 3, 2, pixels);
+
+        var atlas = builder.Build();
+        var region = atlas.GetRegion("image");
+
+        Assert.Equal(4, atlas.Width);
+        Assert.Equal(4, atlas.Height);
+        Assert.Equal(3, region.Width);
+        Assert.Equal(2, region.Height);
+        Assert.Equal((byte)3, GetPixel(atlas, 3, 0)[0]);
+        Assert.Equal((byte)6, GetPixel(atlas, 3, 1)[0]);
+        Assert.Equal((byte)4, GetPixel(atlas, 0, 3)[0]);
+        Assert.Equal((byte)6, GetPixel(atlas, 3, 3)[0]);
+    }
+
+    [Fact]
+    public void MipmappedAtlasDoesNotExtendAlignedImage()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(8, 8, gutter: 0, mipLevels: 4);
+        builder.Add("image", 8, 8, SolidPixels(8, 8, 1, 2, 3, 255));
+
+        var atlas = builder.Build();
+        var region = atlas.GetRegion("image");
+
+        Assert.Equal(8, atlas.Width);
+        Assert.Equal(8, atlas.Height);
+        Assert.Equal(8, region.Width);
+        Assert.Equal(8, region.Height);
+    }
+
+    [Fact]
+    public void FiltersMipRgbInLinearSpace()
+    {
+        var pixels = new byte[]
+        {
+            0, 0, 0, 255,
+            0, 0, 0, 255,
+            255, 255, 255, 255,
+            255, 255, 255, 255
+        };
+        var builder = new MaxRectsTextureAtlasBuilder<string>(2, 2, gutter: 0, mipLevels: 2);
+        builder.Add("image", 2, 2, pixels);
+
+        var atlas = builder.Build();
+
+        Assert.Equal(new byte[] { 188, 188, 188, 255 }, atlas.GetMipPixels(1).ToArray());
+    }
+
+    [Fact]
+    public void FiltersMipUsingPremultipliedAlpha()
+    {
+        var pixels = new byte[]
+        {
+            255, 255, 255, 255,
+            255, 0, 0, 0,
+            0, 255, 0, 0,
+            0, 0, 255, 0
+        };
+        var builder = new MaxRectsTextureAtlasBuilder<string>(2, 2, gutter: 0, mipLevels: 2);
+        builder.Add("image", 2, 2, pixels);
+
+        var atlas = builder.Build();
+
+        Assert.Equal(new byte[] { 255, 255, 255, 64 }, atlas.GetMipPixels(1).ToArray());
+    }
+
+    [Fact]
+    public void FiltersFullyTransparentMipToTransparentBlack()
+    {
+        var pixels = new byte[]
+        {
+            255, 0, 0, 0,
+            0, 255, 0, 0,
+            0, 0, 255, 0,
+            255, 255, 255, 0
+        };
+        var builder = new MaxRectsTextureAtlasBuilder<string>(2, 2, gutter: 0, mipLevels: 2);
+        builder.Add("image", 2, 2, pixels);
+
+        var atlas = builder.Build();
+
+        Assert.Equal(new byte[] { 0, 0, 0, 0 }, atlas.GetMipPixels(1).ToArray());
+    }
+
+    [Fact]
+    public void RejectsInvalidMipLevelIndex()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(2, 2, gutter: 0, mipLevels: 2);
+        builder.Add("image", 2, 2, SolidPixels(2, 2, 1, 2, 3, 4));
+        var atlas = builder.Build();
+
+        var negative = Assert.Throws<ArgumentOutOfRangeException>(() => atlas.GetMipPixels(-1));
+        var pastEnd = Assert.Throws<ArgumentOutOfRangeException>(() => atlas.GetMipPixels(atlas.MipLevels));
+
+        Assert.Equal("mipLevel", negative.ParamName);
+        Assert.Equal("mipLevel", pastEnd.ParamName);
     }
 
     [Fact]
@@ -242,6 +392,54 @@ public sealed class TextureAtlasTests
     }
 
     [Fact]
+    public void RejectsNonPositiveMipLevels()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MaxRectsTextureAtlasBuilder<string>(16, 16, gutter: 0, mipLevels: 0));
+
+        Assert.Equal("mipLevels", exception.ParamName);
+    }
+
+    [Fact]
+    public void RejectsMipAlignmentLargerThanCapacity()
+    {
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new MaxRectsTextureAtlasBuilder<string>(4, 8, gutter: 0, mipLevels: 4));
+
+        Assert.Equal("mipLevels", exception.ParamName);
+    }
+
+    [Fact]
+    public void RejectsGutterWithMultipleMipLevels()
+    {
+        var exception = Assert.Throws<ArgumentException>(() =>
+            new MaxRectsTextureAtlasBuilder<string>(16, 16, gutter: 1, mipLevels: 2));
+
+        Assert.Equal("gutter", exception.ParamName);
+    }
+
+    [Fact]
+    public void RejectsEmptyMipmappedAtlas()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(16, 16, gutter: 0, mipLevels: 4);
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Fact]
+    public void ReportsAlignedCellWhenMipmappedImageExceedsCapacity()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(12, 12, gutter: 0, mipLevels: 4);
+
+        var exception = Assert.Throws<ArgumentException>(() =>
+            builder.Add("wide", 9, 1, SolidPixels(9, 1, 1, 2, 3, 4)));
+
+        Assert.Contains("wide", exception.Message);
+        Assert.Contains("9x1", exception.Message);
+        Assert.Contains("16x8", exception.Message);
+    }
+
+    [Fact]
     public void RejectsNullKey()
     {
         var builder = new MaxRectsTextureAtlasBuilder<string>(4, 4);
@@ -444,6 +642,32 @@ public sealed class TextureAtlasTests
     {
         var offset = (y * atlas.Width + x) * 4;
         return atlas.Pixels.Span.Slice(offset, 4).ToArray();
+    }
+
+    private static byte[] GetMipPixel(TextureAtlas<string> atlas, int mipLevel, int x, int y)
+    {
+        var mipWidth = atlas.Width >> mipLevel;
+        var offset = (y * mipWidth + x) * 4;
+        return atlas.GetMipPixels(mipLevel).Span.Slice(offset, 4).ToArray();
+    }
+
+    private static void AssertSolidMipSlot(
+        TextureAtlas<string> atlas,
+        int mipLevel,
+        int x,
+        int y,
+        int size,
+        byte r,
+        byte g,
+        byte b,
+        byte a)
+    {
+        var expected = new byte[] { r, g, b, a };
+        for (var localY = 0; localY < size; localY++)
+        {
+            for (var localX = 0; localX < size; localX++)
+                Assert.Equal(expected, GetMipPixel(atlas, mipLevel, x + localX, y + localY));
+        }
     }
 
     private static void AssertRegionPixels(

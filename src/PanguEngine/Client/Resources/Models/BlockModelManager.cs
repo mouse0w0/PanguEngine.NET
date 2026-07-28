@@ -12,7 +12,8 @@ namespace PanguEngine.Client.Resources.Models;
 
 internal sealed class BlockModelManager
 {
-    private const int AtlasGutter = 1;
+    private const int AtlasGutter = 0;
+    private const int AtlasMipLevels = 5;
     private static readonly ResourceKey MissingTextureKey = ResourceKey.Create("pangu", "missing");
     private static readonly ResourceKey MissingModelKey = ResourceKey.Create("pangu", "missing_model");
 
@@ -186,7 +187,8 @@ internal sealed class BlockModelManager
         var builder = new MaxRectsTextureAtlasBuilder<ResourceKey>(
             _atlasMaxDimension,
             _atlasMaxDimension,
-            AtlasGutter);
+            AtlasGutter,
+            AtlasMipLevels);
         foreach (var (key, texture) in textures)
             builder.Add(key, texture.Width, texture.Height, texture.Pixels.Span);
         var atlas = builder.Build();
