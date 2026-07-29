@@ -117,7 +117,8 @@ internal sealed class WorldRenderer
     {
         ArgumentNullException.ThrowIfNull(camera);
 
-        var uploadHandles = _chunkRenderer.RebuildDirtyChunks();
+        var cameraPosition = camera.GetInterpolatedPosition(alpha);
+        var uploadHandles = _chunkRenderer.UpdateMeshes(cameraPosition);
         EnsureDepthStencilAttachmentSize();
         if (!_presenter.TryBeginFrame(out var frame))
             return;

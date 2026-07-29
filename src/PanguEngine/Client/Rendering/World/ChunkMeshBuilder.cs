@@ -1,5 +1,4 @@
 using PanguEngine.Client.Resources.Models;
-using PanguEngine.Client.World;
 using PanguEngine.World;
 using PanguEngine.World.Chunking;
 using Silk.NET.Maths;
@@ -15,23 +14,30 @@ internal sealed class ChunkMeshBuilder
         _models = models;
     }
 
-    public ChunkMesh Build(ClientWorld world, Chunk chunk)
+    public ChunkMesh Build(ChunkMeshSnapshot snapshot)
     {
-        ArgumentNullException.ThrowIfNull(world);
-        ArgumentNullException.ThrowIfNull(chunk);
+        ArgumentNullException.ThrowIfNull(snapshot);
 
         var writer = new ChunkMeshWriter();
-        foreach (var (localPosition, state) in chunk.EnumerateBlocks())
+        for (var y = 0; y < Chunk.SizeY; y++)
         {
-            if (state.IsAir)
-                continue;
+            for (var z = 0; z < Chunk.SizeZ; z++)
+            {
+                for (var x = 0; x < Chunk.SizeX; x++)
+                {
+                    var localPosition = new BlockPos(x, y, z);
+                    var state = snapshot.GetBlock(localPosition);
+                    if (state.IsAir)
+                        continue;
 
-            var worldPosition = ToWorldPosition(chunk.Position, localPosition);
-            var cullMask = GetCullMask(world, worldPosition);
-            _models.Get(state, worldPosition).Emit(
-                new Vector3D<float>(localPosition.X, localPosition.Y, localPosition.Z),
-                cullMask,
-                writer);
+                    var worldPosition = ToWorldPosition(snapshot.Position, localPosition);
+                    var cullMask = GetCullMask(snapshot, localPosition);
+                    _models.Get(state, worldPosition).Emit(
+                        new Vector3D<float>(x, y, z),
+                        cullMask,
+                        writer);
+                }
+            }
         }
 
         return new ChunkMesh(writer.Vertices.ToArray(), writer.Indices.ToArray());
@@ -46,13 +52,13 @@ internal sealed class ChunkMeshBuilder
     }
 
     private static DirectionFlags GetCullMask(
-        ClientWorld world,
+        ChunkMeshSnapshot snapshot,
         BlockPos position)
     {
         var result = DirectionFlags.None;
         foreach (var direction in Enum.GetValues<Direction>())
         {
-            var neighbor = world.GetBlock(position.Offset(direction));
+            var neighbor = snapshot.GetBlock(position.Offset(direction));
             if (neighbor.CanOccludeFace(direction.Opposite()))
                 result |= direction.ToFlag();
         }

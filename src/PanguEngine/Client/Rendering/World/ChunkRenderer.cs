@@ -14,7 +14,9 @@ internal sealed class ChunkRenderer
     private readonly GraphicsDevice _device;
     private readonly ClientWorld _world;
     private readonly BlockModelManager _models;
-    private readonly ChunkMeshBuilder _meshBuilder;
+    private readonly ChunkMeshBuildQueue _meshBuildQueue;
+    private readonly ChunkMeshUpdateState _meshUpdateState = new();
+    private readonly ChunkMeshBuildTicket[] _dispatchTickets;
     private readonly Dictionary<ChunkPos, ChunkMeshResource> _meshes = [];
     private readonly Shader _vertexShader;
     private readonly Shader _fragmentShader;
@@ -25,7 +27,6 @@ internal sealed class ChunkRenderer
     private readonly TextureView _atlasView;
     private readonly DescriptorSet _atlasDescriptorSet;
     private readonly List<UploadHandle> _pendingUploads = [];
-    private HashSet<ChunkPos> _invalidatedChunkPositions = [];
 
     internal ChunkRenderer(
         GraphicsDevice device,
@@ -38,7 +39,6 @@ internal sealed class ChunkRenderer
         _device = device;
         _world = world;
         _models = models;
-        _meshBuilder = new ChunkMeshBuilder(models);
 
         _atlasDescriptorLayout = _device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
             [new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStageFlags.Fragment)]));
@@ -92,38 +92,81 @@ internal sealed class ChunkRenderer
             DepthStencilAttachmentFormat = depthStencilFormat
         });
 
+        _meshBuildQueue = new ChunkMeshBuildQueue(models);
+        _dispatchTickets = new ChunkMeshBuildTicket[_meshBuildQueue.DispatchBudget];
         foreach (var chunk in _world.Chunks.EnumerateChunks())
+        {
+            _meshUpdateState.Register(chunk.Position);
             Invalidate(chunk.Position);
+        }
+
         _world.BlockChanged += OnBlockChanged;
     }
 
-    internal List<UploadHandle> RebuildDirtyChunks()
+    internal List<UploadHandle> UpdateMeshes(Vector3D<double> cameraPosition)
     {
         RemoveCompletedUploads();
+        _meshBuildQueue.ThrowIfFaulted();
         var uploadHandles = new List<UploadHandle>(_pendingUploads);
-        var invalidatedPositions = _invalidatedChunkPositions;
-        _invalidatedChunkPositions = [];
-        foreach (var chunk in _world.Chunks.EnumerateChunks()
-                     .Where(chunk => invalidatedPositions.Contains(chunk.Position))
-                     .ToArray())
+        while (_meshBuildQueue.TryReadResult(out var result))
+            ApplyBuildResult(result, uploadHandles);
+        DispatchBuildTasks(cameraPosition);
+        return uploadHandles;
+    }
+
+    private void ApplyBuildResult(
+        ChunkMeshBuildResult result,
+        List<UploadHandle> uploadHandles)
+    {
+        if (!_meshUpdateState.Complete(result.Position, result.Version))
+            return;
+
+        if (result.Exception is { } exception)
+            exception.Throw();
+
+        var mesh = result.Mesh!;
+        if (mesh.IsEmpty)
         {
-            var chunkPos = chunk.Position;
-            var mesh = _meshBuilder.Build(_world, chunk);
-            if (_meshes.Remove(chunkPos, out var oldMesh))
+            if (_meshes.Remove(result.Position, out var oldMesh))
                 oldMesh.Destroy();
-
-            if (mesh.IsEmpty)
-                continue;
-
-            var resource = CreateMeshResource(mesh);
-            _meshes.Add(chunkPos, resource);
-            uploadHandles.Add(resource.VertexUpload);
-            uploadHandles.Add(resource.IndexUpload);
-            _pendingUploads.Add(resource.VertexUpload);
-            _pendingUploads.Add(resource.IndexUpload);
+            return;
         }
 
-        return uploadHandles;
+        var resource = CreateMeshResource(mesh);
+        if (_meshes.Remove(result.Position, out var replacedMesh))
+            replacedMesh.Destroy();
+        _meshes.Add(result.Position, resource);
+        uploadHandles.Add(resource.VertexUpload);
+        uploadHandles.Add(resource.IndexUpload);
+        _pendingUploads.Add(resource.VertexUpload);
+        _pendingUploads.Add(resource.IndexUpload);
+    }
+
+    private void DispatchBuildTasks(Vector3D<double> cameraPosition)
+    {
+        var ticketCount = _meshUpdateState.CollectNearest(cameraPosition, _dispatchTickets);
+        for (var index = 0; index < ticketCount; index++)
+        {
+            if (!_meshBuildQueue.TryReserveTaskSlot())
+                return;
+
+            var ticket = _dispatchTickets[index];
+            var enqueued = false;
+            try
+            {
+                var snapshot = ChunkMeshSnapshot.Capture(_world, ticket.Position);
+                enqueued = _meshBuildQueue.TryEnqueueReserved(
+                    new ChunkMeshBuildTask(snapshot, ticket.Version));
+                if (!enqueued)
+                    return;
+                _meshUpdateState.MarkDispatched(ticket);
+            }
+            finally
+            {
+                if (!enqueued)
+                    _meshBuildQueue.ReleaseReservedTaskSlot();
+            }
+        }
     }
 
     internal void Draw(
@@ -162,6 +205,7 @@ internal sealed class ChunkRenderer
     internal void Destroy()
     {
         _world.BlockChanged -= OnBlockChanged;
+        _meshBuildQueue.Dispose();
         foreach (var mesh in _meshes.Values)
             mesh.Destroy();
         _meshes.Clear();
@@ -258,12 +302,13 @@ internal sealed class ChunkRenderer
 
     private void OnBlockChanged(BlockPos position)
     {
+        _meshUpdateState.Register(position.ToChunkPos());
         Invalidate(position);
     }
 
     private void Invalidate(ChunkPos position)
     {
-        _invalidatedChunkPositions.Add(position);
+        _meshUpdateState.Invalidate(position);
     }
 
     private void Invalidate(BlockPos position)
@@ -325,4 +370,93 @@ internal sealed class ChunkRenderer
         TextureView View,
         DescriptorSet DescriptorSet,
         IReadOnlyList<UploadHandle> Uploads);
+}
+
+internal readonly record struct ChunkMeshBuildTicket(ChunkPos Position, long Version);
+
+internal sealed class ChunkMeshUpdateState
+{
+    private readonly Dictionary<ChunkPos, long> _versions = [];
+    private readonly HashSet<ChunkPos> _dirty = [];
+    private readonly HashSet<ChunkPos> _inFlight = [];
+
+    internal int DirtyCount => _dirty.Count;
+
+    internal void Register(ChunkPos position)
+    {
+        _versions.TryAdd(position, 0);
+    }
+
+    internal void Invalidate(ChunkPos position)
+    {
+        if (!_versions.TryGetValue(position, out var version))
+            return;
+
+        _versions[position] = version + 1;
+        _dirty.Add(position);
+    }
+
+    internal int CollectNearest(
+        Vector3D<double> cameraPosition,
+        Span<ChunkMeshBuildTicket> tickets)
+    {
+        if (tickets.IsEmpty)
+            return 0;
+
+        Span<double> distances = stackalloc double[tickets.Length];
+        var count = 0;
+        foreach (var position in _dirty)
+        {
+            if (_inFlight.Contains(position))
+                continue;
+
+            var centerX = (position.X + 0.5) * Chunk.SizeX;
+            var centerY = (position.Y + 0.5) * Chunk.SizeY;
+            var centerZ = (position.Z + 0.5) * Chunk.SizeZ;
+            var deltaX = centerX - cameraPosition.X;
+            var deltaY = centerY - cameraPosition.Y;
+            var deltaZ = centerZ - cameraPosition.Z;
+            var distance = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+            int insertionIndex;
+            if (count < tickets.Length)
+            {
+                insertionIndex = count;
+                count++;
+            }
+            else
+            {
+                if (distance >= distances[count - 1])
+                    continue;
+                insertionIndex = count - 1;
+            }
+
+            while (insertionIndex > 0 && distance < distances[insertionIndex - 1])
+            {
+                distances[insertionIndex] = distances[insertionIndex - 1];
+                tickets[insertionIndex] = tickets[insertionIndex - 1];
+                insertionIndex--;
+            }
+
+            distances[insertionIndex] = distance;
+            tickets[insertionIndex] = new ChunkMeshBuildTicket(position, _versions[position]);
+        }
+
+        return count;
+    }
+
+    internal void MarkDispatched(ChunkMeshBuildTicket ticket)
+    {
+        _dirty.Remove(ticket.Position);
+        _inFlight.Add(ticket.Position);
+    }
+
+    internal bool Complete(ChunkPos position, long version)
+    {
+        _inFlight.Remove(position);
+        return _versions[position] == version;
+    }
+
+    internal bool IsDirty(ChunkPos position) => _dirty.Contains(position);
+
+    internal bool IsInFlight(ChunkPos position) => _inFlight.Contains(position);
 }

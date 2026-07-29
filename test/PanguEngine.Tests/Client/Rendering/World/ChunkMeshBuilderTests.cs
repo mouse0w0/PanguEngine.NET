@@ -22,10 +22,9 @@ public sealed class ChunkMeshBuilderTests
         var world = new ClientWorld();
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
-        var chunk = GetChunk(world, position.ToChunkPos());
         var models = CreateModels();
 
-        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
+        var mesh = BuildMesh(models, world, position.ToChunkPos());
 
         Assert.False(mesh.IsEmpty);
         Assert.Equal(24, mesh.VertexCount);
@@ -58,10 +57,9 @@ public sealed class ChunkMeshBuilderTests
         var second = new BlockPos(33, 32, 32);
         world.SetBlock(first, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(second, BuiltinBlocks.Stone.DefaultState);
-        var chunk = GetChunk(world, first.ToChunkPos());
         var models = CreateModels();
 
-        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
+        var mesh = BuildMesh(models, world, first.ToChunkPos());
 
         Assert.Equal(40, mesh.VertexCount);
         Assert.Equal(60, mesh.IndexCount);
@@ -73,10 +71,9 @@ public sealed class ChunkMeshBuilderTests
         var world = new ClientWorld();
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
-        var chunk = GetChunk(world, position.ToChunkPos());
         var models = CreateModels();
 
-        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
+        var mesh = BuildMesh(models, world, position.ToChunkPos());
 
         Assert.Equal(new[]
             {
@@ -101,13 +98,43 @@ public sealed class ChunkMeshBuilderTests
         var neighbor = new BlockPos(48, 32, 32);
         world.SetBlock(boundary, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(neighbor, BuiltinBlocks.Stone.DefaultState);
-        var chunk = GetChunk(world, boundary.ToChunkPos());
         var models = CreateModels();
 
-        var mesh = new ChunkMeshBuilder(models).Build(world, chunk);
+        var mesh = BuildMesh(models, world, boundary.ToChunkPos());
 
         Assert.Equal(20, mesh.VertexCount);
         Assert.Equal(30, mesh.IndexCount);
+    }
+
+    [Fact]
+    public void BuildUsesWorldNeighborsAcrossNegativeChunkBoundaries()
+    {
+        var world = new ClientWorld();
+        var boundary = new BlockPos(32, 32, 32);
+        var neighbor = new BlockPos(31, 32, 32);
+        world.SetBlock(boundary, BuiltinBlocks.Stone.DefaultState);
+        world.SetBlock(neighbor, BuiltinBlocks.Stone.DefaultState);
+        var models = CreateModels();
+
+        var mesh = BuildMesh(models, world, boundary.ToChunkPos());
+
+        Assert.Equal(20, mesh.VertexCount);
+        Assert.Equal(30, mesh.IndexCount);
+    }
+
+    [Fact]
+    public void BuildUsesCapturedStateAfterWorldChanges()
+    {
+        var world = new ClientWorld();
+        var position = new BlockPos(32, 32, 32);
+        world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
+        var snapshot = ChunkMeshSnapshot.Capture(world, position.ToChunkPos());
+        world.SetBlock(position, BuiltinBlocks.Air.DefaultState);
+
+        var mesh = new ChunkMeshBuilder(CreateModels()).Build(snapshot);
+
+        Assert.Equal(24, mesh.VertexCount);
+        Assert.Equal(36, mesh.IndexCount);
     }
 
     [Fact]
@@ -144,10 +171,8 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(firstPosition, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(secondPosition, BuiltinBlocks.Stone.DefaultState);
 
-        var firstMesh = new ChunkMeshBuilder(models)
-            .Build(world, GetChunk(world, firstPosition.ToChunkPos()));
-        var secondMesh = new ChunkMeshBuilder(models)
-            .Build(world, GetChunk(world, secondPosition.ToChunkPos()));
+        var firstMesh = BuildMesh(models, world, firstPosition.ToChunkPos());
+        var secondMesh = BuildMesh(models, world, secondPosition.ToChunkPos());
 
         Assert.Equal(4, firstMesh.VertexCount);
         Assert.Equal(8, secondMesh.VertexCount);
@@ -190,10 +215,8 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(offPosition, block.DefaultState);
         world.SetBlock(onPosition, block.DefaultState.With(Powered, true));
 
-        var offMesh = new ChunkMeshBuilder(models)
-            .Build(world, GetChunk(world, offPosition.ToChunkPos()));
-        var onMesh = new ChunkMeshBuilder(models)
-            .Build(world, GetChunk(world, onPosition.ToChunkPos()));
+        var offMesh = BuildMesh(models, world, offPosition.ToChunkPos());
+        var onMesh = BuildMesh(models, world, onPosition.ToChunkPos());
 
         Assert.Equal(4, offMesh.VertexCount);
         Assert.Equal(8, onMesh.VertexCount);
@@ -232,6 +255,15 @@ public sealed class ChunkMeshBuilderTests
         return models;
     }
 
+    private static ChunkMesh BuildMesh(
+        BlockModelManager models,
+        ClientWorld world,
+        ChunkPos position)
+    {
+        var snapshot = ChunkMeshSnapshot.Capture(world, position);
+        return new ChunkMeshBuilder(models).Build(snapshot);
+    }
+
     private static void WriteModel(
         TestDirectory directory,
         string name,
@@ -251,10 +283,5 @@ public sealed class ChunkMeshBuilderTests
                 ]
               }
               """);
-    }
-
-    private static Chunk GetChunk(ClientWorld world, ChunkPos position)
-    {
-        return world.Chunks.EnumerateChunks().Single(chunk => chunk.Position == position);
     }
 }
