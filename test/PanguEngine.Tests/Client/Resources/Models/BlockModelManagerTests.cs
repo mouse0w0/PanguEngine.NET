@@ -52,7 +52,7 @@ public sealed class BlockModelManagerTests
         using var resources = new ResourceManager([]);
         var manager = new BlockModelManager(resources, registry, 1u, NullLogger.Instance);
 
-        Assert.Throws<ArgumentException>(() => manager.Load());
+        Assert.Throws<ArgumentOutOfRangeException>(() => manager.Load());
         Assert.Throws<InvalidOperationException>(() => manager.Atlas);
     }
 
