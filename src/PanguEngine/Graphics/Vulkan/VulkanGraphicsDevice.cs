@@ -339,7 +339,11 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 
         var vulkanDescriptorSetLayouts = new VKDescriptorSetLayout[descriptorSetLayouts.Length];
         for (var i = 0; i < descriptorSetLayouts.Length; i++)
-            vulkanDescriptorSetLayouts[i] = ((VulkanDescriptorSetLayout)descriptorSetLayouts[i]).DescriptorSetLayout;
+        {
+            var layout = (VulkanDescriptorSetLayout)descriptorSetLayouts[i];
+            layout.ThrowIfDestroyed();
+            vulkanDescriptorSetLayouts[i] = layout.DescriptorSetLayout;
+        }
 
         return new VulkanGraphicsPipeline(description, vulkanDescriptorSetLayouts);
     }

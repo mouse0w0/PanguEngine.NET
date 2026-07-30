@@ -77,11 +77,8 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
 
         if (DescriptorSetLayout.Handle != 0)
         {
-            var descriptorSetLayout = DescriptorSetLayout;
+            VulkanContext.Vk.DestroyDescriptorSetLayout(VulkanContext.Device, DescriptorSetLayout, null);
             DescriptorSetLayout = default;
-            var retireValue = VulkanContext.GlobalTimelineValue + VulkanContext.MaxFramesInFlight;
-            VulkanDeletionQueue.Enqueue(retireValue,
-                () => VulkanContext.Vk.DestroyDescriptorSetLayout(VulkanContext.Device, descriptorSetLayout, null));
         }
     }
 

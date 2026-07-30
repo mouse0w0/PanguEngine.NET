@@ -133,6 +133,7 @@ internal sealed unsafe class VulkanFrameContext
         if (_destroyed)
             return;
 
+        CommandList.Invalidate();
         if (_fence.Handle != 0)
             VulkanContext.Vk.DestroyFence(VulkanContext.Device, _fence, null);
         if (_imageAvailableSemaphore.Handle != 0)

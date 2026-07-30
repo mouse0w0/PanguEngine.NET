@@ -132,4 +132,11 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         VulkanAllocator.Destroy();
         VulkanContext.Destroy();
     }
+
+    /// <inheritdoc/>
+    internal override void Render(double alpha)
+    {
+        WindowManager.RenderWindows(alpha);
+        VulkanDeletionQueue.Collect();
+    }
 }

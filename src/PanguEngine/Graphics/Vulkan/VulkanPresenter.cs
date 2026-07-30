@@ -142,7 +142,6 @@ internal sealed unsafe class VulkanPresenter : Presenter
                 vulkanFrame.VulkanColorOutput.VulkanTexture.ResetLayout();
 
             _frameSlot = (_frameSlot + 1) % VulkanContext.MaxFramesInFlight;
-            VulkanDeletionQueue.Collect();
         }
         catch
         {

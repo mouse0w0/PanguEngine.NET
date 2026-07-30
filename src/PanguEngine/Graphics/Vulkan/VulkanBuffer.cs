@@ -114,6 +114,7 @@ public sealed unsafe class VulkanBuffer : Buffer
     {
         VulkanContext.EnsureRenderThread();
         if (IsDestroyed) return;
+        MarkDestroyed();
 
         if (_persistentlyMapped)
         {
@@ -122,7 +123,6 @@ public sealed unsafe class VulkanBuffer : Buffer
             _persistentlyMapped = false;
         }
 
-        MarkDestroyed();
         Lifetime.RequestDestroy();
     }
 }

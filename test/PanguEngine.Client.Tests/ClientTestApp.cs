@@ -88,7 +88,7 @@ public sealed class ClientTestApp
             () => WindowManager.Windows.Count > 0,
             WindowManager.DoEvents,
             () => { },
-            WindowManager.RenderWindows);
+            _graphicsBackend.Render);
         _scene.Initialize(Window);
         _sceneInitialized = true;
     }

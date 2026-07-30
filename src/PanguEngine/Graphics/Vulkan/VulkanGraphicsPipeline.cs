@@ -386,6 +386,7 @@ internal sealed unsafe class VulkanGraphicsPipeline : GraphicsPipeline
             var layout = layouts[i] as VulkanDescriptorSetLayout
                          ?? throw new InvalidOperationException(
                              "Descriptor set layout was not created by the Vulkan backend.");
+            layout.ThrowIfDestroyed();
             result[i] = layout.DescriptorSetLayout;
         }
 

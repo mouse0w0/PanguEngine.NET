@@ -89,7 +89,7 @@ public sealed class ClientEngine
             () => WindowManager.Windows.Count > 0,
             WindowManager.DoEvents,
             OnUpdate,
-            WindowManager.RenderWindows);
+            GraphicsBackend.Render);
         Engine.ModManager.RunClientSetup();
         BlockModelManager = new BlockModelManager(
             Engine.ResourceManager,

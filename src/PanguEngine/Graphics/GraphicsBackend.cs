@@ -41,4 +41,10 @@ public abstract class GraphicsBackend
     /// Destroys the graphics backend.
     /// </summary>
     internal abstract void Destroy();
+
+    /// <summary>
+    /// Renders the managed windows and performs backend maintenance for the render phase.
+    /// </summary>
+    /// <param name="alpha">The interpolation factor since the last fixed update.</param>
+    internal abstract void Render(double alpha);
 }
