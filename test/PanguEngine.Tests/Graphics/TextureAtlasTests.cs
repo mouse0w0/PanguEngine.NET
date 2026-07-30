@@ -290,6 +290,62 @@ public sealed class TextureAtlasTests
     }
 
     [Fact]
+    public void SortsByLongestCellSideBeforeArea()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(5, 5);
+        builder.Add("square", 3, 3, SolidPixels(3, 3, 1, 2, 3, 4));
+        builder.Add("wide", 4, 2, SolidPixels(4, 2, 5, 6, 7, 8));
+
+        var atlas = builder.Build();
+
+        Assert.Equal(0, atlas.GetRegion("wide").X);
+        Assert.Equal(0, atlas.GetRegion("wide").Y);
+        Assert.Equal(0, atlas.GetRegion("square").X);
+        Assert.Equal(2, atlas.GetRegion("square").Y);
+    }
+
+    [Fact]
+    public void SortsByCellAreaWhenLongestSidesMatch()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(4, 4);
+        builder.Add("thin", 4, 1, SolidPixels(4, 1, 1, 2, 3, 4));
+        builder.Add("block", 4, 2, SolidPixels(4, 2, 5, 6, 7, 8));
+
+        var atlas = builder.Build();
+
+        Assert.Equal(0, atlas.GetRegion("block").Y);
+        Assert.Equal(2, atlas.GetRegion("thin").Y);
+    }
+
+    [Fact]
+    public void PreservesAddOrderWhenCellSortKeysMatch()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(3, 4);
+        builder.Add("z", 3, 2, SolidPixels(3, 2, 1, 2, 3, 4));
+        builder.Add("a", 3, 2, SolidPixels(3, 2, 5, 6, 7, 8));
+
+        var atlas = builder.Build();
+
+        Assert.Equal(0, atlas.GetRegion("z").Y);
+        Assert.Equal(2, atlas.GetRegion("a").Y);
+    }
+
+    [Fact]
+    public void SortsByAlignedCellDimensions()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(16, 16, gutter: 0, mipLevels: 3);
+        builder.Add("wide", 8, 1, SolidPixels(8, 1, 1, 2, 3, 4));
+        builder.Add("square", 5, 5, SolidPixels(5, 5, 5, 6, 7, 8));
+
+        var atlas = builder.Build();
+
+        Assert.Equal(0, atlas.GetRegion("square").X);
+        Assert.Equal(0, atlas.GetRegion("square").Y);
+        Assert.Equal(8, atlas.GetRegion("wide").X);
+        Assert.Equal(0, atlas.GetRegion("wide").Y);
+    }
+
+    [Fact]
     public void GrowsCandidateWhenInitialApproximateSquareCannotFit()
     {
         var builder = new MaxRectsTextureAtlasBuilder<string>(8, 8);
@@ -516,7 +572,21 @@ public sealed class TextureAtlasTests
     }
 
     [Fact]
-    public void UsesShortSideFitAndAddOrderBeforeKeyOrder()
+    public void ReportsFirstSortedEntryThatDoesNotFit()
+    {
+        var builder = new MaxRectsTextureAtlasBuilder<string>(8, 8);
+        builder.Add("mid", 5, 5, SolidPixels(5, 5, 1, 2, 3, 4));
+        builder.Add("full", 8, 8, SolidPixels(8, 8, 5, 6, 7, 8));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Build());
+
+        Assert.Contains("mid", exception.Message);
+        Assert.Contains("5x5", exception.Message);
+        Assert.Contains("maximum atlas size is 8x8", exception.Message);
+    }
+
+    [Fact]
+    public void SortsEntriesBeforeUsingShortSideFit()
     {
         var builder = new MaxRectsTextureAtlasBuilder<string>(10, 10);
         builder.Add("z", 4, 6, SolidPixels(4, 6, 1, 2, 3, 4));
@@ -528,13 +598,13 @@ public sealed class TextureAtlasTests
         Assert.Equal(10, atlas.Width);
         Assert.Equal(9, atlas.Height);
         Assert.Equal(
-            new TextureAtlasRegion(0, 0, 4, 6, 0f, 0f, 0.4f, 6f / 9f),
+            new TextureAtlasRegion(0, 1, 4, 6, 0f, 1f / 9f, 0.4f, 7f / 9f),
             atlas.GetRegion("z"));
         Assert.Equal(
-            new TextureAtlasRegion(0, 6, 3, 2, 0f, 6f / 9f, 0.3f, 8f / 9f),
+            new TextureAtlasRegion(0, 7, 3, 2, 0f, 7f / 9f, 0.3f, 1f),
             atlas.GetRegion("a"));
         Assert.Equal(
-            new TextureAtlasRegion(0, 8, 10, 1, 0f, 8f / 9f, 1f, 1f),
+            new TextureAtlasRegion(0, 0, 10, 1, 0f, 0f, 1f, 1f / 9f),
             atlas.GetRegion("filler"));
         AssertRegionPixels(atlas, atlas.GetRegion("z"), SolidPixels(4, 6, 1, 2, 3, 4));
         AssertRegionPixels(atlas, atlas.GetRegion("a"), SolidPixels(3, 2, 5, 6, 7, 8));

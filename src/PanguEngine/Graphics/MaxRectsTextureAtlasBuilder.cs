@@ -166,9 +166,18 @@ public sealed class MaxRectsTextureAtlasBuilder<TKey> where TKey : notnull
         var side = Math.Max(CeilSqrt(totalArea), Math.Max(maxCellWidth, maxCellHeight));
         var candidateWidth = (int)Math.Min(_maxWidth, side);
         var candidateHeight = (int)Math.Min(_maxHeight, side);
+        var layoutEntries = _entries
+            .OrderByDescending(entry => Math.Max(entry.CellWidth, entry.CellHeight))
+            .ThenByDescending(entry => (long)entry.CellWidth * entry.CellHeight)
+            .ToArray();
         while (true)
         {
-            if (TryPack(candidateWidth, candidateHeight, out var placements, out var failedEntry))
+            if (TryPack(
+                    layoutEntries,
+                    candidateWidth,
+                    candidateHeight,
+                    out var placements,
+                    out var failedEntry))
             {
                 var atlas = CreateAtlas(placements);
                 _built = true;
@@ -411,17 +420,18 @@ public sealed class MaxRectsTextureAtlasBuilder<TKey> where TKey : notnull
         }
     }
 
-    private bool TryPack(
+    private static bool TryPack(
+        IReadOnlyList<Entry> entries,
         int width,
         int height,
         out List<Placement> placements,
         out Entry? failedEntry)
     {
         List<FreeRect> freeRects = [new(0, 0, width, height)];
-        placements = new List<Placement>(_entries.Count);
+        placements = new List<Placement>(entries.Count);
         failedEntry = null;
 
-        foreach (var entry in _entries)
+        foreach (var entry in entries)
         {
             var bestIndex = -1;
             var bestShortSideFit = long.MaxValue;
