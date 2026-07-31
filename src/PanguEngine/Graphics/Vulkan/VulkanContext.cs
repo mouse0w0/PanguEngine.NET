@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
 using Silk.NET.Core;
 using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
@@ -19,6 +20,7 @@ public static unsafe class VulkanContext
     private static int _renderThreadId;
 
     private static bool _enableValidationLayers;
+    private static ILogger _logger = null!;
 
     /// <summary>
     /// The core Vulkan API.
@@ -166,6 +168,7 @@ public static unsafe class VulkanContext
             throw new InvalidOperationException("Vulkan instance already initialized.");
 
         _enableValidationLayers = enableValidationLayers;
+        _logger = Log.CreateLogger("Vulkan");
         Vk = Vk.GetApi();
 
         try
@@ -398,8 +401,17 @@ public static unsafe class VulkanContext
         DebugUtilsMessengerCallbackDataEXT* pCallbackData,
         void* pUserData)
     {
-        var message = Marshal.PtrToStringAnsi((nint)pCallbackData->PMessage);
-        Console.WriteLine($"Vulkan validation: {message}");
+        var logLevel = (messageSeverity & DebugUtilsMessageSeverityFlagsEXT.ErrorBitExt) != 0
+            ? LogLevel.Error
+            : (messageSeverity & DebugUtilsMessageSeverityFlagsEXT.WarningBitExt) != 0
+                ? LogLevel.Warning
+                : LogLevel.Debug;
+        if (_logger.IsEnabled(logLevel))
+        {
+            var message = Marshal.PtrToStringAnsi((nint)pCallbackData->PMessage);
+            _logger.Log(logLevel, "[{MessageType}] {Message}", messageTypes, message);
+        }
+
         return Vk.False;
     }
 
