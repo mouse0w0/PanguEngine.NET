@@ -8,6 +8,11 @@ namespace PanguEngine.Graphics;
 public record struct GraphicsBackendOptions
 {
     /// <summary>
+    /// Gets or sets whether graphics API validation is enabled.
+    /// </summary>
+    public bool EnableValidation { get; set; }
+
+    /// <summary>
     /// Gets the options used to create the primary window.
     /// </summary>
     public WindowOptions PrimaryWindow { get; set; } = new();

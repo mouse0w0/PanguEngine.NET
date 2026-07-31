@@ -82,6 +82,7 @@ public sealed class ClientEngine
 
         GraphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
+            EnableValidation = _launchOptions.GpuValidation,
             PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
         });
 

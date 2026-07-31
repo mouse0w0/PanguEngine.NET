@@ -59,7 +59,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             var glfwExtensions = silkWindow.VkSurface.GetRequiredExtensions(out var count);
             var requiredExtensions = SilkMarshal.PtrToStringArray((nint)glfwExtensions, (int)count);
 
-            VulkanContext.InitializeInstance(requiredExtensions);
+            VulkanContext.InitializeInstance(requiredExtensions, options.EnableValidation);
             instanceInitialized = true;
 
             surface = silkWindow.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)

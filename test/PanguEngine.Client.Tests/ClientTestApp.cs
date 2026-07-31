@@ -74,6 +74,7 @@ public sealed class ClientTestApp
 
         _graphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
+            EnableValidation = true,
             PrimaryWindow = new WindowOptions
             {
                 Size = new Vector2D<int>(800, 600),

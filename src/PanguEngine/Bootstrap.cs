@@ -25,6 +25,7 @@ public static class Bootstrap
     internal static LaunchOptions ParseOptions(string[] args)
     {
         var modPaths = new List<string>();
+        var gpuValidation = false;
 
         for (var i = 0; i < args.Length; i++)
         {
@@ -40,11 +41,18 @@ public static class Bootstrap
 
                     modPaths.Add(path);
                     break;
+                case "--gpu-validation":
+                    gpuValidation = true;
+                    break;
                 default:
                     throw new ArgumentException($"Unknown argument '{args[i]}'.");
             }
         }
 
-        return new LaunchOptions { ModPaths = modPaths.ToArray() };
+        return new LaunchOptions
+        {
+            GpuValidation = gpuValidation,
+            ModPaths = modPaths.ToArray()
+        };
     }
 }

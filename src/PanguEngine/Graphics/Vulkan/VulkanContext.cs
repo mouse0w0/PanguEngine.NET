@@ -160,7 +160,7 @@ public static unsafe class VulkanContext
     /// </summary>
     /// <param name="requiredExtensions">Extensions required by the application (e.g., surface extensions).</param>
     /// <param name="enableValidationLayers">Whether to enable Vulkan validation layers for debugging.</param>
-    internal static void InitializeInstance(string[] requiredExtensions, bool enableValidationLayers = true)
+    internal static void InitializeInstance(string[] requiredExtensions, bool enableValidationLayers)
     {
         if (_instanceInitialized)
             throw new InvalidOperationException("Vulkan instance already initialized.");
