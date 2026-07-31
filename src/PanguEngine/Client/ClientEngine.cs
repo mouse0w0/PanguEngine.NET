@@ -105,6 +105,7 @@ public sealed class ClientEngine
 
     private void OnRunning()
     {
+        PrimaryWindow.PreRender += (_, alpha) => Game.PrepareFrame(alpha);
         PrimaryWindow.Render += (_, alpha) => Game.DrawFrame(alpha);
         Loop.Run();
     }

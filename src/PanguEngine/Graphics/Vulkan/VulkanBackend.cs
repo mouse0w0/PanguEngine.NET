@@ -136,6 +136,8 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     /// <inheritdoc/>
     internal override void Render(double alpha)
     {
+        WindowManager.PreRenderWindows(alpha);
+        VulkanUploader.FlushPendingUploads();
         WindowManager.RenderWindows(alpha);
         VulkanDeletionQueue.Collect();
     }

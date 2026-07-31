@@ -129,6 +129,9 @@ public abstract class Window
     /// <summary>Raised when a character is typed.</summary>
     public abstract event Action<Window, char>? CharInput;
 
+    /// <summary>Raised during frame preparation before any due window is rendered.</summary>
+    public abstract event Action<Window, double>? PreRender;
+
     /// <summary>Raised each frame for rendering with the interpolation factor since the last fixed update.</summary>
     public abstract event Action<Window, double>? Render;
 
@@ -194,6 +197,10 @@ public abstract class Window
 
     /// <summary>Processes pending platform events for the window.</summary>
     internal abstract void DoEvents();
+
+    /// <summary>Performs a pre-render event for this window.</summary>
+    /// <param name="alpha">The interpolation factor since the last fixed update.</param>
+    internal abstract void DoPreRender(double alpha);
 
     /// <summary>Performs a render event for this window.</summary>
     /// <param name="alpha">The interpolation factor since the last fixed update.</param>

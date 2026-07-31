@@ -52,6 +52,9 @@ public sealed partial class VulkanWindow
     public override event Action<Window, char>? CharInput;
 
     /// <inheritdoc/>
+    public override event Action<Window, double>? PreRender;
+
+    /// <inheritdoc/>
     public override event Action<Window, double>? Render;
 
     /// <summary>Subscribes to platform window lifecycle events.</summary>

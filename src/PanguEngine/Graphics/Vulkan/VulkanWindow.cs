@@ -54,6 +54,9 @@ public sealed unsafe partial class VulkanWindow : Window
     internal override void DoEvents() => _silkWindow.DoEvents();
 
     /// <inheritdoc/>
+    internal override void DoPreRender(double alpha) => PreRender?.Invoke(this, alpha);
+
+    /// <inheritdoc/>
     internal override void DoRender(double alpha) => Render?.Invoke(this, alpha);
 
     /// <inheritdoc/>

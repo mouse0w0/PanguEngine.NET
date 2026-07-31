@@ -8,9 +8,12 @@ namespace PanguEngine.Windowing;
 public sealed class WindowManager
 {
     private readonly Func<WindowOptions, Window> _createWindow;
+    private readonly Func<double> _getTime;
     private readonly List<Window> _windows = [];
+    private readonly List<Window> _dueWindows = [];
     private readonly List<Window> _pendingDestroy = [];
     private readonly Dictionary<Window, double> _lastRenderTimes = [];
+    private double _renderTime;
     private bool _destroyed;
 
     /// <summary>
@@ -19,12 +22,21 @@ public sealed class WindowManager
     /// <param name="primaryWindow">The primary window created by the client startup path.</param>
     /// <param name="createWindow">The non-primary window factory.</param>
     public WindowManager(Window primaryWindow, Func<WindowOptions, Window> createWindow)
+        : this(primaryWindow, createWindow, GetCurrentTime)
+    {
+    }
+
+    internal WindowManager(
+        Window primaryWindow,
+        Func<WindowOptions, Window> createWindow,
+        Func<double> getTime)
     {
         ArgumentNullException.ThrowIfNull(primaryWindow);
         if (!primaryWindow.IsPrimary)
             throw new InvalidOperationException("Window is not a primary window.");
 
         _createWindow = createWindow ?? throw new ArgumentNullException(nameof(createWindow));
+        _getTime = getTime ?? throw new ArgumentNullException(nameof(getTime));
         PrimaryWindow = primaryWindow;
         AddWindow(primaryWindow);
     }
@@ -59,11 +71,12 @@ public sealed class WindowManager
         DestroyClosedWindows();
     }
 
-    /// <summary>Renders all visible windows that are due for a frame.</summary>
+    /// <summary>Captures the windows due for a frame and performs their pre-render events.</summary>
     /// <param name="alpha">The interpolation factor since the last fixed update.</param>
-    public void RenderWindows(double alpha)
+    internal void PreRenderWindows(double alpha)
     {
-        var now = Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
+        _dueWindows.Clear();
+        _renderTime = _getTime();
         foreach (var window in _windows)
         {
             if (window.IsDestroyed || window.IsClosing || !window.IsVisible ||
@@ -72,11 +85,28 @@ public sealed class WindowManager
 
             _lastRenderTimes.TryGetValue(window, out var lastRenderTime);
             var interval = window.FramesPerSecond <= 0 ? 0 : 1d / window.FramesPerSecond;
-            if (interval > 0 && now - lastRenderTime < interval)
+            if (interval > 0 && _renderTime - lastRenderTime < interval)
+                continue;
+
+            _dueWindows.Add(window);
+        }
+
+        foreach (var window in _dueWindows)
+            window.DoPreRender(alpha);
+    }
+
+    /// <summary>Renders windows from the most recent pre-render snapshot that remain renderable.</summary>
+    /// <param name="alpha">The interpolation factor since the last fixed update.</param>
+    internal void RenderWindows(double alpha)
+    {
+        foreach (var window in _dueWindows)
+        {
+            if (window.IsDestroyed || window.IsClosing || !window.IsVisible ||
+                window.WindowState == WindowState.Minimized)
                 continue;
 
             window.DoRender(alpha);
-            _lastRenderTimes[window] = now;
+            _lastRenderTimes[window] = _renderTime;
         }
     }
 
@@ -102,6 +132,7 @@ public sealed class WindowManager
         }
 
         _windows.Clear();
+        _dueWindows.Clear();
         _pendingDestroy.Clear();
         _lastRenderTimes.Clear();
         PrimaryWindow = null;
@@ -147,4 +178,6 @@ public sealed class WindowManager
         if (_destroyed)
             throw new InvalidOperationException("Window manager is destroyed.");
     }
+
+    private static double GetCurrentTime() => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 }

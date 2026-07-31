@@ -60,6 +60,15 @@ public sealed class ClientGame
     }
 
     /// <summary>
+    /// Prepares resources for the next client frame.
+    /// </summary>
+    /// <param name="alpha">The interpolation factor between fixed updates.</param>
+    public void PrepareFrame(double alpha)
+    {
+        _renderer.PrepareFrame(_camera, alpha);
+    }
+
+    /// <summary>
     /// Draws a frame for the client game.
     /// </summary>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>

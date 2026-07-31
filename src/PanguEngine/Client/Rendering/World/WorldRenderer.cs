@@ -34,6 +34,7 @@ internal sealed class WorldRenderer
     private readonly ChunkRenderer _chunkRenderer;
     private readonly SelectionRenderer _selectionRenderer;
     private readonly CrosshairRenderer _crosshairRenderer;
+    private List<UploadHandle> _preparedUploadHandles = [];
     private uint _depthStencilWidth;
     private uint _depthStencilHeight;
 
@@ -107,6 +108,14 @@ internal sealed class WorldRenderer
             _presenter.MaxFramesInFlight);
     }
 
+    internal void PrepareFrame(Camera camera, double alpha)
+    {
+        var cameraPosition = camera.GetInterpolatedPosition(alpha);
+        var uploadHandles = _chunkRenderer.UpdateMeshes(cameraPosition);
+        EnsureDepthStencilAttachmentSize();
+        _preparedUploadHandles = uploadHandles;
+    }
+
     /// <summary>
     /// Draws a world frame.
     /// </summary>
@@ -117,16 +126,13 @@ internal sealed class WorldRenderer
     {
         ArgumentNullException.ThrowIfNull(camera);
 
-        var cameraPosition = camera.GetInterpolatedPosition(alpha);
-        var uploadHandles = _chunkRenderer.UpdateMeshes(cameraPosition);
-        EnsureDepthStencilAttachmentSize();
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
         InvalidOperationException? uploadFailure;
         try
         {
-            uploadFailure = GetUploadFailure(uploadHandles);
+            uploadFailure = GetUploadFailure(_preparedUploadHandles);
 
             var commandList = frame.CommandList;
             if (frame.Width == 0 || frame.Height == 0

@@ -79,7 +79,6 @@ internal sealed unsafe class VulkanPresenter : Presenter
         try
         {
             context.WaitForReuse();
-            VulkanUploader.FlushPendingUploads();
 
             var result = _window.AcquireNextImage(context.ImageAvailableSemaphore, out var imageIndex);
             if (result == Result.ErrorOutOfDateKhr)

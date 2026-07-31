@@ -27,7 +27,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
     private Shader _vertShader = null!;
     private Shader _fragShader = null!;
     private GraphicsPipeline _pipeline = null!;
-    private Mesh _mesh = null!;
+    private Mesh? _mesh;
     private Presenter _presenter = null!;
 
     /// <inheritdoc/>
@@ -39,20 +39,30 @@ internal sealed class BufferLifecycleScene : IClientTestScene
         _presenter = window.Presenter;
         CreateShaders();
         CreatePipeline(_presenter.ColorFormat);
+        window.PreRender += (_, _) => PrepareFrame();
         window.Render += (_, _) => DrawFrame();
     }
 
     /// <inheritdoc/>
     public void Destroy()
     {
+        _mesh?.Buffer.Destroy();
+        _mesh = null;
         _pipeline.Destroy();
         _fragShader.Destroy();
         _vertShader.Destroy();
     }
 
+    private void PrepareFrame()
+    {
+        _mesh?.Buffer.Destroy();
+        _mesh = null;
+        _mesh = CreateMesh();
+    }
+
     private void DrawFrame()
     {
-        _mesh = CreateMesh();
+        var mesh = _mesh!;
 
         if (!_presenter.TryBeginFrame(out var frame))
             return;
@@ -76,17 +86,18 @@ internal sealed class BufferLifecycleScene : IClientTestScene
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
 
-            if (!_mesh.UploadHandle.CheckSuccess())
+            if (!mesh.UploadHandle.CheckSuccess())
                 throw new InvalidOperationException(
                     "Mesh buffer upload did not complete after flushing pending uploads.");
 
-            commands.SetVertexBuffer(0, _mesh.Buffer);
-            commands.Draw(_mesh.VertexCount);
+            commands.SetVertexBuffer(0, mesh.Buffer);
+            commands.Draw(mesh.VertexCount);
             commands.EndRendering();
             commands.PrepareForPresent(frame.ColorOutput);
             commands.EndRecording();
 
-            _mesh.Buffer.Destroy();
+            mesh.Buffer.Destroy();
+            _mesh = null;
         }
         finally
         {
@@ -102,8 +113,16 @@ internal sealed class BufferLifecycleScene : IClientTestScene
             size,
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
-        var uploadHandle = ClientTestApp.Current.Device.UploadBuffer(buffer, vertices);
-        return new Mesh(buffer, uploadHandle, (uint)vertices.Length);
+        try
+        {
+            var uploadHandle = ClientTestApp.Current.Device.UploadBuffer(buffer, vertices);
+            return new Mesh(buffer, uploadHandle, (uint)vertices.Length);
+        }
+        catch
+        {
+            buffer.Destroy();
+            throw;
+        }
     }
 
     private Vertex[] CreateVertices()
