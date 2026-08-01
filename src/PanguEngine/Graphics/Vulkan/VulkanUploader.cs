@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Silk.NET.Vulkan;
@@ -11,6 +12,8 @@ public static unsafe class VulkanUploader
 {
     private abstract class PendingUpload
     {
+        private bool _holdReleased;
+
         internal required VulkanUploadHandle Handle { get; init; }
 
         protected abstract VulkanResourceLifetime Lifetime { get; }
@@ -19,23 +22,38 @@ public static unsafe class VulkanUploader
 
         internal bool IsPlanned { get; set; }
 
-        internal void SignalSuccess(ulong submissionValue)
+        internal void SignalFailure(Exception exception)
         {
-            if (IsTerminal)
-                throw new InvalidOperationException("Upload request is already terminal.");
-
-            IsTerminal = true;
-            Handle.SignalSuccess();
-            Lifetime.ReleaseHold(submissionValue);
+            SignalFailureHandle(exception);
+            ReleaseHoldOnce(null);
         }
 
-        internal void SignalFailure(Exception exception, ulong? submissionValue = null)
+        internal void SignalSubmittedFailure(Exception exception, ulong submissionValue)
+        {
+            SignalFailureHandle(exception);
+            ReleaseHoldOnce(submissionValue);
+        }
+
+        internal void BindSubmission(ulong submissionValue)
+        {
+            ReleaseHoldOnce(submissionValue);
+        }
+
+        private void SignalFailureHandle(Exception exception)
         {
             if (IsTerminal)
                 return;
 
             IsTerminal = true;
             Handle.SignalFailure(exception);
+        }
+
+        private void ReleaseHoldOnce(ulong? submissionValue)
+        {
+            if (_holdReleased)
+                return;
+
+            _holdReleased = true;
             if (submissionValue.HasValue)
                 Lifetime.ReleaseHold(submissionValue.Value);
             else
@@ -102,15 +120,15 @@ public static unsafe class VulkanUploader
 
     private static readonly Queue<PendingUpload> PendingOperations = new();
     private static bool _initialized;
+    private static bool _destroying;
     private static bool _faulted;
     private static Exception? _faultException;
     private static VulkanStagingPagePool _stagingPages = null!;
+    private static VulkanUploadPacketRing _packetRing = null!;
     private static CommandPool _commandPool;
-    private static CommandBuffer _commandBuffer;
-    private static Fence _fence;
 
     /// <summary>
-    /// Initializes the staging uploader with a persistent page pool, command pool, and fence.
+    /// Initializes the staging uploader with a persistent page pool and three upload packets.
     /// </summary>
     /// <param name="initialSize">The regular staging page size in bytes. Defaults to 4 MiB.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="initialSize"/> is zero.</exception>
@@ -126,9 +144,7 @@ public static unsafe class VulkanUploader
                 "Initial staging page size must be greater than zero.");
 
         CommandPool commandPool = default;
-        Fence fence = default;
         var commandPoolCreated = false;
-        var fenceCreated = false;
         VulkanStagingPagePool? stagingPages = null;
 
         try
@@ -147,49 +163,34 @@ public static unsafe class VulkanUploader
                 throw new InvalidOperationException("Failed to create staging upload command pool.");
             commandPoolCreated = true;
 
-            CommandBufferAllocateInfo commandBufferAllocInfo = new()
+            CommandBufferAllocateInfo allocateInfo = new()
             {
                 SType = StructureType.CommandBufferAllocateInfo,
                 CommandPool = commandPool,
                 Level = CommandBufferLevel.Primary,
-                CommandBufferCount = 1
+                CommandBufferCount = (uint)VulkanUploadPacketRing.Capacity
             };
-            var commandBuffers = new CommandBuffer[1];
+            var commandBuffers = new CommandBuffer[VulkanUploadPacketRing.Capacity];
             fixed (CommandBuffer* commandBufferPointer = commandBuffers)
             {
                 if (VulkanContext.Vk.AllocateCommandBuffers(
                         VulkanContext.Device,
-                        in commandBufferAllocInfo,
+                        in allocateInfo,
                         commandBufferPointer) != Result.Success)
-                    throw new InvalidOperationException("Failed to allocate staging upload command buffer.");
+                    throw new InvalidOperationException("Failed to allocate staging upload command buffers.");
             }
-
-            FenceCreateInfo fenceInfo = new()
-            {
-                SType = StructureType.FenceCreateInfo,
-                Flags = FenceCreateFlags.SignaledBit
-            };
-            if (VulkanContext.Vk.CreateFence(
-                    VulkanContext.Device,
-                    in fenceInfo,
-                    null,
-                    out fence) != Result.Success)
-                throw new InvalidOperationException("Failed to create staging upload fence.");
-            fenceCreated = true;
 
             stagingPages = new VulkanStagingPagePool(initialSize);
 
             _stagingPages = stagingPages;
+            _packetRing = new VulkanUploadPacketRing(commandBuffers);
             _commandPool = commandPool;
-            _commandBuffer = commandBuffers[0];
-            _fence = fence;
+            _destroying = false;
             _initialized = true;
         }
         catch
         {
             stagingPages?.Destroy();
-            if (fenceCreated)
-                VulkanContext.Vk.DestroyFence(VulkanContext.Device, fence, null);
             if (commandPoolCreated)
                 VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, commandPool, null);
             throw;
@@ -206,30 +207,49 @@ public static unsafe class VulkanUploader
         if (!_initialized)
             return;
 
+        _destroying = true;
         var disposedException = new ObjectDisposedException(nameof(VulkanUploader));
-        while (PendingOperations.Count > 0)
-            PendingOperations.Dequeue().SignalFailure(disposedException);
+        var pendingFailure = FailPendingOperations(disposedException);
+        if (pendingFailure != null)
+            EnterFaulted(pendingFailure);
 
         var waitResult = VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
+        if (waitResult == Result.ErrorDeviceLost)
+        {
+            var deviceLostException = new InvalidOperationException(
+                $"Failed to wait for the Vulkan device during uploader destruction: {waitResult}.");
+            EnterFaulted(deviceLostException);
+            _packetRing.FaultSubmittedHandles(_faultException ?? deviceLostException);
+            _packetRing.ReclaimAll(
+                _stagingPages,
+                completeSuccessfully: false,
+                exception: _faultException ?? deviceLostException);
+            DestroyResourcesAndReset();
+            return;
+        }
+
         if (waitResult != Result.Success)
         {
             var exception = new InvalidOperationException(
                 $"Failed to wait for the Vulkan device during uploader destruction: {waitResult}.");
             EnterFaulted(exception);
+            _packetRing.FaultSubmittedHandles(_faultException ?? exception);
+            _destroying = false;
             throw exception;
         }
 
-        _stagingPages.Destroy();
-        VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, _commandPool, null);
-        VulkanContext.Vk.DestroyFence(VulkanContext.Device, _fence, null);
+        if (_faulted)
+        {
+            var exception = _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.");
+            _packetRing.FaultSubmittedHandles(exception);
+            _packetRing.ReclaimAll(_stagingPages, completeSuccessfully: false, exception: exception);
+        }
+        else
+        {
+            _packetRing.ReclaimAll(_stagingPages, completeSuccessfully: true, exception: null);
+        }
 
-        _initialized = false;
-        _faulted = false;
-        _faultException = null;
-        _stagingPages = null!;
-        _commandPool = default;
-        _commandBuffer = default;
-        _fence = default;
+        DestroyResourcesAndReset();
     }
 
     internal static VulkanUploadHandle EnqueueBufferUpload<T>(
@@ -242,7 +262,7 @@ public static unsafe class VulkanUploader
 
         var dataSize = checked((ulong)data.Length * (ulong)sizeof(T));
         if (dataSize == 0)
-            return CreateCompletedHandle();
+            return CreateSucceededHandle();
         if (!dst.Usage.HasFlag(BufferUsageFlags.TransferDstBit))
             throw new ArgumentException("Destination buffer must have TransferDst usage.", nameof(dst));
         if (dstOffset > dst.Size || dataSize > dst.Size - dstOffset)
@@ -342,50 +362,86 @@ public static unsafe class VulkanUploader
     }
 
     /// <summary>
-    /// Executes all pending uploads in FIFO order and waits for their GPU completion.
+    /// Retires completed upload packets and submits at most one pending upload batch.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when the uploader is not initialized or is faulted.</exception>
-    public static void FlushPendingUploads()
+    /// <remarks>
+    /// The render thread may block when all three upload packets are still in flight. A resource submitted by this
+    /// method can be consumed by a later submission on the same graphics queue before its handle is completed.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown when the uploader is not initialized or has faulted.</exception>
+    public static void Pump()
     {
-        VulkanContext.EnsureRenderThread();
-        if (!_initialized)
-            throw new InvalidOperationException("VulkanUploader is not initialized.");
-        if (_faulted)
-            ExceptionDispatchInfo.Capture(
-                _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.")).Throw();
-
-        var batch = DrainPendingUploads();
-        if (batch.Count == 0)
+        EnsureCanPump();
+        var timelineValue = QueryTimeline();
+        _packetRing.RetireCompleted(timelineValue, _stagingPages);
+        if (PendingOperations.Count == 0)
             return;
 
+        if (_packetRing.NextPacket.IsSubmitted)
+        {
+            var semaphore = VulkanContext.GlobalTimelineSemaphore;
+            var submissionValue = _packetRing.NextPacket.SubmissionValue;
+            SemaphoreWaitInfo waitInfo = new()
+            {
+                SType = StructureType.SemaphoreWaitInfo,
+                SemaphoreCount = 1,
+                PSemaphores = &semaphore,
+                PValues = &submissionValue
+            };
+            var waitResult = VulkanContext.Vk.WaitSemaphores(
+                VulkanContext.Device,
+                in waitInfo,
+                ulong.MaxValue);
+            if (waitResult != Result.Success)
+                FailPendingAndSubmitted(new InvalidOperationException(
+                    $"Failed to wait for a Vulkan upload packet: {waitResult}."));
+
+            timelineValue = QueryTimeline();
+            _packetRing.RetireCompleted(timelineValue, _stagingPages);
+        }
+
+        _packetRing.EnsureNextAvailable();
+        SubmitPendingBatch();
+    }
+
+    private static ulong QueryTimeline()
+    {
+        var result = VulkanContext.Vk.GetSemaphoreCounterValue(
+            VulkanContext.Device,
+            VulkanContext.GlobalTimelineSemaphore,
+            out var timelineValue);
+        if (result != Result.Success)
+            FailPendingAndSubmitted(new InvalidOperationException(
+                $"Failed to query the global Vulkan timeline: {result}."));
+
+        return timelineValue;
+    }
+
+    private static void SubmitPendingBatch()
+    {
         var textureStates = new Dictionary<VulkanTexture, VulkanUploadLayoutState>(
             ReferenceEqualityComparer.Instance);
-        ulong? submissionValue = null;
-        var submitted = false;
+        var batch = DrainPendingUploads();
+        VulkanStagingLease? lease = null;
+        ulong submissionValue = 0;
+        var packetCommitted = false;
 
         try
         {
-            var waitResult = VulkanContext.Vk.WaitForFences(
-                VulkanContext.Device,
-                1,
-                in _fence,
-                true,
-                ulong.MaxValue);
-            if (waitResult != Result.Success)
-                throw new InvalidOperationException(
-                    $"Failed to wait for the staging upload fence before planning: {waitResult}.");
-
-            PlanBatch(batch, textureStates);
+            lease = _stagingPages.BeginBatch();
+            PlanBatch(batch, textureStates, lease);
             if (!batch.Any(operation => operation.IsPlanned && !operation.IsTerminal))
             {
-                _stagingPages.ResetUnsubmittedBatch();
+                _stagingPages.Recycle(lease);
                 return;
             }
 
             CopyDataToStaging(batch);
-            _stagingPages.FlushWrittenRanges();
+            _stagingPages.FlushWrittenRanges(lease);
 
-            var resetCommandResult = VulkanContext.Vk.ResetCommandBuffer(_commandBuffer, 0);
+            var packet = _packetRing.NextPacket;
+            var commandBuffer = packet.CommandBuffer;
+            var resetCommandResult = VulkanContext.Vk.ResetCommandBuffer(commandBuffer, 0);
             if (resetCommandResult != Result.Success)
                 throw new InvalidOperationException(
                     $"Failed to reset the staging upload command buffer: {resetCommandResult}.");
@@ -395,35 +451,30 @@ public static unsafe class VulkanUploader
                 SType = StructureType.CommandBufferBeginInfo,
                 Flags = CommandBufferUsageFlags.OneTimeSubmitBit
             };
-            var beginResult = VulkanContext.Vk.BeginCommandBuffer(_commandBuffer, in beginInfo);
+            var beginResult = VulkanContext.Vk.BeginCommandBuffer(commandBuffer, in beginInfo);
             if (beginResult != Result.Success)
                 throw new InvalidOperationException(
                     $"Failed to begin the staging upload command buffer: {beginResult}.");
 
-            RecordBatch(batch);
+            RecordBatch(batch, commandBuffer);
 
-            var endResult = VulkanContext.Vk.EndCommandBuffer(_commandBuffer);
+            var endResult = VulkanContext.Vk.EndCommandBuffer(commandBuffer);
             if (endResult != Result.Success)
                 throw new InvalidOperationException(
                     $"Failed to end the staging upload command buffer: {endResult}.");
 
-            var resetFenceResult = VulkanContext.Vk.ResetFences(
-                VulkanContext.Device,
-                1,
-                in _fence);
-            if (resetFenceResult != Result.Success)
-                throw new InvalidOperationException(
-                    $"Failed to reset the staging upload fence: {resetFenceResult}.");
-
+            var handles = batch
+                .Where(operation => operation.IsPlanned && !operation.IsTerminal)
+                .Select(operation => operation.Handle)
+                .ToArray();
+            _packetRing.EnsureNextAvailable();
             submissionValue = VulkanContext.NextGlobalTimelineValue();
-            var signalValue = submissionValue.Value;
-            var commandBuffer = _commandBuffer;
             var timelineSemaphore = VulkanContext.GlobalTimelineSemaphore;
             TimelineSemaphoreSubmitInfo timelineSubmitInfo = new()
             {
                 SType = StructureType.TimelineSemaphoreSubmitInfo,
                 SignalSemaphoreValueCount = 1,
-                PSignalSemaphoreValues = &signalValue
+                PSignalSemaphoreValues = &submissionValue
             };
             SubmitInfo submitInfo = new()
             {
@@ -438,40 +489,34 @@ public static unsafe class VulkanUploader
                 VulkanContext.GraphicsQueue,
                 1,
                 in submitInfo,
-                _fence);
+                default);
+            if (submitResult is Result.ErrorOutOfHostMemory or Result.ErrorOutOfDeviceMemory)
+                throw CreateSubmitException(submitResult);
+
+            _packetRing.CommitNextSubmission(submissionValue, lease, handles);
+            packetCommitted = true;
             if (submitResult != Result.Success)
-                throw new InvalidOperationException(
-                    $"Failed to submit staging upload commands: {submitResult}.");
-            submitted = true;
+                throw CreateSubmitException(submitResult);
 
             CommitTextureLayouts(textureStates);
+            var bindingFailure = BindSubmittedOperations(batch, submissionValue);
+            if (bindingFailure != null)
+                throw bindingFailure;
 
-            var completionResult = VulkanContext.Vk.WaitForFences(
-                VulkanContext.Device,
-                1,
-                in _fence,
-                true,
-                ulong.MaxValue);
-            if (completionResult != Result.Success)
-                throw new InvalidOperationException(
-                    $"Failed to wait for staging upload completion: {completionResult}.");
-
-            foreach (var operation in batch)
-            {
-                if (operation.IsPlanned && !operation.IsTerminal)
-                    operation.SignalSuccess(signalValue);
-            }
-
-            _stagingPages.CompleteSubmittedBatch();
+            foreach (var handle in handles)
+                handle.SignalReady();
         }
         catch (Exception exception)
         {
-            FailInfrastructure(
-                batch,
-                exception,
-                submitted ? submissionValue : null,
-                submitted);
+            if (packetCommitted)
+                FailSubmittedBatch(batch, submissionValue, exception);
+            FailUnsubmittedBatch(batch, lease, exception);
         }
+    }
+
+    private static InvalidOperationException CreateSubmitException(Result result)
+    {
+        return new InvalidOperationException($"Failed to submit staging upload commands: {result}.");
     }
 
     private static List<PendingUpload> DrainPendingUploads()
@@ -484,7 +529,8 @@ public static unsafe class VulkanUploader
 
     private static void PlanBatch(
         IReadOnlyList<PendingUpload> batch,
-        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates)
+        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates,
+        VulkanStagingLease lease)
     {
         foreach (var operation in batch)
         {
@@ -493,10 +539,10 @@ public static unsafe class VulkanUploader
                 switch (operation)
                 {
                     case PendingBufferUpload bufferUpload:
-                        PlanBufferUpload(bufferUpload);
+                        PlanBufferUpload(bufferUpload, lease);
                         break;
                     case PendingTextureUpload textureUpload:
-                        PlanTextureUpload(textureUpload, textureStates);
+                        PlanTextureUpload(textureUpload, textureStates, lease);
                         break;
                     case PendingMipmapGeneration mipmapGeneration:
                         PlanMipmapGeneration(mipmapGeneration, textureStates);
@@ -514,17 +560,19 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static void PlanBufferUpload(PendingBufferUpload upload)
+    private static void PlanBufferUpload(PendingBufferUpload upload, VulkanStagingLease lease)
     {
-        upload.Segment = _stagingPages.Allocate(upload.Size, 1);
+        upload.Segment = _stagingPages.Allocate(lease, upload.Size, 1);
         upload.IsPlanned = true;
     }
 
     private static void PlanTextureUpload(
         PendingTextureUpload upload,
-        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates)
+        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates,
+        VulkanStagingLease lease)
     {
         upload.Segment = _stagingPages.Allocate(
+            lease,
             upload.Size,
             VulkanBarrier.GetTextureUploadAlignment(upload.Dst.Format));
 
@@ -634,7 +682,9 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static void RecordBatch(IReadOnlyList<PendingUpload> batch)
+    private static void RecordBatch(
+        IReadOnlyList<PendingUpload> batch,
+        CommandBuffer commandBuffer)
     {
         foreach (var operation in batch)
         {
@@ -644,19 +694,21 @@ public static unsafe class VulkanUploader
             switch (operation)
             {
                 case PendingBufferUpload bufferUpload:
-                    RecordBufferUpload(bufferUpload);
+                    RecordBufferUpload(bufferUpload, commandBuffer);
                     break;
                 case PendingTextureUpload textureUpload:
-                    RecordTextureUpload(textureUpload);
+                    RecordTextureUpload(textureUpload, commandBuffer);
                     break;
                 case PendingMipmapGeneration mipmapGeneration:
-                    RecordMipmapGeneration(mipmapGeneration);
+                    RecordMipmapGeneration(mipmapGeneration, commandBuffer);
                     break;
             }
         }
     }
 
-    private static void RecordBufferUpload(PendingBufferUpload upload)
+    private static void RecordBufferUpload(
+        PendingBufferUpload upload,
+        CommandBuffer commandBuffer)
     {
         var segment = upload.Segment ??
                       throw new InvalidOperationException("Buffer upload has no staging segment.");
@@ -667,27 +719,29 @@ public static unsafe class VulkanUploader
             Size = upload.Size
         };
         VulkanContext.Vk.CmdCopyBuffer(
-            _commandBuffer,
+            commandBuffer,
             segment.Buffer.Buffer,
             upload.Dst.Buffer,
             1,
             in copyRegion);
         VulkanBarrier.RecordBufferUploadBarrier(
-            _commandBuffer,
+            commandBuffer,
             upload.Dst.Buffer,
             upload.DstOffset,
             upload.Size,
             upload.Dst.Usage);
     }
 
-    private static void RecordTextureUpload(PendingTextureUpload upload)
+    private static void RecordTextureUpload(
+        PendingTextureUpload upload,
+        CommandBuffer commandBuffer)
     {
         var segment = upload.Segment ??
                       throw new InvalidOperationException("Texture upload has no staging segment.");
         foreach (var layer in upload.Layers)
         {
             VulkanBarrier.RecordImageLayoutTransition(
-                _commandBuffer,
+                commandBuffer,
                 upload.Dst.Image,
                 layer.MipLevel,
                 1,
@@ -734,7 +788,7 @@ public static unsafe class VulkanUploader
             }
         };
         VulkanContext.Vk.CmdCopyBufferToImage(
-            _commandBuffer,
+            commandBuffer,
             segment.Buffer.Buffer,
             upload.Dst.Image,
             ImageLayout.TransferDstOptimal,
@@ -743,7 +797,7 @@ public static unsafe class VulkanUploader
 
         var finalState = upload.Layers[0].FinalState;
         VulkanBarrier.RecordImageLayoutTransition(
-            _commandBuffer,
+            commandBuffer,
             upload.Dst.Image,
             upload.Region.MipLevel,
             1,
@@ -758,13 +812,15 @@ public static unsafe class VulkanUploader
             finalState.Access);
     }
 
-    private static void RecordMipmapGeneration(PendingMipmapGeneration generation)
+    private static void RecordMipmapGeneration(
+        PendingMipmapGeneration generation,
+        CommandBuffer commandBuffer)
     {
         var texture = generation.Texture;
         foreach (var step in generation.Steps)
         {
             VulkanBarrier.RecordImageLayoutTransition(
-                _commandBuffer,
+                commandBuffer,
                 texture.Image,
                 step.SourceMip,
                 1,
@@ -778,7 +834,7 @@ public static unsafe class VulkanUploader
                 PipelineStageFlags2.TransferBit,
                 AccessFlags2.TransferReadBit);
             VulkanBarrier.RecordImageLayoutTransition(
-                _commandBuffer,
+                commandBuffer,
                 texture.Image,
                 step.DestinationMip,
                 1,
@@ -828,7 +884,7 @@ public static unsafe class VulkanUploader
                 checked((int)destinationHeight),
                 1);
             VulkanContext.Vk.CmdBlitImage(
-                _commandBuffer,
+                commandBuffer,
                 texture.Image,
                 ImageLayout.TransferSrcOptimal,
                 texture.Image,
@@ -838,7 +894,7 @@ public static unsafe class VulkanUploader
                 Filter.Linear);
 
             VulkanBarrier.RecordImageLayoutTransition(
-                _commandBuffer,
+                commandBuffer,
                 texture.Image,
                 step.SourceMip,
                 1,
@@ -855,7 +911,7 @@ public static unsafe class VulkanUploader
             if (step.DestinationMip == texture.MipLevels - 1)
             {
                 VulkanBarrier.RecordImageLayoutTransition(
-                    _commandBuffer,
+                    commandBuffer,
                     texture.Image,
                     step.DestinationMip,
                     1,
@@ -882,26 +938,139 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static void FailInfrastructure(
+    private static Exception? BindSubmittedOperations(
         IReadOnlyList<PendingUpload> batch,
-        Exception exception,
-        ulong? submissionValue,
-        bool mayStillBeInUse)
+        ulong submissionValue)
     {
-        EnterFaulted(exception);
+        Exception? firstFailure = null;
         foreach (var operation in batch)
         {
-            if (!operation.IsTerminal)
-                operation.SignalFailure(exception, submissionValue);
+            if (!operation.IsPlanned || operation.IsTerminal)
+                continue;
+
+            try
+            {
+                operation.BindSubmission(submissionValue);
+            }
+            catch (Exception exception)
+            {
+                firstFailure ??= exception;
+            }
         }
 
+        return firstFailure;
+    }
+
+    [DoesNotReturn]
+    private static void FailUnsubmittedBatch(
+        IReadOnlyList<PendingUpload> batch,
+        VulkanStagingLease? lease,
+        Exception exception)
+    {
+        EnterFaulted(exception);
+        FailOperations(batch, exception, null);
+        FailPendingOperations(exception);
+        _packetRing.FaultSubmittedHandles(_faultException ?? exception);
+        if (lease is { IsRecycled: false })
+            _stagingPages.Recycle(lease);
+        ThrowFault();
+    }
+
+    [DoesNotReturn]
+    private static void FailSubmittedBatch(
+        IReadOnlyList<PendingUpload> batch,
+        ulong submissionValue,
+        Exception exception)
+    {
+        EnterFaulted(exception);
+        FailOperations(batch, exception, submissionValue);
+        FailPendingOperations(exception);
+        _packetRing.FaultSubmittedHandles(_faultException ?? exception);
+        ThrowFault();
+    }
+
+    [DoesNotReturn]
+    private static void FailPendingAndSubmitted(Exception exception)
+    {
+        EnterFaulted(exception);
+        FailPendingOperations(exception);
+        _packetRing.FaultSubmittedHandles(_faultException ?? exception);
+        ThrowFault();
+    }
+
+    private static void FailOperations(
+        IReadOnlyList<PendingUpload> operations,
+        Exception exception,
+        ulong? submissionValue)
+    {
+        foreach (var operation in operations)
+        {
+            if (operation.IsTerminal)
+                continue;
+
+            try
+            {
+                if (submissionValue.HasValue)
+                    operation.SignalSubmittedFailure(exception, submissionValue.Value);
+                else
+                    operation.SignalFailure(exception);
+            }
+            catch (Exception cleanupException)
+            {
+                EnterFaulted(cleanupException);
+            }
+        }
+    }
+
+    private static Exception? FailPendingOperations(Exception exception)
+    {
+        Exception? firstFailure = null;
         while (PendingOperations.Count > 0)
-            PendingOperations.Dequeue().SignalFailure(exception);
+        {
+            try
+            {
+                PendingOperations.Dequeue().SignalFailure(exception);
+            }
+            catch (Exception cleanupException)
+            {
+                firstFailure ??= cleanupException;
+            }
+        }
 
-        if (!mayStillBeInUse)
-            _stagingPages.ResetUnsubmittedBatch();
+        return firstFailure;
+    }
 
-        ExceptionDispatchInfo.Capture(exception).Throw();
+    [DoesNotReturn]
+    private static void ThrowFault()
+    {
+        ExceptionDispatchInfo.Capture(
+            _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.")).Throw();
+        throw new InvalidOperationException("VulkanUploader fault propagation returned unexpectedly.");
+    }
+
+    private static void DestroyResourcesAndReset()
+    {
+        _stagingPages.Destroy();
+        VulkanContext.Vk.DestroyCommandPool(VulkanContext.Device, _commandPool, null);
+
+        PendingOperations.Clear();
+        _initialized = false;
+        _destroying = false;
+        _faulted = false;
+        _faultException = null;
+        _stagingPages = null!;
+        _packetRing = null!;
+        _commandPool = default;
+    }
+
+    private static void EnsureCanPump()
+    {
+        VulkanContext.EnsureRenderThread();
+        if (!_initialized)
+            throw new InvalidOperationException("VulkanUploader is not initialized.");
+        ObjectDisposedException.ThrowIf(_destroying, typeof(VulkanUploader));
+        if (_faulted)
+            ThrowFault();
     }
 
     private static void EnterFaulted(Exception exception)
@@ -917,12 +1086,12 @@ public static unsafe class VulkanUploader
     {
         if (!_initialized)
             throw new InvalidOperationException("VulkanUploader is not initialized.");
+        ObjectDisposedException.ThrowIf(_destroying, typeof(VulkanUploader));
         if (_faulted)
-            ExceptionDispatchInfo.Capture(
-                _faultException ?? new InvalidOperationException("VulkanUploader is in a faulted state.")).Throw();
+            ThrowFault();
     }
 
-    private static VulkanUploadHandle CreateCompletedHandle()
+    private static VulkanUploadHandle CreateSucceededHandle()
     {
         var handle = new VulkanUploadHandle();
         handle.SignalSuccess();

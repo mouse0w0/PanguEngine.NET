@@ -132,7 +132,7 @@ internal sealed class WorldRenderer
         InvalidOperationException? uploadFailure;
         try
         {
-            uploadFailure = GetUploadFailure(_preparedUploadHandles);
+            uploadFailure = GetUploadReadinessFailure(_preparedUploadHandles);
 
             var commandList = frame.CommandList;
             if (frame.Width == 0 || frame.Height == 0
@@ -221,22 +221,24 @@ internal sealed class WorldRenderer
     }
 
     /// <summary>
-    /// Gets an upload failure from a set of upload handles.
+    /// Checks whether a set of upload handles is ready to be consumed by a graphics submission.
     /// </summary>
     /// <param name="uploadHandles">The upload handles to inspect.</param>
-    /// <returns>The upload failure, or null when all uploads completed successfully.</returns>
-    private static InvalidOperationException? GetUploadFailure(List<UploadHandle> uploadHandles)
+    /// <returns>
+    /// The upload readiness failure, or null when every upload is ready to be consumed.
+    /// </returns>
+    private static InvalidOperationException? GetUploadReadinessFailure(List<UploadHandle> uploadHandles)
     {
         foreach (var uploadHandle in uploadHandles)
         {
-            if (!uploadHandle.IsCompleted)
+            try
             {
-                return new InvalidOperationException(
-                    "World chunk mesh upload did not complete after flushing pending uploads.");
+                uploadHandle.ThrowIfNotReady();
             }
-
-            if (uploadHandle.IsFaulted)
-                return new InvalidOperationException("World chunk mesh upload failed.", uploadHandle.Exception);
+            catch (Exception exception)
+            {
+                return new InvalidOperationException("World chunk mesh upload is not ready.", exception);
+            }
         }
 
         return null;

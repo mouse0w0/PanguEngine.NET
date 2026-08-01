@@ -62,9 +62,7 @@ internal sealed class BufferUploadScene : IClientTestScene
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        if (!_uploadHandle.CheckSuccess())
-            throw new InvalidOperationException(
-                "Vertex buffer upload did not complete after flushing pending uploads.");
+        _uploadHandle.ThrowIfNotReady();
 
         try
         {

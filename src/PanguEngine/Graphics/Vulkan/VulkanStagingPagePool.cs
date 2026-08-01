@@ -84,9 +84,11 @@ internal sealed class VulkanStagingPage
 
 internal sealed unsafe class VulkanStagingPagePool
 {
+    private const int MaxCachedRegularPages = 4;
+
     private readonly List<VulkanStagingPage> _pages = [];
+    private readonly List<VulkanStagingPage> _idleRegularPages = new(MaxCachedRegularPages);
     private readonly Func<ulong, bool, int, VulkanStagingPage> _createPage;
-    private VulkanStagingPage? _currentRegularPage;
     private int _nextRegularCreationIndex;
 
     internal VulkanStagingPagePool(ulong pageSize)
@@ -100,105 +102,91 @@ internal sealed unsafe class VulkanStagingPagePool
     {
         PageSize = pageSize;
         _createPage = createPage;
-        var page = _createPage(pageSize, false, _nextRegularCreationIndex);
-        _pages.Add(page);
-        _currentRegularPage = page;
+        var page = CreatePage(pageSize, false, _nextRegularCreationIndex);
         _nextRegularCreationIndex++;
+        _pages.Add(page);
+        _idleRegularPages.Add(page);
     }
 
     internal ulong PageSize { get; }
 
-    internal VulkanStagingSegment Allocate(ulong size, ulong alignment)
+    internal VulkanStagingLease BeginBatch()
     {
-        if (RequiresDedicatedPage(size, PageSize))
-        {
-            var dedicatedPage = CreatePage(size, true, -1);
-            _pages.Add(dedicatedPage);
-            dedicatedPage.Offset = size;
-            dedicatedPage.WrittenEnd = size;
-            return new VulkanStagingSegment(
-                dedicatedPage.Buffer,
-                (byte*)dedicatedPage.MappedAddress,
-                0,
-                dedicatedPage.RegularCreationIndex);
-        }
+        return new VulkanStagingLease(this);
+    }
 
-        var currentPage = _currentRegularPage ??
-                          throw new InvalidOperationException("The staging page pool has no regular page.");
-        if (!TryAllocateInPage(
-                currentPage.Capacity,
-                currentPage.Offset,
+    internal VulkanStagingSegment Allocate(
+        VulkanStagingLease lease,
+        ulong size,
+        ulong alignment)
+    {
+        ValidateActiveLease(lease);
+        if (RequiresDedicatedPage(size, PageSize))
+            return AllocateDedicated(lease, size);
+
+        var page = lease.CurrentRegularPage;
+        if (page == null ||
+            !TryAllocateInPage(
+                page.Capacity,
+                page.Offset,
                 size,
                 alignment,
                 out var segmentOffset,
                 out var nextOffset))
         {
-            var foundReusablePage = false;
-            foreach (var reusablePage in _pages)
-            {
-                if (ReferenceEquals(reusablePage, currentPage) ||
-                    !ShouldRetainPage(reusablePage.Dedicated, reusablePage.RegularCreationIndex))
-                    continue;
-                if (!TryAllocateInPage(
-                        reusablePage.Capacity,
-                        reusablePage.Offset,
-                        size,
-                        alignment,
-                        out segmentOffset,
-                        out nextOffset))
-                    continue;
-
-                currentPage = reusablePage;
-                _currentRegularPage = reusablePage;
-                foundReusablePage = true;
-                break;
-            }
-
-            if (!foundReusablePage)
-            {
-                var newPage = CreatePage(PageSize, false, _nextRegularCreationIndex);
-                _pages.Add(newPage);
-                _currentRegularPage = newPage;
-                _nextRegularCreationIndex++;
-                currentPage = newPage;
-
-                if (!TryAllocateInPage(
-                        currentPage.Capacity,
-                        currentPage.Offset,
-                        size,
-                        alignment,
-                        out segmentOffset,
-                        out nextOffset))
-                    throw new InvalidOperationException("A regular staging request does not fit in an empty page.");
-            }
+            page = AcquireRegularPage();
+            lease.CurrentRegularPage = page;
+            lease.AddPage(page);
+            if (!TryAllocateInPage(
+                    page.Capacity,
+                    page.Offset,
+                    size,
+                    alignment,
+                    out segmentOffset,
+                    out nextOffset))
+                throw new InvalidOperationException("A regular staging request does not fit in an empty page.");
         }
 
-        currentPage.Offset = nextOffset;
-        currentPage.WrittenEnd = Math.Max(currentPage.WrittenEnd, nextOffset);
-        return new VulkanStagingSegment(
-            currentPage.Buffer,
-            (byte*)currentPage.MappedAddress + segmentOffset,
-            segmentOffset,
-            currentPage.RegularCreationIndex);
+        page.Offset = nextOffset;
+        page.WrittenEnd = Math.Max(page.WrittenEnd, nextOffset);
+        return CreateSegment(page, segmentOffset);
     }
 
-    internal void FlushWrittenRanges()
+    internal void FlushWrittenRanges(VulkanStagingLease lease)
     {
-        foreach (var page in _pages)
+        ValidateActiveLease(lease);
+        foreach (var page in lease.Pages)
         {
             if (page.WrittenEnd > 0)
                 page.FlushWrittenRange(0, page.WrittenEnd);
         }
     }
 
-    internal void CompleteSubmittedBatch()
+    internal void Recycle(VulkanStagingLease lease)
     {
-        RecycleBatchPages();
-    }
+        ValidateActiveLease(lease);
+        lease.MarkRecycled();
+        foreach (var page in lease.Pages)
+        {
+            page.Offset = 0;
+            page.WrittenEnd = 0;
+            if (page.Dedicated)
+            {
+                page.DestroyPage();
+                _pages.Remove(page);
+                continue;
+            }
 
-    internal void ResetUnsubmittedBatch()
-    {
-        RecycleBatchPages();
+            if (_idleRegularPages.Count == MaxCachedRegularPages)
+            {
+                var oldest = _idleRegularPages[0];
+                _idleRegularPages.RemoveAt(0);
+                oldest.DestroyPage();
+                _pages.Remove(oldest);
+            }
+
+            _idleRegularPages.Add(page);
+        }
     }
 
     internal void Destroy()
@@ -207,7 +195,7 @@ internal sealed unsafe class VulkanStagingPagePool
             page.DestroyPage();
 
         _pages.Clear();
-        _currentRegularPage = null;
+        _idleRegularPages.Clear();
     }
 
     internal static ulong AlignOffset(ulong offset, ulong alignment)
@@ -218,11 +206,6 @@ internal sealed unsafe class VulkanStagingPagePool
     internal static bool RequiresDedicatedPage(ulong size, ulong pageSize)
     {
         return size > pageSize;
-    }
-
-    internal static bool ShouldRetainPage(bool dedicated, int regularCreationIndex)
-    {
-        return !dedicated && regularCreationIndex < 2;
     }
 
     internal static bool TryAllocateInPage(
@@ -244,6 +227,49 @@ internal sealed unsafe class VulkanStagingPagePool
         segmentOffset = alignedOffset;
         nextOffset = alignedOffset + size;
         return true;
+    }
+
+    private VulkanStagingSegment AllocateDedicated(VulkanStagingLease lease, ulong size)
+    {
+        var page = CreatePage(size, true, -1);
+        _pages.Add(page);
+        lease.AddPage(page);
+        page.Offset = size;
+        page.WrittenEnd = size;
+        return CreateSegment(page, 0);
+    }
+
+    private VulkanStagingPage AcquireRegularPage()
+    {
+        if (_idleRegularPages.Count > 0)
+        {
+            var index = _idleRegularPages.Count - 1;
+            var page = _idleRegularPages[index];
+            _idleRegularPages.RemoveAt(index);
+            return page;
+        }
+
+        var createdPage = CreatePage(PageSize, false, _nextRegularCreationIndex);
+        _nextRegularCreationIndex++;
+        _pages.Add(createdPage);
+        return createdPage;
+    }
+
+    private static VulkanStagingSegment CreateSegment(VulkanStagingPage page, ulong offset)
+    {
+        return new VulkanStagingSegment(
+            page.Buffer,
+            (byte*)page.MappedAddress + offset,
+            offset,
+            page.RegularCreationIndex);
+    }
+
+    private void ValidateActiveLease(VulkanStagingLease lease)
+    {
+        if (!ReferenceEquals(lease.Owner, this))
+            throw new InvalidOperationException("The staging lease belongs to another page pool.");
+        if (lease.IsRecycled)
+            throw new InvalidOperationException("The staging lease has already been recycled.");
     }
 
     private VulkanStagingPage CreatePage(
@@ -293,27 +319,5 @@ internal sealed unsafe class VulkanStagingPagePool
                 $"Failed to create a {capacity}-byte staging page.",
                 exception);
         }
-    }
-
-    private void RecycleBatchPages()
-    {
-        VulkanStagingPage? currentRegularPage = null;
-        for (var index = _pages.Count - 1; index >= 0; index--)
-        {
-            var page = _pages[index];
-            if (ShouldRetainPage(page.Dedicated, page.RegularCreationIndex))
-            {
-                page.Offset = 0;
-                page.WrittenEnd = 0;
-                currentRegularPage ??= page;
-                continue;
-            }
-
-            page.DestroyPage();
-            _pages.RemoveAt(index);
-        }
-
-        _currentRegularPage = currentRegularPage ??
-                              throw new InvalidOperationException("The staging page pool lost all regular pages.");
     }
 }

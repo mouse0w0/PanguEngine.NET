@@ -86,9 +86,7 @@ internal sealed class BufferLifecycleScene : IClientTestScene
             commands.SetViewport(0, 0, frame.Width, frame.Height);
             commands.SetScissor(0, 0, frame.Width, frame.Height);
 
-            if (!mesh.UploadHandle.CheckSuccess())
-                throw new InvalidOperationException(
-                    "Mesh buffer upload did not complete after flushing pending uploads.");
+            mesh.UploadHandle.ThrowIfNotReady();
 
             commands.SetVertexBuffer(0, mesh.Buffer);
             commands.Draw(mesh.VertexCount);

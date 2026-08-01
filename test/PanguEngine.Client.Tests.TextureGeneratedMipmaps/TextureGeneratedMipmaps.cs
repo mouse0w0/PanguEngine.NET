@@ -72,13 +72,9 @@ internal sealed class TextureGeneratedMipmapsScene : IClientTestScene
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        if (!_vertexUploadHandle.CheckSuccess())
-            throw new InvalidOperationException(
-                "Vertex buffer upload did not complete after flushing pending uploads.");
-        if (!_textureUploadHandle.CheckSuccess())
-            throw new InvalidOperationException("Texture upload did not complete after flushing pending uploads.");
-        if (!_mipmapUploadHandle.CheckSuccess())
-            throw new InvalidOperationException("Mipmap generation did not complete after flushing pending uploads.");
+        _vertexUploadHandle.ThrowIfNotReady();
+        _textureUploadHandle.ThrowIfNotReady();
+        _mipmapUploadHandle.ThrowIfNotReady();
 
         try
         {

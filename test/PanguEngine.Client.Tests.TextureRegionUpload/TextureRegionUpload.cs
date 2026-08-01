@@ -71,15 +71,9 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
-        if (!_vertexUploadHandle.CheckSuccess())
-            throw new InvalidOperationException(
-                "Vertex buffer upload did not complete after flushing pending uploads.");
+        _vertexUploadHandle.ThrowIfNotReady();
         foreach (var uploadHandle in _textureUploadHandles)
-        {
-            if (!uploadHandle.CheckSuccess())
-                throw new InvalidOperationException(
-                    "Texture upload did not complete after flushing pending uploads.");
-        }
+            uploadHandle.ThrowIfNotReady();
 
         try
         {

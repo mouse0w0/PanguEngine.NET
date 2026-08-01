@@ -10,13 +10,11 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
 {
-    private sealed class CompletedUploadHandle : UploadHandle
+    private sealed class SucceededUploadHandle : UploadHandle
     {
-        public static readonly CompletedUploadHandle Instance = new();
+        public static readonly SucceededUploadHandle Instance = new();
 
-        public override bool IsCompleted => true;
-
-        public override bool IsFaulted => false;
+        protected override UploadState State => UploadState.Succeeded;
 
         public override Exception? Exception => null;
     }
@@ -116,7 +114,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                 "Destination offset and data size exceed the buffer bounds.");
 
         if (dataSize == 0)
-            return CompletedUploadHandle.Instance;
+            return SucceededUploadHandle.Instance;
 
         return VulkanUploader.EnqueueBufferUpload(vulkanBuffer, data, destinationOffset);
     }
@@ -245,7 +243,7 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new InvalidOperationException("Depth/stencil textures do not support mipmap generation.");
 
         if (vulkanTexture.MipLevels == 1)
-            return CompletedUploadHandle.Instance;
+            return SucceededUploadHandle.Instance;
 
         if (vulkanTexture.Dimension == TextureDimension.Type3D)
             throw new NotSupportedException("3D texture mipmap generation is not supported.");

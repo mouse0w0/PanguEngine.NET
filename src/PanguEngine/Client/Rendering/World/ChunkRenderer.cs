@@ -333,7 +333,7 @@ internal sealed class ChunkRenderer
 
     private void RemoveCompletedUploads()
     {
-        _pendingUploads.RemoveAll(handle => handle.IsCompletedSuccessfully);
+        _pendingUploads.RemoveAll(handle => handle.IsSucceeded);
     }
 
     private sealed class ChunkMeshResource
