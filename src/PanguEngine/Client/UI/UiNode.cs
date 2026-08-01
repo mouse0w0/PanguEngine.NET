@@ -54,7 +54,7 @@ public abstract partial class UiNode
             if (!binding.IsTwoWay)
                 throw new InvalidOperationException($"Property '{property.Name}' has a one-way binding.");
 
-            VerifyLayoutPropertyAccess(property);
+            VerifyPropertyAccess(property);
             if (EqualityComparer<T>.Default.Equals(GetValueCore(property), value))
                 return;
 
@@ -80,7 +80,7 @@ public abstract partial class UiNode
     {
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
-        VerifyLayoutPropertyAccess(property);
+        VerifyPropertyAccess(property);
 
         if (TryGetBinding(property, out var binding))
         {
@@ -124,7 +124,7 @@ public abstract partial class UiNode
 
     private void SetValueCore<T>(UiProperty<T> property, T value)
     {
-        VerifyLayoutPropertyAccess(property);
+        VerifyPropertyAccess(property);
         var oldValue = GetValueCore(property);
         _localValues ??= [];
         _localValues[property] = value;

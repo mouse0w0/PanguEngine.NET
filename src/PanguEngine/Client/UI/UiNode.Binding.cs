@@ -26,7 +26,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TValue>.ParseOneWay(sourceExpression);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
         var initialValue = expression.Getter(source);
         var binding = new NotifyPropertyChangedBinding<TRoot, TValue, TValue>(
             this,
@@ -63,7 +63,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TSource>.ParseOneWay(sourceExpression);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
         var initialValue = converter(expression.Getter(source));
         var binding = new NotifyPropertyChangedBinding<TRoot, TSource, TTarget>(
             this,
@@ -96,7 +96,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TValue>.ParseTwoWay(sourceProperty);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
         var initialValue = expression.Getter(source);
         var binding = new NotifyPropertyChangedBinding<TRoot, TValue, TValue>(
             this,
@@ -136,7 +136,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TSource>.ParseTwoWay(sourceProperty);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
         var initialValue = converter(expression.Getter(source));
         var binding = new NotifyPropertyChangedBinding<TRoot, TSource, TTarget>(
             this,
@@ -166,7 +166,7 @@ public abstract partial class UiNode
         ArgumentNullException.ThrowIfNull(sourceProperty);
         sourceProperty.VerifyOwner(source);
         VerifyCanBind(targetProperty);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
 
         var initialValue = source.GetValue(sourceProperty);
         var binding = new UiPropertyBinding<TValue, TValue>(
@@ -199,7 +199,7 @@ public abstract partial class UiNode
         ArgumentNullException.ThrowIfNull(converter);
         sourceProperty.VerifyOwner(source);
         VerifyCanBind(targetProperty);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
 
         var initialValue = converter(source.GetValue(sourceProperty));
         var binding = new UiPropertyBinding<TSource, TTarget>(
@@ -228,7 +228,7 @@ public abstract partial class UiNode
         ArgumentNullException.ThrowIfNull(sourceProperty);
         sourceProperty.VerifyOwner(source);
         VerifyCanBind(targetProperty);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
 
         var initialValue = source.GetValue(sourceProperty);
         var binding = new UiPropertyBinding<TValue, TValue>(
@@ -264,7 +264,7 @@ public abstract partial class UiNode
         ArgumentNullException.ThrowIfNull(convertBack);
         sourceProperty.VerifyOwner(source);
         VerifyCanBind(targetProperty);
-        VerifyLayoutPropertyAccess(targetProperty);
+        VerifyPropertyAccess(targetProperty);
 
         var initialValue = converter(source.GetValue(sourceProperty));
         var binding = new UiPropertyBinding<TSource, TTarget>(
@@ -302,7 +302,7 @@ public abstract partial class UiNode
         if (!TryGetBinding(property, out var binding))
             return;
 
-        VerifyLayoutPropertyAccess(property);
+        VerifyPropertyAccess(property);
         var currentValue = GetValueCore(property);
         binding.Detach();
         RemoveBinding(property, binding);
@@ -333,7 +333,7 @@ public abstract partial class UiNode
     {
         try
         {
-            VerifyLayoutPropertyAccess(property);
+            VerifyPropertyAccess(property);
         }
         catch
         {

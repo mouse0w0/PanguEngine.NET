@@ -2,9 +2,6 @@ namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
-    private const UiPropertyInvalidation LayoutInvalidation =
-        UiPropertyInvalidation.Measure | UiPropertyInvalidation.Arrange;
-
     /// <summary>
     /// Identifies the <see cref="Width"/> property.
     /// </summary>
@@ -379,9 +376,9 @@ public abstract partial class UiNode
     private void VerifyLayoutAccess() =>
         ActiveDispatcher?.VerifyAccess();
 
-    private void VerifyLayoutPropertyAccess(UiProperty property)
+    private void VerifyPropertyAccess(UiProperty property)
     {
-        if ((property.Invalidation & LayoutInvalidation) != 0)
+        if (property.Invalidation != UiPropertyInvalidation.None)
             VerifyLayoutAccess();
     }
 
