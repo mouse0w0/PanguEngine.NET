@@ -81,6 +81,15 @@ public abstract partial class UiNode
             VerticalAlignment.Stretch,
             UiPropertyInvalidation.Arrange);
 
+    /// <summary>
+    /// Identifies the <see cref="Visibility"/> property.
+    /// </summary>
+    public static readonly UiProperty<Visibility> VisibilityProperty =
+        UiProperty.Register<UiNode, Visibility>(
+            nameof(Visibility),
+            Visibility.Visible,
+            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+
     private Size _lastMeasureConstraint;
     private Size _desiredContentSize;
     private Rect _lastArrangeRect;
@@ -171,6 +180,15 @@ public abstract partial class UiNode
     }
 
     /// <summary>
+    /// Gets or sets how this node participates in layout, drawing, and hit testing.
+    /// </summary>
+    public Visibility Visibility
+    {
+        get => GetValue(VisibilityProperty);
+        set => SetValue(VisibilityProperty, value);
+    }
+
+    /// <summary>
     /// Gets the measured size, including margin.
     /// </summary>
     public Size DesiredSize { get; private set; }
@@ -210,6 +228,15 @@ public abstract partial class UiNode
             return;
 
         InvalidateMeasureState();
+
+        if (Visibility == Visibility.Collapsed)
+        {
+            _lastMeasureConstraint = availableSize;
+            _desiredContentSize = Size.Zero;
+            DesiredSize = Size.Zero;
+            IsMeasureValid = true;
+            return;
+        }
 
         var margin = Margin;
         var width = Width;
@@ -279,6 +306,14 @@ public abstract partial class UiNode
             return;
 
         InvalidateArrangeState();
+
+        if (Visibility == Visibility.Collapsed)
+        {
+            _lastArrangeRect = finalRect;
+            LayoutBounds = Rect.Zero;
+            IsArrangeValid = true;
+            return;
+        }
 
         var margin = Margin;
         var width = Width;
@@ -448,6 +483,14 @@ public abstract partial class UiNode
                 VerticalAlignment.Stretch))
         {
             throw new InvalidOperationException("VerticalAlignment has an undefined value.");
+        }
+
+        if (Visibility is not (
+                Visibility.Visible or
+                Visibility.Hidden or
+                Visibility.Collapsed))
+        {
+            throw new InvalidOperationException("Visibility has an undefined value.");
         }
     }
 

@@ -20,6 +20,7 @@ public sealed class UiNodeLayoutTests
         Assert.Equal(Thickness.Zero, node.Margin);
         Assert.Equal(HorizontalAlignment.Stretch, node.HorizontalAlignment);
         Assert.Equal(VerticalAlignment.Stretch, node.VerticalAlignment);
+        Assert.Equal(Visibility.Visible, node.Visibility);
         Assert.Equal(Size.Zero, node.DesiredSize);
         Assert.Equal(Rect.Zero, node.LayoutBounds);
         Assert.False(node.IsMeasureValid);
@@ -445,6 +446,189 @@ public sealed class UiNodeLayoutTests
     }
 
     [Fact]
+    public void VisibilityPropertyExposesThreeStateMeasureAndRenderMetadata()
+    {
+        Assert.Equal(nameof(UiNode.Visibility), UiNode.VisibilityProperty.Name);
+        Assert.Equal(typeof(UiNode), UiNode.VisibilityProperty.OwnerType);
+        Assert.Equal(typeof(UiNode), UiNode.VisibilityProperty.TargetType);
+        Assert.Equal(Visibility.Visible, UiNode.VisibilityProperty.DefaultValue);
+        Assert.Equal(
+            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
+            UiNode.VisibilityProperty.Invalidation);
+        Assert.Equal(
+            [Visibility.Visible, Visibility.Hidden, Visibility.Collapsed],
+            Enum.GetValues<Visibility>());
+    }
+
+    [Fact]
+    public void HiddenParticipatesInTheSameLayoutAsVisible()
+    {
+        var visible = new TestNode
+        {
+            CoreDesiredSize = new Size(20, 10),
+            Margin = new Thickness(2)
+        };
+        var hidden = new TestNode
+        {
+            Visibility = Visibility.Hidden,
+            CoreDesiredSize = visible.CoreDesiredSize,
+            Margin = visible.Margin
+        };
+
+        visible.Measure(new Size(100, 80));
+        hidden.Measure(new Size(100, 80));
+        visible.Arrange(new Rect(5, 7, 60, 40));
+        hidden.Arrange(new Rect(5, 7, 60, 40));
+
+        Assert.Equal(visible.DesiredSize, hidden.DesiredSize);
+        Assert.Equal(visible.LayoutBounds, hidden.LayoutBounds);
+        Assert.Equal(1, hidden.MeasureCoreCalls);
+        Assert.Equal(1, hidden.ArrangeCoreCalls);
+    }
+
+    [Fact]
+    public void CollapsedCommitsZeroLayoutWithoutCallingCoreMethods()
+    {
+        var node = new TestNode
+        {
+            CoreDesiredSize = new Size(20, 10),
+            Margin = new Thickness(4)
+        };
+        node.Measure(new Size(100, 80));
+        node.Arrange(new Rect(5, 7, 60, 40));
+        Assert.NotEqual(Rect.Zero, node.LayoutBounds);
+
+        node.Visibility = Visibility.Collapsed;
+        Assert.False(node.IsMeasureValid);
+        Assert.False(node.IsArrangeValid);
+
+        node.Measure(new Size(100, 80));
+        Assert.Equal(Size.Zero, node.DesiredSize);
+        Assert.True(node.IsMeasureValid);
+        Assert.False(node.IsArrangeValid);
+        Assert.Equal(1, node.MeasureCoreCalls);
+
+        node.Arrange(new Rect(5, 7, 60, 40));
+        Assert.Equal(Rect.Zero, node.LayoutBounds);
+        Assert.True(node.IsArrangeValid);
+        Assert.Equal(1, node.ArrangeCoreCalls);
+    }
+
+    [Fact]
+    public void CollapsedStillRejectsInvalidLayoutPropertiesBeforeCoreMethods()
+    {
+        var invalidWidth = new TestNode
+        {
+            Visibility = Visibility.Collapsed,
+            Width = -1
+        };
+        Assert.Throws<InvalidOperationException>(() =>
+            invalidWidth.Measure(new Size(100, 100)));
+        Assert.Equal(0, invalidWidth.MeasureCoreCalls);
+
+        var invalidVisibility = new TestNode
+        {
+            Visibility = (Visibility)99
+        };
+        Assert.Throws<InvalidOperationException>(() =>
+            invalidVisibility.Measure(new Size(100, 100)));
+        Assert.Equal(0, invalidVisibility.MeasureCoreCalls);
+    }
+
+    [Fact]
+    public void VisibilityChangesInvalidateNodeAndAncestorsThroughPropertyPaths()
+    {
+        var root = new TestParent();
+        var child = new TestNode { CoreDesiredSize = new Size(10, 10) };
+        root.Add(child);
+        ValidateLayout(root);
+        ValidateLayout(child);
+
+        child.Visibility = Visibility.Hidden;
+
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(root.IsMeasureValid);
+        Assert.False(root.IsArrangeValid);
+
+        ValidateLayout(root);
+        ValidateLayout(child);
+        var source = new LayoutSource { Visibility = Visibility.Collapsed };
+        child.Bind(UiNode.VisibilityProperty, source, item => item.Visibility);
+
+        Assert.Equal(Visibility.Collapsed, child.Visibility);
+        Assert.False(child.IsMeasureValid);
+        Assert.False(root.IsMeasureValid);
+    }
+
+    [Fact]
+    public void VisibilityClearBindingUpdateAndUnbindUseThePropertyPipeline()
+    {
+        var root = new TestParent();
+        var child = new TestNode
+        {
+            Visibility = Visibility.Hidden,
+            CoreDesiredSize = new Size(10, 10)
+        };
+        root.Add(child);
+        ValidateLayout(root);
+        ValidateLayout(child);
+
+        child.ClearValue(UiNode.VisibilityProperty);
+
+        Assert.Equal(Visibility.Visible, child.Visibility);
+        Assert.False(child.IsMeasureValid);
+        Assert.False(root.IsMeasureValid);
+
+        ValidateLayout(root);
+        ValidateLayout(child);
+        var source = new LayoutSource { Visibility = Visibility.Hidden };
+        child.Bind(UiNode.VisibilityProperty, source, item => item.Visibility);
+        Assert.Equal(Visibility.Hidden, child.Visibility);
+        Assert.False(child.IsMeasureValid);
+
+        ValidateLayout(root);
+        ValidateLayout(child);
+        source.Visibility = Visibility.Collapsed;
+        Assert.Equal(Visibility.Collapsed, child.Visibility);
+        Assert.False(child.IsMeasureValid);
+        Assert.False(root.IsMeasureValid);
+
+        ValidateLayout(root);
+        ValidateLayout(child);
+        child.Unbind(UiNode.VisibilityProperty);
+        source.Visibility = Visibility.Visible;
+
+        Assert.False(child.IsBound(UiNode.VisibilityProperty));
+        Assert.Equal(Visibility.Collapsed, child.Visibility);
+        Assert.True(child.IsMeasureValid);
+        Assert.True(child.IsArrangeValid);
+    }
+
+    [Fact]
+    public void ActiveVisibilityMutationRejectsWrongThreadWithoutPartialState()
+    {
+        var dispatcher = new UiDispatcher();
+        var node = new TestNode { CoreDesiredSize = new Size(10, 10) };
+        ValidateLayout(node);
+        node.AttachToTree(dispatcher);
+
+        var setterError = RunOnBackgroundThread(() =>
+            Record.Exception(() => node.Visibility = Visibility.Hidden));
+        var source = new LayoutSource { Visibility = Visibility.Collapsed };
+        var bindingError = RunOnBackgroundThread(() =>
+            Record.Exception(() =>
+                node.Bind(UiNode.VisibilityProperty, source, item => item.Visibility)));
+
+        Assert.IsType<InvalidOperationException>(setterError);
+        Assert.IsType<InvalidOperationException>(bindingError);
+        Assert.Equal(Visibility.Visible, node.Visibility);
+        Assert.False(node.IsBound(UiNode.VisibilityProperty));
+        Assert.True(node.IsMeasureValid);
+        Assert.True(node.IsArrangeValid);
+    }
+
+    [Fact]
     public void LayoutPropertySetClearAndBindingUseTheSameInvalidationPath()
     {
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
@@ -656,6 +840,7 @@ public sealed class UiNodeLayoutTests
     private sealed class LayoutSource : INotifyPropertyChanged
     {
         private double _width;
+        private Visibility _visibility = Visibility.Visible;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -675,6 +860,19 @@ public sealed class UiNodeLayoutTests
 
                 _width = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Width)));
+            }
+        }
+
+        public Visibility Visibility
+        {
+            get => _visibility;
+            set
+            {
+                if (_visibility == value)
+                    return;
+
+                _visibility = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Visibility)));
             }
         }
     }
