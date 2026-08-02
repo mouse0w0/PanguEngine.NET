@@ -34,5 +34,15 @@ public enum BufferUsage
     /// <summary>
     /// Buffer can be used as an index buffer.
     /// </summary>
-    Index = 16
+    Index = 16,
+
+    /// <summary>
+    /// Buffer can be used as a storage buffer.
+    /// </summary>
+    Storage = 32,
+
+    /// <summary>
+    /// Buffer can provide indirect draw arguments.
+    /// </summary>
+    Indirect = 64
 }

@@ -23,6 +23,9 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     public override uint MaxTextureDimension2D => VulkanContext.MaxImageDimension2D;
 
     /// <inheritdoc/>
+    public override uint MaxDrawIndirectCount => VulkanContext.MaxDrawIndirectCount;
+
+    /// <inheritdoc/>
     public override void WaitIdle()
     {
         VulkanContext.EnsureRenderThread();
@@ -50,6 +53,10 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             vkUsage |= BufferUsageFlags.VertexBufferBit;
         if (description.Usage.HasFlag(BufferUsage.Index))
             vkUsage |= BufferUsageFlags.IndexBufferBit;
+        if (description.Usage.HasFlag(BufferUsage.Storage))
+            vkUsage |= BufferUsageFlags.StorageBufferBit;
+        if (description.Usage.HasFlag(BufferUsage.Indirect))
+            vkUsage |= BufferUsageFlags.IndirectBufferBit;
 
         BufferCreateInfo bufferInfo = new()
         {

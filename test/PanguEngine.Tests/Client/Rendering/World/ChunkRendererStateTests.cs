@@ -1,4 +1,5 @@
 using PanguEngine.Client.Rendering.World;
+using PanguEngine.Graphics;
 using PanguEngine.World.Chunking;
 using Silk.NET.Maths;
 
@@ -111,5 +112,103 @@ public sealed class ChunkRendererStateTests
 
         Assert.False(state.IsDirty(position));
         Assert.True(state.IsInFlight(position));
+    }
+
+    [Fact]
+    public void ReleasedInstanceSlotIsReused()
+    {
+        var slots = new ChunkInstanceSlotPool();
+        Assert.Equal(0u, slots.Acquire());
+        Assert.Equal(1u, slots.Acquire());
+
+        slots.Release(0);
+
+        Assert.Equal(0u, slots.Acquire());
+    }
+
+    [Fact]
+    public void IndirectCommandsAreGroupedByPageWithStableInstanceSlots()
+    {
+        var device = new TestGraphicsDevice(16);
+        var arena = new ChunkMeshArena(device, 8, 8);
+        var first = arena.Allocate(CreateMesh(2, 3));
+        var second = arena.Allocate(CreateMesh(2, 4));
+        var otherPage = arena.Allocate(CreateMesh(6, 2));
+        ChunkDrawCandidate[] candidates =
+        [
+            new ChunkDrawCandidate(
+                first.Page,
+                first.IndexCount,
+                first.FirstIndex,
+                checked((int)first.VertexOffset),
+                5),
+            new ChunkDrawCandidate(
+                otherPage.Page,
+                otherPage.IndexCount,
+                otherPage.FirstIndex,
+                checked((int)otherPage.VertexOffset),
+                9),
+            new ChunkDrawCandidate(
+                second.Page,
+                second.IndexCount,
+                second.FirstIndex,
+                checked((int)second.VertexOffset),
+                7)
+        ];
+        List<IndexedIndirectDrawArguments> commands = [];
+        List<ChunkPageDrawRange> ranges = [];
+
+        var builder = new ChunkIndirectDrawBuilder();
+
+        builder.Build(candidates, commands, ranges);
+
+        Assert.Equal(3, commands.Count);
+        Assert.Equal(2, ranges.Count);
+        Assert.Equal(0ul, ranges[0].Offset);
+        Assert.Equal(2u, ranges[0].DrawCount);
+        Assert.Equal(40ul, ranges[1].Offset);
+        Assert.Equal(1u, ranges[1].DrawCount);
+        Assert.Equal(first.IndexCount, commands[0].IndexCount);
+        Assert.Equal(1u, commands[0].InstanceCount);
+        Assert.Equal(first.FirstIndex, commands[0].FirstIndex);
+        Assert.Equal(checked((int)first.VertexOffset), commands[0].VertexOffset);
+        Assert.Equal(5u, commands[0].FirstInstance);
+        Assert.Equal(second.IndexCount, commands[1].IndexCount);
+        Assert.Equal(1u, commands[1].InstanceCount);
+        Assert.Equal(second.FirstIndex, commands[1].FirstIndex);
+        Assert.Equal(checked((int)second.VertexOffset), commands[1].VertexOffset);
+        Assert.Equal(7u, commands[1].FirstInstance);
+        Assert.Equal(9u, commands[2].FirstInstance);
+    }
+
+    [Fact]
+    public void EmptyMeshTransitionReleasesAllocationAndSlot()
+    {
+        var device = new TestGraphicsDevice(16);
+        var arena = new ChunkMeshArena(device, 8, 8);
+        var record = new ChunkMeshRecord(arena.Allocate(CreateMesh(2, 2)), 7);
+
+        var transition = ChunkMeshRecordTransitionPlanner.Plan(record, CreateMesh(0, 0));
+
+        Assert.Equal(ChunkMeshRecordTransitionKind.Remove, transition.Kind);
+        Assert.Equal(7u, transition.InstanceSlot);
+    }
+
+    [Fact]
+    public void OversizedReplacementTransitionPreservesInstanceSlot()
+    {
+        var device = new TestGraphicsDevice(16);
+        var arena = new ChunkMeshArena(device, 8, 8);
+        var record = new ChunkMeshRecord(arena.Allocate(CreateMesh(2, 2)), 7);
+
+        var transition = ChunkMeshRecordTransitionPlanner.Plan(record, CreateMesh(3, 2));
+
+        Assert.Equal(ChunkMeshRecordTransitionKind.Replace, transition.Kind);
+        Assert.Equal(7u, transition.InstanceSlot);
+    }
+
+    private static ChunkMesh CreateMesh(int vertexCount, int indexCount)
+    {
+        return new ChunkMesh(new ChunkVertex[vertexCount], new uint[indexCount]);
     }
 }

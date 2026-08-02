@@ -93,7 +93,8 @@ internal sealed class WorldRenderer
             _worldDescriptorLayout,
             DepthStencilFormat,
             world,
-            models);
+            models,
+            _presenter.MaxFramesInFlight);
         _selectionRenderer = new SelectionRenderer(
             _device,
             _presenter.ColorFormat,
@@ -157,7 +158,10 @@ internal sealed class WorldRenderer
                 worldUniform,
                 checked(frame.FrameSlot * _worldUniformStride));
             if (uploadFailure is null)
+            {
+                _chunkRenderer.PrepareDraw(frame.FrameSlot, worldRenderState);
                 _selectionRenderer.Prepare(frame.FrameSlot, selection);
+            }
             _crosshairRenderer.Prepare(frame.FrameSlot, frame.Width, frame.Height);
 
             commandList.BeginRecording();
@@ -179,7 +183,7 @@ internal sealed class WorldRenderer
                 _chunkRenderer.Draw(
                     commandList,
                     _worldDescriptorSets[frameIndex],
-                    worldRenderState);
+                    frame.FrameSlot);
                 _selectionRenderer.Draw(
                     commandList,
                     _worldDescriptorSets[frameIndex],

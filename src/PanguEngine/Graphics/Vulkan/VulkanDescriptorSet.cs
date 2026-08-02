@@ -110,6 +110,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
             switch (binding.Type)
             {
                 case DescriptorType.UniformBuffer:
+                case DescriptorType.StorageBuffer:
                     resources.Add(((VulkanBuffer)binding.Buffer!).Lifetime);
                     break;
                 case DescriptorType.CombinedImageSampler:
@@ -163,6 +164,9 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 case DescriptorType.UniformBuffer:
                     WriteUniformBufferDescriptor(bindings[i], bufferInfos, i);
                     break;
+                case DescriptorType.StorageBuffer:
+                    WriteStorageBufferDescriptor(bindings[i], bufferInfos, i);
+                    break;
                 case DescriptorType.CombinedImageSampler:
                     WriteCombinedImageSamplerDescriptor(bindings[i], imageInfos, i);
                     break;
@@ -180,6 +184,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 switch (bindings[i].Type)
                 {
                     case DescriptorType.UniformBuffer:
+                    case DescriptorType.StorageBuffer:
                         pWrites[i].PBufferInfo = pBufferInfos + i;
                         break;
                     case DescriptorType.CombinedImageSampler:
@@ -231,12 +236,44 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         DescriptorBufferInfo[] bufferInfos,
         int index)
     {
+        WriteBufferDescriptor(
+            binding,
+            bufferInfos,
+            index,
+            BufferUsageFlags.UniformBufferBit,
+            VulkanContext.MinUniformBufferOffsetAlignment,
+            "Uniform");
+    }
+
+    private static void WriteStorageBufferDescriptor(
+        DescriptorSetBinding binding,
+        DescriptorBufferInfo[] bufferInfos,
+        int index)
+    {
+        WriteBufferDescriptor(
+            binding,
+            bufferInfos,
+            index,
+            BufferUsageFlags.StorageBufferBit,
+            VulkanContext.MinStorageBufferOffsetAlignment,
+            "Storage");
+    }
+
+    private static void WriteBufferDescriptor(
+        DescriptorSetBinding binding,
+        DescriptorBufferInfo[] bufferInfos,
+        int index,
+        BufferUsageFlags requiredUsage,
+        ulong requiredAlignment,
+        string usageName)
+    {
         var buffer = binding.Buffer as VulkanBuffer
                      ?? throw new InvalidOperationException(
-                         "Descriptor set buffer was not created by the Vulkan backend.");
+                          "Descriptor set buffer was not created by the Vulkan backend.");
         buffer.ThrowIfDestroyed();
-        if (!buffer.Usage.HasFlag(BufferUsageFlags.UniformBufferBit))
-            throw new InvalidOperationException("Descriptor set buffer was not created with Uniform usage.");
+        if (!buffer.Usage.HasFlag(requiredUsage))
+            throw new InvalidOperationException(
+                $"Descriptor set buffer was not created with {usageName} usage.");
         if (binding.Size == 0)
             throw new ArgumentOutOfRangeException(nameof(binding),
                 "Descriptor set buffer binding size must be greater than zero.");
@@ -244,13 +281,12 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
             throw new ArgumentOutOfRangeException(nameof(binding),
                 "Descriptor set buffer offset and size exceed the buffer bounds.");
 
-        var uniformAlignment = VulkanContext.MinUniformBufferOffsetAlignment;
-        if (uniformAlignment == 0)
+        if (requiredAlignment == 0)
             throw new InvalidOperationException(
-                "VulkanContext.MinUniformBufferOffsetAlignment is 0. Ensure VulkanContext is initialized.");
-        if (binding.Offset % uniformAlignment != 0)
+                $"The Vulkan {usageName.ToLowerInvariant()} buffer alignment is 0. Ensure VulkanContext is initialized.");
+        if (binding.Offset % requiredAlignment != 0)
             throw new ArgumentOutOfRangeException(nameof(binding),
-                "Uniform buffer binding offset must satisfy the device uniform buffer alignment requirement.");
+                $"{usageName} buffer binding offset must satisfy the device {usageName.ToLowerInvariant()} buffer alignment requirement.");
 
         bufferInfos[index] = new DescriptorBufferInfo
         {
@@ -291,6 +327,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         return type switch
         {
             DescriptorType.UniformBuffer => VkDescriptorType.UniformBuffer,
+            DescriptorType.StorageBuffer => VkDescriptorType.StorageBuffer,
             DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
             _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
         };

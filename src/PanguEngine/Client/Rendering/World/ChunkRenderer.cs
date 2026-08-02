@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.World;
@@ -11,17 +12,23 @@ namespace PanguEngine.Client.Rendering.World;
 
 internal sealed class ChunkRenderer
 {
+    private const uint ChunkPositionSizeInBytes = 16;
+
     private readonly GraphicsDevice _device;
     private readonly ClientWorld _world;
     private readonly BlockModelManager _models;
     private readonly ChunkMeshBuildQueue _meshBuildQueue;
     private readonly ChunkMeshUpdateState _meshUpdateState = new();
     private readonly ChunkMeshBuildTicket[] _dispatchTickets;
-    private readonly Dictionary<ChunkPos, ChunkMeshResource> _meshes = [];
+    private readonly Dictionary<ChunkPos, ChunkMeshRecord> _meshes = [];
+    private readonly ChunkMeshArena _arena;
+    private readonly ChunkInstanceSlotPool _instanceSlots = new();
+    private readonly ChunkFrameResource[] _frameResources;
     private readonly Shader _vertexShader;
     private readonly Shader _fragmentShader;
     private readonly GraphicsPipeline _pipeline;
     private readonly DescriptorSetLayout _atlasDescriptorLayout;
+    private readonly DescriptorSetLayout _chunkStorageLayout;
     private readonly Sampler _atlasSampler;
     private readonly Texture _atlasTexture;
     private readonly TextureView _atlasView;
@@ -34,7 +41,8 @@ internal sealed class ChunkRenderer
         DescriptorSetLayout cameraLayout,
         TextureFormat depthStencilFormat,
         ClientWorld world,
-        BlockModelManager models)
+        BlockModelManager models,
+        uint maxFramesInFlight)
     {
         _device = device;
         _world = world;
@@ -42,6 +50,8 @@ internal sealed class ChunkRenderer
 
         _atlasDescriptorLayout = _device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
             [new DescriptorSetLayoutBinding(0, DescriptorType.CombinedImageSampler, ShaderStageFlags.Fragment)]));
+        _chunkStorageLayout = _device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
+            [new DescriptorSetLayoutBinding(0, DescriptorType.StorageBuffer, ShaderStageFlags.Vertex)]));
         _atlasSampler = _device.CreateSampler(new SamplerDescription(
             FilterMode.Nearest,
             FilterMode.Nearest,
@@ -72,11 +82,7 @@ internal sealed class ChunkRenderer
             Shaders = [_vertexShader, _fragmentShader],
             VertexInput = ChunkVertex.VertexInput,
             ColorAttachmentFormats = [colorFormat],
-            DescriptorSetLayouts = [cameraLayout, _atlasDescriptorLayout],
-            PushConstantRanges =
-            [
-                new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, 16)
-            ],
+            DescriptorSetLayouts = [cameraLayout, _atlasDescriptorLayout, _chunkStorageLayout],
             Rasterizer = new RasterizerDescription
             {
                 CullMode = CullMode.Back,
@@ -91,6 +97,11 @@ internal sealed class ChunkRenderer
                 default),
             DepthStencilAttachmentFormat = depthStencilFormat
         });
+
+        _arena = new ChunkMeshArena(device);
+        _frameResources = new ChunkFrameResource[checked((int)maxFramesInFlight)];
+        for (var frameIndex = 0; frameIndex < _frameResources.Length; frameIndex++)
+            _frameResources[frameIndex] = CreateFrameResource();
 
         _meshBuildQueue = new ChunkMeshBuildQueue(models);
         _dispatchTickets = new ChunkMeshBuildTicket[_meshBuildQueue.DispatchBudget];
@@ -125,21 +136,36 @@ internal sealed class ChunkRenderer
             exception.Throw();
 
         var mesh = result.Mesh!;
-        if (mesh.IsEmpty)
+        _meshes.TryGetValue(result.Position, out var existingMesh);
+        var transition = ChunkMeshRecordTransitionPlanner.Plan(existingMesh, mesh);
+        ChunkMeshArenaAllocation allocation;
+        switch (transition.Kind)
         {
-            if (_meshes.Remove(result.Position, out var oldMesh))
-                oldMesh.Destroy();
-            return;
+            case ChunkMeshRecordTransitionKind.None:
+                return;
+            case ChunkMeshRecordTransitionKind.Remove:
+                _meshes.Remove(result.Position);
+                _arena.Release(existingMesh!.Allocation);
+                _instanceSlots.Release(transition.InstanceSlot!.Value);
+                return;
+            case ChunkMeshRecordTransitionKind.UploadInPlace:
+                _arena.UploadInPlace(existingMesh!.Allocation, mesh);
+                allocation = existingMesh.Allocation;
+                break;
+            case ChunkMeshRecordTransitionKind.Replace:
+                allocation = _arena.Allocate(mesh);
+                _meshes[result.Position] = new ChunkMeshRecord(allocation, transition.InstanceSlot!.Value);
+                _arena.Release(existingMesh!.Allocation);
+                break;
+            case ChunkMeshRecordTransitionKind.Allocate:
+                allocation = _arena.Allocate(mesh);
+                _meshes.Add(result.Position, new ChunkMeshRecord(allocation, _instanceSlots.Acquire()));
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
         }
 
-        var resource = CreateMeshResource(mesh);
-        if (_meshes.Remove(result.Position, out var replacedMesh))
-            replacedMesh.Destroy();
-        _meshes.Add(result.Position, resource);
-        uploadHandles.Add(resource.VertexUpload);
-        uploadHandles.Add(resource.IndexUpload);
-        _pendingUploads.Add(resource.VertexUpload);
-        _pendingUploads.Add(resource.IndexUpload);
+        TrackUploads(allocation, uploadHandles);
     }
 
     private void DispatchBuildTasks(Vector3D<double> cameraPosition)
@@ -169,14 +195,18 @@ internal sealed class ChunkRenderer
         }
     }
 
-    internal void Draw(
-        CommandList commandList,
-        DescriptorSet cameraDescriptorSet,
-        WorldRenderState worldRenderState)
+    internal void PrepareDraw(uint frameSlot, WorldRenderState worldRenderState)
     {
-        commandList.SetGraphicsPipeline(_pipeline);
-        commandList.SetDescriptorSet(0, cameraDescriptorSet);
-        commandList.SetDescriptorSet(1, _atlasDescriptorSet);
+        var frame = _frameResources[checked((int)frameSlot)];
+        frame.Candidates.Clear();
+        frame.Commands.Clear();
+        frame.Ranges.Clear();
+
+        var requiredStorageCapacity = 1u;
+        foreach (var mesh in _meshes.Values)
+            requiredStorageCapacity = Math.Max(requiredStorageCapacity, checked(mesh.InstanceSlot + 1));
+        EnsureStorageCapacity(frame, requiredStorageCapacity);
+
         var frustum = Frustum<float>.CreateFromZeroToOne(worldRenderState.ViewProjection);
         foreach (var (chunkPosition, mesh) in _meshes)
         {
@@ -185,6 +215,9 @@ internal sealed class ChunkRenderer
                 (double)chunkPosition.Y * Chunk.SizeY,
                 (double)chunkPosition.Z * Chunk.SizeZ);
             var translatedWorldPosition = worldRenderState.ToTranslatedWorldPosition(worldOrigin);
+            frame.StorageBuffer.Write(
+                translatedWorldPosition,
+                checked((ulong)mesh.InstanceSlot * ChunkPositionSizeInBytes));
             var bounds = new Box3D<float>(
                 translatedWorldPosition.X,
                 translatedWorldPosition.Y,
@@ -195,10 +228,36 @@ internal sealed class ChunkRenderer
             if (!frustum.Intersects(bounds))
                 continue;
 
-            commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, translatedWorldPosition);
-            commandList.SetVertexBuffer(0, mesh.VertexBuffer);
-            commandList.SetIndexBuffer(mesh.IndexBuffer, IndexFormat.UInt32);
-            commandList.DrawIndexed(mesh.IndexCount);
+            var allocation = mesh.Allocation;
+            frame.Candidates.Add(new ChunkDrawCandidate(
+                allocation.Page,
+                allocation.IndexCount,
+                allocation.FirstIndex,
+                checked((int)allocation.VertexOffset),
+                mesh.InstanceSlot));
+        }
+
+        frame.DrawBuilder.Build(frame.Candidates, frame.Commands, frame.Ranges);
+        EnsureIndirectCapacity(frame, checked((uint)Math.Max(frame.Commands.Count, 1)));
+        if (frame.Commands.Count > 0)
+            frame.IndirectBuffer.Write(CollectionsMarshal.AsSpan(frame.Commands));
+    }
+
+    internal void Draw(
+        CommandList commandList,
+        DescriptorSet cameraDescriptorSet,
+        uint frameSlot)
+    {
+        var frame = _frameResources[checked((int)frameSlot)];
+        commandList.SetGraphicsPipeline(_pipeline);
+        commandList.SetDescriptorSet(0, cameraDescriptorSet);
+        commandList.SetDescriptorSet(1, _atlasDescriptorSet);
+        commandList.SetDescriptorSet(2, frame.StorageDescriptorSet);
+        foreach (var range in frame.Ranges)
+        {
+            commandList.SetVertexBuffer(0, range.Page.VertexBuffer);
+            commandList.SetIndexBuffer(range.Page.IndexBuffer, IndexFormat.UInt32);
+            commandList.DrawIndexedIndirect(frame.IndirectBuffer, range.DrawCount, range.Offset);
         }
     }
 
@@ -206,9 +265,17 @@ internal sealed class ChunkRenderer
     {
         _world.BlockChanged -= OnBlockChanged;
         _meshBuildQueue.Dispose();
-        foreach (var mesh in _meshes.Values)
-            mesh.Destroy();
         _meshes.Clear();
+        _instanceSlots.Clear();
+        foreach (var frame in _frameResources)
+        {
+            frame.StorageDescriptorSet.Destroy();
+            frame.StorageBuffer.Destroy();
+            frame.IndirectBuffer.Destroy();
+        }
+
+        _arena.Destroy();
+        _chunkStorageLayout.Destroy();
 
         _atlasDescriptorSet.Destroy();
         _atlasView.Destroy();
@@ -269,35 +336,98 @@ internal sealed class ChunkRenderer
         }
     }
 
-    private ChunkMeshResource CreateMeshResource(ChunkMesh mesh)
+    private ChunkFrameResource CreateFrameResource()
     {
-        GraphicsBuffer? vertexBuffer = null;
-        GraphicsBuffer? indexBuffer = null;
+        var storageBuffer = _device.CreateBuffer(new BufferDescription(
+            ChunkPositionSizeInBytes,
+            BufferUsage.Storage,
+            MemoryUsage.CpuToGpu));
+        DescriptorSet? storageDescriptorSet = null;
+        GraphicsBuffer? indirectBuffer = null;
         try
         {
-            vertexBuffer = _device.CreateBuffer(new BufferDescription(
-                checked((ulong)mesh.VertexCount * ChunkVertex.SizeInBytes),
-                BufferUsage.TransferDestination | BufferUsage.Vertex,
-                MemoryUsage.GpuOnly));
-            indexBuffer = _device.CreateBuffer(new BufferDescription(
-                checked((ulong)mesh.IndexCount * sizeof(uint)),
-                BufferUsage.TransferDestination | BufferUsage.Index,
-                MemoryUsage.GpuOnly));
-            var vertexUpload = _device.UploadBuffer(vertexBuffer, mesh.Vertices);
-            var indexUpload = _device.UploadBuffer(indexBuffer, mesh.Indices);
-            return new ChunkMeshResource(
-                vertexBuffer,
-                indexBuffer,
-                vertexUpload,
-                indexUpload,
-                checked((uint)mesh.IndexCount));
+            storageDescriptorSet = _device.CreateDescriptorSet(new DescriptorSetDescription(
+                _chunkStorageLayout,
+                [DescriptorSetBinding.StorageBuffer(0, storageBuffer, 0, storageBuffer.Size)]));
+            indirectBuffer = _device.CreateBuffer(new BufferDescription(
+                IndexedIndirectDrawArguments.SizeInBytes,
+                BufferUsage.Indirect,
+                MemoryUsage.CpuToGpu));
+            return new ChunkFrameResource(storageBuffer, storageDescriptorSet!, indirectBuffer!);
         }
         catch
         {
-            indexBuffer?.Destroy();
-            vertexBuffer?.Destroy();
+            indirectBuffer?.Destroy();
+            storageDescriptorSet?.Destroy();
+            storageBuffer.Destroy();
             throw;
         }
+    }
+
+    private void EnsureStorageCapacity(ChunkFrameResource frame, uint requiredCapacity)
+    {
+        if (frame.StorageCapacity >= requiredCapacity)
+            return;
+
+        var newCapacity = GrowCapacity(frame.StorageCapacity, requiredCapacity);
+        var newBuffer = _device.CreateBuffer(new BufferDescription(
+            checked((ulong)newCapacity * ChunkPositionSizeInBytes),
+            BufferUsage.Storage,
+            MemoryUsage.CpuToGpu));
+        DescriptorSet? newDescriptorSet = null;
+        try
+        {
+            newDescriptorSet = _device.CreateDescriptorSet(new DescriptorSetDescription(
+                _chunkStorageLayout,
+                [DescriptorSetBinding.StorageBuffer(0, newBuffer, 0, newBuffer.Size)]));
+        }
+        catch
+        {
+            newBuffer.Destroy();
+            throw;
+        }
+
+        var oldDescriptorSet = frame.StorageDescriptorSet;
+        var oldBuffer = frame.StorageBuffer;
+        frame.StorageDescriptorSet = newDescriptorSet!;
+        frame.StorageBuffer = newBuffer;
+        frame.StorageCapacity = newCapacity;
+        oldDescriptorSet.Destroy();
+        oldBuffer.Destroy();
+    }
+
+    private void EnsureIndirectCapacity(ChunkFrameResource frame, uint requiredCapacity)
+    {
+        if (frame.IndirectCapacity >= requiredCapacity)
+            return;
+
+        var newCapacity = GrowCapacity(frame.IndirectCapacity, requiredCapacity);
+        var newBuffer = _device.CreateBuffer(new BufferDescription(
+            checked((ulong)newCapacity * IndexedIndirectDrawArguments.SizeInBytes),
+            BufferUsage.Indirect,
+            MemoryUsage.CpuToGpu));
+        var oldBuffer = frame.IndirectBuffer;
+        frame.IndirectBuffer = newBuffer;
+        frame.IndirectCapacity = newCapacity;
+        oldBuffer.Destroy();
+    }
+
+    private static uint GrowCapacity(uint currentCapacity, uint requiredCapacity)
+    {
+        var capacity = currentCapacity;
+        while (capacity < requiredCapacity)
+            capacity = checked(capacity * 2);
+        return capacity;
+    }
+
+    private void TrackUploads(
+        ChunkMeshArenaAllocation allocation,
+        List<UploadHandle> uploadHandles)
+    {
+        uploadHandles.Add(allocation.VertexUpload);
+        uploadHandles.Add(allocation.IndexUpload);
+        _pendingUploads.Add(allocation.VertexUpload);
+        _pendingUploads.Add(allocation.IndexUpload);
     }
 
     private void OnBlockChanged(BlockPos position)
@@ -336,33 +466,35 @@ internal sealed class ChunkRenderer
         _pendingUploads.RemoveAll(handle => handle.IsSucceeded);
     }
 
-    private sealed class ChunkMeshResource
+    private sealed class ChunkFrameResource
     {
-        internal ChunkMeshResource(
-            GraphicsBuffer vertexBuffer,
-            GraphicsBuffer indexBuffer,
-            UploadHandle vertexUpload,
-            UploadHandle indexUpload,
-            uint indexCount)
+        internal ChunkFrameResource(
+            GraphicsBuffer storageBuffer,
+            DescriptorSet storageDescriptorSet,
+            GraphicsBuffer indirectBuffer)
         {
-            VertexBuffer = vertexBuffer;
-            IndexBuffer = indexBuffer;
-            VertexUpload = vertexUpload;
-            IndexUpload = indexUpload;
-            IndexCount = indexCount;
+            StorageBuffer = storageBuffer;
+            StorageDescriptorSet = storageDescriptorSet;
+            IndirectBuffer = indirectBuffer;
         }
 
-        internal GraphicsBuffer VertexBuffer { get; }
-        internal GraphicsBuffer IndexBuffer { get; }
-        internal UploadHandle VertexUpload { get; }
-        internal UploadHandle IndexUpload { get; }
-        internal uint IndexCount { get; }
+        internal GraphicsBuffer StorageBuffer { get; set; }
 
-        internal void Destroy()
-        {
-            IndexBuffer.Destroy();
-            VertexBuffer.Destroy();
-        }
+        internal DescriptorSet StorageDescriptorSet { get; set; }
+
+        internal uint StorageCapacity { get; set; } = 1;
+
+        internal GraphicsBuffer IndirectBuffer { get; set; }
+
+        internal uint IndirectCapacity { get; set; } = 1;
+
+        internal List<ChunkDrawCandidate> Candidates { get; } = [];
+
+        internal List<IndexedIndirectDrawArguments> Commands { get; } = [];
+
+        internal List<ChunkPageDrawRange> Ranges { get; } = [];
+
+        internal ChunkIndirectDrawBuilder DrawBuilder { get; } = new();
     }
 
     private sealed record AtlasResources(
@@ -370,6 +502,142 @@ internal sealed class ChunkRenderer
         TextureView View,
         DescriptorSet DescriptorSet,
         IReadOnlyList<UploadHandle> Uploads);
+}
+
+internal sealed class ChunkInstanceSlotPool
+{
+    private readonly SortedSet<uint> _free = [];
+    private uint _next;
+
+    internal uint Acquire()
+    {
+        if (_free.Count == 0)
+        {
+            var nextSlot = _next;
+            _next = checked(_next + 1);
+            return nextSlot;
+        }
+
+        var slot = _free.Min;
+        _free.Remove(slot);
+        return slot;
+    }
+
+    internal void Release(uint slot)
+    {
+        _free.Add(slot);
+    }
+
+    internal void Clear()
+    {
+        _free.Clear();
+        _next = 0;
+    }
+}
+
+internal readonly record struct ChunkDrawCandidate(
+    ChunkMeshArenaPage Page,
+    uint IndexCount,
+    uint FirstIndex,
+    int VertexOffset,
+    uint InstanceSlot);
+
+internal readonly record struct ChunkPageDrawRange(
+    ChunkMeshArenaPage Page,
+    ulong Offset,
+    uint DrawCount);
+
+internal sealed record ChunkMeshRecord(
+    ChunkMeshArenaAllocation Allocation,
+    uint InstanceSlot);
+
+internal enum ChunkMeshRecordTransitionKind
+{
+    None,
+    Remove,
+    UploadInPlace,
+    Replace,
+    Allocate
+}
+
+internal readonly record struct ChunkMeshRecordTransition(
+    ChunkMeshRecordTransitionKind Kind,
+    uint? InstanceSlot);
+
+internal static class ChunkMeshRecordTransitionPlanner
+{
+    internal static ChunkMeshRecordTransition Plan(ChunkMeshRecord? existing, ChunkMesh mesh)
+    {
+        if (mesh.IsEmpty)
+            return existing is null
+                ? new ChunkMeshRecordTransition(ChunkMeshRecordTransitionKind.None, null)
+                : new ChunkMeshRecordTransition(ChunkMeshRecordTransitionKind.Remove, existing.InstanceSlot);
+        if (existing is null)
+            return new ChunkMeshRecordTransition(ChunkMeshRecordTransitionKind.Allocate, null);
+        return existing.Allocation.CanFit(mesh)
+            ? new ChunkMeshRecordTransition(ChunkMeshRecordTransitionKind.UploadInPlace, existing.InstanceSlot)
+            : new ChunkMeshRecordTransition(ChunkMeshRecordTransitionKind.Replace, existing.InstanceSlot);
+    }
+}
+
+internal sealed class ChunkIndirectDrawBuilder
+{
+    private readonly Dictionary<ChunkMeshArenaPage, int> _groupIndices = [];
+    private readonly List<ChunkCandidateGroup> _groups = [];
+
+    internal void Build(
+        IReadOnlyList<ChunkDrawCandidate> candidates,
+        List<IndexedIndirectDrawArguments> commands,
+        List<ChunkPageDrawRange> ranges)
+    {
+        commands.Clear();
+        ranges.Clear();
+        _groupIndices.Clear();
+        var groupCount = 0;
+        foreach (var candidate in candidates)
+        {
+            if (!_groupIndices.TryGetValue(candidate.Page, out var groupIndex))
+            {
+                groupIndex = groupCount++;
+                if (groupIndex == _groups.Count)
+                    _groups.Add(new ChunkCandidateGroup());
+                _groups[groupIndex].Reset(candidate.Page);
+                _groupIndices.Add(candidate.Page, groupIndex);
+            }
+
+            _groups[groupIndex].Candidates.Add(candidate);
+        }
+
+        for (var groupIndex = 0; groupIndex < groupCount; groupIndex++)
+        {
+            var group = _groups[groupIndex];
+            var offset = checked((ulong)commands.Count * IndexedIndirectDrawArguments.SizeInBytes);
+            foreach (var candidate in group.Candidates)
+            {
+                commands.Add(new IndexedIndirectDrawArguments(
+                    candidate.IndexCount,
+                    1,
+                    candidate.FirstIndex,
+                    candidate.VertexOffset,
+                    candidate.InstanceSlot));
+            }
+
+            ranges.Add(new ChunkPageDrawRange(group.Page, offset, checked((uint)group.Candidates.Count)));
+        }
+    }
+
+    private sealed class ChunkCandidateGroup
+    {
+        internal ChunkMeshArenaPage Page { get; private set; } = null!;
+
+        internal List<ChunkDrawCandidate> Candidates { get; } = [];
+
+        internal void Reset(ChunkMeshArenaPage page)
+        {
+            Page = page;
+            Candidates.Clear();
+        }
+    }
 }
 
 internal readonly record struct ChunkMeshBuildTicket(ChunkPos Position, long Version);

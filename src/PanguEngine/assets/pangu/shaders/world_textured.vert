@@ -12,17 +12,17 @@ layout(set = 0, binding = 0, std140) uniform WorldUniform
     vec4 ambientColor;
 } world;
 
-layout(push_constant) uniform ObjectPushConstants
+layout(set = 2, binding = 0, std430) readonly buffer ChunkData
 {
-    vec4 translatedWorldPosition;
-} objectData;
+    vec4 translatedWorldPositions[];
+} chunks;
 
 layout(location = 0) out vec2 fragTexCoord;
 layout(location = 1) out vec3 fragNormal;
 
 void main()
 {
-    vec3 translatedVertexPosition = inPosition + objectData.translatedWorldPosition.xyz;
+    vec3 translatedVertexPosition = inPosition + chunks.translatedWorldPositions[gl_InstanceIndex].xyz;
     gl_Position = world.viewProjection * vec4(translatedVertexPosition, 1.0);
     fragTexCoord = inTexCoord;
     fragNormal = inNormal;

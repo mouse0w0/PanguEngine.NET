@@ -718,6 +718,12 @@ public static unsafe class VulkanUploader
             DstOffset = upload.DstOffset,
             Size = upload.Size
         };
+        VulkanBarrier.RecordBufferUploadWriteBarrier(
+            commandBuffer,
+            upload.Dst.Buffer,
+            upload.DstOffset,
+            upload.Size,
+            upload.Dst.Usage);
         VulkanContext.Vk.CmdCopyBuffer(
             commandBuffer,
             segment.Buffer.Buffer,

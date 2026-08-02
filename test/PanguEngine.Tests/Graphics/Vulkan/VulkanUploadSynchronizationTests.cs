@@ -51,6 +51,29 @@ public sealed class VulkanUploadSynchronizationTests
     }
 
     [Fact]
+    public void BufferUploadWriteBarrierWaitsForPriorConsumersAndTransfers()
+    {
+        var barrier = VulkanBarrier.CreateBufferUploadWriteBarrier(
+            default,
+            13,
+            7,
+            BufferUsageFlags.TransferDstBit |
+            BufferUsageFlags.VertexBufferBit |
+            BufferUsageFlags.IndexBufferBit);
+
+        Assert.True(barrier.SrcStageMask.HasFlag(PipelineStageFlags2.TransferBit));
+        Assert.True(barrier.SrcStageMask.HasFlag(PipelineStageFlags2.VertexAttributeInputBit));
+        Assert.True(barrier.SrcStageMask.HasFlag(PipelineStageFlags2.IndexInputBit));
+        Assert.True(barrier.SrcAccessMask.HasFlag(AccessFlags2.TransferWriteBit));
+        Assert.True(barrier.SrcAccessMask.HasFlag(AccessFlags2.VertexAttributeReadBit));
+        Assert.True(barrier.SrcAccessMask.HasFlag(AccessFlags2.IndexReadBit));
+        Assert.Equal(PipelineStageFlags2.TransferBit, barrier.DstStageMask);
+        Assert.Equal(AccessFlags2.TransferWriteBit, barrier.DstAccessMask);
+        Assert.Equal(13ul, barrier.Offset);
+        Assert.Equal(7ul, barrier.Size);
+    }
+
+    [Fact]
     public void SampledTextureTakesPriorityAndCoversBothShaderStages()
     {
         var state = VulkanBarrier.GetTextureUploadDestination(

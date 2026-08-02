@@ -11,6 +11,11 @@ public abstract class GraphicsDevice
     public abstract uint MaxTextureDimension2D { get; }
 
     /// <summary>
+    /// Gets the maximum number of draws supported by one indirect draw command.
+    /// </summary>
+    public abstract uint MaxDrawIndirectCount { get; }
+
+    /// <summary>
     /// Creates a buffer with the given description.
     /// </summary>
     /// <param name="description">The buffer description.</param>

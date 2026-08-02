@@ -87,6 +87,16 @@ public static unsafe class VulkanContext
     public static ulong MinUniformBufferOffsetAlignment { get; private set; }
 
     /// <summary>
+    /// Minimum required alignment for storage buffer offsets, in bytes.
+    /// </summary>
+    public static ulong MinStorageBufferOffsetAlignment { get; private set; }
+
+    /// <summary>
+    /// Maximum number of draws supported by one indirect draw command.
+    /// </summary>
+    public static uint MaxDrawIndirectCount { get; private set; }
+
+    /// <summary>
     /// Maximum supported width for one-dimensional images.
     /// </summary>
     public static uint MaxImageDimension1D { get; private set; }
@@ -224,6 +234,8 @@ public static unsafe class VulkanContext
             Vk.GetPhysicalDeviceProperties(PhysicalDevice, out var props);
             Vk.GetPhysicalDeviceFeatures(PhysicalDevice, out var physicalDeviceFeatures);
             MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
+            MinStorageBufferOffsetAlignment = props.Limits.MinStorageBufferOffsetAlignment;
+            MaxDrawIndirectCount = props.Limits.MaxDrawIndirectCount;
             MaxImageDimension1D = props.Limits.MaxImageDimension1D;
             MaxImageDimension2D = props.Limits.MaxImageDimension2D;
             MaxImageDimension3D = props.Limits.MaxImageDimension3D;
@@ -276,6 +288,8 @@ public static unsafe class VulkanContext
             PresentQueueFamily = 0;
             MaxFramesInFlight = 0;
             MinUniformBufferOffsetAlignment = 0;
+            MinStorageBufferOffsetAlignment = 0;
+            MaxDrawIndirectCount = 0;
             MaxImageDimension1D = 0;
             MaxImageDimension2D = 0;
             MaxImageDimension3D = 0;
@@ -453,6 +467,7 @@ public static unsafe class VulkanContext
     {
         var indices = FindQueueFamilies(device, surface);
         var extensionsSupported = CheckDeviceExtensionsSupport(device);
+        Vk.GetPhysicalDeviceFeatures(device, out var features);
 
         var swapChainAdequate = false;
         if (extensionsSupported)
@@ -461,7 +476,11 @@ public static unsafe class VulkanContext
             swapChainAdequate = swapChainSupport.Formats.Length > 0 && swapChainSupport.PresentModes.Length > 0;
         }
 
-        return indices.IsComplete && extensionsSupported && swapChainAdequate;
+        return indices.IsComplete &&
+               extensionsSupported &&
+               swapChainAdequate &&
+               features.MultiDrawIndirect &&
+               features.DrawIndirectFirstInstance;
     }
 
     private static bool CheckDeviceExtensionsSupport(PhysicalDevice device)
@@ -590,7 +609,9 @@ public static unsafe class VulkanContext
 
         PhysicalDeviceFeatures deviceFeatures = new()
         {
-            SamplerAnisotropy = SamplerAnisotropySupported
+            SamplerAnisotropy = SamplerAnisotropySupported,
+            MultiDrawIndirect = true,
+            DrawIndirectFirstInstance = true
         };
 
         PhysicalDeviceVulkan12Features vulkan12Features = new()

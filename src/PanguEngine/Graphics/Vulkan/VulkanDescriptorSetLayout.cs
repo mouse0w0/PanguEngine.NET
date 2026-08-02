@@ -98,6 +98,7 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
         return type switch
         {
             DescriptorType.UniformBuffer => VkDescriptorType.UniformBuffer,
+            DescriptorType.StorageBuffer => VkDescriptorType.StorageBuffer,
             DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
             _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
         };

@@ -113,6 +113,45 @@ internal static unsafe class VulkanBarrier
         VulkanContext.Vk.CmdPipelineBarrier2(commandBuffer, &dependency);
     }
 
+    internal static BufferMemoryBarrier2 CreateBufferUploadWriteBarrier(
+        VkBuffer buffer,
+        ulong offset,
+        ulong size,
+        BufferUsageFlags usage)
+    {
+        var source = GetBufferUploadDestination(usage);
+        return new BufferMemoryBarrier2
+        {
+            SType = StructureType.BufferMemoryBarrier2,
+            SrcStageMask = source.Stage,
+            SrcAccessMask = source.Access,
+            DstStageMask = PipelineStageFlags2.TransferBit,
+            DstAccessMask = AccessFlags2.TransferWriteBit,
+            SrcQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            DstQueueFamilyIndex = Vk.QueueFamilyIgnored,
+            Buffer = buffer,
+            Offset = offset,
+            Size = size
+        };
+    }
+
+    internal static void RecordBufferUploadWriteBarrier(
+        CommandBuffer commandBuffer,
+        VkBuffer buffer,
+        ulong offset,
+        ulong size,
+        BufferUsageFlags usage)
+    {
+        var barrier = CreateBufferUploadWriteBarrier(buffer, offset, size, usage);
+        DependencyInfo dependency = new()
+        {
+            SType = StructureType.DependencyInfo,
+            BufferMemoryBarrierCount = 1,
+            PBufferMemoryBarriers = &barrier
+        };
+        VulkanContext.Vk.CmdPipelineBarrier2(commandBuffer, &dependency);
+    }
+
     /// <summary>
     /// Records a single image memory barrier via <c>vkCmdPipelineBarrier2</c>.
     /// </summary>

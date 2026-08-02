@@ -11,6 +11,11 @@ public enum DescriptorType
     UniformBuffer,
 
     /// <summary>
+    /// A storage buffer binding.
+    /// </summary>
+    StorageBuffer,
+
+    /// <summary>
     /// A sampled texture and sampler binding.
     /// </summary>
     CombinedImageSampler

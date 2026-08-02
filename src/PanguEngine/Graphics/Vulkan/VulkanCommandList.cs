@@ -395,6 +395,81 @@ internal sealed unsafe class VulkanCommandList : CommandList
     }
 
     /// <inheritdoc/>
+    public override void DrawIndexedIndirect(
+        Buffer indirectBuffer,
+        uint drawCount,
+        ulong offset = 0,
+        uint stride = IndexedIndirectDrawArguments.SizeInBytes)
+    {
+        EnsureRecording();
+        if (!_rendering)
+            throw new InvalidOperationException("Draw commands must be recorded inside an active rendering operation.");
+        ArgumentNullException.ThrowIfNull(indirectBuffer);
+
+        var vulkanBuffer = indirectBuffer as VulkanBuffer
+                           ?? throw new InvalidOperationException(
+                               "Graphics buffer was not created by the Vulkan backend.");
+        vulkanBuffer.ThrowIfDestroyed();
+        if (!vulkanBuffer.Usage.HasFlag(BufferUsageFlags.IndirectBufferBit))
+            throw new InvalidOperationException("Buffer was not created with Indirect usage.");
+
+        ValidateIndexedIndirectDraw(
+            vulkanBuffer.Size,
+            VulkanContext.MaxDrawIndirectCount,
+            drawCount,
+            offset,
+            stride);
+
+        TrackResource(vulkanBuffer.Lifetime);
+        VulkanContext.Vk.CmdDrawIndexedIndirect(
+            _commandBuffer,
+            vulkanBuffer.Buffer,
+            offset,
+            drawCount,
+            stride);
+    }
+
+    internal static void ValidateIndexedIndirectDraw(
+        ulong bufferSize,
+        uint maxDrawCount,
+        uint drawCount,
+        ulong offset,
+        uint stride)
+    {
+        if (drawCount > maxDrawCount)
+            throw new ArgumentOutOfRangeException(nameof(drawCount),
+                "Draw count exceeds the device indirect draw limit.");
+        if ((offset & 3) != 0)
+            throw new ArgumentOutOfRangeException(nameof(offset),
+                "Indirect draw offset must be a multiple of four bytes.");
+        if (drawCount == 0)
+            return;
+        if (drawCount > 1 &&
+            (stride < IndexedIndirectDrawArguments.SizeInBytes || (stride & 3) != 0))
+            throw new ArgumentOutOfRangeException(nameof(stride),
+                "Indirect draw stride must be at least 20 bytes and a multiple of four bytes.");
+
+        ulong end;
+        try
+        {
+            end = drawCount == 1
+                ? checked(offset + IndexedIndirectDrawArguments.SizeInBytes)
+                : checked(offset +
+                          checked((ulong)(drawCount - 1) * stride) +
+                          IndexedIndirectDrawArguments.SizeInBytes);
+        }
+        catch (OverflowException)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset),
+                "Indirect draw command range exceeds the supported address range.");
+        }
+
+        if (end > bufferSize)
+            throw new ArgumentOutOfRangeException(nameof(offset),
+                "Indirect draw command range exceeds the buffer bounds.");
+    }
+
+    /// <inheritdoc/>
     public override void EndRendering()
     {
         EnsureRecording();

@@ -98,6 +98,19 @@ public abstract class CommandList
         uint firstInstance = 0);
 
     /// <summary>
+    /// Records indexed draw commands whose parameters are read from a buffer.
+    /// </summary>
+    /// <param name="indirectBuffer">The buffer containing indexed draw parameters.</param>
+    /// <param name="drawCount">The number of draws to execute.</param>
+    /// <param name="offset">The byte offset of the first draw parameter.</param>
+    /// <param name="stride">The byte stride between draw parameters.</param>
+    public abstract void DrawIndexedIndirect(
+        Buffer indirectBuffer,
+        uint drawCount,
+        ulong offset = 0,
+        uint stride = IndexedIndirectDrawArguments.SizeInBytes);
+
+    /// <summary>
     /// Ends the active rendering operation.
     /// </summary>
     public abstract void EndRendering();

@@ -57,9 +57,19 @@ public readonly record struct DescriptorSetBinding
     /// <param name="offset">The byte offset into the buffer.</param>
     /// <param name="size">The number of bytes to bind.</param>
     public DescriptorSetBinding(uint binding, Buffer buffer, ulong offset, ulong size)
+        : this(binding, DescriptorType.UniformBuffer, buffer, offset, size)
+    {
+    }
+
+    private DescriptorSetBinding(
+        uint binding,
+        DescriptorType type,
+        Buffer buffer,
+        ulong offset,
+        ulong size)
     {
         Binding = binding;
-        Type = DescriptorType.UniformBuffer;
+        Type = type;
         Buffer = buffer;
         Offset = offset;
         Size = size;
@@ -81,6 +91,19 @@ public readonly record struct DescriptorSetBinding
     public static DescriptorSetBinding UniformBuffer(uint binding, Buffer buffer, ulong offset, ulong size)
     {
         return new DescriptorSetBinding(binding, buffer, offset, size);
+    }
+
+    /// <summary>
+    /// Creates a storage buffer descriptor binding.
+    /// </summary>
+    /// <param name="binding">The shader binding index.</param>
+    /// <param name="buffer">The buffer to bind.</param>
+    /// <param name="offset">The byte offset into the buffer.</param>
+    /// <param name="size">The number of bytes to bind.</param>
+    /// <returns>The descriptor binding.</returns>
+    public static DescriptorSetBinding StorageBuffer(uint binding, Buffer buffer, ulong offset, ulong size)
+    {
+        return new DescriptorSetBinding(binding, DescriptorType.StorageBuffer, buffer, offset, size);
     }
 
     public static DescriptorSetBinding CombinedImageSampler(uint binding, TextureView textureView, Sampler sampler)
