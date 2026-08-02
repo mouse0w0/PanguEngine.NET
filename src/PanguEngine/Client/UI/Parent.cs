@@ -38,6 +38,9 @@ public abstract class Parent : UiNode
     protected void AddChild(UiNode child) =>
         InsertChild(_children.Count, child);
 
+    internal void AddChildFromCollection(UiNode child) =>
+        AddChild(child);
+
     /// <summary>
     /// Inserts a child at an index, moving it from another parent when necessary.
     /// </summary>
@@ -78,6 +81,9 @@ public abstract class Parent : UiNode
         InvalidateTreeStructure(child);
     }
 
+    internal void InsertChildFromCollection(int index, UiNode child) =>
+        InsertChild(index, child);
+
     /// <summary>
     /// Removes a direct child from this parent.
     /// </summary>
@@ -97,14 +103,17 @@ public abstract class Parent : UiNode
         if (index < 0)
             return false;
 
-        var dispatcher = ActiveDispatcher;
-        dispatcher?.VerifyAccess();
-        _children.RemoveAt(index);
-        child.SetParent(null);
-        if (dispatcher is not null)
-            child.SetActiveDispatcherRecursive(null);
-        InvalidateTreeStructure(child);
+        RemoveChildAt(index);
         return true;
+    }
+
+    internal bool RemoveChildFromCollection(UiNode child) =>
+        RemoveChild(child);
+
+    internal void RemoveChildAtFromCollection(int index)
+    {
+        VerifyChildIndex(index);
+        RemoveChildAt(index);
     }
 
     /// <summary>
@@ -134,27 +143,79 @@ public abstract class Parent : UiNode
         InvalidateTreeStructure(this);
     }
 
+    internal void ClearChildrenFromCollection() =>
+        ClearChildren();
+
+    internal void ReplaceChildFromCollection(int index, UiNode child)
+    {
+        ArgumentNullException.ThrowIfNull(child);
+        VerifyChildIndex(index);
+        var replacedChild = _children[index];
+        if (ReferenceEquals(replacedChild, child))
+            return;
+
+        ValidateInsertion(child);
+        var oldParent = child.Parent;
+        var oldDispatcher = child.ActiveDispatcher;
+        var newDispatcher = ActiveDispatcher;
+        VerifyDispatchers(oldDispatcher, newDispatcher);
+
+        if (oldParent is not null)
+            oldParent._children.RemoveAt(oldParent._children.IndexOf(child));
+
+        child.SetParent(this);
+        _children[index] = child;
+        if (!ReferenceEquals(oldDispatcher, newDispatcher))
+            child.SetActiveDispatcherRecursive(newDispatcher);
+
+        replacedChild.SetParent(null);
+        if (newDispatcher is not null)
+            replacedChild.SetActiveDispatcherRecursive(null);
+
+        oldParent?.InvalidateTreeStructure(child);
+        InvalidateTreeStructure(child);
+    }
+
+    internal void MoveChildFromCollection(int oldIndex, int newIndex)
+    {
+        VerifyChildIndex(oldIndex);
+        VerifyChildIndex(newIndex);
+        MoveChild(oldIndex, newIndex);
+    }
+
     internal void MoveChildToFront(UiNode child)
     {
         var index = GetChildIndex(child);
-        if (index == _children.Count - 1)
-            return;
-
-        ActiveDispatcher?.VerifyAccess();
-        _children.RemoveAt(index);
-        _children.Add(child);
-        InvalidateTreeStructure(child);
+        MoveChild(index, _children.Count - 1);
     }
 
     internal void MoveChildToBack(UiNode child)
     {
         var index = GetChildIndex(child);
-        if (index == 0)
+        MoveChild(index, 0);
+    }
+
+    private void RemoveChildAt(int index)
+    {
+        var child = _children[index];
+        var dispatcher = ActiveDispatcher;
+        dispatcher?.VerifyAccess();
+        _children.RemoveAt(index);
+        child.SetParent(null);
+        if (dispatcher is not null)
+            child.SetActiveDispatcherRecursive(null);
+        InvalidateTreeStructure(child);
+    }
+
+    private void MoveChild(int oldIndex, int newIndex)
+    {
+        if (oldIndex == newIndex)
             return;
 
         ActiveDispatcher?.VerifyAccess();
-        _children.RemoveAt(index);
-        _children.Insert(0, child);
+        var child = _children[oldIndex];
+        _children.RemoveAt(oldIndex);
+        _children.Insert(newIndex, child);
         InvalidateTreeStructure(child);
     }
 
@@ -189,5 +250,11 @@ public abstract class Parent : UiNode
             throw new InvalidOperationException("The UI node is not a child of this parent.");
 
         return index;
+    }
+
+    private void VerifyChildIndex(int index)
+    {
+        if ((uint)index >= (uint)_children.Count)
+            throw new ArgumentOutOfRangeException(nameof(index));
     }
 }

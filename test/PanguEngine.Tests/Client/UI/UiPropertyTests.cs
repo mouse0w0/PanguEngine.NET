@@ -12,6 +12,7 @@ public sealed class UiPropertyTests
 
         Assert.Equal(nameof(TestNode.Value), property.Name);
         Assert.Equal(typeof(TestNode), property.OwnerType);
+        Assert.Equal(typeof(TestNode), property.TargetType);
         Assert.Equal(typeof(int), property.ValueType);
         Assert.Equal(10, property.DefaultValue);
         Assert.Equal(UiPropertyInvalidation.Measure, property.Invalidation);
@@ -72,6 +73,75 @@ public sealed class UiPropertyTests
             UiProperty.Register<TestNode, int>(nameof(TestNode.Value), 20));
         Assert.Throws<InvalidOperationException>(() =>
             UiProperty.Register<TestNode, string>(nameof(TestNode.Value), "duplicate"));
+    }
+
+    [Fact]
+    public void AttachedPropertySeparatesOwnerAndTargetTypes()
+    {
+        var property = AttachedOwner.ValueProperty;
+
+        Assert.Equal("Value", property.Name);
+        Assert.Equal(typeof(AttachedOwner), property.OwnerType);
+        Assert.Equal(typeof(AttachedTarget), property.TargetType);
+        Assert.Equal(typeof(int), property.ValueType);
+        Assert.Equal(7, property.DefaultValue);
+        Assert.Equal(UiPropertyInvalidation.Arrange, property.Invalidation);
+    }
+
+    [Fact]
+    public void AttachedPropertyCanBeStoredOnTargetAndDerivedTarget()
+    {
+        var target = new AttachedTarget();
+        var derived = new DerivedAttachedTarget();
+        var changes = new List<(int OldValue, int NewValue)>();
+        using var subscription = target.Subscribe(
+            AttachedOwner.ValueProperty,
+            (_, args) => changes.Add((args.OldValue, args.NewValue)));
+
+        target.SetValue(AttachedOwner.ValueProperty, 9);
+        derived.SetValue(AttachedOwner.ValueProperty, 11);
+
+        Assert.Equal(9, target.GetValue(AttachedOwner.ValueProperty));
+        Assert.Equal(11, derived.GetValue(AttachedOwner.ValueProperty));
+        Assert.Equal([(7, 9)], changes);
+
+        target.ClearValue(AttachedOwner.ValueProperty);
+
+        Assert.Equal(7, target.GetValue(AttachedOwner.ValueProperty));
+        Assert.Equal([(7, 9), (9, 7)], changes);
+    }
+
+    [Fact]
+    public void AttachedPropertyRejectsUnrelatedTargetAcrossPropertyEntrypoints()
+    {
+        var node = new ForeignNode();
+        var source = new AttachedTarget();
+
+        Assert.Throws<ArgumentException>(() => node.GetValue(AttachedOwner.ValueProperty));
+        Assert.Throws<ArgumentException>(() => node.SetValue(AttachedOwner.ValueProperty, 1));
+        Assert.Throws<ArgumentException>(() => node.ClearValue(AttachedOwner.ValueProperty));
+        Assert.Throws<ArgumentException>(() =>
+            node.Subscribe(AttachedOwner.ValueProperty, (_, _) => { }));
+        Assert.Throws<ArgumentException>(() =>
+            node.SubscribeWeak(AttachedOwner.ValueProperty, (_, _) => { }));
+        Assert.Throws<ArgumentException>(() =>
+            node.Bind(AttachedOwner.ValueProperty, source, AttachedOwner.ValueProperty));
+        Assert.Throws<ArgumentException>(() => node.IsBound(AttachedOwner.ValueProperty));
+        Assert.Throws<ArgumentException>(() => node.Unbind(AttachedOwner.ValueProperty));
+    }
+
+    [Fact]
+    public void AttachedRegistrationUsesOwnerAndNameAsTheUniqueKey()
+    {
+        var name = $"Attached_{Guid.NewGuid():N}";
+        _ = UiProperty.RegisterAttached<AttachedOwner, AttachedTarget, int>(name);
+
+        Assert.Throws<InvalidOperationException>(() =>
+            UiProperty.Register<AttachedOwner, int>(name));
+        Assert.Throws<InvalidOperationException>(() =>
+            UiProperty.RegisterAttached<AttachedOwner, DerivedAttachedTarget, int>(name));
+        Assert.Throws<InvalidOperationException>(() =>
+            UiProperty.RegisterAttached<AttachedOwner, AttachedTarget, string>(name));
     }
 
     [Fact]
@@ -377,6 +447,23 @@ public sealed class UiPropertyTests
     }
 
     private sealed class ConcurrentNode : UiNode
+    {
+    }
+
+    private sealed class AttachedOwner : UiNode
+    {
+        internal static readonly UiProperty<int> ValueProperty =
+            UiProperty.RegisterAttached<AttachedOwner, AttachedTarget, int>(
+                "Value",
+                7,
+                UiPropertyInvalidation.Arrange);
+    }
+
+    private class AttachedTarget : UiNode
+    {
+    }
+
+    private sealed class DerivedAttachedTarget : AttachedTarget
     {
     }
 
