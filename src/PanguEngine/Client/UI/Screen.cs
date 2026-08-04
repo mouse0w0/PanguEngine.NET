@@ -3,7 +3,7 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Represents a UI screen with a retained root node.
 /// </summary>
-public class Screen
+public partial class Screen
 {
     private UiManager? _owner;
 

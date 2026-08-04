@@ -16,5 +16,8 @@ public enum UiPropertyInvalidation
     Arrange = 1 << 1,
 
     /// <summary>Rendering may need to be recalculated.</summary>
-    Render = 1 << 2
+    Render = 1 << 2,
+
+    /// <summary>Input eligibility or hit testing may need to be recalculated.</summary>
+    Input = 1 << 3
 }

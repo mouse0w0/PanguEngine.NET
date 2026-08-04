@@ -41,7 +41,12 @@ public abstract partial class UiNode
 
     internal UiDispatcher? ActiveDispatcher { get; private set; }
 
-    internal void AttachToTree(UiDispatcher dispatcher)
+    /// <summary>
+    /// Gets the active screen that contains this node.
+    /// </summary>
+    public Screen? ActiveScreen { get; private set; }
+
+    internal void AttachToTree(UiDispatcher dispatcher, Screen? screen = null)
     {
         ArgumentNullException.ThrowIfNull(dispatcher);
         if (Parent is not null)
@@ -50,7 +55,7 @@ public abstract partial class UiNode
             throw new InvalidOperationException("The UI node is already attached to an active UI tree.");
 
         dispatcher.VerifyAccess();
-        SetActiveDispatcherRecursive(dispatcher);
+        SetActiveTreeRecursive(dispatcher, screen);
     }
 
     internal void DetachFromTree()
@@ -62,20 +67,35 @@ public abstract partial class UiNode
             return;
 
         dispatcher.VerifyAccess();
-        SetActiveDispatcherRecursive(null);
+        var detachedNodes = new List<UiNode>();
+        CollectSubtree(detachedNodes);
+        var screen = ActiveScreen;
+        SetActiveTreeRecursive(null, null);
+        screen?.HandleSubtreesDetached(detachedNodes);
     }
 
     internal void SetParent(Parent? parent) =>
         Parent = parent;
 
-    internal void SetActiveDispatcherRecursive(UiDispatcher? dispatcher)
+    internal void SetActiveTreeRecursive(UiDispatcher? dispatcher, Screen? screen)
     {
         ActiveDispatcher = dispatcher;
+        ActiveScreen = screen;
         if (this is not Parent parent)
             return;
 
         foreach (var child in parent.Children)
-            child.SetActiveDispatcherRecursive(dispatcher);
+            child.SetActiveTreeRecursive(dispatcher, screen);
+    }
+
+    internal void CollectSubtree(List<UiNode> nodes)
+    {
+        nodes.Add(this);
+        if (this is not Parent parent)
+            return;
+
+        foreach (var child in parent.Children)
+            child.CollectSubtree(nodes);
     }
 
     internal void InvalidateTreeStructure(UiNode source)

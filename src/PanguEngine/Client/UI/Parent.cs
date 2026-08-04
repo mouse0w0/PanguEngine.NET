@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Runtime.ExceptionServices;
 
 namespace PanguEngine.Client.UI;
 
@@ -7,6 +8,14 @@ namespace PanguEngine.Client.UI;
 /// </summary>
 public abstract class Parent : UiNode
 {
+    /// <summary>
+    /// Identifies the <see cref="ClipToBounds"/> property.
+    /// </summary>
+    public static readonly UiProperty<bool> ClipToBoundsProperty =
+        UiProperty.Register<Parent, bool>(
+            nameof(ClipToBounds),
+            invalidation: UiPropertyInvalidation.Input | UiPropertyInvalidation.Render);
+
     private readonly List<UiNode> _children = [];
     private readonly ReadOnlyCollection<UiNode> _readOnlyChildren;
 
@@ -22,6 +31,15 @@ public abstract class Parent : UiNode
     /// Gets a stable read-only view of the direct children in drawing order.
     /// </summary>
     public IReadOnlyList<UiNode> Children => _readOnlyChildren;
+
+    /// <summary>
+    /// Gets or sets whether descendants are clipped to this parent's local layout bounds.
+    /// </summary>
+    public bool ClipToBounds
+    {
+        get => GetValue(ClipToBoundsProperty);
+        set => SetValue(ClipToBoundsProperty, value);
+    }
 
     /// <summary>
     /// Adds a child after all existing children, moving it from another parent when necessary.
@@ -66,19 +84,25 @@ public abstract class Parent : UiNode
         ValidateInsertion(child);
         var oldParent = child.Parent;
         var oldDispatcher = child.ActiveDispatcher;
+        var oldScreen = child.ActiveScreen;
         var newDispatcher = ActiveDispatcher;
+        var newScreen = ActiveScreen;
         VerifyDispatchers(oldDispatcher, newDispatcher);
+        var detachedGroups = new Dictionary<Screen, List<UiNode>>(ReferenceEqualityComparer.Instance);
+        if (oldScreen is not null && !ReferenceEquals(oldScreen, newScreen))
+            AddDetachedNodes(detachedGroups, oldScreen, child);
 
         if (oldParent is not null)
             oldParent._children.RemoveAt(oldParent._children.IndexOf(child));
 
         child.SetParent(this);
         _children.Insert(index, child);
-        if (!ReferenceEquals(oldDispatcher, newDispatcher))
-            child.SetActiveDispatcherRecursive(newDispatcher);
+        if (!ReferenceEquals(oldDispatcher, newDispatcher) || !ReferenceEquals(oldScreen, newScreen))
+            child.SetActiveTreeRecursive(newDispatcher, newScreen);
 
         oldParent?.InvalidateTreeStructure(child);
         InvalidateTreeStructure(child);
+        NotifyDetached(detachedGroups);
     }
 
     internal void InsertChildFromCollection(int index, UiNode child) =>
@@ -132,15 +156,23 @@ public abstract class Parent : UiNode
 
         var dispatcher = ActiveDispatcher;
         dispatcher?.VerifyAccess();
+        var detachedGroups = new Dictionary<Screen, List<UiNode>>(ReferenceEqualityComparer.Instance);
+        foreach (var child in _children)
+        {
+            if (child.ActiveScreen is not null)
+                AddDetachedNodes(detachedGroups, child.ActiveScreen, child);
+        }
+
         foreach (var child in _children)
         {
             child.SetParent(null);
             if (dispatcher is not null)
-                child.SetActiveDispatcherRecursive(null);
+                child.SetActiveTreeRecursive(null, null);
         }
 
         _children.Clear();
         InvalidateTreeStructure(this);
+        NotifyDetached(detachedGroups);
     }
 
     internal void ClearChildrenFromCollection() =>
@@ -157,23 +189,30 @@ public abstract class Parent : UiNode
         ValidateInsertion(child);
         var oldParent = child.Parent;
         var oldDispatcher = child.ActiveDispatcher;
+        var oldScreen = child.ActiveScreen;
         var newDispatcher = ActiveDispatcher;
+        var newScreen = ActiveScreen;
         VerifyDispatchers(oldDispatcher, newDispatcher);
-
+        var detachedGroups = new Dictionary<Screen, List<UiNode>>(ReferenceEqualityComparer.Instance);
+        if (oldScreen is not null && !ReferenceEquals(oldScreen, newScreen))
+            AddDetachedNodes(detachedGroups, oldScreen, child);
+        if (replacedChild.ActiveScreen is not null)
+            AddDetachedNodes(detachedGroups, replacedChild.ActiveScreen, replacedChild);
         if (oldParent is not null)
             oldParent._children.RemoveAt(oldParent._children.IndexOf(child));
 
         child.SetParent(this);
         _children[index] = child;
-        if (!ReferenceEquals(oldDispatcher, newDispatcher))
-            child.SetActiveDispatcherRecursive(newDispatcher);
+        if (!ReferenceEquals(oldDispatcher, newDispatcher) || !ReferenceEquals(oldScreen, newScreen))
+            child.SetActiveTreeRecursive(newDispatcher, newScreen);
 
         replacedChild.SetParent(null);
         if (newDispatcher is not null)
-            replacedChild.SetActiveDispatcherRecursive(null);
+            replacedChild.SetActiveTreeRecursive(null, null);
 
         oldParent?.InvalidateTreeStructure(child);
         InvalidateTreeStructure(child);
+        NotifyDetached(detachedGroups);
     }
 
     internal void MoveChildFromCollection(int oldIndex, int newIndex)
@@ -200,11 +239,14 @@ public abstract class Parent : UiNode
         var child = _children[index];
         var dispatcher = ActiveDispatcher;
         dispatcher?.VerifyAccess();
+        var screen = child.ActiveScreen;
+        var detachedNodes = screen is null ? null : SnapshotSubtree(child);
         _children.RemoveAt(index);
         child.SetParent(null);
         if (dispatcher is not null)
-            child.SetActiveDispatcherRecursive(null);
+            child.SetActiveTreeRecursive(null, null);
         InvalidateTreeStructure(child);
+        screen?.HandleSubtreesDetached(detachedNodes!);
     }
 
     private void MoveChild(int oldIndex, int newIndex)
@@ -241,6 +283,54 @@ public abstract class Parent : UiNode
         oldDispatcher?.VerifyAccess();
         if (!ReferenceEquals(oldDispatcher, newDispatcher))
             newDispatcher?.VerifyAccess();
+    }
+
+    private static List<UiNode> SnapshotSubtree(UiNode root)
+    {
+        var nodes = new List<UiNode>();
+        root.CollectSubtree(nodes);
+        return nodes;
+    }
+
+    private static void AddDetachedNodes(
+        Dictionary<Screen, List<UiNode>> groups,
+        Screen screen,
+        UiNode root)
+    {
+        if (!groups.TryGetValue(screen, out var nodes))
+        {
+            nodes = [];
+            groups.Add(screen, nodes);
+        }
+
+        root.CollectSubtree(nodes);
+    }
+
+    private static void NotifyDetached(Dictionary<Screen, List<UiNode>> groups)
+    {
+        if (groups.Count == 0)
+            return;
+
+        var errors = new List<Exception>();
+        foreach (var (screen, nodes) in groups)
+        {
+            try
+            {
+                screen.HandleSubtreesDetached(nodes);
+            }
+            catch (Exception exception)
+            {
+                if (exception is AggregateException aggregate)
+                    errors.AddRange(aggregate.InnerExceptions);
+                else
+                    errors.Add(exception);
+            }
+        }
+
+        if (errors.Count == 1)
+            ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        if (errors.Count > 1)
+            throw new AggregateException(errors);
     }
 
     private int GetChildIndex(UiNode child)

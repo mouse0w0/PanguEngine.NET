@@ -1,3 +1,5 @@
+using PanguEngine.Input;
+
 namespace PanguEngine.Client.UI;
 
 /// <summary>
@@ -57,9 +59,10 @@ public sealed class UiManager
                 VerifyRootCanAttach(screen);
             }
 
+            screen.ResetInputStateForOpening();
             screen.InvokeOpening(this);
             VerifyRootCanAttach(screen);
-            screen.Root.AttachToTree(Dispatcher);
+            screen.Root.AttachToTree(Dispatcher, screen);
             CurrentScreen = screen;
             releaseCandidate = false;
 
@@ -143,6 +146,9 @@ public sealed class UiManager
             {
                 _isLayingOut = false;
             }
+
+            if (ReferenceEquals(CurrentScreen, screen))
+                screen.RefreshPointerAfterLayout();
         }
         finally
         {
@@ -173,20 +179,88 @@ public sealed class UiManager
         ThrowLifecycleErrors(errors);
     }
 
+    internal void ProcessPointerMoved(Point position)
+    {
+        Dispatcher.VerifyAccess();
+        CurrentScreen?.ProcessPointerMoved(position);
+    }
+
+    internal void ProcessPointerPressed(
+        Point position,
+        MouseButton button,
+        KeyModifiers modifiers)
+    {
+        Dispatcher.VerifyAccess();
+        Screen.VerifyMouseButton(button);
+        CurrentScreen?.ProcessPointerPressed(position, button, modifiers);
+    }
+
+    internal void ProcessPointerReleased(
+        Point position,
+        MouseButton button,
+        KeyModifiers modifiers)
+    {
+        Dispatcher.VerifyAccess();
+        Screen.VerifyMouseButton(button);
+        CurrentScreen?.ProcessPointerReleased(position, button, modifiers);
+    }
+
+    internal void ProcessPointerWheel(Point position, double deltaX, double deltaY)
+    {
+        Dispatcher.VerifyAccess();
+        Screen.VerifyWheelDelta(deltaX, nameof(deltaX));
+        Screen.VerifyWheelDelta(deltaY, nameof(deltaY));
+        CurrentScreen?.ProcessPointerWheel(position, deltaX, deltaY);
+    }
+
+    internal void ProcessKeyDown(Key key, KeyModifiers modifiers)
+    {
+        Dispatcher.VerifyAccess();
+        CurrentScreen?.ProcessKeyDown(key, modifiers);
+    }
+
+    internal void ProcessKeyUp(Key key, KeyModifiers modifiers)
+    {
+        Dispatcher.VerifyAccess();
+        CurrentScreen?.ProcessKeyUp(key, modifiers);
+    }
+
     private void CloseCurrent()
     {
         var screen = CurrentScreen!;
         screen.InvokeClosing(this);
-        screen.Root.DetachFromTree();
+        var errors = new List<Exception>();
+        try
+        {
+            screen.Root.DetachFromTree();
+        }
+        catch (Exception exception)
+        {
+            AddLifecycleErrors(errors, exception);
+        }
+
+        if (screen.Root.ActiveDispatcher is not null)
+        {
+            ThrowLifecycleErrors(errors);
+            return;
+        }
+
+        screen.ClearInputStateAfterClose();
         CurrentScreen = null;
         try
         {
             screen.InvokeClosed(this);
         }
+        catch (Exception exception)
+        {
+            AddLifecycleErrors(errors, exception);
+        }
         finally
         {
             screen.Release(this);
         }
+
+        ThrowLifecycleErrors(errors);
     }
 
     private void ForceCloseCurrent(List<Exception> errors)
@@ -201,10 +275,22 @@ public sealed class UiManager
         }
         catch (Exception exception)
         {
-            errors.Add(exception);
+            AddLifecycleErrors(errors, exception);
         }
 
-        screen.Root.DetachFromTree();
+        try
+        {
+            screen.Root.DetachFromTree();
+        }
+        catch (Exception exception)
+        {
+            AddLifecycleErrors(errors, exception);
+        }
+
+        if (screen.Root.ActiveDispatcher is not null)
+            return;
+
+        screen.ClearInputStateAfterClose();
         CurrentScreen = null;
         try
         {
@@ -212,7 +298,7 @@ public sealed class UiManager
         }
         catch (Exception exception)
         {
-            errors.Add(exception);
+            AddLifecycleErrors(errors, exception);
         }
         finally
         {
@@ -240,5 +326,13 @@ public sealed class UiManager
             throw errors[0];
         if (errors.Count > 1)
             throw new AggregateException(errors);
+    }
+
+    private static void AddLifecycleErrors(List<Exception> errors, Exception exception)
+    {
+        if (exception is AggregateException aggregate)
+            errors.AddRange(aggregate.InnerExceptions);
+        else
+            errors.Add(exception);
     }
 }
