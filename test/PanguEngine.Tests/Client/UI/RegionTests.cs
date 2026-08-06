@@ -411,13 +411,13 @@ public sealed class RegionTests
     [Fact]
     public void ActiveRegionRejectsWrongThreadRenderPropertyPathsWithoutPartialState()
     {
-        var dispatcher = new UiDispatcher();
         var region = new TestRegion();
         var original = new SolidColorBrush(new Color(10, 20, 30));
         var changed = new SolidColorBrush(new Color(40, 50, 60));
         region.Background = original;
+        var screen = new UiScreen(region);
         ValidateLayout(region);
-        region.AttachToTree(dispatcher);
+        screen.Open();
 
         var setterError = RunOnBackgroundThread(
             () => Record.Exception(() => region.Background = changed));
@@ -462,8 +462,7 @@ public sealed class RegionTests
         Assert.True(region.IsMeasureValid);
         Assert.True(region.IsArrangeValid);
 
-        region.DetachFromTree();
-        dispatcher.Shutdown();
+        screen.Close();
     }
 
     private static void ValidateLayout(UiNode node)

@@ -24,9 +24,8 @@ public sealed class UiNodeCollection : IList<UiNode>, IReadOnlyList<UiNode>
     /// <exception cref="ArgumentNullException">Thrown when a replacement value is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="index"/> is invalid.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when replacement would violate the tree or active dispatcher contract.
+    /// Thrown when replacement would violate the tree or open screen owner-thread contract.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when an active dispatcher is shut down.</exception>
     public UiNode this[int index]
     {
         get => _items[index];
@@ -49,17 +48,15 @@ public sealed class UiNodeCollection : IList<UiNode>, IReadOnlyList<UiNode>
     /// <param name="item">The child to add.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="item"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the operation would violate the tree or active dispatcher contract.
+    /// Thrown when the operation would violate the tree or open screen owner-thread contract.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when an active dispatcher is shut down.</exception>
     public void Add(UiNode item) =>
         _owner.AddChildFromCollection(item);
 
     /// <summary>
     /// Removes all direct children.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when an active tree is modified from the wrong thread.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a tree owned by an open screen is modified from the wrong thread.</exception>
     public void Clear() =>
         _owner.ClearChildrenFromCollection();
 
@@ -118,9 +115,8 @@ public sealed class UiNodeCollection : IList<UiNode>, IReadOnlyList<UiNode>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="item"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="index"/> is invalid.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the operation would violate the tree or active dispatcher contract.
+    /// Thrown when the operation would violate the tree or open screen owner-thread contract.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when an active dispatcher is shut down.</exception>
     public void Insert(int index, UiNode item) =>
         _owner.InsertChildFromCollection(index, item);
 
@@ -130,8 +126,7 @@ public sealed class UiNodeCollection : IList<UiNode>, IReadOnlyList<UiNode>
     /// <param name="item">The child to remove.</param>
     /// <returns>Whether the child was present and removed.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="item"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when an active tree is modified from the wrong thread.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a tree owned by an open screen is modified from the wrong thread.</exception>
     public bool Remove(UiNode item) =>
         _owner.RemoveChildFromCollection(item);
 
@@ -140,8 +135,7 @@ public sealed class UiNodeCollection : IList<UiNode>, IReadOnlyList<UiNode>
     /// </summary>
     /// <param name="index">The zero-based child index.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="index"/> is invalid.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when an active tree is modified from the wrong thread.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a tree owned by an open screen is modified from the wrong thread.</exception>
     public void RemoveAt(int index) =>
         _owner.RemoveChildAtFromCollection(index);
 
@@ -151,8 +145,7 @@ public sealed class UiNodeCollection : IList<UiNode>, IReadOnlyList<UiNode>
     /// <param name="oldIndex">The current zero-based child index.</param>
     /// <param name="newIndex">The zero-based child index after the move.</param>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when either index is invalid.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when an active tree is modified from the wrong thread.</exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when a tree owned by an open screen is modified from the wrong thread.</exception>
     public void Move(int oldIndex, int newIndex) =>
         _owner.MoveChildFromCollection(oldIndex, newIndex);
 

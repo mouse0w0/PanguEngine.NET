@@ -34,9 +34,6 @@ public class UiPointerEventArgs : UiInputEventArgs
     /// <exception cref="InvalidOperationException">
     /// Thrown when an active node outside the event path is queried from the wrong thread.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when an active node outside the event path belongs to a shut down dispatcher.
-    /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
     /// </exception>
@@ -49,10 +46,10 @@ public class UiPointerEventArgs : UiInputEventArgs
                 return entry.LocalPosition;
         }
 
-        relativeTo.ActiveDispatcher?.VerifyAccess();
+        relativeTo.Screen?.VerifyTreeAccess();
         var eventRoot = _path[0].Node;
         var ancestors = new List<UiNode>();
-        for (UiNode? current = relativeTo; current is not null; current = current.Parent)
+        for (var current = relativeTo; current is not null; current = current.Parent)
         {
             ancestors.Add(current);
             if (ReferenceEquals(current, eventRoot))

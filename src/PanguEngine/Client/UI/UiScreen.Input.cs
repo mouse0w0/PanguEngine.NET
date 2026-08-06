@@ -3,16 +3,35 @@ using System.Runtime.ExceptionServices;
 
 namespace PanguEngine.Client.UI;
 
-public partial class Screen
+public partial class UiScreen
 {
     private readonly List<UiHitPathEntry> _hoverPath = [];
     private readonly UiNode?[] _pressedTargets =
         new UiNode?[(int)MouseButton.Button12 - (int)MouseButton.Left + 1];
-    private readonly HashSet<ulong> _focusChangeVersions = [];
     private Point _pointerPosition;
-    private ulong _activationVersion;
     private bool _hasPointerPosition;
+    private bool _isChangingFocus;
     private bool _isRoutingInput;
+
+    internal sealed class InputStateCleanupSnapshot
+    {
+        internal InputStateCleanupSnapshot(
+            UiNode? focusedNode,
+            UiHitPathEntry[] hoverPath,
+            UiNode[] exitedNodes,
+            Point pointerPosition)
+        {
+            FocusedNode = focusedNode;
+            HoverPath = hoverPath;
+            ExitedNodes = exitedNodes;
+            PointerPosition = pointerPosition;
+        }
+
+        internal UiNode? FocusedNode { get; }
+        internal UiHitPathEntry[] HoverPath { get; }
+        internal UiNode[] ExitedNodes { get; }
+        internal Point PointerPosition { get; }
+    }
 
     /// <summary>
     /// Gets the node that currently owns keyboard focus.
@@ -38,7 +57,7 @@ public partial class Screen
         if (!IsScreenActive())
             return;
 
-        Root.ActiveDispatcher!.VerifyAccess();
+        VerifyOwnerThread();
         _ = ChangeFocus(null);
     }
 
@@ -47,33 +66,24 @@ public partial class Screen
         if (!IsScreenActive())
             return false;
 
-        Root.ActiveDispatcher!.VerifyAccess();
+        VerifyOwnerThread();
         if (!CanFocus(node))
             return false;
 
         return ChangeFocus(node);
     }
 
-    internal void ResetInputStateForOpening()
-    {
-        _activationVersion++;
-        _hoverPath.Clear();
-        Array.Clear(_pressedTargets, 0, _pressedTargets.Length);
-        _pointerPosition = Point.Zero;
-        _hasPointerPosition = false;
-        FocusedNode = null;
-    }
-
     internal void RefreshPointerAfterLayout()
     {
+        VerifyOwnerThread();
+        VerifyNotTransitioningOrUpdatingLayout();
         if (!IsScreenActive() || !_hasPointerPosition)
             return;
 
-        Root.ActiveDispatcher!.VerifyAccess();
-        var activationVersion = BeginInputRouting();
+        BeginInputRouting();
         try
         {
-            UpdateHover(_pointerPosition, activationVersion);
+            UpdateHover(_pointerPosition);
         }
         finally
         {
@@ -83,11 +93,11 @@ public partial class Screen
 
     internal void ProcessPointerMoved(Point position)
     {
-        var activationVersion = BeginInputRouting();
+        BeginInputRouting();
         try
         {
-            UpdateHover(position, activationVersion);
-            if (!IsCurrentActivation(activationVersion) || _hoverPath.Count == 0)
+            UpdateHover(position);
+            if (!IsScreenActive() || _hoverPath.Count == 0)
                 return;
 
             var path = _hoverPath.ToArray();
@@ -95,7 +105,6 @@ public partial class Screen
             Bubble(
                 path,
                 args,
-                activationVersion,
                 static (node, eventArgs) => node.RaisePointerMoved(eventArgs));
         }
         finally
@@ -109,11 +118,11 @@ public partial class Screen
         MouseButton button,
         KeyModifiers modifiers)
     {
-        var activationVersion = BeginInputRouting();
+        BeginInputRouting(button);
         try
         {
-            UpdateHover(position, activationVersion);
-            if (!IsCurrentActivation(activationVersion))
+            UpdateHover(position);
+            if (!IsScreenActive())
                 return;
 
             var path = _hoverPath.ToArray();
@@ -131,7 +140,7 @@ public partial class Screen
             }
 
             _ = ChangeFocus(focusCandidate);
-            if (!IsCurrentActivation(activationVersion) || path.Length == 0)
+            if (!IsScreenActive() || path.Length == 0)
                 return;
 
             var args = new UiPointerButtonEventArgs(
@@ -143,7 +152,6 @@ public partial class Screen
             Bubble(
                 path,
                 args,
-                activationVersion,
                 static (node, eventArgs) => node.RaisePointerPressed(eventArgs));
         }
         finally
@@ -157,11 +165,11 @@ public partial class Screen
         MouseButton button,
         KeyModifiers modifiers)
     {
-        var activationVersion = BeginInputRouting();
+        BeginInputRouting(button);
         try
         {
-            UpdateHover(position, activationVersion);
-            if (!IsCurrentActivation(activationVersion))
+            UpdateHover(position);
+            if (!IsScreenActive())
                 return;
 
             var target = _pressedTargets[GetButtonIndex(button)];
@@ -182,10 +190,9 @@ public partial class Screen
             Bubble(
                 path,
                 args,
-                activationVersion,
                 static (node, eventArgs) => node.RaisePointerReleased(eventArgs));
 
-            if (!IsCurrentActivation(activationVersion) || !IsActive(target))
+            if (!IsScreenActive() || !IsActive(target))
                 return;
 
             var currentPath = BuildHitPath(position);
@@ -201,7 +208,6 @@ public partial class Screen
             Bubble(
                 currentPath,
                 pointerClickedArgs,
-                activationVersion,
                 static (node, eventArgs) => node.RaisePointerClicked(eventArgs));
         }
         finally
@@ -212,11 +218,11 @@ public partial class Screen
 
     internal void ProcessPointerWheel(Point position, double deltaX, double deltaY)
     {
-        var activationVersion = BeginInputRouting();
+        BeginInputRouting(deltaX, deltaY);
         try
         {
-            UpdateHover(position, activationVersion);
-            if (!IsCurrentActivation(activationVersion) || _hoverPath.Count == 0)
+            UpdateHover(position);
+            if (!IsScreenActive() || _hoverPath.Count == 0)
                 return;
 
             var path = _hoverPath.ToArray();
@@ -229,7 +235,6 @@ public partial class Screen
             Bubble(
                 path,
                 args,
-                activationVersion,
                 static (node, eventArgs) => node.RaisePointerWheel(eventArgs));
         }
         finally
@@ -248,41 +253,23 @@ public partial class Screen
         ProcessKey(key, modifiers, static (node, eventArgs) => node.RaiseKeyUp(eventArgs));
     }
 
-    internal void HandleSubtreesDetached(IReadOnlyCollection<UiNode> detachedNodes)
+    internal InputStateCleanupSnapshot? CommitInputStateAfterTreeChange()
     {
-        if (detachedNodes.Count == 0)
-            return;
+        return CommitInputStateCore(clearAll: false);
+    }
 
+    internal void NotifyInputStateLoss(InputStateCleanupSnapshot snapshot)
+    {
         var errors = new List<Exception>();
-        var focused = FocusedNode;
-        var lostFocus = focused is not null && detachedNodes.Contains(focused);
-        if (lostFocus)
-            FocusedNode = null;
-
-        for (var index = 0; index < _pressedTargets.Length; index++)
-        {
-            if (_pressedTargets[index] is not null && detachedNodes.Contains(_pressedTargets[index]!))
-                _pressedTargets[index] = null;
-        }
-
-        var oldHoverPath = _hoverPath.ToArray();
-        var hoverIndex = Array.FindIndex(
-            oldHoverPath,
-            entry => detachedNodes.Contains(entry.Node));
-        if (hoverIndex >= 0)
-        {
-            _hoverPath.Clear();
-            _hoverPath.AddRange(oldHoverPath.AsSpan(0, hoverIndex).ToArray());
-        }
-
-        if (lostFocus)
+        if (snapshot.FocusedNode is { } focused)
         {
             var focusArgs = new UiFocusChangedEventArgs(focused, null);
-            var focusVersion = _activationVersion;
-            var addedFocusGuard = _focusChangeVersions.Add(focusVersion);
+            var ownsFocusGuard = !_isChangingFocus;
+            if (ownsFocusGuard)
+                _isChangingFocus = true;
             try
             {
-                focused!.RaiseLostFocus(focusArgs);
+                focused.RaiseLostFocus(focusArgs);
             }
             catch (Exception exception)
             {
@@ -290,21 +277,20 @@ public partial class Screen
             }
             finally
             {
-                if (addedFocusGuard)
-                    _focusChangeVersions.Remove(focusVersion);
+                if (ownsFocusGuard)
+                    _isChangingFocus = false;
             }
         }
 
-        if (hoverIndex >= 0 && oldHoverPath.Length != 0)
+        if (snapshot.ExitedNodes.Length != 0)
         {
-            var path = oldHoverPath;
-            var args = new UiPointerEventArgs(path[^1].Node, _pointerPosition, path);
-            for (var index = path.Length - 1; index >= hoverIndex; index--)
+            var path = snapshot.HoverPath;
+            var args = new UiPointerEventArgs(path[^1].Node, snapshot.PointerPosition, path);
+            for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
             {
-                var node = path[index].Node;
                 try
                 {
-                    node.RaisePointerExited(args);
+                    snapshot.ExitedNodes[index].RaisePointerExited(args);
                 }
                 catch (Exception exception)
                 {
@@ -316,48 +302,88 @@ public partial class Screen
         ThrowInputErrors(errors);
     }
 
-    internal void ClearInputStateAfterClose()
+    private InputStateCleanupSnapshot? CommitInputStateForClose()
     {
-        _hoverPath.Clear();
-        Array.Clear(_pressedTargets, 0, _pressedTargets.Length);
+        var snapshot = CommitInputStateCore(clearAll: true);
         _pointerPosition = Point.Zero;
         _hasPointerPosition = false;
-        FocusedNode = null;
+        return snapshot;
+    }
+
+    private InputStateCleanupSnapshot? CommitInputStateCore(bool clearAll)
+    {
+        var focused = FocusedNode;
+        var lostFocus = focused is not null && (clearAll || !ReferenceEquals(focused.Screen, this));
+        if (lostFocus)
+            FocusedNode = null;
+
+        for (var index = 0; index < _pressedTargets.Length; index++)
+        {
+            var target = _pressedTargets[index];
+            if (target is not null && (clearAll || !ReferenceEquals(target.Screen, this)))
+                _pressedTargets[index] = null;
+        }
+
+        var oldHoverPath = _hoverPath.ToArray();
+        var exitedNodes = oldHoverPath
+            .Where(entry => clearAll || !ReferenceEquals(entry.Node.Screen, this))
+            .Select(static entry => entry.Node)
+            .ToArray();
+        _hoverPath.Clear();
+        if (!clearAll)
+        {
+            _hoverPath.AddRange(oldHoverPath.Where(entry => ReferenceEquals(entry.Node.Screen, this)));
+        }
+
+        if (!lostFocus && exitedNodes.Length == 0)
+            return null;
+
+        return new InputStateCleanupSnapshot(
+            lostFocus ? focused : null,
+            oldHoverPath,
+            exitedNodes,
+            _pointerPosition);
     }
 
     private List<UiHitPathEntry> BuildHitPath(Point screenPoint)
     {
-        Root.ActiveDispatcher?.VerifyAccess();
-        var rootPoint = new Point(
-            screenPoint.X - Root.LayoutBounds.X,
-            screenPoint.Y - Root.LayoutBounds.Y);
+        var root = Root;
+        if (root is null)
+            return [];
+
+        VerifyTreeAccess();
         var path = new List<UiHitPathEntry>();
-        _ = Root.TryBuildHitPath(rootPoint, path);
+        _ = root.TryBuildHitPath(
+            new Point(
+                screenPoint.X - root.LayoutBounds.X,
+                screenPoint.Y - root.LayoutBounds.Y),
+            path);
         return path;
     }
 
     private List<UiHitPathEntry> BuildPathForNode(UiNode node, Point screenPoint)
     {
-        if (!IsActive(node))
+        var root = Root;
+        if (root is null || !IsActive(node))
             return [];
 
         var nodes = new List<UiNode>();
-        for (UiNode? current = node; current is not null; current = current.Parent)
+        for (var current = node; current is not null; current = current.Parent)
         {
             nodes.Add(current);
-            if (ReferenceEquals(current, Root))
+            if (ReferenceEquals(current, root))
                 break;
         }
 
-        if (!ReferenceEquals(nodes[^1], Root))
+        if (!ReferenceEquals(nodes[^1], root))
             return [];
 
         nodes.Reverse();
         var path = new List<UiHitPathEntry>(nodes.Count);
         var localPoint = new Point(
-            screenPoint.X - Root.LayoutBounds.X,
-            screenPoint.Y - Root.LayoutBounds.Y);
-        path.Add(new UiHitPathEntry(Root, localPoint));
+            screenPoint.X - root.LayoutBounds.X,
+            screenPoint.Y - root.LayoutBounds.Y);
+        path.Add(new UiHitPathEntry(root, localPoint));
         for (var index = 1; index < nodes.Count; index++)
         {
             localPoint = new Point(
@@ -374,12 +400,12 @@ public partial class Screen
         KeyModifiers modifiers,
         Action<UiNode, UiKeyEventArgs> raise)
     {
-        var activationVersion = BeginInputRouting();
+        BeginInputRouting();
         try
         {
             if (FocusedNode is not null && !CanFocus(FocusedNode))
                 _ = ChangeFocus(null);
-            if (!IsCurrentActivation(activationVersion) || FocusedNode is null)
+            if (!IsScreenActive() || FocusedNode is null)
                 return;
 
             var path = BuildPathForNode(FocusedNode, _pointerPosition);
@@ -390,7 +416,7 @@ public partial class Screen
             var args = new UiKeyEventArgs(FocusedNode, key, modifiers);
             for (var index = nodes.Length - 1; index >= 0; index--)
             {
-                if (!IsCurrentActivation(activationVersion))
+                if (!IsScreenActive())
                     break;
                 if (!IsActive(nodes[index]))
                     continue;
@@ -405,9 +431,9 @@ public partial class Screen
         }
     }
 
-    private void UpdateHover(Point screenPosition, ulong activationVersion)
+    private void UpdateHover(Point screenPosition)
     {
-        if (!IsCurrentActivation(activationVersion))
+        if (!IsScreenActive())
             return;
 
         _pointerPosition = screenPosition;
@@ -431,7 +457,7 @@ public partial class Screen
             var args = new UiPointerEventArgs(oldPath[^1].Node, screenPosition, oldPath);
             for (var index = oldPath.Length - 1; index >= commonLength; index--)
             {
-                if (!IsCurrentActivation(activationVersion))
+                if (!IsScreenActive())
                     break;
                 if (!IsActive(oldPath[index].Node))
                     continue;
@@ -451,7 +477,7 @@ public partial class Screen
             var args = new UiPointerEventArgs(newPath[^1].Node, screenPosition, newPath);
             for (var index = commonLength; index < newPath.Length; index++)
             {
-                if (!IsCurrentActivation(activationVersion))
+                if (!IsScreenActive())
                     break;
                 if (!IsActive(newPath[index].Node))
                     continue;
@@ -471,53 +497,60 @@ public partial class Screen
 
     private bool ChangeFocus(UiNode? next)
     {
-        var activationVersion = _activationVersion;
-        if (_focusChangeVersions.Contains(activationVersion))
-            throw new InvalidOperationException("A UI focus transition is already being notified.");
-        if (ReferenceEquals(FocusedNode, next))
-            return true;
-
-        var old = FocusedNode;
-        FocusedNode = next;
-        var eventArgs = new UiFocusChangedEventArgs(old, next);
-        var errors = new List<Exception>();
-        _focusChangeVersions.Add(activationVersion);
+        BeginRuntimeOperation();
         try
         {
-            if (old is not null)
+            if (_isChangingFocus)
+                throw new InvalidOperationException("A UI focus transition is already being notified.");
+            if (ReferenceEquals(FocusedNode, next))
+                return true;
+
+            var old = FocusedNode;
+            FocusedNode = next;
+            var eventArgs = new UiFocusChangedEventArgs(old, next);
+            var errors = new List<Exception>();
+            _isChangingFocus = true;
+            try
             {
-                try
+                if (old is not null)
                 {
-                    old.RaiseLostFocus(eventArgs);
+                    try
+                    {
+                        old.RaiseLostFocus(eventArgs);
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
                 }
-                catch (Exception exception)
+
+                if (next is not null &&
+                    IsScreenActive() &&
+                    ReferenceEquals(FocusedNode, next) &&
+                    IsActive(next))
                 {
-                    errors.Add(exception);
+                    try
+                    {
+                        next.RaiseGotFocus(eventArgs);
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
                 }
+            }
+            finally
+            {
+                _isChangingFocus = false;
             }
 
-            if (next is not null &&
-                IsCurrentActivation(activationVersion) &&
-                ReferenceEquals(FocusedNode, next) &&
-                IsActive(next))
-            {
-                try
-                {
-                    next.RaiseGotFocus(eventArgs);
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-            }
+            ThrowInputErrors(errors);
+            return true;
         }
         finally
         {
-            _focusChangeVersions.Remove(activationVersion);
+            EndRuntimeOperation();
         }
-
-        ThrowInputErrors(errors);
-        return true;
     }
 
     private bool CanFocus(UiNode node)
@@ -525,7 +558,7 @@ public partial class Screen
         if (!IsActive(node) || !node.Focusable || !node.IsArrangeValid || node.Visibility != Visibility.Visible)
             return false;
 
-        for (UiNode? ancestor = node.Parent; ancestor is not null; ancestor = ancestor.Parent)
+        for (var ancestor = node.Parent; ancestor is not null; ancestor = ancestor.Parent)
         {
             if (ancestor.Visibility != Visibility.Visible)
                 return false;
@@ -539,13 +572,12 @@ public partial class Screen
     private void Bubble<TEventArgs>(
         IReadOnlyList<UiHitPathEntry> path,
         TEventArgs eventArgs,
-        ulong activationVersion,
         Action<UiNode, TEventArgs> raise)
         where TEventArgs : UiInputEventArgs
     {
         for (var index = path.Count - 1; index >= 0; index--)
         {
-            if (!IsCurrentActivation(activationVersion))
+            if (!IsScreenActive())
                 break;
             if (!IsActive(path[index].Node))
                 continue;
@@ -555,41 +587,72 @@ public partial class Screen
         }
     }
 
-    private bool IsScreenActive() =>
-        ReferenceEquals(Root.ActiveScreen, this) && Root.ActiveDispatcher is not null;
-
-    private bool IsActive(UiNode node) =>
-        ReferenceEquals(node.ActiveScreen, this);
-
-    private bool IsCurrentActivation(ulong activationVersion) =>
-        _activationVersion == activationVersion && IsScreenActive();
-
-    private ulong BeginInputRouting()
+    private bool IsScreenActive()
     {
-        var dispatcher = Root.ActiveDispatcher;
-        if (!ReferenceEquals(Root.ActiveScreen, this) || dispatcher is null)
-            throw new InvalidOperationException("The UI screen is not active.");
-
-        dispatcher.VerifyAccess();
-        if (_isRoutingInput)
-            throw new InvalidOperationException("The UI screen is already routing input.");
-        _isRoutingInput = true;
-        return _activationVersion;
+        lock (_stateSync)
+            return _ownerThreadId is not null && _isInteractionActive && !_isClosing;
     }
 
-    private void EndInputRouting() =>
+    private bool IsActive(UiNode node) =>
+        IsScreenActive() && ReferenceEquals(node.Screen, this);
+
+    private void BeginInputRouting()
+    {
+        VerifyCanBeginInputRouting();
+        StartInputRouting();
+    }
+
+    private void BeginInputRouting(MouseButton button)
+    {
+        VerifyCanBeginInputRouting();
+        VerifyMouseButton(button);
+        StartInputRouting();
+    }
+
+    private void BeginInputRouting(double deltaX, double deltaY)
+    {
+        VerifyCanBeginInputRouting();
+        VerifyWheelDelta(deltaX, nameof(deltaX));
+        VerifyWheelDelta(deltaY, nameof(deltaY));
+        StartInputRouting();
+    }
+
+    private void VerifyCanBeginInputRouting()
+    {
+        if (!IsScreenActive())
+        {
+            throw new InvalidOperationException("The UI screen is not active.");
+        }
+
+        VerifyOwnerThread();
+        if (_isTransitioning)
+            throw new InvalidOperationException("The UI screen cannot route input during a lifecycle transition.");
+        if (_isRoutingInput)
+            throw new InvalidOperationException("The UI screen is already routing input.");
+    }
+
+    private void StartInputRouting()
+    {
+        BeginRuntimeOperation();
+        _isRoutingInput = true;
+    }
+
+    private void EndInputRouting()
+    {
         _isRoutingInput = false;
+        EndRuntimeOperation();
+    }
 
     private static int GetButtonIndex(MouseButton button) =>
         (int)button - (int)MouseButton.Left;
 
-    internal static void VerifyMouseButton(MouseButton button)
+    private static void VerifyMouseButton(MouseButton button)
     {
         if (button is < MouseButton.Left or > MouseButton.Button12)
             throw new ArgumentOutOfRangeException(nameof(button));
     }
 
-    internal static void VerifyWheelDelta(double value, string parameterName)
+    private static void VerifyWheelDelta(double value, string parameterName)
     {
         if (!double.IsFinite(value))
             throw new ArgumentOutOfRangeException(parameterName, "A wheel delta must be finite.");

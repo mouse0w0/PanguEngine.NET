@@ -15,10 +15,7 @@ public abstract partial class UiNode
     /// while already at the front has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active tree is modified from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active tree dispatcher is shut down.
+    /// Thrown when a tree owned by an open screen is modified from the wrong thread.
     /// </exception>
     public void MoveToFront() =>
         Parent?.MoveChildToFront(this);
@@ -31,78 +28,34 @@ public abstract partial class UiNode
     /// while already at the back has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active tree is modified from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active tree dispatcher is shut down.
+    /// Thrown when a tree owned by an open screen is modified from the wrong thread.
     /// </exception>
     public void MoveToBack() =>
         Parent?.MoveChildToBack(this);
 
-    internal UiDispatcher? ActiveDispatcher { get; private set; }
-
     /// <summary>
-    /// Gets the active screen that contains this node.
+    /// Gets the UI screen that owns this node.
     /// </summary>
-    public Screen? ActiveScreen { get; private set; }
-
-    internal void AttachToTree(UiDispatcher dispatcher, Screen? screen = null)
-    {
-        ArgumentNullException.ThrowIfNull(dispatcher);
-        if (Parent is not null)
-            throw new InvalidOperationException("Only a root node can be attached to an active UI tree.");
-        if (ActiveDispatcher is not null)
-            throw new InvalidOperationException("The UI node is already attached to an active UI tree.");
-
-        dispatcher.VerifyAccess();
-        SetActiveTreeRecursive(dispatcher, screen);
-    }
-
-    internal void DetachFromTree()
-    {
-        if (Parent is not null)
-            throw new InvalidOperationException("Only a root node can be detached from an active UI tree.");
-        var dispatcher = ActiveDispatcher;
-        if (dispatcher is null)
-            return;
-
-        dispatcher.VerifyAccess();
-        var detachedNodes = new List<UiNode>();
-        CollectSubtree(detachedNodes);
-        var screen = ActiveScreen;
-        SetActiveTreeRecursive(null, null);
-        screen?.HandleSubtreesDetached(detachedNodes);
-    }
+    public UiScreen? Screen { get; private set; }
 
     internal void SetParent(Parent? parent) =>
         Parent = parent;
 
-    internal void SetActiveTreeRecursive(UiDispatcher? dispatcher, Screen? screen)
+    internal void SetScreenRecursive(UiScreen? screen)
     {
-        ActiveDispatcher = dispatcher;
-        ActiveScreen = screen;
+        Screen = screen;
         if (this is not Parent parent)
             return;
 
         foreach (var child in parent.Children)
-            child.SetActiveTreeRecursive(dispatcher, screen);
+            child.SetScreenRecursive(screen);
     }
 
-    internal void CollectSubtree(List<UiNode> nodes)
+    internal void InvalidateTreeStructure()
     {
-        nodes.Add(this);
-        if (this is not Parent parent)
-            return;
-
-        foreach (var child in parent.Children)
-            child.CollectSubtree(nodes);
+        for (var node = this; node is not null; node = node.Parent)
+            node.OnTreeStructureInvalidated();
     }
 
-    internal void InvalidateTreeStructure(UiNode source)
-    {
-        for (UiNode? node = this; node is not null; node = node.Parent)
-            node.OnTreeStructureInvalidated(source);
-    }
-
-    partial void OnTreeStructureInvalidated(UiNode source);
+    partial void OnTreeStructureInvalidated();
 }

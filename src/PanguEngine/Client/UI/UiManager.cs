@@ -1,4 +1,5 @@
 using PanguEngine.Input;
+using System.Runtime.ExceptionServices;
 
 namespace PanguEngine.Client.UI;
 
@@ -7,25 +8,20 @@ namespace PanguEngine.Client.UI;
 /// </summary>
 public sealed class UiManager
 {
+    private readonly int _ownerThreadId;
     private bool _isTransitioning;
     private bool _isUpdating;
-    private bool _isLayingOut;
-    private volatile bool _isShutdown;
+    private bool _isShutdown;
 
     internal UiManager()
     {
-        Dispatcher = new UiDispatcher();
+        _ownerThreadId = Environment.CurrentManagedThreadId;
     }
-
-    /// <summary>
-    /// Gets the dispatcher that owns active UI work.
-    /// </summary>
-    public UiDispatcher Dispatcher { get; }
 
     /// <summary>
     /// Gets the current screen, or null when no screen is open.
     /// </summary>
-    public Screen? CurrentScreen { get; private set; }
+    public UiScreen? CurrentScreen { get; private set; }
 
     /// <summary>
     /// Opens a screen, replacing the current screen when necessary.
@@ -33,61 +29,35 @@ public sealed class UiManager
     /// <param name="screen">The screen to open.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="screen"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the screen cannot be opened or the manager is performing another lifecycle or
-    /// layout operation.
+    /// Thrown when the screen cannot be opened or the manager is performing another lifecycle or layout operation.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
-    public void Open(Screen screen)
+    public void Open(UiScreen screen)
     {
         ArgumentNullException.ThrowIfNull(screen);
-        Dispatcher.VerifyAccess();
+        VerifyAccess();
         VerifyLifecycleOperation();
         if (ReferenceEquals(screen, CurrentScreen))
             return;
 
-        VerifyRootCanAttach(screen);
-        if (!screen.TryClaim(this))
-            throw new InvalidOperationException("The UI screen is already owned by another manager.");
-
-        var releaseCandidate = true;
+        screen.VerifyCanOpen();
         _isTransitioning = true;
         try
         {
-            if (CurrentScreen is not null)
+            var old = CurrentScreen;
+            if (old is not null)
             {
-                CloseCurrent();
-                VerifyRootCanAttach(screen);
+                old.VerifyCanClose();
+                CurrentScreen = null;
+                old.Close();
             }
 
-            screen.ResetInputStateForOpening();
-            screen.InvokeOpening(this);
-            VerifyRootCanAttach(screen);
-            screen.Root.AttachToTree(Dispatcher, screen);
+            screen.Open();
             CurrentScreen = screen;
-            releaseCandidate = false;
-
-            try
-            {
-                screen.InvokeOpened(this);
-            }
-            catch (Exception exception)
-            {
-                var errors = new List<Exception> { exception };
-                ForceCloseCurrent(errors);
-                ThrowLifecycleErrors(errors);
-            }
         }
         finally
         {
-            try
-            {
-                if (releaseCandidate)
-                    screen.Release(this);
-            }
-            finally
-            {
-                _isTransitioning = false;
-            }
+            _isTransitioning = false;
         }
     }
 
@@ -100,15 +70,18 @@ public sealed class UiManager
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
     public void Close()
     {
-        Dispatcher.VerifyAccess();
+        VerifyAccess();
         VerifyLifecycleOperation();
-        if (CurrentScreen is null)
+        var screen = CurrentScreen;
+        if (screen is null)
             return;
 
+        screen.VerifyCanClose();
         _isTransitioning = true;
+        CurrentScreen = null;
         try
         {
-            CloseCurrent();
+            screen.Close();
         }
         finally
         {
@@ -118,37 +91,19 @@ public sealed class UiManager
 
     internal void Update(Size viewportSize)
     {
-        Dispatcher.VerifyAccess();
-        if (_isUpdating || _isTransitioning || _isLayingOut)
+        VerifyAccess();
+        if (_isUpdating || _isTransitioning)
             throw new InvalidOperationException("The UI manager cannot update in its current state.");
 
-        var viewportBounds = new Rect(0, 0, viewportSize);
+        UiScreen.CreateViewportBounds(viewportSize);
         _isUpdating = true;
         try
         {
-            Dispatcher.DrainPending();
-            if (_isShutdown)
-                return;
-
             var screen = CurrentScreen;
             if (screen is null)
                 return;
 
-            _isLayingOut = true;
-            try
-            {
-                var root = screen.Root;
-                root.Measure(viewportSize);
-                if (root.IsMeasureValid)
-                    root.Arrange(viewportBounds);
-            }
-            finally
-            {
-                _isLayingOut = false;
-            }
-
-            if (ReferenceEquals(CurrentScreen, screen))
-                screen.RefreshPointerAfterLayout();
+            screen.Update(viewportSize);
         }
         finally
         {
@@ -161,14 +116,26 @@ public sealed class UiManager
         if (_isShutdown)
             return;
 
-        Dispatcher.VerifyAccess();
+        VerifyAccess();
         VerifyLifecycleOperation();
         var errors = new List<Exception>();
+        var screen = CurrentScreen;
+        CurrentScreen = null;
         _isTransitioning = true;
         try
         {
-            ForceCloseCurrent(errors);
-            Dispatcher.Shutdown();
+            if (screen is not null)
+            {
+                try
+                {
+                    screen.Close();
+                }
+                catch (Exception exception)
+                {
+                    AddLifecycleErrors(errors, exception);
+                }
+            }
+
             _isShutdown = true;
         }
         finally
@@ -181,7 +148,7 @@ public sealed class UiManager
 
     internal void ProcessPointerMoved(Point position)
     {
-        Dispatcher.VerifyAccess();
+        VerifyAccess();
         CurrentScreen?.ProcessPointerMoved(position);
     }
 
@@ -190,8 +157,7 @@ public sealed class UiManager
         MouseButton button,
         KeyModifiers modifiers)
     {
-        Dispatcher.VerifyAccess();
-        Screen.VerifyMouseButton(button);
+        VerifyAccess();
         CurrentScreen?.ProcessPointerPressed(position, button, modifiers);
     }
 
@@ -200,130 +166,47 @@ public sealed class UiManager
         MouseButton button,
         KeyModifiers modifiers)
     {
-        Dispatcher.VerifyAccess();
-        Screen.VerifyMouseButton(button);
+        VerifyAccess();
         CurrentScreen?.ProcessPointerReleased(position, button, modifiers);
     }
 
     internal void ProcessPointerWheel(Point position, double deltaX, double deltaY)
     {
-        Dispatcher.VerifyAccess();
-        Screen.VerifyWheelDelta(deltaX, nameof(deltaX));
-        Screen.VerifyWheelDelta(deltaY, nameof(deltaY));
+        VerifyAccess();
         CurrentScreen?.ProcessPointerWheel(position, deltaX, deltaY);
     }
 
     internal void ProcessKeyDown(Key key, KeyModifiers modifiers)
     {
-        Dispatcher.VerifyAccess();
+        VerifyAccess();
         CurrentScreen?.ProcessKeyDown(key, modifiers);
     }
 
     internal void ProcessKeyUp(Key key, KeyModifiers modifiers)
     {
-        Dispatcher.VerifyAccess();
+        VerifyAccess();
         CurrentScreen?.ProcessKeyUp(key, modifiers);
     }
 
-    private void CloseCurrent()
+    private void VerifyAccess()
     {
-        var screen = CurrentScreen!;
-        screen.InvokeClosing(this);
-        var errors = new List<Exception>();
-        try
-        {
-            screen.Root.DetachFromTree();
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-
-        if (screen.Root.ActiveDispatcher is not null)
-        {
-            ThrowLifecycleErrors(errors);
-            return;
-        }
-
-        screen.ClearInputStateAfterClose();
-        CurrentScreen = null;
-        try
-        {
-            screen.InvokeClosed(this);
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-        finally
-        {
-            screen.Release(this);
-        }
-
-        ThrowLifecycleErrors(errors);
-    }
-
-    private void ForceCloseCurrent(List<Exception> errors)
-    {
-        var screen = CurrentScreen;
-        if (screen is null)
-            return;
-
-        try
-        {
-            screen.InvokeClosing(this);
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-
-        try
-        {
-            screen.Root.DetachFromTree();
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-
-        if (screen.Root.ActiveDispatcher is not null)
-            return;
-
-        screen.ClearInputStateAfterClose();
-        CurrentScreen = null;
-        try
-        {
-            screen.InvokeClosed(this);
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-        finally
-        {
-            screen.Release(this);
-        }
+        ObjectDisposedException.ThrowIf(_isShutdown, this);
+        if (_ownerThreadId != Environment.CurrentManagedThreadId)
+            throw new InvalidOperationException("UI manager access requires its owner thread.");
     }
 
     private void VerifyLifecycleOperation()
     {
         if (_isTransitioning)
             throw new InvalidOperationException("The UI manager is already changing screens.");
-        if (_isLayingOut)
+        if (CurrentScreen?.IsUpdatingLayout == true)
             throw new InvalidOperationException("The UI manager cannot change screens during layout.");
-    }
-
-    private static void VerifyRootCanAttach(Screen screen)
-    {
-        if (screen.Root.Parent is not null || screen.Root.ActiveDispatcher is not null)
-            throw new InvalidOperationException("The UI screen root must be an inactive root node.");
     }
 
     private static void ThrowLifecycleErrors(List<Exception> errors)
     {
         if (errors.Count == 1)
-            throw errors[0];
+            ExceptionDispatchInfo.Capture(errors[0]).Throw();
         if (errors.Count > 1)
             throw new AggregateException(errors);
     }

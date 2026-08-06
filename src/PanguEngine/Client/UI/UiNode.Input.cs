@@ -97,13 +97,10 @@ public abstract partial class UiNode
     /// </summary>
     /// <returns>Whether this node became or remained focused.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the active screen is accessed from the wrong thread or a focus transition is already notifying.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active screen dispatcher is shut down.
+    /// Thrown when the open screen is accessed from the wrong thread or a focus transition is already notifying.
     /// </exception>
     public bool Focus() =>
-        ActiveScreen is not null && ActiveScreen.TryFocus(this);
+        Screen is not null && Screen.TryFocus(this);
 
     /// <summary>
     /// Converts a point from screen coordinates to this node's local coordinates.
@@ -111,22 +108,20 @@ public abstract partial class UiNode
     /// <param name="screenPoint">The point in screen coordinates.</param>
     /// <returns>The point in this node's local coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this node does not belong to an active screen or is accessed from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active dispatcher is shut down.
+    /// Thrown when this node does not belong to a UI screen or its open screen is accessed from the wrong thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
     /// </exception>
     public Point ScreenToLocal(Point screenPoint)
     {
-        ActiveDispatcher?.VerifyAccess();
-        if (ActiveScreen is null)
-            throw new InvalidOperationException("The UI node does not belong to an active screen.");
+        var screen = Screen;
+        screen?.VerifyTreeAccess();
+        if (screen is null)
+            throw new InvalidOperationException("The UI node does not belong to a UI screen.");
 
         var point = screenPoint;
-        for (UiNode? current = this; current is not null; current = current.Parent)
+        for (var current = this; current is not null; current = current.Parent)
         {
             point = new Point(
                 point.X - current.LayoutBounds.X,
@@ -142,22 +137,20 @@ public abstract partial class UiNode
     /// <param name="localPoint">The point in this node's local coordinates.</param>
     /// <returns>The point in screen coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this node does not belong to an active screen or is accessed from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active dispatcher is shut down.
+    /// Thrown when this node does not belong to a UI screen or its open screen is accessed from the wrong thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
     /// </exception>
     public Point LocalToScreen(Point localPoint)
     {
-        ActiveDispatcher?.VerifyAccess();
-        if (ActiveScreen is null)
-            throw new InvalidOperationException("The UI node does not belong to an active screen.");
+        var screen = Screen;
+        screen?.VerifyTreeAccess();
+        if (screen is null)
+            throw new InvalidOperationException("The UI node does not belong to a UI screen.");
 
         var point = localPoint;
-        for (UiNode? current = this; current is not null; current = current.Parent)
+        for (var current = this; current is not null; current = current.Parent)
         {
             point = new Point(
                 point.X + current.LayoutBounds.X,
@@ -262,14 +255,11 @@ public abstract partial class UiNode
     /// <param name="localPoint">The point in local coordinates.</param>
     /// <returns>Whether the point lies within this node's local geometry.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active node is queried from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active dispatcher is shut down.
+    /// Thrown when a node owned by an open screen is queried from the wrong thread.
     /// </exception>
     public bool Contains(Point localPoint)
     {
-        ActiveDispatcher?.VerifyAccess();
+        Screen?.VerifyTreeAccess();
         return ContainsWithoutAccessCheck(localPoint);
     }
 
@@ -279,14 +269,11 @@ public abstract partial class UiNode
     /// <param name="localPoint">The point in local coordinates.</param>
     /// <returns>The deepest hit node, or null when the subtree is not hit.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active tree is queried from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active dispatcher is shut down.
+    /// Thrown when a tree owned by an open screen is queried from the wrong thread.
     /// </exception>
     public UiNode? HitTest(Point localPoint)
     {
-        ActiveDispatcher?.VerifyAccess();
+        Screen?.VerifyTreeAccess();
         var path = new List<UiHitPathEntry>();
         return TryBuildHitPath(localPoint, path) ? path[^1].Node : null;
     }
@@ -301,7 +288,7 @@ public abstract partial class UiNode
 
     internal bool TryBuildHitPath(Point localPoint, List<UiHitPathEntry> path)
     {
-        if (!IsArrangeValid || Visibility != Visibility.Visible || !IsHitTestVisible)
+        if (!_isHitTestLayoutValid || Visibility != Visibility.Visible || !IsHitTestVisible)
             return false;
 
         var originalCount = path.Count;
@@ -320,7 +307,7 @@ public abstract partial class UiNode
             }
         }
 
-        if (ContainsWithoutAccessCheck(localPoint))
+        if (ContainsForHitTest(localPoint))
             return true;
 
         path.RemoveRange(originalCount, path.Count - originalCount);
@@ -329,6 +316,9 @@ public abstract partial class UiNode
 
     private bool ContainsWithoutAccessCheck(Point localPoint) =>
         IsArrangeValid && ContainsCore(localPoint);
+
+    private bool ContainsForHitTest(Point localPoint) =>
+        _isHitTestLayoutValid && ContainsCore(localPoint);
 
     private bool IsWithinLayoutBounds(Point localPoint) =>
         localPoint.X >= 0 &&

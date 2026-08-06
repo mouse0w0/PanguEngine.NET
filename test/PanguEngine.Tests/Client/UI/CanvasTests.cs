@@ -364,12 +364,12 @@ public sealed class CanvasTests
     [Fact]
     public void ActivePositionPathsRejectWrongThreadWithoutPartialState()
     {
-        var dispatcher = new UiDispatcher();
         var node = new TestNode();
         Canvas.SetLeft(node, 4);
+        var screen = new UiScreen(node);
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
-        node.AttachToTree(dispatcher);
+        screen.Open();
 
         var setterError = RunOnBackgroundThread(() =>
             Record.Exception(() => Canvas.SetLeft(node, 8)));
@@ -397,6 +397,7 @@ public sealed class CanvasTests
         Assert.IsType<InvalidOperationException>(updateError);
         Assert.Equal(8, Canvas.GetLeft(node));
         Assert.True(node.IsBound(Canvas.LeftProperty));
+        screen.Close();
     }
 
     private sealed class TestPanel : Panel

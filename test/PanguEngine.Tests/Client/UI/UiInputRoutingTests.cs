@@ -55,12 +55,11 @@ public sealed class UiInputRoutingTests
     [Fact]
     public void GetPositionForOffPathNodeRejectsNonFiniteAccumulation()
     {
-        var dispatcher = new UiDispatcher();
         var root = new Canvas();
         var sibling = new TestNode();
         root.Children.Add(sibling);
-        var screen = new Screen(root);
-        root.AttachToTree(dispatcher, screen);
+        var screen = new UiScreen(root);
+        screen.Open();
         root.Measure(new Size(1, 1));
         root.Arrange(new Rect(-double.MaxValue, 0, 1, 1));
         sibling.Measure(new Size(1, 1));
@@ -71,28 +70,31 @@ public sealed class UiInputRoutingTests
             [new UiHitPathEntry(root, Point.Zero)]);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => eventArgs.GetPosition(sibling));
+        screen.Close();
     }
 
     [Fact]
-    public void ManagerInputWithoutScreenIsNoOpButStillValidatesArgumentsAndThread()
+    public void ManagerInputWithoutScreenIsNoOpOnOwnerThreadAndRejectsWrongThread()
     {
         var manager = new UiManager();
 
         manager.ProcessPointerMoved(Point.Zero);
-        manager.ProcessPointerWheel(Point.Zero, 0, 0);
+        manager.ProcessPointerPressed(Point.Zero, MouseButton.Unknown, KeyModifiers.None);
+        manager.ProcessPointerReleased(Point.Zero, (MouseButton)13, KeyModifiers.None);
+        manager.ProcessPointerWheel(Point.Zero, double.NaN, double.PositiveInfinity);
         manager.ProcessKeyDown(Key.A, KeyModifiers.Shift);
         manager.ProcessKeyUp(Key.A, KeyModifiers.Shift);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            manager.ProcessPointerPressed(Point.Zero, MouseButton.Unknown, KeyModifiers.None));
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            manager.ProcessPointerReleased(Point.Zero, (MouseButton)13, KeyModifiers.None));
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            manager.ProcessPointerWheel(Point.Zero, double.NaN, 0));
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            manager.ProcessPointerWheel(Point.Zero, 0, double.PositiveInfinity));
         var threadError = RunOnBackgroundThread(() =>
-            Record.Exception(() => manager.ProcessPointerMoved(Point.Zero)));
+            Record.Exception(() =>
+            {
+                manager.ProcessPointerMoved(Point.Zero);
+                manager.ProcessPointerPressed(Point.Zero, MouseButton.Unknown, KeyModifiers.None);
+                manager.ProcessPointerReleased(Point.Zero, (MouseButton)13, KeyModifiers.None);
+                manager.ProcessPointerWheel(Point.Zero, double.NaN, double.PositiveInfinity);
+                manager.ProcessKeyDown(Key.A, KeyModifiers.None);
+                manager.ProcessKeyUp(Key.A, KeyModifiers.None);
+            }));
         Assert.IsType<InvalidOperationException>(threadError);
     }
 
@@ -313,19 +315,49 @@ public sealed class UiInputRoutingTests
     [InlineData(MouseButton.Unknown)]
     [InlineData((MouseButton)13)]
     [InlineData((MouseButton)int.MaxValue)]
-    public void InvalidMouseButtonsFailBeforeRouting(MouseButton button)
+    public void ScreenRejectsInvalidMouseButtonsBeforeRouting(MouseButton button)
     {
-        var (manager, _, root) = OpenScene();
+        var (_, screen, root) = OpenScene();
         var leaf = Place(root, new TestNode(), 0, 0, 20, 20);
         var events = 0;
+        leaf.PointerEntered += (_, _) => events++;
         leaf.PointerPressed += (_, _) => events++;
         leaf.PointerReleased += (_, _) => events++;
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            manager.ProcessPointerPressed(new Point(5, 5), button, KeyModifiers.None));
+            screen.ProcessPointerPressed(new Point(5, 5), button, KeyModifiers.None));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            manager.ProcessPointerReleased(new Point(5, 5), button, KeyModifiers.None));
+            screen.ProcessPointerReleased(new Point(5, 5), button, KeyModifiers.None));
         Assert.Equal(0, events);
+    }
+
+    [Fact]
+    public void ScreenRejectsNonFiniteWheelDeltasBeforeRouting()
+    {
+        var (_, screen, root) = OpenScene();
+        var leaf = Place(root, new TestNode(), 0, 0, 20, 20);
+        var events = 0;
+        leaf.PointerEntered += (_, _) => events++;
+        leaf.PointerWheel += (_, _) => events++;
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            screen.ProcessPointerWheel(new Point(5, 5), double.NaN, 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            screen.ProcessPointerWheel(new Point(5, 5), 0, double.PositiveInfinity));
+        Assert.Equal(0, events);
+    }
+
+    [Fact]
+    public void ScreenInputRejectsWrongOwnerThread()
+    {
+        var (_, screen, _) = OpenScene();
+
+        var errors = RunOnBackgroundThread(() =>
+            (Pointer: Record.Exception(() => screen.ProcessPointerMoved(Point.Zero)),
+                Key: Record.Exception(() => screen.ProcessKeyDown(Key.A, KeyModifiers.None))));
+
+        Assert.IsType<InvalidOperationException>(errors.Pointer);
+        Assert.IsType<InvalidOperationException>(errors.Key);
     }
 
     [Fact]
@@ -488,7 +520,7 @@ public sealed class UiInputRoutingTests
             {
                 first.Focus();
             });
-            manager.Dispatcher.Post(() => second.Focus());
+            screen.Post(() => second.Focus());
         };
 
         Assert.True(first.Focus());
@@ -506,7 +538,7 @@ public sealed class UiInputRoutingTests
         var (manager, _, root) = OpenScene();
         var leaf = Place(root, new TestNode(), 0, 0, 20, 20);
         var replacementRoot = new Canvas();
-        var replacement = new Screen(replacementRoot);
+        var replacement = new UiScreen(replacementRoot);
         var events = new List<string>();
         leaf.PointerMoved += (_, _) =>
         {
@@ -569,7 +601,7 @@ public sealed class UiInputRoutingTests
 
         Assert.Equal(["lost", "exit"], events);
         Assert.Null(oldScreen.FocusedNode);
-        Assert.Same(newScreen, leaf.ActiveScreen);
+        Assert.Same(newScreen, leaf.Screen);
 
         oldManager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.DoesNotContain("release", events);
@@ -586,16 +618,16 @@ public sealed class UiInputRoutingTests
         Point? exitPosition = null;
         Exception? conversionError = null;
         leaf.LostFocus += (_, _) =>
-            events.Add($"lost:{leaf.Parent is not null}:{leaf.ActiveScreen is null}");
+            events.Add($"lost:{leaf.Parent is not null}:{leaf.Screen is null}");
         leaf.PointerExited += (_, eventArgs) =>
         {
-            events.Add($"leaf-exit:{leaf.ActiveScreen is null}");
+            events.Add($"leaf-exit:{leaf.Screen is null}");
             exitPosition = eventArgs.GetPosition(leaf);
             conversionError = Record.Exception(() =>
                 leaf.ScreenToLocal(eventArgs.ScreenPosition));
         };
         branch.PointerExited += (_, _) =>
-            events.Add($"branch-exit:{branch.ActiveScreen is null}");
+            events.Add($"branch-exit:{branch.Screen is null}");
         leaf.PointerReleased += (_, _) => events.Add("release");
         manager.ProcessPointerMoved(new Point(15, 15));
         Assert.True(leaf.Focus());
@@ -646,8 +678,8 @@ public sealed class UiInputRoutingTests
         Assert.Equal([lostError, exitError], aggregate.InnerExceptions);
         Assert.Equal(["lost", "exit", "branch-exit"], notifications);
         Assert.DoesNotContain(branch, root.Children);
-        Assert.Null(branch.ActiveScreen);
-        Assert.Null(leaf.ActiveScreen);
+        Assert.Null(branch.Screen);
+        Assert.Null(leaf.Screen);
         Assert.Null(screen.FocusedNode);
     }
 
@@ -671,8 +703,8 @@ public sealed class UiInputRoutingTests
         Assert.Equal(["first-exit"], events);
         Assert.DoesNotContain(first, root.Children);
         Assert.DoesNotContain(second, root.Children);
-        Assert.Null(first.ActiveScreen);
-        Assert.Null(second.ActiveScreen);
+        Assert.Null(first.Screen);
+        Assert.Null(second.Screen);
     }
 
     [Fact]
@@ -702,7 +734,7 @@ public sealed class UiInputRoutingTests
         var manager = new UiManager();
         var root = new Canvas();
         var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
-        var screen = new Screen(root);
+        var screen = new UiScreen(root);
         var events = new List<string>();
         leaf.PointerEntered += (_, _) => events.Add("enter");
         leaf.PointerReleased += (_, _) => events.Add("release");
@@ -728,9 +760,9 @@ public sealed class UiInputRoutingTests
         var manager = new UiManager();
         var root = new TestNode { Focusable = true };
         var expected = new InvalidOperationException("opened");
-        var screen = new RecordingScreen(root)
+        var screen = new RecordingUiScreen(root)
         {
-            Opened = _ =>
+            Opened = () =>
             {
                 root.Measure(new Size(20, 20));
                 root.Arrange(new Rect(0, 0, 20, 20));
@@ -743,8 +775,9 @@ public sealed class UiInputRoutingTests
 
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
-        Assert.Null(root.ActiveScreen);
+        Assert.Same(screen, root.Screen);
         Assert.Null(screen.FocusedNode);
+        screen.Opened = null;
         var otherManager = new UiManager();
         otherManager.Open(screen);
         Assert.Same(screen, otherManager.CurrentScreen);
@@ -755,14 +788,14 @@ public sealed class UiInputRoutingTests
     {
         var manager = new UiManager();
         var oldRoot = new TestNode { Focusable = true };
-        var oldScreen = new Screen(oldRoot);
+        var oldScreen = new UiScreen(oldRoot);
         var expected = new InvalidOperationException("lost");
         oldRoot.LostFocus += (_, _) => throw expected;
         manager.Open(oldScreen);
         oldRoot.Measure(new Size(20, 20));
         oldRoot.Arrange(new Rect(0, 0, 20, 20));
         Assert.True(oldRoot.Focus());
-        var candidate = new Screen(new TestNode());
+        var candidate = new UiScreen(new TestNode());
 
         var actual = Assert.Throws<InvalidOperationException>(() => manager.Open(candidate));
 
@@ -778,7 +811,7 @@ public sealed class UiInputRoutingTests
     {
         var manager = new UiManager();
         var root = new TestNode { Focusable = true };
-        var screen = new Screen(root);
+        var screen = new UiScreen(root);
         var expected = new InvalidOperationException("lost");
         root.LostFocus += (_, _) => throw expected;
         manager.Open(screen);
@@ -790,8 +823,8 @@ public sealed class UiInputRoutingTests
 
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
-        Assert.Null(root.ActiveScreen);
-        Assert.False(manager.Dispatcher.CheckAccess());
+        Assert.Same(screen, root.Screen);
+        Assert.Throws<ObjectDisposedException>(() => manager.Update(new Size(20, 20)));
     }
 
     [Fact]
@@ -799,11 +832,11 @@ public sealed class UiInputRoutingTests
     {
         var manager = new UiManager();
         var root = new TestNode { Focusable = true };
-        var screen = new RecordingScreen(root);
+        var screen = new RecordingUiScreen(root);
         bool? openingResult = null;
         bool? openedResult = null;
-        screen.Opening = _ => openingResult = root.Focus();
-        screen.Opened = _ =>
+        screen.Opening = () => openingResult = root.Focus();
+        screen.Opened = () =>
         {
             root.Measure(new Size(20, 20));
             root.Arrange(new Rect(0, 0, 20, 20));
@@ -824,9 +857,9 @@ public sealed class UiInputRoutingTests
         var root = new Canvas();
         var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
         var closedCalls = 0;
-        var screen = new RecordingScreen(root)
+        var screen = new RecordingUiScreen(root)
         {
-            Closed = _ => closedCalls++
+            Closed = () => closedCalls++
         };
         var expected = new InvalidOperationException("lost");
         leaf.LostFocus += (_, _) => throw expected;
@@ -839,31 +872,99 @@ public sealed class UiInputRoutingTests
         Assert.Same(expected, actual);
         Assert.Equal(1, closedCalls);
         Assert.Null(manager.CurrentScreen);
-        Assert.Null(root.ActiveScreen);
+        Assert.Same(screen, root.Screen);
         var otherManager = new UiManager();
         otherManager.Open(screen);
         Assert.Same(screen, otherManager.CurrentScreen);
     }
 
     [Fact]
-    public void InputDuringCommittedCloseCleanupIsRejectedAsInactive()
+    public void InputDuringCommittedCloseCleanupUsesHostAndScreenTransitionPolicies()
     {
         var manager = new UiManager();
         var root = new Canvas();
         var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
-        var screen = new Screen(root);
-        Exception? nestedError = null;
+        var screen = new UiScreen(root);
+        Exception? managerError = null;
+        Exception? screenError = null;
+        var routedMoves = 0;
+        root.PointerMoved += (_, _) => routedMoves++;
         leaf.LostFocus += (_, _) =>
-            nestedError = Record.Exception(() => manager.ProcessPointerMoved(Point.Zero));
+        {
+            managerError = Record.Exception(() => manager.ProcessPointerMoved(Point.Zero));
+            screenError = Record.Exception(() => screen.ProcessPointerMoved(Point.Zero));
+        };
         manager.Open(screen);
         manager.Update(new Size(100, 100));
         Assert.True(leaf.Focus());
 
         manager.Close();
 
-        Assert.IsType<InvalidOperationException>(nestedError);
+        Assert.Null(managerError);
+        Assert.IsType<InvalidOperationException>(screenError);
+        Assert.Equal(0, routedMoves);
         Assert.Null(manager.CurrentScreen);
-        Assert.Null(root.ActiveScreen);
+        Assert.Same(screen, root.Screen);
+    }
+
+    [Fact]
+    public void DetachCallbackCannotReopenSameScreenBeforeCleanupReturns()
+    {
+        var (manager, screen, root) = OpenScene();
+        var branch = Place(root, new Canvas(), 10, 10, 30, 30);
+        var leaf = Place(branch, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var notifications = new List<string>();
+        Exception? reopenError = null;
+        leaf.LostFocus += (_, _) =>
+        {
+            notifications.Add("lost");
+            manager.Close();
+            reopenError = Record.Exception(() => manager.Open(screen));
+        };
+        leaf.PointerExited += (_, _) => notifications.Add("leaf-exit");
+        branch.PointerExited += (_, _) => notifications.Add("branch-exit");
+        manager.ProcessPointerMoved(new Point(15, 15));
+        Assert.True(leaf.Focus());
+
+        Assert.True(root.Children.Remove(branch));
+
+        Assert.IsType<InvalidOperationException>(reopenError);
+        Assert.Equal(["lost", "leaf-exit", "branch-exit"], notifications);
+        Assert.Null(manager.CurrentScreen);
+        manager.Open(screen);
+        manager.Close();
+    }
+
+    [Fact]
+    public void UiScreenInputRoutingWorksWithoutUiManager()
+    {
+        var root = new Canvas();
+        var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var screen = new UiScreen(root);
+        var events = new List<string>();
+        leaf.PointerMoved += (_, _) => events.Add("move");
+        leaf.PointerPressed += (_, _) => events.Add("press");
+        leaf.PointerReleased += (_, _) => events.Add("release");
+        leaf.PointerClicked += (_, _) => events.Add("click");
+        leaf.KeyDown += (_, _) => events.Add("key-down");
+        leaf.LostFocus += (_, _) => events.Add("lost-focus");
+        leaf.PointerExited += (_, _) => events.Add("exit");
+
+        screen.Open();
+        screen.Update(new Size(100, 100));
+        screen.ProcessPointerMoved(new Point(5, 5));
+        screen.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        screen.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        screen.ProcessKeyDown(Key.A, KeyModifiers.None);
+        Assert.True(root.Children.Remove(leaf));
+        screen.Close();
+
+        Assert.Equal(
+            ["move", "press", "release", "click", "key-down", "lost-focus", "exit"],
+            events);
+        Assert.Null(screen.FocusedNode);
+        Assert.Null(leaf.Screen);
+        Assert.Same(screen, screen.Root!.Screen);
     }
 
     [Fact]
@@ -884,18 +985,19 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void ReopeningSameScreenDuringRouteDoesNotContinueTheOldActivation()
+    public void PointerCallbackCannotReopenSameScreenBeforeRoutingReturns()
     {
         var manager = new UiManager();
         var root = new Canvas();
         var leaf = Place(root, new TestNode(), 0, 0, 20, 20);
-        var screen = new Screen(root);
+        var screen = new UiScreen(root);
         var events = new List<string>();
+        Exception? reopenError = null;
         leaf.PointerMoved += (_, _) =>
         {
             events.Add("leaf");
             manager.Close();
-            manager.Open(screen);
+            reopenError = Record.Exception(() => manager.Open(screen));
         };
         root.PointerMoved += (_, _) => events.Add("root");
         manager.Open(screen);
@@ -904,46 +1006,289 @@ public sealed class UiInputRoutingTests
         manager.ProcessPointerMoved(new Point(5, 5));
 
         Assert.Equal(["leaf"], events);
-        Assert.Same(screen, manager.CurrentScreen);
+        Assert.IsType<InvalidOperationException>(reopenError);
+        Assert.Null(manager.CurrentScreen);
+        manager.Open(screen);
+        manager.Close();
     }
 
     [Fact]
-    public void ReopenedActivationCanFocusWhileOldFocusNotificationUnwinds()
+    public void FocusCallbackCannotReopenSameScreenBeforeTransitionReturns()
     {
         var manager = new UiManager();
         var root = new Canvas();
         var first = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
-        var second = Place(root, new TestNode { Focusable = true }, 30, 0, 20, 20);
-        var screen = new RecordingScreen(root);
-        var reopening = false;
-        var gotCalls = 0;
-        screen.Opened = _ =>
-        {
-            if (reopening)
-                Assert.True(second.Focus());
-        };
-        second.GotFocus += (_, _) => gotCalls++;
+        var screen = new UiScreen(root);
+        Exception? reopenError = null;
         first.LostFocus += (_, _) =>
         {
-            reopening = true;
             manager.Close();
-            manager.Open(screen);
+            reopenError = Record.Exception(() => manager.Open(screen));
         };
         manager.Open(screen);
         manager.Update(new Size(100, 100));
         Assert.True(first.Focus());
 
-        Assert.True(second.Focus());
+        screen.ClearFocus();
 
-        Assert.Same(second, screen.FocusedNode);
-        Assert.Equal(1, gotCalls);
+        Assert.IsType<InvalidOperationException>(reopenError);
+        Assert.Null(manager.CurrentScreen);
+        manager.Open(screen);
+        manager.Close();
     }
 
-    private static (UiManager Manager, Screen Screen, Canvas Root) OpenScene()
+    [Fact]
+    public void CloseNotifiesInteractionLossWithoutClearingScreenOwnership()
     {
         var manager = new UiManager();
         var root = new Canvas();
-        var screen = new Screen(root);
+        var branch = Place(root, new Canvas(), 0, 0, 30, 30);
+        var leaf = Place(branch, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var screen = new UiScreen(root);
+        var events = new List<string>();
+        leaf.LostFocus += (_, _) =>
+        {
+            Assert.Same(screen, leaf.Screen);
+            events.Add("lost");
+        };
+        leaf.PointerExited += (_, _) =>
+        {
+            Assert.Same(screen, leaf.Screen);
+            events.Add("leaf-exit");
+        };
+        branch.PointerExited += (_, _) =>
+        {
+            Assert.Same(screen, branch.Screen);
+            events.Add("branch-exit");
+        };
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerMoved(new Point(5, 5));
+        Assert.True(leaf.Focus());
+
+        manager.Close();
+
+        Assert.Equal(["lost", "leaf-exit", "branch-exit"], events);
+        Assert.Same(screen, root.Screen);
+        Assert.Same(screen, branch.Screen);
+        Assert.Same(screen, leaf.Screen);
+    }
+
+    [Fact]
+    public void CloseNotificationCanReplaceRootAndStillCompletesSnapshot()
+    {
+        var manager = new UiManager();
+        var oldRoot = new Canvas();
+        var branch = Place(oldRoot, new Canvas(), 0, 0, 30, 30);
+        var leaf = Place(branch, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var newRoot = new Canvas();
+        var screen = new UiScreen(oldRoot);
+        var events = new List<string>();
+        leaf.LostFocus += (_, _) =>
+        {
+            events.Add("lost");
+            screen.Root = newRoot;
+        };
+        leaf.PointerExited += (_, _) => events.Add("leaf-exit");
+        branch.PointerExited += (_, _) => events.Add("branch-exit");
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerMoved(new Point(5, 5));
+        Assert.True(leaf.Focus());
+
+        manager.Close();
+
+        Assert.Equal(["lost", "leaf-exit", "branch-exit"], events);
+        Assert.Null(oldRoot.Screen);
+        Assert.Null(branch.Screen);
+        Assert.Null(leaf.Screen);
+        Assert.Same(newRoot, screen.Root);
+        Assert.Same(screen, newRoot.Screen);
+    }
+
+    [Fact]
+    public void ReplacingRootSynchronouslyCleansOutgoingInteraction()
+    {
+        var manager = new UiManager();
+        var oldRoot = new Canvas();
+        var branch = Place(oldRoot, new Canvas(), 0, 0, 30, 30);
+        var leaf = Place(branch, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var newRoot = new Canvas();
+        var screen = new UiScreen(oldRoot);
+        var events = new List<string>();
+        leaf.LostFocus += (_, _) => events.Add("lost");
+        leaf.PointerExited += (_, _) => events.Add("leaf-exit");
+        branch.PointerExited += (_, _) => events.Add("branch-exit");
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerMoved(new Point(5, 5));
+        Assert.True(leaf.Focus());
+
+        screen.Root = newRoot;
+
+        Assert.Equal(["lost", "leaf-exit", "branch-exit"], events);
+        Assert.Null(oldRoot.Screen);
+        Assert.Null(branch.Screen);
+        Assert.Null(leaf.Screen);
+        Assert.Same(screen, newRoot.Screen);
+        Assert.Same(newRoot, screen.Root);
+        manager.Close();
+    }
+
+    [Fact]
+    public void PromotingDescendantRootPreservesItsInteractionState()
+    {
+        var manager = new UiManager();
+        var oldRoot = new Canvas();
+        var incoming = Place(oldRoot, new Canvas(), 0, 0, 30, 30);
+        // Explicit alignment keeps the fixed-size node at the origin after promotion;
+        // the default Stretch alignment would center it at (35,35).
+        incoming.HorizontalAlignment = HorizontalAlignment.Left;
+        incoming.VerticalAlignment = VerticalAlignment.Top;
+        var leaf = Place(incoming, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var screen = new UiScreen(oldRoot);
+        var events = new List<string>();
+        incoming.PointerExited += (_, _) => events.Add("incoming-exit");
+        leaf.PointerExited += (_, _) => events.Add("leaf-exit");
+        leaf.PointerClicked += (_, _) => events.Add("click");
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerMoved(new Point(5, 5));
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.True(leaf.Focus());
+
+        screen.Root = incoming;
+
+        Assert.Empty(events);
+        Assert.Same(leaf, screen.FocusedNode);
+        Assert.Null(oldRoot.Screen);
+        Assert.Same(screen, incoming.Screen);
+        Assert.Same(screen, leaf.Screen);
+
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.Equal(["click"], events);
+        manager.Close();
+    }
+
+    [Fact]
+    public void RootTransferNotificationFailureKeepsCommittedStructure()
+    {
+        var incoming = new TestNode { Focusable = true };
+        var source = new UiScreen(incoming);
+        var target = new UiScreen(new Canvas());
+        var expected = new InvalidOperationException("lost");
+        incoming.LostFocus += (_, _) => throw expected;
+        source.Open();
+        incoming.Measure(new Size(20, 20));
+        incoming.Arrange(new Rect(0, 0, 20, 20));
+        Assert.True(incoming.Focus());
+
+        var actual = Assert.Throws<InvalidOperationException>(() => target.Root = incoming);
+
+        Assert.Same(expected, actual);
+        Assert.Null(source.Root);
+        Assert.Same(incoming, target.Root);
+        Assert.Same(target, incoming.Screen);
+        Assert.Null(source.FocusedNode);
+        source.Close();
+    }
+
+    [Fact]
+    public void RootTransferCommitsSourceFocusBeforeTargetNotification()
+    {
+        var targetRoot = new Canvas();
+        var targetLeaf = Place(targetRoot, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var sourceRoot = new Canvas();
+        var sourceLeaf = Place(sourceRoot, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var target = new UiScreen(targetRoot);
+        var source = new UiScreen(sourceRoot);
+        target.Open();
+        source.Open();
+        target.Update(new Size(100, 100));
+        source.Update(new Size(100, 100));
+        Assert.True(targetLeaf.Focus());
+        Assert.True(sourceLeaf.Focus());
+        UiNode? sourceFocusDuringTargetNotification = source.FocusedNode;
+        targetLeaf.LostFocus += (_, _) => sourceFocusDuringTargetNotification = source.FocusedNode;
+
+        target.Root = sourceRoot;
+
+        Assert.Null(sourceFocusDuringTargetNotification);
+        Assert.Null(source.FocusedNode);
+        Assert.Same(target, sourceLeaf.Screen);
+        target.Close();
+        source.Close();
+    }
+
+    [Fact]
+    public void RootTransferAggregatesNotificationsFromTargetAndSourceScreens()
+    {
+        var targetRoot = new Canvas();
+        var targetLeaf = Place(targetRoot, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var sourceRoot = new Canvas();
+        var sourceLeaf = Place(sourceRoot, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var target = new UiScreen(targetRoot);
+        var source = new UiScreen(sourceRoot);
+        var targetError = new InvalidOperationException("target lost focus");
+        var sourceError = new InvalidOperationException("source lost focus");
+        targetLeaf.LostFocus += (_, _) => throw targetError;
+        sourceLeaf.LostFocus += (_, _) => throw sourceError;
+        target.Open();
+        source.Open();
+        target.Update(new Size(100, 100));
+        source.Update(new Size(100, 100));
+        Assert.True(targetLeaf.Focus());
+        Assert.True(sourceLeaf.Focus());
+
+        var actual = Assert.Throws<AggregateException>(() => target.Root = sourceRoot);
+
+        Assert.Equal([targetError, sourceError], actual.InnerExceptions);
+        Assert.Null(source.Root);
+        Assert.Same(sourceRoot, target.Root);
+        Assert.Null(targetLeaf.Screen);
+        Assert.Same(target, sourceLeaf.Screen);
+        Assert.Null(source.FocusedNode);
+        target.Close();
+        source.Close();
+
+        var targetReopenError = Record.Exception(() =>
+        {
+            target.Open();
+            target.Close();
+        });
+        var sourceReopenError = Record.Exception(() =>
+        {
+            source.Open();
+            source.Close();
+        });
+        Assert.Null(targetReopenError);
+        Assert.Null(sourceReopenError);
+    }
+
+    [Fact]
+    public void NullRootInputProducesNoNodeEvents()
+    {
+        var manager = new UiManager();
+        var screen = new UiScreen();
+        manager.Open(screen);
+
+        manager.ProcessPointerMoved(Point.Zero);
+        manager.ProcessPointerPressed(Point.Zero, MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerReleased(Point.Zero, MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerWheel(Point.Zero, 1, -1);
+        manager.ProcessKeyDown(Key.A, KeyModifiers.None);
+        manager.ProcessKeyUp(Key.A, KeyModifiers.None);
+
+        Assert.Null(screen.FocusedNode);
+        manager.Close();
+    }
+
+    private static (UiManager Manager, UiScreen Screen, Canvas Root) OpenScene()
+    {
+        var manager = new UiManager();
+        var root = new Canvas();
+        var screen = new UiScreen(root);
         manager.Open(screen);
         manager.Update(new Size(100, 100));
         return (manager, screen, root);
@@ -957,7 +1302,7 @@ public sealed class UiInputRoutingTests
         Canvas.SetLeft(child, x);
         Canvas.SetTop(child, y);
         parent.Children.Add(child);
-        if (parent.ActiveScreen is not null)
+        if (parent.Screen?.IsOpen() == true)
         {
             var root = parent;
             while (root.Parent is Canvas ancestor)
@@ -997,14 +1342,16 @@ public sealed class UiInputRoutingTests
     {
     }
 
-    private sealed class RecordingScreen(UiNode root) : Screen(root)
+    private sealed class RecordingUiScreen(UiNode? root = null) : UiScreen(root)
     {
-        internal Action<UiManager>? Opening { get; set; }
-        internal Action<UiManager>? Opened { get; set; }
-        internal Action<UiManager>? Closed { get; set; }
+        internal Action? Opening { get; set; }
+        internal Action? Opened { get; set; }
+        internal Action? Closing { get; set; }
+        internal Action? Closed { get; set; }
 
-        protected override void OnOpening(UiManager manager) => Opening?.Invoke(manager);
-        protected override void OnOpened(UiManager manager) => Opened?.Invoke(manager);
-        protected override void OnClosed(UiManager manager) => Closed?.Invoke(manager);
+        protected override void OnOpening() => Opening?.Invoke();
+        protected override void OnOpened() => Opened?.Invoke();
+        protected override void OnClosing() => Closing?.Invoke();
+        protected override void OnClosed() => Closed?.Invoke();
     }
 }

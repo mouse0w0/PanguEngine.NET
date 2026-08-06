@@ -47,11 +47,8 @@ public abstract class Parent : UiNode
     /// <param name="child">The child to add.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="child"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the operation would duplicate a child, create a cycle, adopt an active root,
-    /// or modify an active tree from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when either active tree dispatcher is shut down.
+    /// Thrown when the operation would duplicate a child, create a cycle, adopt a UI screen root,
+    /// or modify a tree owned by an open screen from the wrong thread.
     /// </exception>
     protected void AddChild(UiNode child) =>
         InsertChild(_children.Count, child);
@@ -69,11 +66,8 @@ public abstract class Parent : UiNode
     /// Thrown when <paramref name="index"/> is outside the range from zero through the child count.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the operation would duplicate a child, create a cycle, adopt an active root,
-    /// or modify an active tree from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when either active tree dispatcher is shut down.
+    /// Thrown when the operation would duplicate a child, create a cycle, adopt a UI screen root,
+    /// or modify a tree owned by an open screen from the wrong thread.
     /// </exception>
     protected void InsertChild(int index, UiNode child)
     {
@@ -83,26 +77,31 @@ public abstract class Parent : UiNode
 
         ValidateInsertion(child);
         var oldParent = child.Parent;
-        var oldDispatcher = child.ActiveDispatcher;
-        var oldScreen = child.ActiveScreen;
-        var newDispatcher = ActiveDispatcher;
-        var newScreen = ActiveScreen;
-        VerifyDispatchers(oldDispatcher, newDispatcher);
-        var detachedGroups = new Dictionary<Screen, List<UiNode>>(ReferenceEqualityComparer.Instance);
+        var oldScreen = child.Screen;
+        var newScreen = Screen;
+        VerifyScreens(oldScreen, newScreen);
+        var affectedScreens = new List<UiScreen>();
         if (oldScreen is not null && !ReferenceEquals(oldScreen, newScreen))
-            AddDetachedNodes(detachedGroups, oldScreen, child);
+            AddAffectedScreen(affectedScreens, oldScreen);
 
-        if (oldParent is not null)
-            oldParent._children.RemoveAt(oldParent._children.IndexOf(child));
+        var activeScreens = BeginRuntimeOperations(affectedScreens);
+        try
+        {
+            oldParent?._children.RemoveAt(oldParent._children.IndexOf(child));
 
-        child.SetParent(this);
-        _children.Insert(index, child);
-        if (!ReferenceEquals(oldDispatcher, newDispatcher) || !ReferenceEquals(oldScreen, newScreen))
-            child.SetActiveTreeRecursive(newDispatcher, newScreen);
+            child.SetParent(this);
+            _children.Insert(index, child);
+            if (!ReferenceEquals(oldScreen, newScreen))
+                child.SetScreenRecursive(newScreen);
 
-        oldParent?.InvalidateTreeStructure(child);
-        InvalidateTreeStructure(child);
-        NotifyDetached(detachedGroups);
+            oldParent?.InvalidateTreeStructure();
+            InvalidateTreeStructure();
+            CommitAndNotifyInputState(activeScreens);
+        }
+        finally
+        {
+            EndRuntimeOperations(activeScreens);
+        }
     }
 
     internal void InsertChildFromCollection(int index, UiNode child) =>
@@ -115,10 +114,7 @@ public abstract class Parent : UiNode
     /// <returns>Whether the node was a direct child and was removed.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="child"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active tree is modified from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active tree dispatcher is shut down.
+    /// Thrown when a tree owned by an open screen is modified from the wrong thread.
     /// </exception>
     protected bool RemoveChild(UiNode child)
     {
@@ -140,39 +136,48 @@ public abstract class Parent : UiNode
         RemoveChildAt(index);
     }
 
+    internal void RemoveChildForRootTransfer(UiNode child)
+    {
+        var index = GetChildIndex(child);
+        _children.RemoveAt(index);
+        child.SetParent(null);
+        InvalidateTreeStructure();
+    }
+
     /// <summary>
     /// Removes all direct children from this parent.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active tree is modified from the wrong thread.
-    /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    /// Thrown when the active tree dispatcher is shut down.
+    /// Thrown when a tree owned by an open screen is modified from the wrong thread.
     /// </exception>
     protected void ClearChildren()
     {
         if (_children.Count == 0)
             return;
 
-        var dispatcher = ActiveDispatcher;
-        dispatcher?.VerifyAccess();
-        var detachedGroups = new Dictionary<Screen, List<UiNode>>(ReferenceEqualityComparer.Instance);
-        foreach (var child in _children)
-        {
-            if (child.ActiveScreen is not null)
-                AddDetachedNodes(detachedGroups, child.ActiveScreen, child);
-        }
+        var screen = Screen;
+        screen?.VerifyTreeAccess();
+        var affectedScreens = new List<UiScreen>();
+        AddAffectedScreen(affectedScreens, screen);
+        var activeScreens = BeginRuntimeOperations(affectedScreens);
 
-        foreach (var child in _children)
+        try
         {
-            child.SetParent(null);
-            if (dispatcher is not null)
-                child.SetActiveTreeRecursive(null, null);
-        }
+            foreach (var child in _children)
+            {
+                child.SetParent(null);
+                if (screen is not null)
+                    child.SetScreenRecursive(null);
+            }
 
-        _children.Clear();
-        InvalidateTreeStructure(this);
-        NotifyDetached(detachedGroups);
+            _children.Clear();
+            InvalidateTreeStructure();
+            CommitAndNotifyInputState(activeScreens);
+        }
+        finally
+        {
+            EndRuntimeOperations(activeScreens);
+        }
     }
 
     internal void ClearChildrenFromCollection() =>
@@ -188,31 +193,36 @@ public abstract class Parent : UiNode
 
         ValidateInsertion(child);
         var oldParent = child.Parent;
-        var oldDispatcher = child.ActiveDispatcher;
-        var oldScreen = child.ActiveScreen;
-        var newDispatcher = ActiveDispatcher;
-        var newScreen = ActiveScreen;
-        VerifyDispatchers(oldDispatcher, newDispatcher);
-        var detachedGroups = new Dictionary<Screen, List<UiNode>>(ReferenceEqualityComparer.Instance);
+        var oldScreen = child.Screen;
+        var newScreen = Screen;
+        VerifyScreens(oldScreen, newScreen);
+        var affectedScreens = new List<UiScreen>();
         if (oldScreen is not null && !ReferenceEquals(oldScreen, newScreen))
-            AddDetachedNodes(detachedGroups, oldScreen, child);
-        if (replacedChild.ActiveScreen is not null)
-            AddDetachedNodes(detachedGroups, replacedChild.ActiveScreen, replacedChild);
-        if (oldParent is not null)
-            oldParent._children.RemoveAt(oldParent._children.IndexOf(child));
+            AddAffectedScreen(affectedScreens, oldScreen);
+        if (replacedChild.Screen is not null)
+            AddAffectedScreen(affectedScreens, replacedChild.Screen);
 
-        child.SetParent(this);
-        _children[index] = child;
-        if (!ReferenceEquals(oldDispatcher, newDispatcher) || !ReferenceEquals(oldScreen, newScreen))
-            child.SetActiveTreeRecursive(newDispatcher, newScreen);
+        var activeScreens = BeginRuntimeOperations(affectedScreens);
+        try
+        {
+            oldParent?._children.RemoveAt(oldParent._children.IndexOf(child));
+            child.SetParent(this);
+            _children[index] = child;
+            if (!ReferenceEquals(oldScreen, newScreen))
+                child.SetScreenRecursive(newScreen);
 
-        replacedChild.SetParent(null);
-        if (newDispatcher is not null)
-            replacedChild.SetActiveTreeRecursive(null, null);
+            replacedChild.SetParent(null);
+            if (newScreen is not null)
+                replacedChild.SetScreenRecursive(null);
 
-        oldParent?.InvalidateTreeStructure(child);
-        InvalidateTreeStructure(child);
-        NotifyDetached(detachedGroups);
+            oldParent?.InvalidateTreeStructure();
+            InvalidateTreeStructure();
+            CommitAndNotifyInputState(activeScreens);
+        }
+        finally
+        {
+            EndRuntimeOperations(activeScreens);
+        }
     }
 
     internal void MoveChildFromCollection(int oldIndex, int newIndex)
@@ -237,16 +247,24 @@ public abstract class Parent : UiNode
     private void RemoveChildAt(int index)
     {
         var child = _children[index];
-        var dispatcher = ActiveDispatcher;
-        dispatcher?.VerifyAccess();
-        var screen = child.ActiveScreen;
-        var detachedNodes = screen is null ? null : SnapshotSubtree(child);
-        _children.RemoveAt(index);
-        child.SetParent(null);
-        if (dispatcher is not null)
-            child.SetActiveTreeRecursive(null, null);
-        InvalidateTreeStructure(child);
-        screen?.HandleSubtreesDetached(detachedNodes!);
+        var screen = child.Screen;
+        Screen?.VerifyTreeAccess();
+        var affectedScreens = new List<UiScreen>();
+        AddAffectedScreen(affectedScreens, screen);
+        var activeScreens = BeginRuntimeOperations(affectedScreens);
+        try
+        {
+            _children.RemoveAt(index);
+            child.SetParent(null);
+            if (screen is not null)
+                child.SetScreenRecursive(null);
+            InvalidateTreeStructure();
+            CommitAndNotifyInputState(activeScreens);
+        }
+        finally
+        {
+            EndRuntimeOperations(activeScreens);
+        }
     }
 
     private void MoveChild(int oldIndex, int newIndex)
@@ -254,11 +272,14 @@ public abstract class Parent : UiNode
         if (oldIndex == newIndex)
             return;
 
-        ActiveDispatcher?.VerifyAccess();
+        Screen?.VerifyTreeAccess();
+        var preserveHitTestLayout = CanPreserveHitTestLayoutAfterChildOrderChange();
         var child = _children[oldIndex];
         _children.RemoveAt(oldIndex);
         _children.Insert(newIndex, child);
-        InvalidateTreeStructure(child);
+        InvalidateTreeStructure();
+        if (preserveHitTestLayout)
+            RestoreHitTestLayoutAfterChildOrderChange();
     }
 
     private void ValidateInsertion(UiNode child)
@@ -272,51 +293,64 @@ public abstract class Parent : UiNode
                 throw new InvalidOperationException("Adding the UI node would create a parent cycle.");
         }
 
-        if (child.Parent is null && child.ActiveDispatcher is not null)
-            throw new InvalidOperationException("An active root must be detached before it can become a child.");
+        if (child.Parent is null && child.Screen is not null)
+            throw new InvalidOperationException("A UI screen root must be cleared before it can become a child.");
     }
 
-    private static void VerifyDispatchers(
-        UiDispatcher? oldDispatcher,
-        UiDispatcher? newDispatcher)
+    private static void VerifyScreens(UiScreen? oldScreen, UiScreen? newScreen)
     {
-        oldDispatcher?.VerifyAccess();
-        if (!ReferenceEquals(oldDispatcher, newDispatcher))
-            newDispatcher?.VerifyAccess();
+        oldScreen?.VerifyTreeAccess();
+        if (!ReferenceEquals(oldScreen, newScreen))
+            newScreen?.VerifyTreeAccess();
     }
 
-    private static List<UiNode> SnapshotSubtree(UiNode root)
+    private static void AddAffectedScreen(List<UiScreen> screens, UiScreen? screen)
     {
-        var nodes = new List<UiNode>();
-        root.CollectSubtree(nodes);
-        return nodes;
+        if (screen is not null && !screens.Contains(screen))
+            screens.Add(screen);
     }
 
-    private static void AddDetachedNodes(
-        Dictionary<Screen, List<UiNode>> groups,
-        Screen screen,
-        UiNode root)
+    private static List<UiScreen> BeginRuntimeOperations(IReadOnlyList<UiScreen> screens)
     {
-        if (!groups.TryGetValue(screen, out var nodes))
+        var activeScreens = new List<UiScreen>(screens.Count);
+        try
         {
-            nodes = [];
-            groups.Add(screen, nodes);
+            foreach (var screen in screens)
+            {
+                if (screen.BeginRuntimeOperationIfOpen())
+                    activeScreens.Add(screen);
+            }
+        }
+        catch
+        {
+            EndRuntimeOperations(activeScreens);
+            throw;
         }
 
-        root.CollectSubtree(nodes);
+        return activeScreens;
     }
 
-    private static void NotifyDetached(Dictionary<Screen, List<UiNode>> groups)
+    private static void EndRuntimeOperations(IReadOnlyList<UiScreen> screens)
     {
-        if (groups.Count == 0)
-            return;
+        for (var index = screens.Count - 1; index >= 0; index--)
+            screens[index].EndRuntimeOperation();
+    }
+
+    private static void CommitAndNotifyInputState(IReadOnlyList<UiScreen> screens)
+    {
+        var snapshots = new List<(UiScreen Screen, UiScreen.InputStateCleanupSnapshot Snapshot)>();
+        foreach (var screen in screens)
+        {
+            if (screen.CommitInputStateAfterTreeChange() is { } snapshot)
+                snapshots.Add((screen, snapshot));
+        }
 
         var errors = new List<Exception>();
-        foreach (var (screen, nodes) in groups)
+        foreach (var (screen, snapshot) in snapshots)
         {
             try
             {
-                screen.HandleSubtreesDetached(nodes);
+                screen.NotifyInputStateLoss(snapshot);
             }
             catch (Exception exception)
             {

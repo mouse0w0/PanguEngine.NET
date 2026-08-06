@@ -118,12 +118,12 @@ public sealed class PanelTests
     [Fact]
     public void AddAndInsertRejectCyclesAndActiveRootsWithoutChangingTree()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestPanel();
         var nested = new TestPanel();
         root.Children.Add(nested);
         var activeRoot = new TestNode();
-        activeRoot.AttachToTree(dispatcher);
+        var activeScreen = new UiScreen(activeRoot);
+        activeScreen.Open();
 
         Assert.Throws<InvalidOperationException>(() => nested.Children.Add(nested));
         Assert.Throws<InvalidOperationException>(() => nested.Children.Insert(0, root));
@@ -133,7 +133,8 @@ public sealed class PanelTests
         Assert.Equal(new UiNode[] { nested }, root.Children);
         Assert.Same(root, nested.Parent);
         Assert.Null(activeRoot.Parent);
-        Assert.Same(dispatcher, activeRoot.ActiveDispatcher);
+        Assert.Same(activeScreen, activeRoot.Screen);
+        activeScreen.Close();
     }
 
     [Fact]
@@ -157,7 +158,6 @@ public sealed class PanelTests
     [Fact]
     public void ActiveIndexReplacementKeepsIncomingMountedAndDeactivatesOutgoing()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestPanel();
         var oldParent = new TestPanel();
         var target = new TestPanel();
@@ -167,61 +167,66 @@ public sealed class PanelTests
         target.Children.Add(outgoing);
         root.Children.Add(oldParent);
         root.Children.Add(target);
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
 
         target.Children[0] = incoming;
 
         Assert.Empty(oldParent.Children);
         Assert.Equal(new UiNode[] { incoming }, target.Children);
         Assert.Same(target, incoming.Parent);
-        Assert.Same(dispatcher, incoming.ActiveDispatcher);
+        Assert.Same(screen, incoming.Screen);
         Assert.Null(outgoing.Parent);
-        Assert.Null(outgoing.ActiveDispatcher);
+        Assert.Null(outgoing.Screen);
+        screen.Close();
     }
 
     [Fact]
     public void ReplacementCanPromoteIncomingChildFromOutgoingSubtree()
     {
-        var dispatcher = new UiDispatcher();
         var target = new TestPanel();
         var outgoing = new TestPanel();
         var incoming = new TestNode();
         outgoing.Children.Add(incoming);
         target.Children.Add(outgoing);
-        target.AttachToTree(dispatcher);
+        var screen = new UiScreen(target);
+        screen.Open();
 
         target.Children[0] = incoming;
 
         Assert.Equal(new UiNode[] { incoming }, target.Children);
         Assert.Same(target, incoming.Parent);
-        Assert.Same(dispatcher, incoming.ActiveDispatcher);
+        Assert.Same(screen, incoming.Screen);
         Assert.Empty(outgoing.Children);
         Assert.Null(outgoing.Parent);
-        Assert.Null(outgoing.ActiveDispatcher);
+        Assert.Null(outgoing.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void ReplacementAcrossDispatchersAdoptsTheTargetDispatcher()
+    public void ReplacementAcrossScreensAdoptsTheTargetScreen()
     {
-        var oldDispatcher = new UiDispatcher();
-        var newDispatcher = new UiDispatcher();
         var oldRoot = new TestPanel();
         var target = new TestPanel();
         var incoming = new TestNode();
         var outgoing = new TestNode();
         oldRoot.Children.Add(incoming);
         target.Children.Add(outgoing);
-        oldRoot.AttachToTree(oldDispatcher);
-        target.AttachToTree(newDispatcher);
+        var oldScreen = new UiScreen(oldRoot);
+        var newScreen = new UiScreen(target);
+        oldScreen.Open();
+        newScreen.Open();
 
         target.Children[0] = incoming;
 
         Assert.Empty(oldRoot.Children);
         Assert.Equal(new UiNode[] { incoming }, target.Children);
         Assert.Same(target, incoming.Parent);
-        Assert.Same(newDispatcher, incoming.ActiveDispatcher);
+        Assert.Same(newScreen, incoming.Screen);
         Assert.Null(outgoing.Parent);
-        Assert.Null(outgoing.ActiveDispatcher);
+        Assert.Null(outgoing.Screen);
+        newScreen.Close();
+        oldScreen.Close();
     }
 
     [Fact]
@@ -243,14 +248,14 @@ public sealed class PanelTests
     [Fact]
     public void IndexReplacementRejectsCycleAndActiveRootWithoutChangingTree()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestPanel();
         var nested = new TestPanel();
         var outgoing = new TestNode();
         root.Children.Add(nested);
         nested.Children.Add(outgoing);
         var activeRoot = new TestNode();
-        activeRoot.AttachToTree(dispatcher);
+        var activeScreen = new UiScreen(activeRoot);
+        activeScreen.Open();
 
         Assert.Throws<InvalidOperationException>(() => nested.Children[0] = root);
         Assert.Throws<InvalidOperationException>(() => nested.Children[0] = activeRoot);
@@ -258,18 +263,19 @@ public sealed class PanelTests
         Assert.Equal(new UiNode[] { outgoing }, nested.Children);
         Assert.Same(nested, outgoing.Parent);
         Assert.Null(activeRoot.Parent);
-        Assert.Same(dispatcher, activeRoot.ActiveDispatcher);
+        Assert.Same(activeScreen, activeRoot.Screen);
+        activeScreen.Close();
     }
 
     [Fact]
     public void SameChildReplacementIsANoOp()
     {
-        var dispatcher = new UiDispatcher();
         var panel = new TestPanel();
         var child = new TestNode();
         panel.Children.Add(child);
+        var screen = new UiScreen(panel);
         ValidateLayout(panel);
-        panel.AttachToTree(dispatcher);
+        screen.Open();
         var enumerator = panel.Children.GetEnumerator();
         Assert.True(enumerator.MoveNext());
 
@@ -280,13 +286,13 @@ public sealed class PanelTests
         Assert.False(enumerator.MoveNext());
         Assert.True(panel.IsMeasureValid);
         Assert.True(panel.IsArrangeValid);
-        Assert.Same(dispatcher, child.ActiveDispatcher);
+        Assert.Same(screen, child.Screen);
+        screen.Close();
     }
 
     [Fact]
     public void MoveUsesFinalIndexAndKeepsChildMounted()
     {
-        var dispatcher = new UiDispatcher();
         var panel = new TestPanel();
         var first = new TestNode();
         var middle = new TestNode();
@@ -294,29 +300,31 @@ public sealed class PanelTests
         panel.Children.Add(first);
         panel.Children.Add(middle);
         panel.Children.Add(last);
+        var screen = new UiScreen(panel);
         ValidateLayout(panel);
-        panel.AttachToTree(dispatcher);
+        screen.Open();
 
         panel.Children.Move(0, 2);
 
         Assert.Equal(new UiNode[] { middle, last, first }, panel.Children);
         Assert.Same(panel, first.Parent);
-        Assert.Same(dispatcher, first.ActiveDispatcher);
+        Assert.Same(screen, first.Screen);
         Assert.False(panel.IsMeasureValid);
         Assert.False(panel.IsArrangeValid);
 
         panel.Children.Move(2, 0);
         Assert.Equal(new UiNode[] { first, middle, last }, panel.Children);
+        screen.Close();
     }
 
     [Fact]
     public void SameIndexMoveIsANoOpOnWrongThread()
     {
-        var dispatcher = new UiDispatcher();
         var panel = new TestPanel();
         panel.Children.Add(new TestNode());
+        var screen = new UiScreen(panel);
         ValidateLayout(panel);
-        panel.AttachToTree(dispatcher);
+        screen.Open();
         var enumerator = panel.Children.GetEnumerator();
         Assert.True(enumerator.MoveNext());
 
@@ -327,15 +335,16 @@ public sealed class PanelTests
         Assert.False(enumerator.MoveNext());
         Assert.True(panel.IsMeasureValid);
         Assert.True(panel.IsArrangeValid);
+        screen.Close();
     }
 
     [Fact]
     public void MissingRemoveAndEmptyClearAreNoOpsOnWrongThread()
     {
-        var dispatcher = new UiDispatcher();
         var panel = new TestPanel();
+        var screen = new UiScreen(panel);
         ValidateLayout(panel);
-        panel.AttachToTree(dispatcher);
+        screen.Open();
         var enumerator = panel.Children.GetEnumerator();
         Assert.False(enumerator.MoveNext());
 
@@ -351,18 +360,19 @@ public sealed class PanelTests
         Assert.False(enumerator.MoveNext());
         Assert.True(panel.IsMeasureValid);
         Assert.True(panel.IsArrangeValid);
+        screen.Close();
     }
 
     [Fact]
     public void ActiveCollectionRejectsRealChangesOnWrongThread()
     {
-        var dispatcher = new UiDispatcher();
         var panel = new TestPanel();
         var first = new TestNode();
         var second = new TestNode();
         panel.Children.Add(first);
         panel.Children.Add(second);
-        panel.AttachToTree(dispatcher);
+        var screen = new UiScreen(panel);
+        screen.Open();
 
         var result = RunOnBackgroundThread(() =>
             (Add: Record.Exception(() => panel.Children.Add(new TestNode())),
@@ -377,6 +387,7 @@ public sealed class PanelTests
         Assert.IsType<InvalidOperationException>(result.Move);
         Assert.IsType<InvalidOperationException>(result.Clear);
         Assert.Equal(new UiNode[] { first, second }, panel.Children);
+        screen.Close();
     }
 
     [Fact]
@@ -395,7 +406,7 @@ public sealed class PanelTests
         });
 
         Assert.Single(panel.Children);
-        Assert.Null(panel.ActiveDispatcher);
+        Assert.Null(panel.Screen);
     }
 
     [Fact]

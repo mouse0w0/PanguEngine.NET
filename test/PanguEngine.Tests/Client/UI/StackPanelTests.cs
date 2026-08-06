@@ -213,7 +213,7 @@ public sealed class StackPanelTests
         root.Children.Add(panel);
         ValidateLayout(root);
 
-        panel.Children.Add(new TestNode());
+        panel.Children.Add(new TestNode { CoreDesiredSize = new Size(0, double.MaxValue) });
 
         Assert.False(panel.IsMeasureValid);
         Assert.False(panel.IsArrangeValid);
@@ -253,7 +253,7 @@ public sealed class StackPanelTests
     {
         var panel = new StackPanel { Spacing = 1 };
         panel.Children.Add(new TestNode { CoreDesiredSize = new Size(0, double.MaxValue) });
-        panel.Children.Add(new TestNode());
+        panel.Children.Add(new TestNode { CoreDesiredSize = new Size(0, double.MaxValue) });
 
         Assert.Throws<InvalidOperationException>(() => panel.Measure(Size.Infinite));
         Assert.False(panel.IsMeasureValid);
@@ -312,10 +312,10 @@ public sealed class StackPanelTests
     [Fact]
     public void ActiveStackPanelPropertiesRejectWrongThreadWithoutPartialState()
     {
-        var dispatcher = new UiDispatcher();
         var panel = new StackPanel();
+        var screen = new UiScreen(panel);
         ValidateLayout(panel);
-        panel.AttachToTree(dispatcher);
+        screen.Open();
 
         var result = RunOnBackgroundThread(() =>
             (Spacing: Record.Exception(() => panel.Spacing = 4),
@@ -327,6 +327,7 @@ public sealed class StackPanelTests
         Assert.Equal(Orientation.Vertical, panel.Orientation);
         Assert.True(panel.IsMeasureValid);
         Assert.True(panel.IsArrangeValid);
+        screen.Close();
     }
 
     private static void ValidateLayout(UiNode node)

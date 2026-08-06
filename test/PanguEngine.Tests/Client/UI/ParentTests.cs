@@ -156,13 +156,13 @@ public sealed class ParentTests
         independent.MoveToBack();
         Assert.Null(independent.Parent);
 
-        var dispatcher = new UiDispatcher();
         var parent = new TestParent();
         var first = new TestNode();
         var last = new TestNode();
         parent.Add(first);
         parent.Add(last);
-        parent.AttachToTree(dispatcher);
+        var screen = new UiScreen(parent);
+        screen.Open();
 
         var backgroundResult = RunOnBackgroundThread(() =>
             (BackError: Record.Exception(first.MoveToBack),
@@ -171,12 +171,12 @@ public sealed class ParentTests
         Assert.Null(backgroundResult.BackError);
         Assert.Null(backgroundResult.FrontError);
         Assert.Equal(new UiNode[] { first, last }, parent.Children);
+        screen.Close();
     }
 
     [Fact]
-    public void ActiveTreeMoveCommandsReorderOnDispatcherThread()
+    public void ActiveTreeMoveCommandsReorderOnOwnerThread()
     {
-        var dispatcher = new UiDispatcher();
         var parent = new TestParent();
         var first = new TestNode();
         var middle = new TestNode();
@@ -184,120 +184,87 @@ public sealed class ParentTests
         parent.Add(first);
         parent.Add(middle);
         parent.Add(last);
-        parent.AttachToTree(dispatcher);
+        var screen = new UiScreen(parent);
+        screen.Open();
 
         middle.MoveToFront();
         Assert.Equal(new UiNode[] { first, last, middle }, parent.Children);
 
         middle.MoveToBack();
         Assert.Equal(new UiNode[] { middle, first, last }, parent.Children);
-        Assert.Same(dispatcher, middle.ActiveDispatcher);
+        Assert.Same(screen, middle.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void AttachAndDetachPropagateDispatcherThroughSubtree()
+    public void AssigningAndClearingRootPropagateScreenThroughSubtree()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
         var nested = new TestParent();
         var leaf = new TestNode();
         root.Add(nested);
         nested.Add(leaf);
 
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
 
-        Assert.Same(dispatcher, root.ActiveDispatcher);
-        Assert.Same(dispatcher, nested.ActiveDispatcher);
-        Assert.Same(dispatcher, leaf.ActiveDispatcher);
+        Assert.Same(screen, root.Screen);
+        Assert.Same(screen, nested.Screen);
+        Assert.Same(screen, leaf.Screen);
 
-        root.DetachFromTree();
-        root.DetachFromTree();
+        screen.Root = null;
 
-        Assert.Null(root.ActiveDispatcher);
-        Assert.Null(nested.ActiveDispatcher);
-        Assert.Null(leaf.ActiveDispatcher);
+        Assert.Null(root.Screen);
+        Assert.Null(nested.Screen);
+        Assert.Null(leaf.Screen);
     }
 
     [Fact]
-    public void RootAttachmentRejectsInvalidStateWithoutChangingSubtree()
+    public void ScreenRootMustBeClearedBeforeBecomingAChild()
     {
-        var dispatcher = new UiDispatcher();
-        var root = new TestParent();
-        var child = new TestNode();
-        root.Add(child);
-
-        Assert.Throws<ArgumentNullException>(() => root.AttachToTree(null!));
-        Assert.Null(root.ActiveDispatcher);
-        Assert.Null(child.ActiveDispatcher);
-
-        root.AttachToTree(dispatcher);
-        Assert.Throws<InvalidOperationException>(() => root.AttachToTree(dispatcher));
-        Assert.Same(dispatcher, root.ActiveDispatcher);
-        Assert.Same(dispatcher, child.ActiveDispatcher);
-    }
-
-    [Fact]
-    public void ChildCannotUseRootAttachmentEntrypoints()
-    {
-        var dispatcher = new UiDispatcher();
-        var parent = new TestParent();
-        var child = new TestNode();
-        parent.Add(child);
-
-        Assert.Throws<InvalidOperationException>(() => child.AttachToTree(dispatcher));
-        Assert.Throws<InvalidOperationException>(child.DetachFromTree);
-
-        Assert.Same(parent, child.Parent);
-        Assert.Null(parent.ActiveDispatcher);
-        Assert.Null(child.ActiveDispatcher);
-    }
-
-    [Fact]
-    public void ActiveRootMustBeDetachedBeforeBecomingAChild()
-    {
-        var dispatcher = new UiDispatcher();
         var activeRoot = new TestParent();
         var target = new TestParent();
-        activeRoot.AttachToTree(dispatcher);
+        var screen = new UiScreen(activeRoot);
+        screen.Open();
 
         Assert.Throws<InvalidOperationException>(() => target.Add(activeRoot));
         Assert.Null(activeRoot.Parent);
-        Assert.Same(dispatcher, activeRoot.ActiveDispatcher);
+        Assert.Same(screen, activeRoot.Screen);
         Assert.Empty(target.Children);
 
-        activeRoot.DetachFromTree();
+        screen.Close();
+        screen.Root = null;
         target.Add(activeRoot);
 
         Assert.Same(target, activeRoot.Parent);
-        Assert.Null(activeRoot.ActiveDispatcher);
+        Assert.Null(activeRoot.Screen);
     }
 
     [Fact]
     public void ActiveParentActivatesAddedSubtreeAndDeactivatesRemovedSubtree()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
         var nested = new TestParent();
         var leaf = new TestNode();
         nested.Add(leaf);
 
         root.Add(nested);
 
-        Assert.Same(dispatcher, nested.ActiveDispatcher);
-        Assert.Same(dispatcher, leaf.ActiveDispatcher);
+        Assert.Same(screen, nested.Screen);
+        Assert.Same(screen, leaf.Screen);
 
         Assert.True(root.Remove(nested));
 
         Assert.Null(nested.Parent);
-        Assert.Null(nested.ActiveDispatcher);
-        Assert.Null(leaf.ActiveDispatcher);
+        Assert.Null(nested.Screen);
+        Assert.Null(leaf.Screen);
+        screen.Close();
     }
 
     [Fact]
     public void ActiveParentClearDeactivatesEveryRemovedSubtree()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
         var first = new TestParent();
         var firstLeaf = new TestNode();
@@ -305,23 +272,24 @@ public sealed class ParentTests
         first.Add(firstLeaf);
         root.Add(first);
         root.Add(second);
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
 
         root.Clear();
 
         Assert.Empty(root.Children);
         Assert.Null(first.Parent);
         Assert.Null(second.Parent);
-        Assert.Null(first.ActiveDispatcher);
-        Assert.Null(firstLeaf.ActiveDispatcher);
-        Assert.Null(second.ActiveDispatcher);
-        Assert.Same(dispatcher, root.ActiveDispatcher);
+        Assert.Null(first.Screen);
+        Assert.Null(firstLeaf.Screen);
+        Assert.Null(second.Screen);
+        Assert.Same(screen, root.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void ReparentWithinSameDispatcherKeepsSubtreeActive()
+    public void ReparentWithinSameScreenKeepsSubtreeActive()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
         var oldParent = new TestParent();
         var newParent = new TestParent();
@@ -331,44 +299,47 @@ public sealed class ParentTests
         oldParent.Add(child);
         root.Add(oldParent);
         root.Add(newParent);
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
 
         newParent.Add(child);
 
         Assert.Empty(oldParent.Children);
         Assert.Equal(new UiNode[] { child }, newParent.Children);
         Assert.Same(newParent, child.Parent);
-        Assert.Same(dispatcher, child.ActiveDispatcher);
-        Assert.Same(dispatcher, leaf.ActiveDispatcher);
+        Assert.Same(screen, child.Screen);
+        Assert.Same(screen, leaf.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void ReparentAcrossSameThreadDispatchersChangesSubtreeDispatcher()
+    public void ReparentAcrossSameThreadScreensChangesScreen()
     {
-        var oldDispatcher = new UiDispatcher();
-        var newDispatcher = new UiDispatcher();
         var oldRoot = new TestParent();
         var newRoot = new TestParent();
         var child = new TestParent();
         var leaf = new TestNode();
         child.Add(leaf);
         oldRoot.Add(child);
-        oldRoot.AttachToTree(oldDispatcher);
-        newRoot.AttachToTree(newDispatcher);
+        var oldScreen = new UiScreen(oldRoot);
+        var newScreen = new UiScreen(newRoot);
+        oldScreen.Open();
+        newScreen.Open();
 
         newRoot.Add(child);
 
         Assert.Empty(oldRoot.Children);
         Assert.Equal(new UiNode[] { child }, newRoot.Children);
         Assert.Same(newRoot, child.Parent);
-        Assert.Same(newDispatcher, child.ActiveDispatcher);
-        Assert.Same(newDispatcher, leaf.ActiveDispatcher);
+        Assert.Same(newScreen, child.Screen);
+        Assert.Same(newScreen, leaf.Screen);
+        newScreen.Close();
+        oldScreen.Close();
     }
 
     [Fact]
     public void ReparentBetweenActiveAndInactiveTreesTransitionsSubtreeState()
     {
-        var dispatcher = new UiDispatcher();
         var activeRoot = new TestParent();
         var activeParent = new TestParent();
         var inactiveParent = new TestParent();
@@ -377,53 +348,52 @@ public sealed class ParentTests
         child.Add(leaf);
         activeParent.Add(child);
         activeRoot.Add(activeParent);
-        activeRoot.AttachToTree(dispatcher);
+        var screen = new UiScreen(activeRoot);
+        screen.Open();
 
         inactiveParent.Add(child);
 
         Assert.Empty(activeParent.Children);
         Assert.Same(inactiveParent, child.Parent);
-        Assert.Null(child.ActiveDispatcher);
-        Assert.Null(leaf.ActiveDispatcher);
+        Assert.Null(child.Screen);
+        Assert.Null(leaf.Screen);
 
         activeParent.Add(child);
 
         Assert.Empty(inactiveParent.Children);
         Assert.Same(activeParent, child.Parent);
-        Assert.Same(dispatcher, child.ActiveDispatcher);
-        Assert.Same(dispatcher, leaf.ActiveDispatcher);
+        Assert.Same(screen, child.Screen);
+        Assert.Same(screen, leaf.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void WrongThreadCannotAttachOrDetachRoot()
+    public void WrongThreadCannotReplaceOpenScreenRoot()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
+        var screen = new UiScreen(root);
+        screen.Open();
 
-        var attachError = RunOnBackgroundThread(() =>
-            Record.Exception(() => root.AttachToTree(dispatcher)));
+        var result = RunOnBackgroundThread(() =>
+            (RootError: Record.Exception(() => screen.Root = null),
+                CloseError: Record.Exception(screen.Close)));
 
-        Assert.IsType<InvalidOperationException>(attachError);
-        Assert.Null(root.ActiveDispatcher);
-
-        root.AttachToTree(dispatcher);
-        var detachError = RunOnBackgroundThread(() =>
-            Record.Exception(root.DetachFromTree));
-
-        Assert.IsType<InvalidOperationException>(detachError);
-        Assert.Same(dispatcher, root.ActiveDispatcher);
+        Assert.IsType<InvalidOperationException>(result.RootError);
+        Assert.IsType<InvalidOperationException>(result.CloseError);
+        Assert.Same(screen, root.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void ActiveStructuralChangesRequireDispatcherThread()
+    public void ActiveStructuralChangesRequireOwnerThread()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
         var first = new TestNode();
         var second = new TestNode();
         root.Add(first);
         root.Add(second);
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
         var added = new TestNode();
 
         var result = RunOnBackgroundThread(() =>
@@ -440,16 +410,17 @@ public sealed class ParentTests
         Assert.Same(root, first.Parent);
         Assert.Same(root, second.Parent);
         Assert.Null(added.Parent);
-        Assert.Null(added.ActiveDispatcher);
+        Assert.Null(added.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void ActiveNoOpOperationsDoNotRequireDispatcherThread()
+    public void ActiveNoOpOperationsDoNotRequireOwnerThread()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
         var foreign = new TestNode();
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
 
         var result = RunOnBackgroundThread(() =>
             (RemoveResult: root.Remove(foreign),
@@ -458,63 +429,66 @@ public sealed class ParentTests
         Assert.False(result.RemoveResult);
         Assert.Null(result.ClearError);
         Assert.Empty(root.Children);
-        Assert.Same(dispatcher, root.ActiveDispatcher);
+        Assert.Same(screen, root.Screen);
+        screen.Close();
     }
 
     [Fact]
-    public void CrossThreadDispatcherMoveFailsWithoutChangingEitherTree()
+    public void CrossThreadScreenMoveFailsWithoutChangingEitherTree()
     {
         var backgroundTree = RunOnBackgroundThread(() =>
         {
-            var dispatcher = new UiDispatcher();
             var root = new TestParent();
             var child = new TestParent();
             var leaf = new TestNode();
             child.Add(leaf);
             root.Add(child);
-            root.AttachToTree(dispatcher);
-            return (Dispatcher: dispatcher, Root: root, Child: child, Leaf: leaf);
+            var screen = new UiScreen(root);
+            screen.Open();
+            return (Screen: screen, Root: root, Child: child, Leaf: leaf);
         });
-        var targetDispatcher = new UiDispatcher();
         var target = new TestParent();
-        target.AttachToTree(targetDispatcher);
+        var targetScreen = new UiScreen(target);
+        targetScreen.Open();
 
         Assert.Throws<InvalidOperationException>(() => target.Add(backgroundTree.Child));
 
         Assert.Equal(new UiNode[] { backgroundTree.Child }, backgroundTree.Root.Children);
         Assert.Same(backgroundTree.Root, backgroundTree.Child.Parent);
-        Assert.Same(backgroundTree.Dispatcher, backgroundTree.Child.ActiveDispatcher);
-        Assert.Same(backgroundTree.Dispatcher, backgroundTree.Leaf.ActiveDispatcher);
+        Assert.Same(backgroundTree.Screen, backgroundTree.Child.Screen);
+        Assert.Same(backgroundTree.Screen, backgroundTree.Leaf.Screen);
         Assert.Empty(target.Children);
-        Assert.Same(targetDispatcher, target.ActiveDispatcher);
+        Assert.Same(targetScreen, target.Screen);
+        targetScreen.Close();
     }
 
     [Fact]
-    public void NewDispatcherCheckFailsBeforeDetachingFromAccessibleOldTree()
+    public void NewScreenCheckFailsBeforeDetachingFromAccessibleOldTree()
     {
-        var oldDispatcher = new UiDispatcher();
         var oldRoot = new TestParent();
         var child = new TestParent();
         var leaf = new TestNode();
         child.Add(leaf);
         oldRoot.Add(child);
-        oldRoot.AttachToTree(oldDispatcher);
+        var oldScreen = new UiScreen(oldRoot);
+        oldScreen.Open();
         var backgroundTarget = RunOnBackgroundThread(() =>
         {
-            var dispatcher = new UiDispatcher();
             var root = new TestParent();
-            root.AttachToTree(dispatcher);
-            return (Dispatcher: dispatcher, Root: root);
+            var screen = new UiScreen(root);
+            screen.Open();
+            return (Screen: screen, Root: root);
         });
 
         Assert.Throws<InvalidOperationException>(() => backgroundTarget.Root.Add(child));
 
         Assert.Equal(new UiNode[] { child }, oldRoot.Children);
         Assert.Same(oldRoot, child.Parent);
-        Assert.Same(oldDispatcher, child.ActiveDispatcher);
-        Assert.Same(oldDispatcher, leaf.ActiveDispatcher);
+        Assert.Same(oldScreen, child.Screen);
+        Assert.Same(oldScreen, leaf.Screen);
         Assert.Empty(backgroundTarget.Root.Children);
-        Assert.Same(backgroundTarget.Dispatcher, backgroundTarget.Root.ActiveDispatcher);
+        Assert.Same(backgroundTarget.Screen, backgroundTarget.Root.Screen);
+        oldScreen.Close();
     }
 
     [Fact]
@@ -538,25 +512,24 @@ public sealed class ParentTests
         Assert.Empty(result.Parent.Children);
         Assert.Null(result.First.Parent);
         Assert.Null(result.Second.Parent);
-        Assert.Null(result.Parent.ActiveDispatcher);
-        Assert.Null(result.First.ActiveDispatcher);
-        Assert.Null(result.Second.ActiveDispatcher);
+        Assert.Null(result.Parent.Screen);
+        Assert.Null(result.First.Screen);
+        Assert.Null(result.Second.Screen);
     }
 
     [Fact]
-    public void ClosedDispatcherPreventsDetachingActiveRoot()
+    public void ClosedScreenKeepsRootAssociated()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestParent();
         var child = new TestNode();
         root.Add(child);
-        root.AttachToTree(dispatcher);
-        dispatcher.Shutdown();
+        var screen = new UiScreen(root);
+        screen.Open();
 
-        Assert.Throws<ObjectDisposedException>(root.DetachFromTree);
+        screen.Close();
 
-        Assert.Same(dispatcher, root.ActiveDispatcher);
-        Assert.Same(dispatcher, child.ActiveDispatcher);
+        Assert.Same(screen, root.Screen);
+        Assert.Same(screen, child.Screen);
         Assert.Same(root, child.Parent);
     }
 

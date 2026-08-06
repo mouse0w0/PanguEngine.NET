@@ -2,6 +2,8 @@ namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
+    private bool _isHitTestLayoutValid;
+
     /// <summary>
     /// Identifies the <see cref="Width"/> property.
     /// </summary>
@@ -216,10 +218,9 @@ public abstract partial class UiNode
     /// </summary>
     /// <param name="availableSize">The available size, which may contain positive infinity.</param>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the active dispatcher belongs to another thread, or when a layout property or
+    /// Thrown when the open screen is accessed from another thread, or when a layout property or
     /// measured result has an invalid value.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
     public void Measure(Size availableSize)
     {
         VerifyLayoutAccess();
@@ -292,10 +293,9 @@ public abstract partial class UiNode
     /// </summary>
     /// <param name="finalRect">The final slot in parent or caller coordinates.</param>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the active dispatcher belongs to another thread, measurement is invalid, or a
+    /// Thrown when the open screen is accessed from another thread, measurement is invalid, or a
     /// layout property has an invalid value.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
     public void Arrange(Rect finalRect)
     {
         VerifyLayoutAccess();
@@ -312,6 +312,7 @@ public abstract partial class UiNode
             _lastArrangeRect = finalRect;
             LayoutBounds = Rect.Zero;
             IsArrangeValid = true;
+            _isHitTestLayoutValid = true;
             return;
         }
 
@@ -364,15 +365,15 @@ public abstract partial class UiNode
         _lastArrangeRect = finalRect;
         LayoutBounds = layoutBounds;
         IsArrangeValid = true;
+        _isHitTestLayoutValid = true;
     }
 
     /// <summary>
     /// Invalidates measurement and arrangement for this node and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the active dispatcher belongs to another thread.
+    /// Thrown when the open screen is accessed from another thread.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
     public void InvalidateMeasure()
     {
         VerifyLayoutAccess();
@@ -383,9 +384,8 @@ public abstract partial class UiNode
     /// Invalidates arrangement for this node and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the active dispatcher belongs to another thread.
+    /// Thrown when the open screen is accessed from another thread.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">Thrown when the active dispatcher is shut down.</exception>
     public void InvalidateArrange()
     {
         VerifyLayoutAccess();
@@ -409,7 +409,7 @@ public abstract partial class UiNode
     }
 
     private void VerifyLayoutAccess() =>
-        ActiveDispatcher?.VerifyAccess();
+        Screen?.VerifyTreeAccess();
 
     private void VerifyPropertyAccess(UiProperty property)
     {
@@ -431,13 +431,13 @@ public abstract partial class UiNode
 
     private void InvalidateMeasureCore()
     {
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (var node = this; node is not null; node = node.Parent)
             node.InvalidateMeasureState();
     }
 
     private void InvalidateArrangeCore()
     {
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (var node = this; node is not null; node = node.Parent)
             node.InvalidateArrangeState();
     }
 
@@ -445,6 +445,7 @@ public abstract partial class UiNode
     {
         IsMeasureValid = false;
         IsArrangeValid = false;
+        _isHitTestLayoutValid = false;
         if (_measurePassDepth != 0)
             _measureInvalidationVersion++;
         if (_arrangePassDepth != 0)
@@ -454,8 +455,26 @@ public abstract partial class UiNode
     private void InvalidateArrangeState()
     {
         IsArrangeValid = false;
+        _isHitTestLayoutValid = false;
         if (_arrangePassDepth != 0)
             _arrangeInvalidationVersion++;
+    }
+
+    internal bool CanPreserveHitTestLayoutAfterChildOrderChange()
+    {
+        for (var node = this; node is not null; node = node.Parent)
+        {
+            if (!node._isHitTestLayoutValid)
+                return false;
+        }
+
+        return true;
+    }
+
+    internal void RestoreHitTestLayoutAfterChildOrderChange()
+    {
+        for (var node = this; node is not null; node = node.Parent)
+            node._isHitTestLayoutValid = true;
     }
 
     private void VerifyLayoutProperties()
@@ -542,7 +561,7 @@ public abstract partial class UiNode
         double effectiveMax,
         bool stretches) =>
         double.IsNaN(requested)
-            ? (stretches ? Math.Clamp(slot, minimum, effectiveMax) : desired)
+            ? stretches ? Math.Clamp(slot, minimum, effectiveMax) : desired
             : Math.Clamp(requested, minimum, effectiveMax);
 
     private static double SubtractMargin(
@@ -593,7 +612,7 @@ public abstract partial class UiNode
             throw new InvalidOperationException($"{propertyName} must be non-negative or positive infinity.");
     }
 
-    partial void OnTreeStructureInvalidated(UiNode source)
+    partial void OnTreeStructureInvalidated()
     {
         InvalidateMeasureState();
     }

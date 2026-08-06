@@ -608,10 +608,10 @@ public sealed class UiNodeLayoutTests
     [Fact]
     public void ActiveVisibilityMutationRejectsWrongThreadWithoutPartialState()
     {
-        var dispatcher = new UiDispatcher();
         var node = new TestNode { CoreDesiredSize = new Size(10, 10) };
+        var screen = new UiScreen(node);
         ValidateLayout(node);
-        node.AttachToTree(dispatcher);
+        screen.Open();
 
         var setterError = RunOnBackgroundThread(() =>
             Record.Exception(() => node.Visibility = Visibility.Hidden));
@@ -626,6 +626,7 @@ public sealed class UiNodeLayoutTests
         Assert.False(node.IsBound(UiNode.VisibilityProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
+        screen.Close();
     }
 
     [Fact]
@@ -679,10 +680,10 @@ public sealed class UiNodeLayoutTests
     [Fact]
     public void ActiveNodesRejectWrongThreadLayoutMutationWithoutPartialState()
     {
-        var dispatcher = new UiDispatcher();
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
+        var screen = new UiScreen(node);
         ValidateLayout(node);
-        node.AttachToTree(dispatcher);
+        screen.Open();
 
         var setError = RunOnBackgroundThread(() =>
             Record.Exception(() => node.Width = 20));
@@ -732,28 +733,48 @@ public sealed class UiNodeLayoutTests
         Assert.True(node.IsBound(UiNode.WidthProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
+        screen.Close();
     }
 
     [Fact]
     public void BindingRechecksLayoutAccessAfterInitialSourceEvaluation()
     {
-        var dispatcher = new UiDispatcher();
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
+        var screen = new UiScreen(node);
         ValidateLayout(node);
-        node.AttachToTree(dispatcher);
+        screen.Open();
+        var reopened = new ManualResetEventSlim();
+        var release = new ManualResetEventSlim();
+        Thread? background = null;
         var source = new LayoutSource
         {
             Width = 20,
-            WidthReadAction = dispatcher.Shutdown
+            WidthReadAction = () =>
+            {
+                screen.Close();
+                background = new Thread(() =>
+                {
+                    screen.Open();
+                    reopened.Set();
+                    release.Wait();
+                    screen.Close();
+                });
+                background.Start();
+                reopened.Wait();
+            }
         };
 
-        Assert.Throws<ObjectDisposedException>(() =>
+        var actual = Record.Exception(() =>
             node.Bind(UiNode.WidthProperty, source, item => item.Width));
+        release.Set();
+        background?.Join();
 
+        Assert.IsType<InvalidOperationException>(actual);
         Assert.Equal(10, node.Width);
         Assert.False(node.IsBound(UiNode.WidthProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
+        Assert.Same(screen, node.Screen);
     }
 
     private static void ValidateLayout(UiNode node)

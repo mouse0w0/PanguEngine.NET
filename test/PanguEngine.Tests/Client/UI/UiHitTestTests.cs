@@ -160,7 +160,7 @@ public sealed class UiHitTestTests
     public void ScreenHitTestConvertsFromScreenToRootLocalCoordinatesWhileInactive()
     {
         var root = new TestNode { Width = 20, Height = 20 };
-        var screen = new Screen(root);
+        var screen = new UiScreen(root);
         Arrange(root, new Rect(10, 20, 20, 20));
 
         Assert.Same(root, screen.HitTest(new Point(10, 20)));
@@ -169,7 +169,7 @@ public sealed class UiHitTestTests
     }
 
     [Fact]
-    public void CoordinateConversionUsesActiveScreenAndAllCommittedLayoutOffsets()
+    public void CoordinateConversionUsesOwnedScreenAndAllCommittedLayoutOffsets()
     {
         var manager = new UiManager();
         var root = new TestParent();
@@ -177,18 +177,16 @@ public sealed class UiHitTestTests
         var leaf = new TestNode();
         root.Add(branch);
         branch.Add(leaf);
-        var screen = new Screen(root);
+        var screen = new UiScreen(root);
 
-        Assert.Null(leaf.ActiveScreen);
-        Assert.Throws<InvalidOperationException>(() => leaf.ScreenToLocal(Point.Zero));
-        Assert.Throws<InvalidOperationException>(() => leaf.LocalToScreen(Point.Zero));
+        Assert.Same(screen, leaf.Screen);
 
         manager.Open(screen);
         Arrange(root, new Rect(10, 20, 100, 100));
         Arrange(branch, new Rect(3, 4, 50, 50));
         Arrange(leaf, new Rect(5, 6, 20, 20));
 
-        Assert.Same(screen, leaf.ActiveScreen);
+        Assert.Same(screen, leaf.Screen);
         Assert.Equal(new Point(1, 2), leaf.ScreenToLocal(new Point(19, 32)));
         Assert.Equal(new Point(19, 32), leaf.LocalToScreen(new Point(1, 2)));
 
@@ -197,17 +195,17 @@ public sealed class UiHitTestTests
 
         manager.Close();
 
-        Assert.Null(leaf.ActiveScreen);
-        Assert.Throws<InvalidOperationException>(() => leaf.ScreenToLocal(Point.Zero));
-        Assert.Throws<InvalidOperationException>(() => leaf.LocalToScreen(Point.Zero));
+        Assert.Same(screen, leaf.Screen);
+        Assert.Equal(new Point(1, 2), leaf.ScreenToLocal(new Point(19, 32)));
+        Assert.Equal(new Point(19, 32), leaf.LocalToScreen(new Point(1, 2)));
     }
 
     [Fact]
-    public void CoordinateConversionVerifiesDispatcherBeforeScreenMembership()
+    public void CoordinateConversionUsesOpenUiScreenOwnerThread()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestNode();
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
 
         var screenToLocalError = RunOnBackgroundThread(() =>
             Record.Exception(() => root.ScreenToLocal(Point.Zero)));
@@ -216,13 +214,13 @@ public sealed class UiHitTestTests
 
         Assert.IsType<InvalidOperationException>(screenToLocalError);
         Assert.IsType<InvalidOperationException>(localToScreenError);
-        Assert.Throws<InvalidOperationException>(() => root.ScreenToLocal(Point.Zero));
-        Assert.Throws<InvalidOperationException>(() => root.LocalToScreen(Point.Zero));
+        Assert.Equal(Point.Zero, root.ScreenToLocal(Point.Zero));
+        Assert.Equal(Point.Zero, root.LocalToScreen(Point.Zero));
 
-        dispatcher.Shutdown();
+        screen.Close();
 
-        Assert.Throws<ObjectDisposedException>(() => root.ScreenToLocal(Point.Zero));
-        Assert.Throws<ObjectDisposedException>(() => root.LocalToScreen(Point.Zero));
+        Assert.Null(RunOnBackgroundThread(() => Record.Exception(() => root.ScreenToLocal(Point.Zero))));
+        Assert.Null(RunOnBackgroundThread(() => Record.Exception(() => root.LocalToScreen(Point.Zero))));
     }
 
     [Fact]
@@ -232,7 +230,7 @@ public sealed class UiHitTestTests
         var root = new TestParent();
         var leaf = new TestNode();
         root.Add(leaf);
-        manager.Open(new Screen(root));
+        manager.Open(new UiScreen(root));
         Arrange(root, new Rect(double.MaxValue, 0, 1, 1));
         Arrange(leaf, new Rect(double.MaxValue, 0, 1, 1));
 
@@ -242,18 +240,19 @@ public sealed class UiHitTestTests
     }
 
     [Fact]
-    public void ActiveContainsAndHitTestRequireDispatcherThread()
+    public void ActiveContainsAndHitTestRequireOwnerThread()
     {
-        var dispatcher = new UiDispatcher();
         var root = new TestNode { Width = 20, Height = 20 };
         Arrange(root, new Rect(0, 0, 20, 20));
-        root.AttachToTree(dispatcher);
+        var screen = new UiScreen(root);
+        screen.Open();
 
         var error = RunOnBackgroundThread(() => Record.Exception(() => root.Contains(new Point(1, 1))));
         var hitTestError = RunOnBackgroundThread(() => Record.Exception(() => root.HitTest(new Point(1, 1))));
 
         Assert.IsType<InvalidOperationException>(error);
         Assert.IsType<InvalidOperationException>(hitTestError);
+        screen.Close();
     }
 
     [Fact]
