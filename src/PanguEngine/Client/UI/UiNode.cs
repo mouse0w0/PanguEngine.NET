@@ -5,6 +5,9 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Provides the base property host for retained-mode UI nodes.
 /// </summary>
+/// <remarks>
+/// A property that invalidates UI work cannot be modified while the owning screen is generating drawing commands.
+/// </remarks>
 public abstract partial class UiNode
 {
     private Dictionary<UiProperty, object?>? _localValues;

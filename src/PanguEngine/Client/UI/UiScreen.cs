@@ -5,6 +5,9 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Represents a retained UI screen with an optional root node.
 /// </summary>
+/// <remarks>
+/// The root and its owned tree cannot change while this screen is generating drawing commands.
+/// </remarks>
 public partial class UiScreen
 {
     private readonly Lock _stateSync = new();
@@ -34,7 +37,8 @@ public partial class UiScreen
     /// the root and its screen ownership.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an involved open screen is accessed from the wrong thread or is updating layout.
+    /// Thrown when an involved open screen is accessed from the wrong thread, is updating layout,
+    /// or is generating drawing commands.
     /// </exception>
     public UiNode? Root
     {
@@ -237,7 +241,7 @@ public partial class UiScreen
             {
                 root.Parent?.RemoveChildForRootTransfer(root);
                 if (sourceScreen is not null && ReferenceEquals(sourceScreen._root, root))
-                    sourceScreen.ClearRootForTransfer(root);
+                    sourceScreen.ClearRootForTransfer();
             }
 
             var oldRoot = _root;
@@ -292,10 +296,16 @@ public partial class UiScreen
     {
         lock (_stateSync)
         {
+            if (_ownerThreadId is not null)
+                VerifyOwnerThreadCore();
+            if (_isDrawing)
+            {
+                throw new InvalidOperationException(
+                    "The UI screen root cannot change while drawing commands are generated.");
+            }
             if (_ownerThreadId is null)
                 return false;
 
-            VerifyOwnerThreadCore();
             if (IsUpdatingLayout)
                 throw new InvalidOperationException("The UI screen root cannot change during layout.");
             _operationDepth++;
@@ -303,11 +313,8 @@ public partial class UiScreen
         }
     }
 
-    internal void ClearRootForTransfer(UiNode root)
+    internal void ClearRootForTransfer()
     {
-        if (!ReferenceEquals(_root, root))
-            throw new InvalidOperationException("The UI screen root is not the node being transferred.");
-
         _root = null;
     }
 
@@ -482,6 +489,11 @@ public partial class UiScreen
                 throw new InvalidOperationException("The UI screen is already changing lifecycle state.");
             if (IsUpdatingLayout)
                 throw new InvalidOperationException("The UI screen cannot change lifecycle state during layout.");
+            if (_isDrawing)
+            {
+                throw new InvalidOperationException(
+                    "The UI screen cannot change lifecycle state while drawing commands are generated.");
+            }
         }
     }
 
@@ -498,9 +510,10 @@ public partial class UiScreen
 
     private static void AddLifecycleErrors(List<Exception> errors, Exception exception)
     {
-        if (exception is AggregateException aggregate)
-            errors.AddRange(aggregate.InnerExceptions);
-        else
-            errors.Add(exception);
+        errors.AddRange(exception switch
+        {
+            AggregateException aggregate => aggregate.InnerExceptions,
+            _ => [exception]
+        });
     }
 }

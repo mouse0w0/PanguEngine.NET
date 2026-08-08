@@ -29,7 +29,8 @@ public sealed class UiManager
     /// <param name="screen">The screen to open.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="screen"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the screen cannot be opened or the manager is performing another lifecycle or layout operation.
+    /// Thrown when the screen cannot be opened or the manager is performing another lifecycle,
+    /// layout, or drawing operation.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
     public void Open(UiScreen screen)
@@ -65,7 +66,7 @@ public sealed class UiManager
     /// Closes the current screen.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the manager is performing another lifecycle or layout operation.
+    /// Thrown when the manager is performing another lifecycle, layout, or drawing operation.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
     public void Close()
@@ -201,6 +202,11 @@ public sealed class UiManager
             throw new InvalidOperationException("The UI manager is already changing screens.");
         if (CurrentScreen?.IsUpdatingLayout == true)
             throw new InvalidOperationException("The UI manager cannot change screens during layout.");
+        if (CurrentScreen?.IsDrawing == true)
+        {
+            throw new InvalidOperationException(
+                "The UI manager cannot change screens while drawing commands are generated.");
+        }
     }
 
     private static void ThrowLifecycleErrors(List<Exception> errors)
@@ -213,9 +219,10 @@ public sealed class UiManager
 
     private static void AddLifecycleErrors(List<Exception> errors, Exception exception)
     {
-        if (exception is AggregateException aggregate)
-            errors.AddRange(aggregate.InnerExceptions);
-        else
-            errors.Add(exception);
+        errors.AddRange(exception switch
+        {
+            AggregateException aggregate => aggregate.InnerExceptions,
+            _ => [exception]
+        });
     }
 }

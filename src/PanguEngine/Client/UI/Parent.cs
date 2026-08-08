@@ -6,6 +6,10 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Provides the only UI node branch that can own child nodes.
 /// </summary>
+/// <remarks>
+/// Real child structure changes are rejected while the owning screen is generating drawing commands.
+/// Existing operations that would not change the child list remain no-ops.
+/// </remarks>
 public abstract class Parent : UiNode
 {
     /// <summary>
@@ -156,7 +160,7 @@ public abstract class Parent : UiNode
             return;
 
         var screen = Screen;
-        screen?.VerifyTreeAccess();
+        screen?.VerifyTreeMutationAccess();
         var affectedScreens = new List<UiScreen>();
         AddAffectedScreen(affectedScreens, screen);
         var activeScreens = BeginRuntimeOperations(affectedScreens);
@@ -248,7 +252,7 @@ public abstract class Parent : UiNode
     {
         var child = _children[index];
         var screen = child.Screen;
-        Screen?.VerifyTreeAccess();
+        Screen?.VerifyTreeMutationAccess();
         var affectedScreens = new List<UiScreen>();
         AddAffectedScreen(affectedScreens, screen);
         var activeScreens = BeginRuntimeOperations(affectedScreens);
@@ -272,7 +276,7 @@ public abstract class Parent : UiNode
         if (oldIndex == newIndex)
             return;
 
-        Screen?.VerifyTreeAccess();
+        Screen?.VerifyTreeMutationAccess();
         var preserveHitTestLayout = CanPreserveHitTestLayoutAfterChildOrderChange();
         var child = _children[oldIndex];
         _children.RemoveAt(oldIndex);
@@ -299,9 +303,9 @@ public abstract class Parent : UiNode
 
     private static void VerifyScreens(UiScreen? oldScreen, UiScreen? newScreen)
     {
-        oldScreen?.VerifyTreeAccess();
+        oldScreen?.VerifyTreeMutationAccess();
         if (!ReferenceEquals(oldScreen, newScreen))
-            newScreen?.VerifyTreeAccess();
+            newScreen?.VerifyTreeMutationAccess();
     }
 
     private static void AddAffectedScreen(List<UiScreen> screens, UiScreen? screen)
@@ -310,7 +314,7 @@ public abstract class Parent : UiNode
             screens.Add(screen);
     }
 
-    private static List<UiScreen> BeginRuntimeOperations(IReadOnlyList<UiScreen> screens)
+    private static List<UiScreen> BeginRuntimeOperations(List<UiScreen> screens)
     {
         var activeScreens = new List<UiScreen>(screens.Count);
         try
@@ -330,13 +334,13 @@ public abstract class Parent : UiNode
         return activeScreens;
     }
 
-    private static void EndRuntimeOperations(IReadOnlyList<UiScreen> screens)
+    private static void EndRuntimeOperations(List<UiScreen> screens)
     {
         for (var index = screens.Count - 1; index >= 0; index--)
             screens[index].EndRuntimeOperation();
     }
 
-    private static void CommitAndNotifyInputState(IReadOnlyList<UiScreen> screens)
+    private static void CommitAndNotifyInputState(List<UiScreen> screens)
     {
         var snapshots = new List<(UiScreen Screen, UiScreen.InputStateCleanupSnapshot Snapshot)>();
         foreach (var screen in screens)
@@ -354,10 +358,11 @@ public abstract class Parent : UiNode
             }
             catch (Exception exception)
             {
-                if (exception is AggregateException aggregate)
-                    errors.AddRange(aggregate.InnerExceptions);
-                else
-                    errors.Add(exception);
+                errors.AddRange(exception switch
+                {
+                    AggregateException aggregate => aggregate.InnerExceptions,
+                    _ => [exception]
+                });
             }
         }
 

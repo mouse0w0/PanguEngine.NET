@@ -223,7 +223,7 @@ public abstract partial class UiNode
     /// </exception>
     public void Measure(Size availableSize)
     {
-        VerifyLayoutAccess();
+        VerifyLayoutMutationAccess();
         VerifyLayoutProperties();
         if (IsMeasureValid && _lastMeasureConstraint == availableSize)
             return;
@@ -298,7 +298,7 @@ public abstract partial class UiNode
     /// </exception>
     public void Arrange(Rect finalRect)
     {
-        VerifyLayoutAccess();
+        VerifyLayoutMutationAccess();
         VerifyLayoutProperties();
         if (!IsMeasureValid)
             throw new InvalidOperationException("A UI node must have a valid measure before it can be arranged.");
@@ -376,7 +376,7 @@ public abstract partial class UiNode
     /// </exception>
     public void InvalidateMeasure()
     {
-        VerifyLayoutAccess();
+        VerifyLayoutMutationAccess();
         InvalidateMeasureCore();
     }
 
@@ -388,7 +388,7 @@ public abstract partial class UiNode
     /// </exception>
     public void InvalidateArrange()
     {
-        VerifyLayoutAccess();
+        VerifyLayoutMutationAccess();
         InvalidateArrangeCore();
     }
 
@@ -408,13 +408,13 @@ public abstract partial class UiNode
     {
     }
 
-    private void VerifyLayoutAccess() =>
-        Screen?.VerifyTreeAccess();
+    private void VerifyLayoutMutationAccess() =>
+        Screen?.VerifyTreeMutationAccess();
 
     private void VerifyPropertyAccess(UiProperty property)
     {
         if (property.Invalidation != UiPropertyInvalidation.None)
-            VerifyLayoutAccess();
+            VerifyLayoutMutationAccess();
     }
 
     private void ApplyPropertyInvalidation(UiProperty property)
