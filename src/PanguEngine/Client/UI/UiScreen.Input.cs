@@ -8,6 +8,7 @@ public partial class UiScreen
     private readonly List<UiHitPathEntry> _hoverPath = [];
     private readonly UiNode?[] _pressedTargets =
         new UiNode?[(int)MouseButton.Button12 - (int)MouseButton.Left + 1];
+    private Control[]? _leftPressedControls;
     private Point _pointerPosition;
     private bool _hasPointerPosition;
     private bool _isChangingFocus;
@@ -17,17 +18,20 @@ public partial class UiScreen
     {
         internal InputStateCleanupSnapshot(
             UiNode? focusedNode,
+            Control[] pressedControls,
             UiHitPathEntry[] hoverPath,
             UiNode[] exitedNodes,
             Point pointerPosition)
         {
             FocusedNode = focusedNode;
+            PressedControls = pressedControls;
             HoverPath = hoverPath;
             ExitedNodes = exitedNodes;
             PointerPosition = pointerPosition;
         }
 
         internal UiNode? FocusedNode { get; }
+        internal Control[] PressedControls { get; }
         internal UiHitPathEntry[] HoverPath { get; }
         internal UiNode[] ExitedNodes { get; }
         internal Point PointerPosition { get; }
@@ -127,7 +131,21 @@ public partial class UiScreen
 
             var path = _hoverPath.ToArray();
             var index = GetButtonIndex(button);
-            _pressedTargets[index] = path.Length == 0 ? null : path[^1].Node;
+            var target = path.Length == 0 ? null : path[^1].Node;
+            Control[]? oldPressedControls = null;
+            Control[]? newPressedControls = null;
+            _pressedTargets[index] = target;
+            if (button == MouseButton.Left)
+            {
+                oldPressedControls = _leftPressedControls;
+                var controls = GetControls(path);
+                newPressedControls = controls.Length == 0 ? null : controls;
+                _leftPressedControls = newPressedControls;
+
+                var errors = new List<Exception>();
+                ProjectPressedDifference(oldPressedControls, newPressedControls, errors);
+                ThrowInputErrors(errors);
+            }
 
             UiNode? focusCandidate = null;
             for (var pathIndex = path.Length - 1; pathIndex >= 0; pathIndex--)
@@ -172,8 +190,18 @@ public partial class UiScreen
             if (!IsScreenActive())
                 return;
 
-            var target = _pressedTargets[GetButtonIndex(button)];
-            _pressedTargets[GetButtonIndex(button)] = null;
+            var buttonIndex = GetButtonIndex(button);
+            var target = _pressedTargets[buttonIndex];
+            _pressedTargets[buttonIndex] = null;
+            if (button == MouseButton.Left)
+            {
+                var pressedControls = _leftPressedControls;
+                _leftPressedControls = null;
+                var errors = new List<Exception>();
+                ClearPressedControls(pressedControls, errors);
+                ThrowInputErrors(errors);
+            }
+
             if (target is null || !IsActive(target))
                 return;
 
@@ -258,9 +286,65 @@ public partial class UiScreen
         return CommitInputStateCore(clearAll: false);
     }
 
+    internal void CommitAndNotifyInputStateAfterNodeDisabled(UiNode node)
+    {
+        if (!ReferenceEquals(node.Screen, this) || node.IsEnabled || !IsScreenActive())
+            return;
+
+        if (!BeginRuntimeOperationIfOpen())
+            return;
+
+        try
+        {
+            var snapshot = CommitInputStateCore(clearAll: false);
+            if (snapshot is not null)
+                NotifyInputStateLoss(snapshot);
+        }
+        finally
+        {
+            EndRuntimeOperation();
+        }
+    }
+
     internal void NotifyInputStateLoss(InputStateCleanupSnapshot snapshot)
     {
         var errors = new List<Exception>();
+        if (snapshot.FocusedNode is { } focusedNode)
+        {
+            try
+            {
+                focusedNode.SetFocused(false);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
+
+        for (var index = snapshot.PressedControls.Length - 1; index >= 0; index--)
+        {
+            try
+            {
+                snapshot.PressedControls[index].SetPressed(false);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
+
+        for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
+        {
+            try
+            {
+                snapshot.ExitedNodes[index].SetHovered(false);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
+
         if (snapshot.FocusedNode is { } focused)
         {
             var focusArgs = new UiFocusChangedEventArgs(focused, null);
@@ -285,7 +369,7 @@ public partial class UiScreen
         if (snapshot.ExitedNodes.Length != 0)
         {
             var path = snapshot.HoverPath;
-            var args = new UiPointerEventArgs(path[^1].Node, snapshot.PointerPosition, path);
+            var args = new UiPointerEventArgs(snapshot.ExitedNodes[^1], snapshot.PointerPosition, path);
             for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
             {
                 try
@@ -313,33 +397,55 @@ public partial class UiScreen
     private InputStateCleanupSnapshot? CommitInputStateCore(bool clearAll)
     {
         var focused = FocusedNode;
-        var lostFocus = focused is not null && (clearAll || !ReferenceEquals(focused.Screen, this));
+        var lostFocus = focused is not null && (clearAll || !IsInputStateCurrent(focused));
         if (lostFocus)
             FocusedNode = null;
 
         for (var index = 0; index < _pressedTargets.Length; index++)
         {
             var target = _pressedTargets[index];
-            if (target is not null && (clearAll || !ReferenceEquals(target.Screen, this)))
+            if (target is not null && (clearAll || !IsInputStateCurrent(target)))
                 _pressedTargets[index] = null;
+        }
+
+        Control[] pressedControls = [];
+        if (_leftPressedControls is { } oldPressedControls)
+        {
+            var leftTarget = _pressedTargets[GetButtonIndex(MouseButton.Left)];
+            if (clearAll || leftTarget is null)
+            {
+                pressedControls = oldPressedControls;
+                _leftPressedControls = null;
+            }
+            else
+            {
+                pressedControls = oldPressedControls
+                    .Where(control => !IsInputStateCurrent(control))
+                    .ToArray();
+                var retainedControls = oldPressedControls
+                    .Where(IsInputStateCurrent)
+                    .ToArray();
+                _leftPressedControls = retainedControls.Length == 0 ? null : retainedControls;
+            }
         }
 
         var oldHoverPath = _hoverPath.ToArray();
         var exitedNodes = oldHoverPath
-            .Where(entry => clearAll || !ReferenceEquals(entry.Node.Screen, this))
+            .Where(entry => clearAll || !IsInputStateCurrent(entry.Node))
             .Select(static entry => entry.Node)
             .ToArray();
         _hoverPath.Clear();
         if (!clearAll)
         {
-            _hoverPath.AddRange(oldHoverPath.Where(entry => ReferenceEquals(entry.Node.Screen, this)));
+            _hoverPath.AddRange(oldHoverPath.Where(entry => IsInputStateCurrent(entry.Node)));
         }
 
-        if (!lostFocus && exitedNodes.Length == 0)
+        if (!lostFocus && pressedControls.Length == 0 && exitedNodes.Length == 0)
             return null;
 
         return new InputStateCleanupSnapshot(
             lostFocus ? focused : null,
+            pressedControls,
             oldHoverPath,
             exitedNodes,
             _pointerPosition);
@@ -436,6 +542,12 @@ public partial class UiScreen
         if (!IsScreenActive())
             return;
 
+        var cleanupSnapshot = CommitInputStateCore(clearAll: false);
+        if (cleanupSnapshot is not null)
+            NotifyInputStateLoss(cleanupSnapshot);
+        if (!IsScreenActive())
+            return;
+
         _pointerPosition = screenPosition;
         _hasPointerPosition = true;
         var oldPath = _hoverPath.ToArray();
@@ -452,6 +564,34 @@ public partial class UiScreen
         }
 
         var errors = new List<Exception>();
+        for (var index = oldPath.Length - 1; index >= commonLength; index--)
+        {
+            try
+            {
+                oldPath[index].Node.SetHovered(false);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
+
+        for (var index = commonLength; index < newPath.Length; index++)
+        {
+            var node = newPath[index].Node;
+            if (!CanSetHovered(node))
+                continue;
+
+            try
+            {
+                node.SetHovered(true);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
+
         if (oldPath.Length != 0)
         {
             var args = new UiPointerEventArgs(oldPath[^1].Node, screenPosition, oldPath);
@@ -516,6 +656,34 @@ public partial class UiScreen
                 {
                     try
                     {
+                        old.SetFocused(false);
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
+                }
+
+                if (next is not null &&
+                    IsScreenActive() &&
+                    ReferenceEquals(FocusedNode, next) &&
+                    ReferenceEquals(next.Screen, this) &&
+                    CanFocus(next))
+                {
+                    try
+                    {
+                        next.SetFocused(true);
+                    }
+                    catch (Exception exception)
+                    {
+                        errors.Add(exception);
+                    }
+                }
+
+                if (old is not null)
+                {
+                    try
+                    {
                         old.RaiseLostFocus(eventArgs);
                     }
                     catch (Exception exception)
@@ -555,18 +723,164 @@ public partial class UiScreen
 
     private bool CanFocus(UiNode node)
     {
-        if (!IsActive(node) || !node.Focusable || !node.IsArrangeValid || node.Visibility != Visibility.Visible)
+        if (!IsActive(node) ||
+            !node.IsEnabled ||
+            !node.Focusable ||
+            !node.IsArrangeValid ||
+            node.Visibility != Visibility.Visible)
             return false;
 
         for (var ancestor = node.Parent; ancestor is not null; ancestor = ancestor.Parent)
         {
-            if (ancestor.Visibility != Visibility.Visible)
+            if (!ancestor.IsEnabled || ancestor.Visibility != Visibility.Visible)
                 return false;
             if (ReferenceEquals(ancestor, Root))
                 return true;
         }
 
         return ReferenceEquals(node, Root);
+    }
+
+    private bool CanSetHovered(UiNode node) =>
+        IsScreenActive() &&
+        ReferenceEquals(node.Screen, this) &&
+        ContainsNodeReference(_hoverPath, node) &&
+        IsInputStateCurrent(node);
+
+    private bool CanSetPressed(Control control)
+    {
+        if (!IsScreenActive() ||
+            !ReferenceEquals(control.Screen, this) ||
+            _leftPressedControls is not { } controls ||
+            !ContainsControlReference(controls, control) ||
+            !IsInputStateCurrent(control))
+        {
+            return false;
+        }
+
+        var target = _pressedTargets[GetButtonIndex(MouseButton.Left)];
+        return target is not null && IsInputStateCurrent(target);
+    }
+
+    private void ProjectPressedDifference(
+        IReadOnlyList<Control>? oldControls,
+        IReadOnlyList<Control>? newControls,
+        List<Exception> errors)
+    {
+        if (oldControls is not null)
+        {
+            for (var index = oldControls.Count - 1; index >= 0; index--)
+            {
+                var control = oldControls[index];
+                if (newControls is not null && ContainsControlReference(newControls, control))
+                    continue;
+
+                try
+                {
+                    control.SetPressed(false);
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(exception);
+                }
+            }
+        }
+
+        if (newControls is null)
+            return;
+
+        for (var index = 0; index < newControls.Count; index++)
+        {
+            var control = newControls[index];
+            if ((oldControls is not null && ContainsControlReference(oldControls, control)) ||
+                !CanSetPressed(control))
+            {
+                continue;
+            }
+
+            try
+            {
+                control.SetPressed(true);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
+    }
+
+    private static void ClearPressedControls(
+        IReadOnlyList<Control>? controls,
+        List<Exception> errors)
+    {
+        if (controls is null)
+            return;
+
+        for (var index = controls.Count - 1; index >= 0; index--)
+        {
+            try
+            {
+                controls[index].SetPressed(false);
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+        }
+    }
+
+    private static Control[] GetControls(IReadOnlyList<UiHitPathEntry> path)
+    {
+        var controls = new List<Control>();
+        foreach (var entry in path)
+        {
+            if (entry.Node is Control control)
+                controls.Add(control);
+        }
+
+        return controls.ToArray();
+    }
+
+    private static bool ContainsControlReference(
+        IReadOnlyList<Control> controls,
+        Control candidate)
+    {
+        foreach (var control in controls)
+        {
+            if (ReferenceEquals(control, candidate))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsInputStateCurrent(UiNode node)
+    {
+        if (!ReferenceEquals(node.Screen, this))
+            return false;
+
+        for (var current = node; current is not null; current = current.Parent)
+        {
+            if (!current.IsEnabled)
+                return false;
+            if (ReferenceEquals(current, Root))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool ContainsNodeReference(
+        IReadOnlyList<UiHitPathEntry> path,
+        UiNode node)
+    {
+        foreach (var entry in path)
+        {
+            if (ReferenceEquals(entry.Node, node))
+                return true;
+        }
+
+        return false;
     }
 
     private void Bubble<TEventArgs>(

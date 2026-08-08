@@ -14,7 +14,8 @@ public abstract class UiProperty
         Type targetType,
         Type valueType,
         object? defaultValue,
-        UiPropertyInvalidation invalidation)
+        UiPropertyInvalidation invalidation,
+        bool isReadOnly)
     {
         ArgumentNullException.ThrowIfNull(name);
         if (name.Length == 0 || string.IsNullOrWhiteSpace(name))
@@ -30,6 +31,7 @@ public abstract class UiProperty
         ValueType = valueType;
         DefaultValue = defaultValue;
         Invalidation = invalidation;
+        IsReadOnly = isReadOnly;
 
         lock (RegistryLock)
         {
@@ -57,6 +59,9 @@ public abstract class UiProperty
     /// <summary>Gets the kinds of UI work that the property may invalidate.</summary>
     public UiPropertyInvalidation Invalidation { get; }
 
+    /// <summary>Gets whether the property can only be written through its registration key.</summary>
+    public bool IsReadOnly { get; }
+
     /// <summary>
     /// Registers a strongly typed property for an owner node type.
     /// </summary>
@@ -74,7 +79,35 @@ public abstract class UiProperty
         TValue defaultValue = default!,
         UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
         where TOwner : UiNode =>
-        new(name, typeof(TOwner), typeof(TOwner), defaultValue, invalidation);
+        new(name, typeof(TOwner), typeof(TOwner), defaultValue, invalidation, isReadOnly: false);
+
+    /// <summary>
+    /// Registers a strongly typed read-only property for an owner node type.
+    /// </summary>
+    /// <typeparam name="TOwner">The node type that owns the property.</typeparam>
+    /// <typeparam name="TValue">The property value type.</typeparam>
+    /// <param name="name">The unique property name for the owner type.</param>
+    /// <param name="defaultValue">The value used when no local value exists.</param>
+    /// <param name="invalidation">The UI work that the property may invalidate.</param>
+    /// <returns>The key that grants owner access to the registered property.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
+    public static UiPropertyKey<TValue> RegisterReadOnly<TOwner, TValue>(
+        string name,
+        TValue defaultValue = default!,
+        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
+        where TOwner : UiNode
+    {
+        var property = new UiProperty<TValue>(
+            name,
+            typeof(TOwner),
+            typeof(TOwner),
+            defaultValue,
+            invalidation,
+            isReadOnly: true);
+        return new UiPropertyKey<TValue>(property);
+    }
 
     /// <summary>
     /// Registers a strongly typed attached property for a target node type.
@@ -95,7 +128,7 @@ public abstract class UiProperty
         UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
         where TOwner : UiNode
         where TTarget : UiNode =>
-        new(name, typeof(TOwner), typeof(TTarget), defaultValue, invalidation);
+        new(name, typeof(TOwner), typeof(TTarget), defaultValue, invalidation, isReadOnly: false);
 
     internal bool IsOwnedBy(UiNode node) =>
         TargetType.IsInstanceOfType(node);
@@ -105,6 +138,12 @@ public abstract class UiProperty
         if (!IsOwnedBy(node))
             throw new ArgumentException(
                 $"Property '{Name}' targets '{TargetType}', not '{node.GetType()}'.");
+    }
+
+    internal void VerifyWritable()
+    {
+        if (IsReadOnly)
+            throw new InvalidOperationException($"Property '{Name}' is read-only.");
     }
 }
 
@@ -119,8 +158,9 @@ public sealed class UiProperty<T> : UiProperty
         Type ownerType,
         Type targetType,
         T defaultValue,
-        UiPropertyInvalidation invalidation)
-        : base(name, ownerType, targetType, typeof(T), defaultValue, invalidation)
+        UiPropertyInvalidation invalidation,
+        bool isReadOnly)
+        : base(name, ownerType, targetType, typeof(T), defaultValue, invalidation, isReadOnly)
     {
         DefaultValue = defaultValue;
     }

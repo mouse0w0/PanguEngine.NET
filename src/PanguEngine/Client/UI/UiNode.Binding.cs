@@ -227,6 +227,7 @@ public abstract partial class UiNode
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(sourceProperty);
         sourceProperty.VerifyOwner(source);
+        sourceProperty.VerifyWritable();
         VerifyCanBind(targetProperty);
         VerifyPropertyAccess(targetProperty);
 
@@ -263,6 +264,7 @@ public abstract partial class UiNode
         ArgumentNullException.ThrowIfNull(converter);
         ArgumentNullException.ThrowIfNull(convertBack);
         sourceProperty.VerifyOwner(source);
+        sourceProperty.VerifyWritable();
         VerifyCanBind(targetProperty);
         VerifyPropertyAccess(targetProperty);
 
@@ -325,6 +327,7 @@ public abstract partial class UiNode
     {
         ArgumentNullException.ThrowIfNull(targetProperty);
         targetProperty.VerifyOwner(this);
+        targetProperty.VerifyWritable();
         if (_bindings?.ContainsKey(targetProperty) == true)
             throw new InvalidOperationException($"Property '{targetProperty.Name}' is already bound.");
     }

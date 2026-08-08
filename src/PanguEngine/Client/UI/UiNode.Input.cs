@@ -2,6 +2,16 @@ namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
+    private static readonly UiPropertyKey<bool> IsHoveredPropertyKey =
+        UiProperty.RegisterReadOnly<UiNode, bool>(
+            nameof(IsHovered),
+            invalidation: UiPropertyInvalidation.Render);
+
+    private static readonly UiPropertyKey<bool> IsFocusedPropertyKey =
+        UiProperty.RegisterReadOnly<UiNode, bool>(
+            nameof(IsFocused),
+            invalidation: UiPropertyInvalidation.Render);
+
     /// <summary>
     /// Identifies the <see cref="Focusable"/> property.
     /// </summary>
@@ -20,6 +30,25 @@ public abstract partial class UiNode
             UiPropertyInvalidation.Input);
 
     /// <summary>
+    /// Identifies the <see cref="IsEnabled"/> property.
+    /// </summary>
+    public static readonly UiProperty<bool> IsEnabledProperty =
+        UiProperty.Register<UiNode, bool>(
+            nameof(IsEnabled),
+            true,
+            UiPropertyInvalidation.Input | UiPropertyInvalidation.Render);
+
+    /// <summary>
+    /// Identifies the <see cref="IsHovered"/> property.
+    /// </summary>
+    public static readonly UiProperty<bool> IsHoveredProperty = IsHoveredPropertyKey.Property;
+
+    /// <summary>
+    /// Identifies the <see cref="IsFocused"/> property.
+    /// </summary>
+    public static readonly UiProperty<bool> IsFocusedProperty = IsFocusedPropertyKey.Property;
+
+    /// <summary>
     /// Gets or sets whether this node can receive keyboard focus.
     /// </summary>
     public bool Focusable
@@ -36,6 +65,25 @@ public abstract partial class UiNode
         get => GetValue(IsHitTestVisibleProperty);
         set => SetValue(IsHitTestVisibleProperty, value);
     }
+
+    /// <summary>
+    /// Gets or sets whether this node and its subtree can receive input.
+    /// </summary>
+    public bool IsEnabled
+    {
+        get => GetValue(IsEnabledProperty);
+        set => SetValue(IsEnabledProperty, value);
+    }
+
+    /// <summary>
+    /// Gets whether the pointer currently targets this node or its subtree.
+    /// </summary>
+    public bool IsHovered => GetValue(IsHoveredProperty);
+
+    /// <summary>
+    /// Gets whether this node currently owns keyboard focus.
+    /// </summary>
+    public bool IsFocused => GetValue(IsFocusedProperty);
 
     /// <summary>
     /// Occurs when the pointer enters this node's hit path.
@@ -249,6 +297,22 @@ public abstract partial class UiNode
     internal void RaiseGotFocus(UiFocusChangedEventArgs eventArgs) => OnGotFocus(eventArgs);
     internal void RaiseLostFocus(UiFocusChangedEventArgs eventArgs) => OnLostFocus(eventArgs);
 
+    internal void SetHovered(bool value)
+    {
+        if (value)
+            SetValue(IsHoveredPropertyKey, true);
+        else
+            ClearValue(IsHoveredPropertyKey);
+    }
+
+    internal void SetFocused(bool value)
+    {
+        if (value)
+            SetValue(IsFocusedPropertyKey, true);
+        else
+            ClearValue(IsFocusedPropertyKey);
+    }
+
     /// <summary>
     /// Determines whether a point lies within this node's local geometry.
     /// </summary>
@@ -288,7 +352,10 @@ public abstract partial class UiNode
 
     internal bool TryBuildHitPath(Point localPoint, List<UiHitPathEntry> path)
     {
-        if (!_isHitTestLayoutValid || Visibility != Visibility.Visible || !IsHitTestVisible)
+        if (!_isHitTestLayoutValid ||
+            Visibility != Visibility.Visible ||
+            !IsHitTestVisible ||
+            !IsEnabled)
             return false;
 
         var originalCount = path.Count;

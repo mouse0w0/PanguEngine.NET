@@ -1,3 +1,5 @@
+using System.Runtime.ExceptionServices;
+
 namespace PanguEngine.Client.UI;
 
 /// <summary>
@@ -42,12 +44,13 @@ public abstract partial class UiNode
     /// A one-way binding rejects direct assignment. A two-way binding writes a changed value back to its source.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the property is the target of a one-way binding.
+    /// Thrown when the property is read-only or is the target of a one-way binding.
     /// </exception>
     public void SetValue<T>(UiProperty<T> property, T value)
     {
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
+        property.VerifyWritable();
 
         if (TryGetBinding(property, out var binding))
         {
@@ -76,10 +79,12 @@ public abstract partial class UiNode
     /// Clearing a bound property removes its binding and restores the descriptor default value.
     /// Use <see cref="Unbind{T}(UiProperty{T})"/> to remove a binding while preserving its current value.
     /// </remarks>
+    /// <exception cref="InvalidOperationException">Thrown when the property is read-only.</exception>
     public void ClearValue<T>(UiProperty<T> property)
     {
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
+        property.VerifyWritable();
         VerifyPropertyAccess(property);
 
         if (TryGetBinding(property, out var binding))
@@ -92,26 +97,92 @@ public abstract partial class UiNode
     }
 
     /// <summary>
+    /// Sets a local value through a read-only property key owned by this node type.
+    /// </summary>
+    /// <typeparam name="T">The property value type.</typeparam>
+    /// <param name="propertyKey">The property key.</param>
+    /// <param name="value">The new local value.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="propertyKey"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the property does not target this node.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the property invalidates an open screen and is written from the wrong thread.
+    /// </exception>
+    protected void SetValue<T>(UiPropertyKey<T> propertyKey, T value)
+    {
+        ArgumentNullException.ThrowIfNull(propertyKey);
+        var property = propertyKey.Property;
+        property.VerifyOwner(this);
+        SetValueCore(property, value);
+    }
+
+    /// <summary>
+    /// Clears a local value through a read-only property key owned by this node type.
+    /// </summary>
+    /// <typeparam name="T">The property value type.</typeparam>
+    /// <param name="propertyKey">The property key.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="propertyKey"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the property does not target this node.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the property invalidates an open screen and is written from the wrong thread.
+    /// </exception>
+    protected void ClearValue<T>(UiPropertyKey<T> propertyKey)
+    {
+        ArgumentNullException.ThrowIfNull(propertyKey);
+        var property = propertyKey.Property;
+        property.VerifyOwner(this);
+        VerifyPropertyAccess(property);
+        ClearValueCore(property);
+    }
+
+    /// <summary>
     /// Raises a property change through the node notification pipeline.
     /// </summary>
     /// <param name="eventArgs">The property change data.</param>
     protected virtual void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs)
     {
         ArgumentNullException.ThrowIfNull(eventArgs);
-        ApplyPropertyInvalidation(eventArgs.Property);
-
-        var globalHandler = PropertyChanged;
-        var propertySubscriptions = BeginSubscriptionNotification(eventArgs.Property);
+        List<Exception>? errors = null;
+        if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) &&
+            eventArgs is UiPropertyChangedEventArgs<bool> { NewValue: false })
+        {
+            errors = [];
+            try
+            {
+                Screen?.CommitAndNotifyInputStateAfterNodeDisabled(this);
+            }
+            catch (Exception exception)
+            {
+                AddErrors(errors, exception);
+            }
+        }
 
         try
         {
-            globalHandler?.Invoke(this, eventArgs);
-            NotifySubscriptions(eventArgs, propertySubscriptions);
+            ApplyPropertyInvalidation(eventArgs.Property);
+
+            var globalHandler = PropertyChanged;
+            var propertySubscriptions = BeginSubscriptionNotification(eventArgs.Property);
+
+            try
+            {
+                globalHandler?.Invoke(this, eventArgs);
+                NotifySubscriptions(eventArgs, propertySubscriptions);
+            }
+            finally
+            {
+                EndSubscriptionNotification(propertySubscriptions);
+            }
         }
-        finally
+        catch (Exception exception) when (errors is not null)
         {
-            EndSubscriptionNotification(propertySubscriptions);
+            AddErrors(errors, exception);
         }
+
+        if (errors is null || errors.Count == 0)
+            return;
+        if (errors.Count == 1)
+            ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        throw new AggregateException(errors);
     }
 
     private T GetValueCore<T>(UiProperty<T> property)
@@ -145,5 +216,16 @@ public abstract partial class UiNode
             return;
 
         OnPropertyChanged(new UiPropertyChangedEventArgs<T>(property, oldValue, newValue));
+    }
+
+    private static void AddErrors(List<Exception> errors, Exception exception)
+    {
+        if (exception is AggregateException aggregate)
+        {
+            foreach (var innerException in aggregate.InnerExceptions)
+                AddErrors(errors, innerException);
+        }
+        else
+            errors.Add(exception);
     }
 }
