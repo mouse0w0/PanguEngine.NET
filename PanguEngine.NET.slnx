@@ -21,6 +21,7 @@
     <Project Path="test/PanguEngine.Client.Tests.TextureAtlas/PanguEngine.Client.Tests.TextureAtlas.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.Triangle/PanguEngine.Client.Tests.Triangle.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.UniformBuffer/PanguEngine.Client.Tests.UniformBuffer.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.UiBatch/PanguEngine.Client.Tests.UiBatch.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.MultiWindow/PanguEngine.Client.Tests.MultiWindow.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.WindowMode/PanguEngine.Client.Tests.WindowMode.csproj"/>
 </Solution>
