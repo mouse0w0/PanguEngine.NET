@@ -4,6 +4,7 @@
     <Project Path="test/PanguEngine.Tests/PanguEngine.Tests.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests/PanguEngine.Client.Tests.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.BufferLifecycle/PanguEngine.Client.Tests.BufferLifecycle.csproj"/>
+    <Project Path="test/PanguEngine.Client.Tests.Audio/PanguEngine.Client.Tests.Audio.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.BufferUpload/PanguEngine.Client.Tests.BufferUpload.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.Clear/PanguEngine.Client.Tests.Clear.csproj"/>
     <Project Path="test/PanguEngine.Client.Tests.DepthStencil/PanguEngine.Client.Tests.DepthStencil.csproj"/>

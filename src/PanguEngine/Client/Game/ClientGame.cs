@@ -1,7 +1,9 @@
+using PanguEngine.Audio;
 using PanguEngine.Client.Rendering.World;
 using PanguEngine.Client.World;
 using PanguEngine.Input;
 using PanguEngine.World.Blocks;
+using PanguEngine.World.Chunking;
 using PanguEngine.World.Interaction;
 using Silk.NET.Maths;
 
@@ -15,6 +17,7 @@ public sealed class ClientGame
     private readonly Camera _camera;
     private readonly CameraController _cameraController;
     private readonly ClientInputState _input;
+    private readonly AudioSystem _audio;
     private readonly WorldRenderer _renderer;
 
     internal ClientGame(ClientEngine engine)
@@ -22,6 +25,7 @@ public sealed class ClientGame
         _camera = new Camera(new Vector3D<double>(8, 22, 24), -90, -20);
         _cameraController = new CameraController(_camera);
         _input = new ClientInputState(engine.PrimaryWindow);
+        _audio = engine.Audio;
         _input.MouseDelta += _cameraController.ApplyMouseDelta;
         World = new ClientWorld();
         FlatWorldGenerator.Generate(World);
@@ -44,17 +48,29 @@ public sealed class ClientGame
         var right = (_input.IsKeyDown(Key.D) ? 1 : 0)
                     - (_input.IsKeyDown(Key.A) ? 1 : 0);
         _cameraController.Move(forward, right);
+        _audio.SetListener(new AudioListenerState(
+            _camera.CurrentPosition,
+            _camera.Forward,
+            Vector3D<double>.UnitY));
 
         SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+        var breakSelection = SelectedBlock;
         if (_input.ConsumeLeftClickRequest()
-            && TryBreakBlock(World, SelectedBlock))
+            && TryBreakBlock(World, breakSelection))
         {
+            _audio.PlayAt(
+                BuiltinSoundEvents.BlockBreak,
+                GetBlockCenter(breakSelection!.Value.BlockPosition));
             SelectedBlock = RaycastSelection(_camera.CurrentPosition);
         }
 
+        var placeSelection = SelectedBlock;
         if (_input.ConsumeRightClickRequest()
-            && TryPlaceBlock(World, SelectedBlock))
+            && TryPlaceBlock(World, placeSelection))
         {
+            _audio.PlayAt(
+                BuiltinSoundEvents.BlockPlace,
+                GetBlockCenter(placeSelection!.Value.BlockPosition.Offset(placeSelection.Value.Face)));
             SelectedBlock = RaycastSelection(_camera.CurrentPosition);
         }
     }
@@ -109,8 +125,11 @@ public sealed class ClientGame
             5d,
             out var hit)
             ? hit
-            : null;
+             : null;
     }
+
+    private static Vector3D<double> GetBlockCenter(BlockPos position) =>
+        new(position.X + 0.5, position.Y + 0.5, position.Z + 0.5);
 
     /// <summary>
     /// Releases resources owned by the client game.

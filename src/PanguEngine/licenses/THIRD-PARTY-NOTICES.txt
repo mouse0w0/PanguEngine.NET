@@ -1,0 +1,36 @@
+OpenAL Soft 1.24.3
+Binary source: https://github.com/kcat/openal-soft/releases/download/1.24.3/openal-soft-1.24.3-bin.zip
+Original binary name: soft_oal.dll
+Distributed binary name: OpenAL32.dll
+Distributed binary SHA-256: 4F7F49003562E1056FD0F25274D021D94E9EACEB9B0C5EBA9C3DF5123E4E355D
+Source code: https://github.com/kcat/openal-soft/tree/1.24.3
+License: GNU Library General Public License Version 2
+Distributed as a replaceable OpenAL32.dll.
+OpenAL Soft also includes components covered by the notices in
+OpenAL-Soft-1.24.3-BSD-3-Clause.txt,
+OpenAL-Soft-1.24.3-LICENSE-pffft.txt, and
+OpenAL-Soft-fmt-11.1.1-LICENSE.txt.
+
+Silk.NET 2.23.0
+Source: https://github.com/dotnet/Silk.NET/tree/v2.23.0
+License: MIT
+
+NVorbis 0.10.5
+Source: https://github.com/NVorbis/NVorbis/tree/v0.10.5
+License: MIT
+
+Kenney Impact Sounds
+Source: https://kenney.nl/assets/impact-sounds
+Package: https://kenney.nl/media/pages/assets/impact-sounds/87b4ddecda-1677589768/kenney_impact-sounds.zip
+License: CC0 1.0 Universal
+Package notice: Kenney-Impact-Sounds-CC0.txt
+Legal code: Creative-Commons-CC0-1.0-Legal-Code.txt
+Original asset: Audio/impactMining_000.ogg
+Distributed asset: assets/pangu/sounds/block/break_1.ogg
+Test asset: test/PanguEngine.Tests/Assets/Audio/break_1.ogg
+Original asset: Audio/impactMining_001.ogg
+Distributed asset: assets/pangu/sounds/block/break_2.ogg
+Original asset: Audio/impactSoft_medium_000.ogg
+Distributed asset: assets/pangu/sounds/block/place_1.ogg
+Original asset: Audio/impactSoft_medium_001.ogg
+Distributed asset: assets/pangu/sounds/block/place_2.ogg

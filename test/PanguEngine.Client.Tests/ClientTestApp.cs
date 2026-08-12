@@ -1,4 +1,6 @@
+using PanguEngine.Audio;
 using PanguEngine.Graphics;
+using PanguEngine.Registries;
 using PanguEngine.Windowing;
 using Silk.NET.Maths;
 using Window = PanguEngine.Windowing.Window;
@@ -33,11 +35,18 @@ public sealed class ClientTestApp
     /// </summary>
     public GraphicsDevice Device => _graphicsBackend.Device;
 
+    /// <summary>
+    /// Gets the audio system when the scene requires audio.
+    /// </summary>
+    public AudioSystem Audio => _audio!;
+
     private GraphicsBackend _graphicsBackend = null!;
     private ClientLoop _loop = null!;
     private bool _sceneInitialized;
     private bool _graphicsBackendInitialized;
     private bool _engineInitialized;
+    private bool _audioInitialized;
+    private AudioSystem? _audio;
 
     private ClientTestApp(IClientTestScene scene)
     {
@@ -69,6 +78,7 @@ public sealed class ClientTestApp
 
     private void Initialize()
     {
+        _scene.ConfigureBeforeEngineInitialize();
         Engine.Initialize();
         _engineInitialized = true;
 
@@ -85,10 +95,21 @@ public sealed class ClientTestApp
 
         Window = _graphicsBackend.PrimaryWindow;
         WindowManager = _graphicsBackend.WindowManager;
+        if (_scene.RequiresAudio)
+        {
+            _audio = new AudioSystem(
+                Engine.ResourceManager,
+                BuiltinRegistries.SoundCategory,
+                BuiltinRegistries.SoundEvent,
+                Log.CreateLogger("AudioTests"));
+            _audioInitialized = true;
+            _audio.Load();
+            _audio.MarkReady();
+        }
         _loop = new ClientLoop(
             () => WindowManager.Windows.Count > 0,
             WindowManager.DoEvents,
-            () => { },
+            Update,
             _graphicsBackend.Render);
         _scene.Initialize(Window);
         _sceneInitialized = true;
@@ -102,10 +123,18 @@ public sealed class ClientTestApp
         if (_sceneInitialized)
             _scene.Destroy();
 
+        if (_audioInitialized)
+            _audio!.Destroy();
+
         if (_graphicsBackendInitialized)
             _graphicsBackend.Destroy();
 
         if (_engineInitialized)
             Engine.Shutdown();
+    }
+
+    private void Update()
+    {
+        _audio?.Update();
     }
 }

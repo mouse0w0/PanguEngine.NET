@@ -13,6 +13,18 @@ public interface IClientTestScene
     string Name { get; }
 
     /// <summary>
+    /// Gets whether the test scene requires the audio system.
+    /// </summary>
+    bool RequiresAudio => false;
+
+    /// <summary>
+    /// Registers scene definitions before engine initialization.
+    /// </summary>
+    void ConfigureBeforeEngineInitialize()
+    {
+    }
+
+    /// <summary>
     /// Initializes resources owned by the scene and subscribes to the window's render event.
     /// </summary>
     /// <param name="window">The primary window used by the test application.</param>

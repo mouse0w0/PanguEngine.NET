@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using PanguEngine.Audio;
 using PanguEngine.Events;
 using PanguEngine.Modding;
 using PanguEngine.Registries;
@@ -59,6 +60,8 @@ public static class Engine
         RegistryManager = new RegistryManager();
         BuiltinRegistries.Register(RegistryManager);
         BuiltinBlocks.Register(BuiltinRegistries.Block);
+        BuiltinSoundCategories.Register(BuiltinRegistries.SoundCategory);
+        BuiltinSoundEvents.Register(BuiltinRegistries.SoundEvent);
         ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "mods"), Log.CreateLogger("Mods"),
             options.ModPaths);
         ModManager.Load();

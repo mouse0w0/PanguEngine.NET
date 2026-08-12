@@ -22,4 +22,10 @@
         <ProjectReference Include="..\..\src\PanguEngine\PanguEngine.csproj"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <Content Include="Assets\Audio\*.ogg">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
 </Project>

@@ -1,3 +1,4 @@
+using PanguEngine.Audio;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Graphics;
@@ -45,6 +46,11 @@ public sealed class ClientEngine
     /// </summary>
     public ClientLoop Loop { get; private set; } = null!;
 
+    /// <summary>
+    /// The client audio system.
+    /// </summary>
+    public AudioSystem Audio { get; private set; } = null!;
+
     private ClientGame Game { get; set; } = null!;
 
     internal BlockModelManager BlockModelManager { get; private set; } = null!;
@@ -86,6 +92,12 @@ public sealed class ClientEngine
             PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
         });
 
+        Audio = new AudioSystem(
+            Engine.ResourceManager,
+            BuiltinRegistries.SoundCategory,
+            BuiltinRegistries.SoundEvent,
+            Log.CreateLogger("Audio"));
+
         Loop = new ClientLoop(
             () => WindowManager.Windows.Count > 0,
             WindowManager.DoEvents,
@@ -98,6 +110,8 @@ public sealed class ClientEngine
             Device.MaxTextureDimension2D,
             Log.CreateLogger("BlockModels"));
         BlockModelManager.Load();
+        Audio.Load();
+        Audio.MarkReady();
         Engine.ModManager.RunReady();
 
         Game = new ClientGame(this);
@@ -113,11 +127,13 @@ public sealed class ClientEngine
     private void OnUpdate()
     {
         Game.Update();
+        Audio.Update();
     }
 
     private void OnShutdown()
     {
         Game.Destroy();
+        Audio.Destroy();
         GraphicsBackend.Destroy();
 
         Engine.Shutdown();
