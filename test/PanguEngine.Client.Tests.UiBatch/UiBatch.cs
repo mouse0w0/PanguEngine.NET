@@ -19,6 +19,8 @@ internal sealed class UiBatchScene : IClientTestScene
     private UiRenderer _renderer = null!;
     private UiBatchNode _root = null!;
     private UiScreen _screen = null!;
+    private UiImage _firstImage = null!;
+    private UiImage _secondImage = null!;
 
     public string Name => "UI Batch";
 
@@ -30,7 +32,9 @@ internal sealed class UiBatchScene : IClientTestScene
             _presenter.ColorFormat,
             TextureFormat.Undefined,
             _presenter.MaxFramesInFlight);
-        _root = new UiBatchNode();
+        _firstImage = CreateCheckerImage(16, 16, new Color(240, 70, 80), new Color(40, 205, 160));
+        _secondImage = CreateCheckerImage(12, 20, new Color(70, 125, 245), new Color(245, 215, 70));
+        _root = new UiBatchNode(_firstImage, _secondImage);
         _screen = new UiScreen(_root);
         window.Render += (_, _) => DrawFrame();
     }
@@ -82,12 +86,86 @@ internal sealed class UiBatchScene : IClientTestScene
         }
     }
 
-    private sealed class UiBatchNode : UiNode
+    private static UiImage CreateCheckerImage(int width, int height, Color first, Color second)
+    {
+        var pixels = new byte[checked(width * height * 4)];
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var border = x == 0 || y == 0 || x == width - 1 || y == height - 1;
+                var color = border || (x / 4 + y / 4) % 2 == 0 ? first : second;
+                var offset = (y * width + x) * 4;
+                pixels[offset] = color.R;
+                pixels[offset + 1] = color.G;
+                pixels[offset + 2] = color.B;
+                pixels[offset + 3] = border ? (byte)255 : (byte)180;
+            }
+        }
+
+        return UiImage.FromRgba(pixels, width, height);
+    }
+
+    private static ImageView CreateImageView(UiImage source, ImageStretch stretch)
+    {
+        var imageView = new ImageView
+        {
+            Source = source,
+            Stretch = stretch,
+            SamplingMode = ImageSamplingMode.Nearest
+        };
+        return imageView;
+    }
+
+    private sealed class UiBatchNode : Panel
     {
         private const double DesignWidth = 640;
         private const double DesignHeight = 480;
+        private readonly UiImage _firstImage;
+        private readonly UiImage _secondImage;
+        private readonly ImageView[] _imageViews;
+
+        internal UiBatchNode(UiImage firstImage, UiImage secondImage)
+        {
+            _firstImage = firstImage;
+            _secondImage = secondImage;
+            _imageViews =
+            [
+                CreateImageView(_firstImage, ImageStretch.None),
+                CreateImageView(_firstImage, ImageStretch.Fill),
+                CreateImageView(_secondImage, ImageStretch.Uniform),
+                CreateImageView(_secondImage, ImageStretch.UniformToFill)
+            ];
+            foreach (var imageView in _imageViews)
+                Children.Add(imageView);
+        }
 
         internal bool Dense { get; set; }
+
+        protected override Size MeasureContent(Size availableSize)
+        {
+            foreach (var imageView in _imageViews)
+                imageView.Measure(Size.Infinite);
+
+            return Size.Zero;
+        }
+
+        protected override void ArrangeContent(Rect contentBounds)
+        {
+            var layoutScale = Math.Min(contentBounds.Width / DesignWidth, contentBounds.Height / DesignHeight);
+            var offsetX = (contentBounds.Width - DesignWidth * layoutScale) / 2;
+            var offsetY = (contentBounds.Height - DesignHeight * layoutScale) / 2;
+            var imageBounds = new[]
+            {
+                new Rect(40, 350, 120, 90),
+                new Rect(180, 350, 120, 90),
+                new Rect(320, 350, 120, 90),
+                new Rect(460, 350, 120, 90)
+            };
+
+            for (var index = 0; index < _imageViews.Length; index++)
+                _imageViews[index].Arrange(Scale(imageBounds[index], layoutScale, offsetX, offsetY));
+        }
 
         protected override void DrawCore(UiDrawingContext context)
         {
@@ -113,6 +191,40 @@ internal sealed class UiBatchScene : IClientTestScene
                 context.FillRectangle(Scale(new Rect(340, 40, 300, 300), layoutScale, offsetX, offsetY), new Color(70, 110, 240, 150));
                 context.FillRectangle(Scale(new Rect(430, 130, 140, 140), layoutScale, offsetX, offsetY), new Color(245, 245, 245, 120));
             }
+
+            var imagePanels = new[]
+            {
+                new Rect(40, 250, 120, 90),
+                new Rect(180, 250, 120, 90),
+                new Rect(320, 250, 120, 90),
+                new Rect(460, 250, 120, 90)
+            };
+            foreach (var panel in imagePanels)
+                context.FillRectangle(Scale(panel, layoutScale, offsetX, offsetY), new Color(32, 36, 44));
+
+            context.DrawImage(
+                Scale(new Rect(40, 250, 120, 90), layoutScale, offsetX, offsetY),
+                _firstImage,
+                samplingMode: ImageSamplingMode.Linear);
+            context.DrawImage(
+                Scale(new Rect(180, 250, 120, 90), layoutScale, offsetX, offsetY),
+                _firstImage,
+                samplingMode: ImageSamplingMode.Nearest);
+            context.DrawImage(
+                Scale(new Rect(320, 250, 120, 90), layoutScale, offsetX, offsetY),
+                _firstImage,
+                new Rect(4, 4, 8, 8),
+                ImageSamplingMode.Linear);
+
+            using (context.PushClip(Scale(new Rect(480, 260, 80, 70), layoutScale, offsetX, offsetY)))
+            using (context.PushOpacity(0.65))
+            {
+                context.DrawImage(
+                    Scale(new Rect(450, 235, 140, 120), layoutScale, offsetX, offsetY),
+                    _secondImage,
+                    samplingMode: ImageSamplingMode.Nearest);
+            }
+
         }
 
         private static Rect Scale(Rect rect, double layoutScale, double offsetX, double offsetY) =>

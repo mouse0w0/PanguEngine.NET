@@ -1,5 +1,6 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Rendering;
+using PanguEngine.Graphics;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -186,7 +187,7 @@ public sealed class UiDrawBuilderTests
             true);
 
         var vertex = builder.Vertices[0];
-        var channel = 128 / 255f;
+        const float channel = 128 / 255f;
         var expectedRed = MathF.Pow((channel + 0.055f) / 1.055f, 2.4f);
         Assert.Equal(expectedRed, vertex.R);
         Assert.Equal(1, vertex.G);
@@ -205,7 +206,7 @@ public sealed class UiDrawBuilderTests
             1,
             true);
 
-        Assert.Equal((10 / 255f) / 12.92f, builder.Vertices[0].R);
+        Assert.Equal(10 / 255f / 12.92f, builder.Vertices[0].R);
     }
 
     [Fact]
@@ -270,8 +271,106 @@ public sealed class UiDrawBuilderTests
             int.MaxValue,
             UiDrawBuilder.GrowCapacity(int.MaxValue / 2 + 1, int.MaxValue));
 
-    private static UiDrawCommandList Commands(params UiFillRectangleCommand[] commands) =>
-        new(commands.Cast<UiDrawCommand>().ToList());
+    [Fact]
+    public void ImageVerticesContainNormalizedUvAndTexelCenterBounds()
+    {
+        var image = UiImage.FromRgba(new byte[64], 4, 4);
+        var descriptorSet = new TestDescriptorSet();
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            Commands(new UiDrawImageCommand(
+                new Rect(0, 0, 8, 8),
+                image,
+                new Rect(1, 1, 2, 2),
+                ImageSamplingMode.Linear,
+                null,
+                0.5)),
+            16,
+            16,
+            1,
+            false,
+            _ => new UiImageRenderBinding(17, descriptorSet));
+
+        var first = builder.Vertices[0];
+        Assert.Equal(0.25f, first.U);
+        Assert.Equal(0.25f, first.V);
+        Assert.Equal(0.375f, first.ClampMinU);
+        Assert.Equal(0.375f, first.ClampMinV);
+        Assert.Equal(0.625f, first.ClampMaxU);
+        Assert.Equal(0.625f, first.ClampMaxV);
+        Assert.Equal(0.5f, first.A);
+        var batch = Assert.Single(builder.Batches.ToArray());
+        Assert.Equal(UiMaterialKind.Image, batch.Material.Kind);
+        Assert.Equal(17ul, batch.Material.ResourceId);
+        Assert.Same(descriptorSet, batch.Material.DescriptorSet);
+    }
+
+    [Fact]
+    public void PendingImageDoesNotSplitCompatibleSolidBatches()
+    {
+        var image = UiImage.FromRgba(new byte[4], 1, 1);
+        var clip = new Rect(0, 0, 10, 10);
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            Commands(
+                Fill(new Rect(0, 0, 1, 1), new Color(1, 0, 0), clip),
+                new UiDrawImageCommand(new Rect(1, 0, 1, 1), image, image.FullSourceRect,
+                    ImageSamplingMode.Linear, clip, 1),
+                Fill(new Rect(2, 0, 1, 1), new Color(0, 1, 0), clip)),
+            10,
+            10,
+            1,
+            false,
+            static _ => null);
+
+        Assert.Equal(12u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Fact]
+    public void DifferentImageMaterialsCreateStableBatchBoundaries()
+    {
+        var firstImage = UiImage.FromRgba(new byte[4], 1, 1);
+        var secondImage = UiImage.FromRgba(new byte[4], 1, 1);
+        var firstDescriptor = new TestDescriptorSet();
+        var secondDescriptor = new TestDescriptorSet();
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            Commands(
+                new UiDrawImageCommand(new Rect(0, 0, 1, 1), firstImage, firstImage.FullSourceRect,
+                    ImageSamplingMode.Linear, null, 1),
+                new UiDrawImageCommand(new Rect(1, 0, 1, 1), firstImage, firstImage.FullSourceRect,
+                    ImageSamplingMode.Linear, null, 1),
+                new UiDrawImageCommand(new Rect(2, 0, 1, 1), firstImage, firstImage.FullSourceRect,
+                    ImageSamplingMode.Nearest, null, 1),
+                new UiDrawImageCommand(new Rect(3, 0, 1, 1), secondImage, secondImage.FullSourceRect,
+                    ImageSamplingMode.Linear, null, 1)),
+            10,
+            10,
+            1,
+            false,
+            command => command.Image == firstImage
+                ? new UiImageRenderBinding(
+                    command.SamplingMode == ImageSamplingMode.Linear ? 1ul : 2ul,
+                    command.SamplingMode == ImageSamplingMode.Linear ? firstDescriptor : secondDescriptor)
+                : new UiImageRenderBinding(3, secondDescriptor));
+
+        Assert.Equal(
+            [
+                new UiBatch(new UiScissor(0, 0, 10, 10),
+                    new UiBatchMaterial(UiMaterialKind.Image, 1, firstDescriptor, ImageSamplingMode.Linear), 0, 12),
+                new UiBatch(new UiScissor(0, 0, 10, 10),
+                    new UiBatchMaterial(UiMaterialKind.Image, 2, secondDescriptor, ImageSamplingMode.Nearest), 12, 6),
+                new UiBatch(new UiScissor(0, 0, 10, 10),
+                    new UiBatchMaterial(UiMaterialKind.Image, 3, secondDescriptor, ImageSamplingMode.Linear), 18, 6)
+            ],
+            builder.Batches.ToArray());
+    }
+
+    private static UiDrawCommandList Commands(params UiDrawCommand[] commands) =>
+        new(commands.ToList());
 
     private static UiFillRectangleCommand Fill(
         Rect bounds,
@@ -279,4 +378,10 @@ public sealed class UiDrawBuilderTests
         Rect? clip = null,
         double opacity = 1) =>
         new(bounds, color, clip, opacity);
+
+    private sealed class TestDescriptorSet : DescriptorSet
+    {
+        public override void Destroy() =>
+            MarkDestroyed();
+    }
 }

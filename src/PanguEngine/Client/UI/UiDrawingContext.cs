@@ -59,6 +59,57 @@ public sealed class UiDrawingContext
     }
 
     /// <summary>
+    /// Appends an image using the requested destination, source region, and sampling mode.
+    /// </summary>
+    /// <param name="bounds">The destination rectangle in local node coordinates.</param>
+    /// <param name="image">The image source.</param>
+    /// <param name="sourceRect">The source region in image pixel coordinates, or the full image when null.</param>
+    /// <param name="samplingMode">The image sampling mode.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="image"/> is null.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the source region is outside the image.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is no longer active.</exception>
+    public void DrawImage(
+        Rect bounds,
+        UiImage image,
+        Rect? sourceRect = null,
+        ImageSamplingMode samplingMode = ImageSamplingMode.Linear)
+    {
+        VerifyActive();
+        ArgumentNullException.ThrowIfNull(image);
+
+        var resolvedSourceRect = sourceRect ?? image.FullSourceRect;
+        if (!image.ContainsSourceRect(resolvedSourceRect))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(sourceRect),
+                "The image source region must be contained within the image.");
+        }
+
+        if (bounds.Width == 0 ||
+            bounds.Height == 0 ||
+            _state.Opacity == 0 ||
+            _state.IsClipEmpty ||
+            resolvedSourceRect.Width == 0 ||
+            resolvedSourceRect.Height == 0)
+        {
+            return;
+        }
+
+        var screenBounds = Translate(bounds, _state.OriginX, _state.OriginY);
+        if (_state.Clip is { } clip && !TryIntersect(screenBounds, clip, out _))
+            return;
+
+        _commands.Add(
+            new UiDrawImageCommand(
+                screenBounds,
+                image,
+                resolvedSourceRect,
+                samplingMode,
+                _state.Clip,
+                _state.Opacity));
+    }
+
+    /// <summary>
     /// Pushes a rectangular clip expressed in local node coordinates.
     /// </summary>
     /// <param name="clip">The local clip rectangle.</param>

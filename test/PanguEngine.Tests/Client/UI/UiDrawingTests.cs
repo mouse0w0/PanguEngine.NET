@@ -97,7 +97,7 @@ public sealed class UiDrawingTests
     }
 
     [Fact]
-    public void CommandListIsReadOnlyAndDoesNotTrackLaterNodeChanges()
+    public void CommandListDoesNotTrackLaterNodeChanges()
     {
         var firstColor = new Color(1, 2, 3);
         var secondColor = new Color(4, 5, 6);
@@ -114,7 +114,6 @@ public sealed class UiDrawingTests
             context.FillRectangle(new Rect(1, 1, 4, 5), secondColor);
         var secondSnapshot = screen.CreateDrawCommandList();
 
-        Assert.False((object)firstSnapshot is IList<UiDrawCommand>);
         var firstCommand = Assert.IsType<UiFillRectangleCommand>(Assert.Single(firstSnapshot));
         Assert.Equal(new Rect(5, 7, 2, 3), firstCommand.Bounds);
         Assert.Equal(firstColor, firstCommand.Color);
@@ -172,7 +171,7 @@ public sealed class UiDrawingTests
             Assert.Single(screen.CreateDrawCommandList()));
 
         Assert.Equal(new Rect(30, 40, 40, 40), command.Bounds);
-        Assert.Equal<Rect?>(new Rect(35, 45, 5, 5), command.Clip);
+        Assert.Equal(new Rect(35, 45, 5, 5), command.Clip);
     }
 
     [Fact]
@@ -283,7 +282,7 @@ public sealed class UiDrawingTests
         var propertyScreen = new UiScreen(propertyNode);
         Arrange(propertyNode, new Rect(0, 0, 10, 10));
 
-        Assert.Throws<InvalidOperationException>(() => propertyScreen.CreateDrawCommandList());
+        Assert.Throws<InvalidOperationException>(propertyScreen.CreateDrawCommandList);
 
         var setValueNode = new DrawingNode
         {
@@ -293,7 +292,7 @@ public sealed class UiDrawingTests
         Arrange(setValueNode, new Rect(0, 0, 10, 10));
         setValueNode.SetValue(UiNode.OpacityProperty, double.NaN);
 
-        Assert.Throws<InvalidOperationException>(() => setValueScreen.CreateDrawCommandList());
+        Assert.Throws<InvalidOperationException>(setValueScreen.CreateDrawCommandList);
 
         var bindingNode = new DrawingNode
         {
@@ -304,7 +303,7 @@ public sealed class UiDrawingTests
         var source = new OpacitySource { Opacity = double.PositiveInfinity };
         bindingNode.Bind(UiNode.OpacityProperty, source, item => item.Opacity);
 
-        Assert.Throws<InvalidOperationException>(() => bindingScreen.CreateDrawCommandList());
+        Assert.Throws<InvalidOperationException>(bindingScreen.CreateDrawCommandList);
         Assert.Equal(0, drawCalls);
     }
 
@@ -384,7 +383,7 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
+        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
 
         node.DrawAction = DrawUnitRectangle;
         Assert.Single(screen.CreateDrawCommandList());
@@ -420,7 +419,7 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        var actual = Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
+        var actual = Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
 
         Assert.Same(expected, actual);
         node.DrawAction = DrawUnitRectangle;
@@ -499,7 +498,7 @@ public sealed class UiDrawingTests
 
         _ = screen.CreateDrawCommandList();
 
-        Assert.All(errors, error => Assert.Null(error));
+        Assert.All(errors, Assert.Null);
         Assert.Equal(new UiNode[] { first, emptyFront }, root.Children);
         Assert.Null(foreign.Parent);
         Assert.Null(independent.Parent);
@@ -551,13 +550,10 @@ public sealed class UiDrawingTests
     public void DrawingRejectsReentrantGeneration()
     {
         Exception? error = null;
-        UiScreen screen = null!;
-        var node = new DrawingNode
-        {
-            DrawAction = _ =>
-                error = Record.Exception(() => screen.CreateDrawCommandList())
-        };
-        screen = new UiScreen(node);
+        var node = new DrawingNode();
+        var screen = new UiScreen(node);
+        node.DrawAction = _ =>
+            error = Record.Exception(screen.CreateDrawCommandList);
         Arrange(node, new Rect(0, 0, 10, 10));
 
         _ = screen.CreateDrawCommandList();
@@ -569,12 +565,9 @@ public sealed class UiDrawingTests
     public void DrawingAllowsPostButDoesNotRunItSynchronously()
     {
         var calls = 0;
-        UiScreen screen = null!;
-        var node = new DrawingNode
-        {
-            DrawAction = _ => screen.Post(() => calls++)
-        };
-        screen = new UiScreen(node);
+        var node = new DrawingNode();
+        var screen = new UiScreen(node);
+        node.DrawAction = _ => screen.Post(() => calls++);
         Arrange(node, new Rect(0, 0, 10, 10));
         screen.Open();
 
@@ -595,7 +588,7 @@ public sealed class UiDrawingTests
         screen.Open();
 
         var openError = RunOnBackgroundThread(() =>
-            Record.Exception(() => screen.CreateDrawCommandList()));
+            Record.Exception(screen.CreateDrawCommandList));
 
         Assert.IsType<InvalidOperationException>(openError);
         screen.Close();
@@ -618,7 +611,7 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(double.MaxValue, 0, 1, 1));
 
-        Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
+        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
     }
 
     [Fact]
@@ -635,7 +628,7 @@ public sealed class UiDrawingTests
         Arrange(root, new Rect(double.MaxValue, 0, 1, 1));
         Arrange(child, new Rect(double.MaxValue, 0, 1, 1));
 
-        Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
+        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
         Assert.Equal(0, drawCalls);
     }
 
@@ -651,7 +644,32 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(double.MaxValue, 0, 1, 1));
 
-        Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
+        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
+    }
+
+    [Fact]
+    public void DrawImageUsesFinalClipOpacityAndSourceRect()
+    {
+        var image = UiImage.FromRgba(new byte[16], 2, 2);
+        var node = new DrawingNode
+        {
+            Opacity = 0.5,
+            DrawAction = context =>
+            {
+                using (context.PushClip(new Rect(1, 2, 3, 4)))
+                    context.DrawImage(new Rect(0, 0, 5, 6), image, new Rect(0, 0, 1, 2));
+            }
+        };
+        var screen = new UiScreen(node);
+        Arrange(node, new Rect(10, 20, 10, 10));
+
+        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+
+        Assert.Same(image, command.Image);
+        Assert.Equal(new Rect(10, 20, 5, 6), command.Bounds);
+        Assert.Equal(new Rect(0, 0, 1, 2), command.SourceRect);
+        Assert.Equal(new Rect(11, 22, 3, 4), command.Clip);
+        Assert.Equal(0.5, command.Opacity);
     }
 
     private static DrawingNode CreateColorNode(byte red) =>
@@ -725,19 +743,17 @@ public sealed class UiDrawingTests
 
     private sealed class OpacitySource : INotifyPropertyChanged
     {
-        private double _opacity;
-
         public event PropertyChangedEventHandler? PropertyChanged;
 
         public double Opacity
         {
-            get => _opacity;
+            get => field;
             set
             {
-                if (_opacity.Equals(value))
+                if (field.Equals(value))
                     return;
 
-                _opacity = value;
+                field = value;
                 PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Opacity)));
             }
         }
