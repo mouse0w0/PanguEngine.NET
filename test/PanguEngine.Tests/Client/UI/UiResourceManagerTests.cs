@@ -303,12 +303,15 @@ public sealed class UiResourceManagerTests
 
     private static void CollectUntilDead<T>(WeakReference<T> reference) where T : class
     {
-        for (var attempt = 0; attempt < 5 && reference.TryGetTarget(out _); attempt++)
+        for (var attempt = 0; attempt < 5; attempt++)
         {
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
+
+        GC.KeepAlive(reference);
     }
 
     private readonly record struct SharedImageReferences(
@@ -395,13 +398,18 @@ internal sealed class ImageTestGraphicsDevice(
     public override UploadHandle GenerateMipmaps(Texture texture) => throw new NotSupportedException();
     public override Sampler CreateSampler(in SamplerDescription description) => throw new NotSupportedException();
     public override Shader CreateShader(in ShaderDescription description) => throw new NotSupportedException();
+
     public override DescriptorSetLayout CreateDescriptorSetLayout(
         in DescriptorSetLayoutDescription description) => throw new NotSupportedException();
+
     public override DescriptorSet CreateDescriptorSet(
         in DescriptorSetDescription description) => throw new NotSupportedException();
+
     public override ulong GetAlignedUniformSize(ulong rawSize) => throw new NotSupportedException();
+
     public override GraphicsPipeline CreateGraphicsPipeline(
         in GraphicsPipelineDescription description) => throw new NotSupportedException();
+
     public override void WaitIdle() => throw new NotSupportedException();
 }
 

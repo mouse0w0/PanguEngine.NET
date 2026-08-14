@@ -14,11 +14,11 @@ internal interface IUiGpuResourceState
 
 internal sealed class UiImageRegistration
 {
-    private readonly WeakReference<UiResourceManager> _manager;
+    private readonly UiResourceManager _manager;
 
     internal UiImageRegistration(UiResourceManager manager, ulong id)
     {
-        _manager = new WeakReference<UiResourceManager>(manager);
+        _manager = manager;
         Id = id;
     }
 
@@ -26,8 +26,7 @@ internal sealed class UiImageRegistration
 
     ~UiImageRegistration()
     {
-        if (_manager.TryGetTarget(out var manager))
-            manager.EnqueueFinalized(Id);
+        _manager.EnqueueFinalized(Id);
     }
 }
 
@@ -220,6 +219,7 @@ internal sealed class UiResourceManager
                 LogImageUploadFailure(_logger, state.ResourceId, uploadFailure);
             return null;
         }
+
         if (!state.IsUploadReady)
             return null;
 
