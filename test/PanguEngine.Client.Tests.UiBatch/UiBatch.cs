@@ -120,10 +120,11 @@ internal sealed class UiBatchScene : IClientTestScene
     private sealed class UiBatchNode : Panel
     {
         private const double DesignWidth = 640;
-        private const double DesignHeight = 480;
+        private const double DesignHeight = 560;
         private readonly UiImage _firstImage;
         private readonly UiImage _secondImage;
         private readonly ImageView[] _imageViews;
+        private readonly DecorationPanel _decorationPanel;
 
         internal UiBatchNode(UiImage firstImage, UiImage secondImage)
         {
@@ -138,6 +139,16 @@ internal sealed class UiBatchScene : IClientTestScene
             ];
             foreach (var imageView in _imageViews)
                 Children.Add(imageView);
+
+            _decorationPanel = new DecorationPanel
+            {
+                Background = new SolidColorBrush(new Color(35, 150, 125, 145)),
+                BorderBrush = new SolidColorBrush(new Color(230, 75, 65, 185)),
+                BorderThickness = new Thickness(6, 10, 14, 8),
+                Padding = new Thickness(8)
+            };
+            _decorationPanel.Children.Add(new DecorationContentNode());
+            Children.Add(_decorationPanel);
         }
 
         internal bool Dense { get; set; }
@@ -146,6 +157,7 @@ internal sealed class UiBatchScene : IClientTestScene
         {
             foreach (var imageView in _imageViews)
                 imageView.Measure(Size.Infinite);
+            _decorationPanel.Measure(Size.Infinite);
 
             return Size.Zero;
         }
@@ -165,6 +177,9 @@ internal sealed class UiBatchScene : IClientTestScene
 
             for (var index = 0; index < _imageViews.Length; index++)
                 _imageViews[index].Arrange(Scale(imageBounds[index], layoutScale, offsetX, offsetY));
+
+            _decorationPanel.Arrange(
+                Scale(new Rect(160, 460, 320, 70), layoutScale, offsetX, offsetY));
         }
 
         protected override void DrawCore(UiDrawingContext context)
@@ -225,6 +240,18 @@ internal sealed class UiBatchScene : IClientTestScene
                     samplingMode: ImageSamplingMode.Nearest);
             }
 
+        }
+
+        private sealed class DecorationPanel : Panel
+        {
+        }
+
+        private sealed class DecorationContentNode : UiNode
+        {
+            protected override void DrawCore(UiDrawingContext context) =>
+                context.FillRectangle(
+                    new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height),
+                    new Color(245, 245, 245, 210));
         }
 
         private static Rect Scale(Rect rect, double layoutScale, double offsetX, double offsetY) =>

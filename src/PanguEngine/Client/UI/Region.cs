@@ -24,6 +24,24 @@ public abstract class Region : Parent
             invalidation: UiPropertyInvalidation.Render);
 
     /// <summary>
+    /// Identifies the <see cref="BorderBrush"/> property.
+    /// </summary>
+    public static readonly UiProperty<Brush?> BorderBrushProperty =
+        UiProperty.Register<Region, Brush?>(
+            nameof(BorderBrush),
+            defaultValue: null,
+            invalidation: UiPropertyInvalidation.Render);
+
+    /// <summary>
+    /// Identifies the <see cref="BorderThickness"/> property.
+    /// </summary>
+    public static readonly UiProperty<Thickness> BorderThicknessProperty =
+        UiProperty.Register<Region, Thickness>(
+            nameof(BorderThickness),
+            Thickness.Zero,
+            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+
+    /// <summary>
     /// Initializes a UI region.
     /// </summary>
     protected Region()
@@ -40,12 +58,30 @@ public abstract class Region : Parent
     }
 
     /// <summary>
-    /// Gets or sets the background fill, or null for no background.
+    /// Gets or sets the background fill within the inner edge of the border, or null for no background.
     /// </summary>
     public Brush? Background
     {
         get => GetValue(BackgroundProperty);
         set => SetValue(BackgroundProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the brush used to fill the border, or null for no visible border.
+    /// </summary>
+    public Brush? BorderBrush
+    {
+        get => GetValue(BorderBrushProperty);
+        set => SetValue(BorderBrushProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the non-negative thickness reserved for the border.
+    /// </summary>
+    public Thickness BorderThickness
+    {
+        get => GetValue(BorderThicknessProperty);
+        set => SetValue(BorderThicknessProperty, value);
     }
 
     /// <summary>
@@ -61,14 +97,17 @@ public abstract class Region : Parent
     /// </summary>
     public Rect ContentBounds =>
         IsArrangeValid
-            ? GetContentBounds(new Size(LayoutBounds.Width, LayoutBounds.Height), Padding)
+            ? GetContentBounds(
+                new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height),
+                BorderThickness,
+                Padding)
             : Rect.Zero;
 
     /// <summary>
-    /// Measures the content within the size left after padding.
+    /// Measures the content within the size left after the border and padding.
     /// </summary>
-    /// <param name="availableSize">The available content size, excluding padding.</param>
-    /// <returns>The desired content size, excluding padding and this region's margin.</returns>
+    /// <param name="availableSize">The available content size, excluding the border and padding.</param>
+    /// <returns>The desired content size, excluding the border, padding, and this region's margin.</returns>
     protected virtual Size MeasureContent(Size availableSize)
     {
         var desiredWidth = 0d;
@@ -84,9 +123,9 @@ public abstract class Region : Parent
     }
 
     /// <summary>
-    /// Arranges the content within the local boundary left after padding.
+    /// Arranges the content within the local boundary left after the border and padding.
     /// </summary>
-    /// <param name="contentBounds">The local content boundary, excluding padding.</param>
+    /// <param name="contentBounds">The local content boundary, excluding the border and padding.</param>
     protected virtual void ArrangeContent(Rect contentBounds)
     {
         foreach (var child in Children)
@@ -96,48 +135,105 @@ public abstract class Region : Parent
     /// <inheritdoc />
     protected sealed override Size MeasureCore(Size availableSize)
     {
+        var borderThickness = BorderThickness;
         var padding = Padding;
-        var contentAvailableSize = new Size(
-            SubtractPadding(availableSize.Width, padding.Left, padding.Right),
-            SubtractPadding(availableSize.Height, padding.Top, padding.Bottom));
+        var innerAvailableSize = SubtractThickness(availableSize, borderThickness);
+        var contentAvailableSize = SubtractThickness(innerAvailableSize, padding);
         var contentDesiredSize = MeasureContent(contentAvailableSize);
-        return new Size(
-            AddPadding(contentDesiredSize.Width, padding.Left, padding.Right),
-            AddPadding(contentDesiredSize.Height, padding.Top, padding.Bottom));
+        var innerDesiredSize = AddThickness(contentDesiredSize, padding);
+        return AddThickness(innerDesiredSize, borderThickness);
     }
 
     /// <inheritdoc />
     protected sealed override void ArrangeCore(Size finalSize) =>
-        ArrangeContent(GetContentBounds(finalSize, Padding));
+        ArrangeContent(GetContentBounds(new Rect(0, 0, finalSize), BorderThickness, Padding));
 
-    private static Rect GetContentBounds(Size finalSize, Thickness padding) =>
+    /// <inheritdoc />
+    protected override void DrawCore(UiDrawingContext context)
+    {
+        var decorationBounds = DecorationBounds;
+        var borderBounds = DeflateBounds(decorationBounds, BorderThickness);
+        if (Background is { } background)
+            context.FillRectangle(borderBounds, background);
+
+        if (BorderBrush is not { } borderBrush)
+            return;
+
+        context.FillRectangle(
+            new Rect(
+                decorationBounds.X,
+                decorationBounds.Y,
+                decorationBounds.Width,
+                borderBounds.Y - decorationBounds.Y),
+            borderBrush);
+        context.FillRectangle(
+            new Rect(
+                borderBounds.X + borderBounds.Width,
+                borderBounds.Y,
+                decorationBounds.X + decorationBounds.Width - (borderBounds.X + borderBounds.Width),
+                borderBounds.Height),
+            borderBrush);
+        context.FillRectangle(
+            new Rect(
+                decorationBounds.X,
+                borderBounds.Y + borderBounds.Height,
+                decorationBounds.Width,
+                decorationBounds.Y + decorationBounds.Height - (borderBounds.Y + borderBounds.Height)),
+            borderBrush);
+        context.FillRectangle(
+            new Rect(
+                decorationBounds.X,
+                borderBounds.Y,
+                borderBounds.X - decorationBounds.X,
+                borderBounds.Height),
+            borderBrush);
+    }
+
+    private static Rect GetContentBounds(
+        Rect decorationBounds,
+        Thickness borderThickness,
+        Thickness padding) =>
+        DeflateBounds(DeflateBounds(decorationBounds, borderThickness), padding);
+
+    private static Rect DeflateBounds(Rect bounds, Thickness thickness) =>
         new(
-            Math.Min(padding.Left, finalSize.Width),
-            Math.Min(padding.Top, finalSize.Height),
-            SubtractPadding(finalSize.Width, padding.Left, padding.Right),
-            SubtractPadding(finalSize.Height, padding.Top, padding.Bottom));
+            bounds.X + Math.Min(thickness.Left, bounds.Width),
+            bounds.Y + Math.Min(thickness.Top, bounds.Height),
+            SubtractThickness(bounds.Width, thickness.Left, thickness.Right),
+            SubtractThickness(bounds.Height, thickness.Top, thickness.Bottom));
 
-    private static double SubtractPadding(
+    private static Size SubtractThickness(Size size, Thickness thickness) =>
+        new(
+            SubtractThickness(size.Width, thickness.Left, thickness.Right),
+            SubtractThickness(size.Height, thickness.Top, thickness.Bottom));
+
+    private static double SubtractThickness(
         double available,
-        double leadingPadding,
-        double trailingPadding)
+        double leadingThickness,
+        double trailingThickness)
     {
         if (double.IsPositiveInfinity(available))
             return double.PositiveInfinity;
 
-        var padding = leadingPadding + trailingPadding;
-        return double.IsPositiveInfinity(padding) ? 0 : Math.Max(0, available - padding);
+        var thickness = leadingThickness + trailingThickness;
+        return double.IsPositiveInfinity(thickness) ? 0 : Math.Max(0, available - thickness);
     }
 
-    private static double AddPadding(
+    private static Size AddThickness(Size size, Thickness thickness) =>
+        new(
+            AddThickness(size.Width, thickness.Left, thickness.Right),
+            AddThickness(size.Height, thickness.Top, thickness.Bottom));
+
+    private static double AddThickness(
         double content,
-        double leadingPadding,
-        double trailingPadding)
+        double leadingThickness,
+        double trailingThickness)
     {
-        var result = content + leadingPadding + trailingPadding;
+        var result = content + leadingThickness + trailingThickness;
         if (!double.IsFinite(result))
             throw new InvalidOperationException("Measurement produced a non-finite desired size.");
 
         return result;
     }
+
 }

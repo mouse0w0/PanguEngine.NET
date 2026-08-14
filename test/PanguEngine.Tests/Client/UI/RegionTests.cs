@@ -78,6 +78,20 @@ public sealed class RegionTests
         Assert.Equal(typeof(Brush), Region.BackgroundProperty.ValueType);
         Assert.Null(Region.BackgroundProperty.DefaultValue);
         Assert.Equal(UiPropertyInvalidation.Render, Region.BackgroundProperty.Invalidation);
+
+        Assert.Equal(nameof(Region.BorderBrush), Region.BorderBrushProperty.Name);
+        Assert.Equal(typeof(Region), Region.BorderBrushProperty.OwnerType);
+        Assert.Equal(typeof(Brush), Region.BorderBrushProperty.ValueType);
+        Assert.Null(Region.BorderBrushProperty.DefaultValue);
+        Assert.Equal(UiPropertyInvalidation.Render, Region.BorderBrushProperty.Invalidation);
+
+        Assert.Equal(nameof(Region.BorderThickness), Region.BorderThicknessProperty.Name);
+        Assert.Equal(typeof(Region), Region.BorderThicknessProperty.OwnerType);
+        Assert.Equal(typeof(Thickness), Region.BorderThicknessProperty.ValueType);
+        Assert.Equal(Thickness.Zero, Region.BorderThicknessProperty.DefaultValue);
+        Assert.Equal(
+            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
+            Region.BorderThicknessProperty.Invalidation);
     }
 
     [Fact]
@@ -87,6 +101,8 @@ public sealed class RegionTests
 
         Assert.Equal(Thickness.Zero, region.Padding);
         Assert.Null(region.Background);
+        Assert.Null(region.BorderBrush);
+        Assert.Equal(Thickness.Zero, region.BorderThickness);
         Assert.Equal(Rect.Zero, region.DecorationBounds);
         Assert.Equal(Rect.Zero, region.ContentBounds);
     }
@@ -121,6 +137,22 @@ public sealed class RegionTests
         Assert.Equal(new Size(60, 60), first.LastMeasureConstraint);
         Assert.Equal(new Size(60, 60), second.LastMeasureConstraint);
         Assert.Equal(new Size(65, 90), region.DesiredSize);
+    }
+
+    [Fact]
+    public void MeasureAppliesBorderOutsidePadding()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(2, 3, 4, 5),
+            Padding = new Thickness(10, 20, 30, 40),
+            ContentDesiredSize = new Size(25, 8)
+        };
+
+        region.Measure(new Size(100, 120));
+
+        Assert.Equal(new Size(54, 52), region.LastMeasureConstraint);
+        Assert.Equal(new Size(71, 76), region.DesiredSize);
     }
 
     [Fact]
@@ -201,6 +233,24 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void ArrangeAppliesBorderBeforePadding()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(2, 3, 4, 5),
+            Padding = new Thickness(10, 20, 30, 40),
+            ContentDesiredSize = Size.Zero
+        };
+        region.Measure(new Size(100, 120));
+
+        region.Arrange(new Rect(50, 60, 100, 120));
+
+        Assert.Equal(new Rect(0, 0, 100, 120), region.DecorationBounds);
+        Assert.Equal(new Rect(12, 23, 54, 52), region.ContentBounds);
+        Assert.Equal(new Rect(12, 23, 54, 52), region.LastArrangeBounds);
+    }
+
+    [Fact]
     public void DefaultArrangePassesSameContentBoundsToEveryChild()
     {
         var region = new TestRegion
@@ -265,6 +315,39 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void OversizedBorderUsesLeadingEdgeAndCollapsesInnerBounds()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(25, 20, 30, 15),
+            ContentDesiredSize = Size.Zero
+        };
+        region.Measure(new Size(100, 100));
+
+        region.Arrange(new Rect(0, 0, 40, 30));
+
+        Assert.Equal(new Rect(0, 0, 40, 30), region.DecorationBounds);
+        Assert.Equal(new Rect(25, 20, 0, 0), region.ContentBounds);
+        Assert.Equal(new Rect(25, 20, 0, 0), region.LastArrangeBounds);
+    }
+
+    [Fact]
+    public void HorizontalBorderOverflowKeepsVerticalInnerSpan()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(15, 2, 10, 3),
+            ContentDesiredSize = Size.Zero
+        };
+        region.Measure(new Size(100, 100));
+
+        region.Arrange(new Rect(0, 0, 20, 40));
+
+        Assert.Equal(new Rect(15, 2, 0, 35), region.ContentBounds);
+        Assert.Equal(new Rect(15, 2, 0, 35), region.LastArrangeBounds);
+    }
+
+    [Fact]
     public void PaddingChangeInvalidatesCommittedBounds()
     {
         var region = new TestRegion();
@@ -277,6 +360,18 @@ public sealed class RegionTests
         Assert.False(region.IsArrangeValid);
         Assert.Equal(Rect.Zero, region.DecorationBounds);
         Assert.Equal(Rect.Zero, region.ContentBounds);
+    }
+
+    [Fact]
+    public void BorderBrushChangeDoesNotInvalidateLayout()
+    {
+        var region = new TestRegion();
+        ValidateLayout(region);
+
+        region.BorderBrush = new SolidColorBrush(new Color(10, 20, 30));
+
+        Assert.True(region.IsMeasureValid);
+        Assert.True(region.IsArrangeValid);
     }
 
     [Fact]
@@ -376,6 +471,22 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void BorderThicknessChangeInvalidatesRegionAndAncestors()
+    {
+        var root = new TestRegion();
+        var child = new TestRegion();
+        root.Add(child);
+        ValidateLayout(root);
+
+        child.BorderThickness = new Thickness(1);
+
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(root.IsMeasureValid);
+        Assert.False(root.IsArrangeValid);
+    }
+
+    [Fact]
     public void ChildStructureChangeInvalidatesRegionAndAncestors()
     {
         var root = new TestRegion();
@@ -459,6 +570,35 @@ public sealed class RegionTests
         Assert.IsType<InvalidOperationException>(unbindError);
         Assert.True(region.IsBound(Region.BackgroundProperty));
         Assert.Same(changed, region.Background);
+        Assert.True(region.IsMeasureValid);
+        Assert.True(region.IsArrangeValid);
+
+        screen.Close();
+    }
+
+    [Fact]
+    public void ActiveRegionRejectsWrongThreadBorderChangesWithoutPartialState()
+    {
+        var originalBrush = new SolidColorBrush(new Color(10, 20, 30));
+        var changedBrush = new SolidColorBrush(new Color(40, 50, 60));
+        var region = new TestRegion
+        {
+            BorderBrush = originalBrush,
+            BorderThickness = new Thickness(1)
+        };
+        var screen = new UiScreen(region);
+        ValidateLayout(region);
+        screen.Open();
+
+        var brushError = RunOnBackgroundThread(
+            () => Record.Exception(() => region.BorderBrush = changedBrush));
+        var thicknessError = RunOnBackgroundThread(
+            () => Record.Exception(() => region.BorderThickness = new Thickness(2)));
+
+        Assert.IsType<InvalidOperationException>(brushError);
+        Assert.IsType<InvalidOperationException>(thicknessError);
+        Assert.Same(originalBrush, region.BorderBrush);
+        Assert.Equal(new Thickness(1), region.BorderThickness);
         Assert.True(region.IsMeasureValid);
         Assert.True(region.IsArrangeValid);
 

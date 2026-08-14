@@ -97,6 +97,178 @@ public sealed class UiDrawingTests
     }
 
     [Fact]
+    public void RegionBackgroundUsesBorderInnerBoundsWithoutVisibleBorder()
+    {
+        var background = new Color(10, 20, 30, 140);
+        var region = new DrawingRegion
+        {
+            Background = new SolidColorBrush(background),
+            BorderThickness = new Thickness(2, 3, 4, 5)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(5, 7, 20, 30));
+
+        var command = Assert.IsType<UiFillRectangleCommand>(
+            Assert.Single(screen.CreateDrawCommandList()));
+
+        Assert.Equal(new Rect(7, 10, 14, 22), command.Bounds);
+        Assert.Equal(background, command.Color);
+    }
+
+    [Fact]
+    public void RegionDrawsDecorationAndCustomContentBeforeChild()
+    {
+        var background = new Color(10, 20, 30, 140);
+        var border = new Color(40, 50, 60, 170);
+        var customColor = new Color(65, 75, 85);
+        var childColor = new Color(70, 80, 90);
+        var region = new DrawingRegion
+        {
+            Background = new SolidColorBrush(background),
+            BorderBrush = new SolidColorBrush(border),
+            BorderThickness = new Thickness(10, 20, 30, 40),
+            DrawAction = context =>
+                context.FillRectangle(new Rect(2, 3, 1, 1), customColor)
+        };
+        region.Add(new DrawingNode
+        {
+            DrawAction = context =>
+                context.FillRectangle(new Rect(0, 0, 1, 1), childColor)
+        });
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(5, 7, 100, 120));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiFillRectangleCommand>()
+            .ToArray();
+
+        Assert.Equal(
+            [background, border, border, border, border, customColor, childColor],
+            commands.Select(command => command.Color));
+        Assert.Equal(new Rect(15, 27, 60, 60), commands[0].Bounds);
+        Assert.Equal(new Rect(5, 7, 100, 20), commands[1].Bounds);
+        Assert.Equal(new Rect(75, 27, 30, 60), commands[2].Bounds);
+        Assert.Equal(new Rect(5, 87, 100, 40), commands[3].Bounds);
+        Assert.Equal(new Rect(5, 27, 10, 60), commands[4].Bounds);
+        Assert.Equal(new Rect(7, 10, 1, 1), commands[5].Bounds);
+        Assert.Equal(new Rect(15, 27, 1, 1), commands[6].Bounds);
+    }
+
+    [Fact]
+    public void OversizedRegionBorderPartitionsWithoutOverlap()
+    {
+        var region = new DrawingRegion
+        {
+            BorderBrush = new SolidColorBrush(new Color(40, 50, 60, 170)),
+            BorderThickness = new Thickness(25, 20, 30, 15)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 40, 30));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiFillRectangleCommand>()
+            .ToArray();
+
+        Assert.Equal(2, commands.Length);
+        Assert.Equal(new Rect(0, 0, 40, 20), commands[0].Bounds);
+        Assert.Equal(new Rect(0, 20, 40, 10), commands[1].Bounds);
+    }
+
+    [Fact]
+    public void PartialRegionBorderEmitsOnlyVisibleEdge()
+    {
+        var region = new DrawingRegion
+        {
+            BorderBrush = new SolidColorBrush(new Color(40, 50, 60)),
+            BorderThickness = new Thickness(4, 0, 0, 0)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 20, 30));
+
+        var command = Assert.IsType<UiFillRectangleCommand>(
+            Assert.Single(screen.CreateDrawCommandList()));
+
+        Assert.Equal(new Rect(0, 0, 4, 30), command.Bounds);
+    }
+
+    [Fact]
+    public void RegionWithoutBaseSkipsDecorationButStillDrawsSelfAndChildren()
+    {
+        var customColor = new Color(70, 80, 90);
+        var childColor = new Color(100, 110, 120);
+        var region = new DrawingRegion
+        {
+            DrawBase = false,
+            Background = new SolidColorBrush(new Color(10, 20, 30)),
+            BorderBrush = new SolidColorBrush(new Color(40, 50, 60)),
+            BorderThickness = new Thickness(2),
+            DrawAction = context =>
+                context.FillRectangle(new Rect(0, 0, 1, 1), customColor)
+        };
+        region.Add(new DrawingNode
+        {
+            DrawAction = context =>
+                context.FillRectangle(new Rect(0, 0, 1, 1), childColor)
+        });
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 20, 20));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiFillRectangleCommand>()
+            .ToArray();
+
+        Assert.Equal([customColor, childColor], commands.Select(command => command.Color));
+        Assert.Equal(new Rect(0, 0, 1, 1), commands[0].Bounds);
+        Assert.Equal(new Rect(2, 2, 1, 1), commands[1].Bounds);
+    }
+
+    [Fact]
+    public void RegionDecorationUsesInheritedClipAndOpacity()
+    {
+        var parent = new DrawingParent { ClipToBounds = true, Opacity = 0.5 };
+        var region = new DrawingRegion
+        {
+            Opacity = 0.5,
+            Background = new SolidColorBrush(new Color(10, 20, 30))
+        };
+        parent.Add(region);
+        var screen = new UiScreen(parent);
+        Arrange(parent, new Rect(10, 20, 30, 30));
+        Arrange(region, new Rect(20, 20, 40, 40));
+
+        var command = Assert.IsType<UiFillRectangleCommand>(
+            Assert.Single(screen.CreateDrawCommandList()));
+
+        Assert.Equal(new Rect(30, 40, 40, 40), command.Bounds);
+        Assert.Equal(new Rect(10, 20, 30, 30), command.Clip);
+        Assert.Equal(0.25, command.Opacity);
+    }
+
+    [Fact]
+    public void RegionDecorationPropertiesCannotChangeWhileDrawing()
+    {
+        var region = new DrawingRegion();
+        Exception? brushError = null;
+        Exception? thicknessError = null;
+        region.DrawAction = _ =>
+        {
+            brushError = Record.Exception(() =>
+                region.BorderBrush = new SolidColorBrush(new Color(10, 20, 30)));
+            thicknessError = Record.Exception(() =>
+                region.BorderThickness = new Thickness(1));
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 20, 20));
+
+        _ = screen.CreateDrawCommandList();
+
+        Assert.IsType<InvalidOperationException>(brushError);
+        Assert.IsType<InvalidOperationException>(thicknessError);
+        Assert.Null(region.BorderBrush);
+        Assert.Equal(Thickness.Zero, region.BorderThickness);
+    }
+
+    [Fact]
     public void CommandListDoesNotTrackLaterNodeChanges()
     {
         var firstColor = new Color(1, 2, 3);
@@ -242,6 +414,33 @@ public sealed class UiDrawingTests
         Arrange(node, new Rect(0, 0, 10, 10));
 
         Assert.Empty(screen.CreateDrawCommandList());
+    }
+
+    [Fact]
+    public void BrushRectangleOverloadUsesExistingSolidCommandSemantics()
+    {
+        var color = new Color(10, 20, 30, 140);
+        var node = new DrawingNode
+        {
+            Opacity = 0.5,
+            DrawAction = context =>
+            {
+                using var clip = context.PushClip(new Rect(1, 2, 3, 4));
+                context.FillRectangle(
+                    new Rect(0, 0, 5, 6),
+                    new SolidColorBrush(color));
+            }
+        };
+        var screen = new UiScreen(node);
+        Arrange(node, new Rect(10, 20, 10, 10));
+
+        var command = Assert.IsType<UiFillRectangleCommand>(
+            Assert.Single(screen.CreateDrawCommandList()));
+
+        Assert.Equal(new Rect(10, 20, 5, 6), command.Bounds);
+        Assert.Equal(color, command.Color);
+        Assert.Equal(new Rect(11, 22, 3, 4), command.Clip);
+        Assert.Equal(0.5, command.Opacity);
     }
 
     [Fact]
@@ -722,6 +921,22 @@ public sealed class UiDrawingTests
 
         protected override void DrawCore(UiDrawingContext context) =>
             DrawAction?.Invoke(context);
+    }
+
+    private sealed class DrawingRegion : Region
+    {
+        internal bool DrawBase { get; set; } = true;
+        internal Action<UiDrawingContext>? DrawAction { get; set; }
+
+        internal void Add(UiNode child) =>
+            AddChild(child);
+
+        protected override void DrawCore(UiDrawingContext context)
+        {
+            if (DrawBase)
+                base.DrawCore(context);
+            DrawAction?.Invoke(context);
+        }
     }
 
     private sealed class DrawingParent : Parent

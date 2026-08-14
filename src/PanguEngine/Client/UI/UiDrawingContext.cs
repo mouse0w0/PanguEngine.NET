@@ -58,6 +58,18 @@ public sealed class UiDrawingContext
                 _state.Opacity));
     }
 
+    internal void FillRectangle(Rect bounds, Brush brush)
+    {
+        if (brush is SolidColorBrush solidColorBrush)
+        {
+            FillRectangle(bounds, solidColorBrush.Color);
+            return;
+        }
+
+        throw new NotSupportedException(
+            $"Brush type '{brush.GetType().FullName}' is not supported for rectangle fills.");
+    }
+
     /// <summary>
     /// Appends an image using the requested destination, source region, and sampling mode.
     /// </summary>
