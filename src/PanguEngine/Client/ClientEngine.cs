@@ -2,6 +2,7 @@ using PanguEngine.Audio;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Graphics;
+using PanguEngine.Graphics.Text;
 using PanguEngine.Registries;
 using PanguEngine.Windowing;
 using Silk.NET.Maths;
@@ -51,6 +52,16 @@ public sealed class ClientEngine
     /// </summary>
     public AudioSystem Audio { get; private set; } = null!;
 
+    /// <summary>
+    /// The client font manager.
+    /// </summary>
+    public FontManager FontManager { get; private set; } = null!;
+
+    /// <summary>
+    /// The client CPU text layout engine.
+    /// </summary>
+    public TextLayoutEngine TextLayoutEngine { get; private set; } = null!;
+
     private ClientGame Game { get; set; } = null!;
 
     internal BlockModelManager BlockModelManager { get; private set; } = null!;
@@ -85,6 +96,7 @@ public sealed class ClientEngine
     private void OnInit()
     {
         Engine.Initialize(_launchOptions);
+        InitializeTextServices();
 
         GraphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
@@ -134,8 +146,26 @@ public sealed class ClientEngine
     {
         Game.Destroy();
         Audio.Destroy();
+        FontManager.Dispose();
         GraphicsBackend.Destroy();
 
         Engine.Shutdown();
+    }
+
+    private void InitializeTextServices()
+    {
+        var fontManager = new FontManager(Engine.ResourceManager);
+        try
+        {
+            fontManager.DefaultFont = new Font("Source Han Sans CN");
+            var textLayoutEngine = new TextLayoutEngine(fontManager);
+            FontManager = fontManager;
+            TextLayoutEngine = textLayoutEngine;
+        }
+        catch
+        {
+            fontManager.Dispose();
+            throw;
+        }
     }
 }

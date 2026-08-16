@@ -26,6 +26,10 @@
         <Content Include="Assets\Audio\*.ogg">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
+        <Content Include="..\..\src\PanguEngine\assets\pangu\fonts\SourceHanSansCN-Regular.otf"
+                  Link="Assets\Fonts\SourceHanSansCN-Regular.otf">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
     </ItemGroup>
 
 </Project>

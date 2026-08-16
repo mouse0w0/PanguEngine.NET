@@ -34,3 +34,33 @@ Original asset: Audio/impactSoft_medium_000.ogg
 Distributed asset: assets/pangu/sounds/block/place_1.ogg
 Original asset: Audio/impactSoft_medium_001.ogg
 Distributed asset: assets/pangu/sounds/block/place_2.ogg
+
+Source Han Sans CN 2.005
+Source: https://github.com/adobe-fonts/source-han-sans/tree/2.005R
+Original asset: SubsetOTF/CN/SourceHanSansCN-Regular.otf
+Distributed asset: assets/pangu/fonts/SourceHanSansCN-Regular.otf
+Original asset SHA: 5e6605995d5cbc432c4273f566a5f2b8c376c682
+License: SIL Open Font License 1.1
+License file: SourceHanSans-2.005R-OFL.txt
+
+HarfBuzzSharp 14.2.1.2
+Source: https://github.com/mono/SkiaSharp/tree/main/binding/HarfBuzzSharp
+License: MIT
+License file: HarfBuzzSharp-14.2.1.2-LICENSE.txt
+HarfBuzzSharp 14.2.1.2 ships the native HarfBuzz 14.2.1 runtime library, covered by the notice in HarfBuzz-14.2.1-COPYING.txt.
+
+HarfBuzz 14.2.1
+Source: https://github.com/harfbuzz/harfbuzz/tree/14.2.1
+License: Old MIT
+License file: HarfBuzz-14.2.1-COPYING.txt
+
+FreeTypeSharp 3.1.0
+Source: https://github.com/ryancheung/FreeTypeSharp/tree/v3.1.0
+License: MIT
+License file: FreeTypeSharp-3.1.0-LICENSE.txt
+FreeTypeSharp 3.1.0 ships the native FreeType 2.13.2 runtime library, covered by the notice in FreeType-2.13.2-FTL.txt.
+
+FreeType 2.13.2
+Source: https://github.com/freetype/freetype/tree/VER-2-13-2
+License: FreeType Project License
+License file: FreeType-2.13.2-FTL.txt
