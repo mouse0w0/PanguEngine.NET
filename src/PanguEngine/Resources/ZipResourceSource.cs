@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.IO.Compression;
 
 namespace PanguEngine.Resources;
@@ -16,8 +17,17 @@ public sealed class ZipResourceSource : IResourceSource
     /// <param name="path">The zip file path.</param>
     public ZipResourceSource(string path)
     {
-        _archive = OpenArchive(path);
+        _archive = ZipFile.OpenRead(path);
         _ownsArchive = true;
+        try
+        {
+            Namespaces = GetNamespaces(_archive);
+        }
+        catch
+        {
+            _archive.Dispose();
+            throw;
+        }
     }
 
     /// <summary>
@@ -27,7 +37,11 @@ public sealed class ZipResourceSource : IResourceSource
     internal ZipResourceSource(ZipArchive archive)
     {
         _archive = archive;
+        Namespaces = GetNamespaces(_archive);
     }
+
+    /// <inheritdoc/>
+    public IReadOnlyList<string> Namespaces { get; }
 
     /// <inheritdoc/>
     public bool Exists(string resourcePath)
@@ -71,17 +85,24 @@ public sealed class ZipResourceSource : IResourceSource
             _archive.Dispose();
     }
 
-    private static ZipArchive OpenArchive(string path)
+    private static string? GetNamespace(string entryPath)
     {
-        var stream = File.OpenRead(path);
-        try
-        {
-            return new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
-        }
-        catch
-        {
-            stream.Dispose();
-            throw;
-        }
+        const string prefix = "assets/";
+        if (!entryPath.StartsWith(prefix, StringComparison.Ordinal))
+            return null;
+
+        var relativePath = entryPath.AsSpan(prefix.Length);
+        var separator = relativePath.IndexOf('/');
+        return separator > 0 ? relativePath[..separator].ToString() : null;
+    }
+
+    private static ReadOnlyCollection<string> GetNamespaces(ZipArchive archive)
+    {
+        return Array.AsReadOnly(archive.Entries
+            .Select(entry => GetNamespace(entry.FullName))
+            .OfType<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray());
     }
 }

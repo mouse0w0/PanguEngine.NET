@@ -9,6 +9,9 @@ public sealed class DirectoryResourceSource(string packageRoot) : IResourceSourc
     private readonly string _packageRoot = Path.GetFullPath(packageRoot);
 
     /// <inheritdoc/>
+    public IReadOnlyList<string> Namespaces { get; } = GetNamespaces(Path.GetFullPath(packageRoot));
+
+    /// <inheritdoc/>
     public bool Exists(string resourcePath)
     {
         return File.Exists(GetFullPath(resourcePath));
@@ -53,5 +56,16 @@ public sealed class DirectoryResourceSource(string packageRoot) : IResourceSourc
     private string GetFullPath(string relativePath)
     {
         return Path.GetFullPath(Path.Combine(_packageRoot, ResourcePath.ToPackagePath(relativePath)));
+    }
+
+    private static IReadOnlyList<string> GetNamespaces(string packageRoot)
+    {
+        var assetsRoot = Path.Combine(packageRoot, "assets");
+        return Directory.Exists(assetsRoot)
+            ? Array.AsReadOnly(Directory.EnumerateDirectories(assetsRoot)
+                .Select(path => new DirectoryInfo(path).Name)
+                .Order(StringComparer.Ordinal)
+                .ToArray())
+            : Array.Empty<string>();
     }
 }

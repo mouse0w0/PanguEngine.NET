@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 using PanguEngine.Registries;
 
@@ -8,7 +9,7 @@ namespace PanguEngine.Resources;
 /// </summary>
 public sealed class ResourceManager : IDisposable
 {
-    private readonly List<IResourceSource> _sources;
+    private IReadOnlyList<IResourceSource> _sources;
 
     /// <summary>
     /// Creates a resource manager with the specified source priority order.
@@ -16,13 +17,19 @@ public sealed class ResourceManager : IDisposable
     /// <param name="sources">The resource sources in priority order.</param>
     internal ResourceManager(IEnumerable<IResourceSource> sources)
     {
-        _sources = sources.ToList();
+        _sources = CreateSourceSnapshot(sources);
+        Namespaces = CreateNamespaceSnapshot(_sources);
     }
 
     /// <summary>
     /// Gets the current resource sources in priority order.
     /// </summary>
-    public IReadOnlyList<IResourceSource> Sources => _sources.ToArray();
+    public IReadOnlyList<IResourceSource> Sources => _sources;
+
+    /// <summary>
+    /// Gets the resource namespaces in source priority order.
+    /// </summary>
+    public IReadOnlyList<string> Namespaces { get; private set; }
 
     /// <summary>
     /// Gets whether a resource exists for the specified key.
@@ -247,10 +254,11 @@ public sealed class ResourceManager : IDisposable
     /// <param name="sources">The new resource sources in priority order.</param>
     public void SetSources(IEnumerable<IResourceSource> sources)
     {
-        var newSources = sources.ToList();
-        var oldSources = _sources.ToArray();
-        _sources.Clear();
-        _sources.AddRange(newSources);
+        var newSources = CreateSourceSnapshot(sources);
+        var newNamespaces = CreateNamespaceSnapshot(newSources);
+        var oldSources = _sources;
+        _sources = newSources;
+        Namespaces = newNamespaces;
         foreach (var source in oldSources)
         {
             if (!newSources.Contains(source))
@@ -263,5 +271,26 @@ public sealed class ResourceManager : IDisposable
     {
         foreach (var source in _sources)
             source.Dispose();
+    }
+
+    private static ReadOnlyCollection<IResourceSource> CreateSourceSnapshot(IEnumerable<IResourceSource> sources)
+    {
+        return Array.AsReadOnly(sources.ToArray());
+    }
+
+    private static ReadOnlyCollection<string> CreateNamespaceSnapshot(IEnumerable<IResourceSource> sources)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var result = new List<string>();
+        foreach (var source in sources)
+        {
+            foreach (var namespaceName in source.Namespaces.Order(StringComparer.Ordinal))
+            {
+                if (seen.Add(namespaceName))
+                    result.Add(namespaceName);
+            }
+        }
+
+        return result.AsReadOnly();
     }
 }

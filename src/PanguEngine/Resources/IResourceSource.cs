@@ -8,6 +8,11 @@ namespace PanguEngine.Resources;
 public interface IResourceSource : IDisposable
 {
     /// <summary>
+    /// Gets the resource namespaces managed by this source.
+    /// </summary>
+    IReadOnlyList<string> Namespaces => Array.Empty<string>();
+
+    /// <summary>
     /// Gets whether a resource exists for the specified key.
     /// </summary>
     /// <param name="key">The resource key.</param>
