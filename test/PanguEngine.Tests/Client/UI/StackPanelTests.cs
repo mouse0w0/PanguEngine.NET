@@ -319,6 +319,157 @@ public sealed class StackPanelTests
         screen.Close();
     }
 
+    [Fact]
+    public void VerticalMeasurementAndArrangementUseRoundedSpacingAndSharedBoundaries()
+    {
+        var panel = new StackPanel { Spacing = 0.6 };
+        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
+        var second = new TestNode { CoreDesiredSize = new Size(10, 12) };
+        panel.Children.Add(first);
+        panel.Children.Add(second);
+
+        panel.Measure(new Size(100, 100));
+
+        Assert.Equal(10.4, first.DesiredSize.Width, 10);
+        Assert.Equal(12, first.DesiredSize.Height, 10);
+        Assert.Equal(10.4, panel.DesiredSize.Width, 10);
+        Assert.Equal(24.8, panel.DesiredSize.Height, 10);
+
+        panel.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(new Rect(0, 0, 100, 12), first.LayoutBounds);
+        Assert.Equal(new Size(100, 12), first.LastArrangeSize);
+        Assert.Equal(12.8, second.LayoutBounds.Y, 10);
+        var verticalGap = second.LayoutBounds.Y - (first.LayoutBounds.Y + first.LayoutBounds.Height);
+        Assert.Equal(0.8, verticalGap, 10);
+        Assert.Equal(1, verticalGap * 1.25, 10);
+        Assert.Equal(first.DesiredSize.Height, first.LastArrangeSize.Height, 10);
+    }
+
+    [Fact]
+    public void HorizontalMeasurementAndArrangementUseRoundedSpacingAndSharedBoundaries()
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0.81 };
+        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var first = new TestNode { CoreDesiredSize = new Size(12, 10) };
+        var second = new TestNode { CoreDesiredSize = new Size(12, 10) };
+        panel.Children.Add(first);
+        panel.Children.Add(second);
+
+        panel.Measure(new Size(100, 100));
+
+        Assert.Equal(12, first.DesiredSize.Width, 10);
+        Assert.Equal(10.4, first.DesiredSize.Height, 10);
+        Assert.Equal(24.8, panel.DesiredSize.Width, 10);
+        Assert.Equal(10.4, panel.DesiredSize.Height, 10);
+
+        panel.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(new Rect(0, 0, 12, 100), first.LayoutBounds);
+        Assert.Equal(12.8, second.LayoutBounds.X, 10);
+        var horizontalGap = second.LayoutBounds.X - (first.LayoutBounds.X + first.LayoutBounds.Width);
+        Assert.Equal(0.8, horizontalGap, 10);
+        Assert.Equal(1, horizontalGap * 1.25, 10);
+        Assert.Equal(first.DesiredSize.Width, first.LastArrangeSize.Width, 10);
+    }
+
+    [Fact]
+    public void DisabledLayoutRoundingPreservesRawSpacingAndFractions()
+    {
+        var panel = new StackPanel { Spacing = 0.6 };
+        var screen = new UiScreen(panel) { Scale = 1.25, UseLayoutRounding = false };
+        var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
+        var second = new TestNode { CoreDesiredSize = new Size(10, 12) };
+        panel.Children.Add(first);
+        panel.Children.Add(second);
+
+        panel.Measure(new Size(100, 100));
+
+        Assert.Equal(new Size(10, 12), first.DesiredSize);
+        Assert.Equal(24.6, panel.DesiredSize.Height, 10);
+
+        panel.Arrange(new Rect(0, 0, 100, 100));
+
+        var gap = second.LayoutBounds.Y - (first.LayoutBounds.Y + first.LayoutBounds.Height);
+        Assert.Equal(0.6, gap, 10);
+        Assert.Equal(0.75, gap * 1.25, 10);
+
+        screen.UseLayoutRounding = true;
+        panel.Measure(new Size(100, 100));
+        panel.Arrange(new Rect(0, 0, 100, 100));
+
+        gap = second.LayoutBounds.Y - (first.LayoutBounds.Y + first.LayoutBounds.Height);
+        Assert.Equal(0.8, gap, 10);
+    }
+
+    [Fact]
+    public void CollapsedChildProducesNoSpacingGap()
+    {
+        var panel = new StackPanel { Spacing = 0.6 };
+        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
+        var collapsed = new TestNode
+        {
+            Visibility = Visibility.Collapsed,
+            CoreDesiredSize = new Size(100, 100)
+        };
+        var last = new TestNode { CoreDesiredSize = new Size(10, 12) };
+        panel.Children.Add(first);
+        panel.Children.Add(collapsed);
+        panel.Children.Add(last);
+
+        panel.Measure(new Size(100, 100));
+
+        Assert.Equal(Size.Zero, collapsed.DesiredSize);
+        Assert.Equal(0, collapsed.MeasureCount);
+        Assert.Equal(24.8, panel.DesiredSize.Height, 10);
+
+        panel.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(Rect.Zero, collapsed.LayoutBounds);
+        Assert.Equal(0, collapsed.ArrangeCount);
+        var gap = last.LayoutBounds.Y - (first.LayoutBounds.Y + first.LayoutBounds.Height);
+        Assert.Equal(0.8, gap, 10);
+        Assert.Equal(1, gap * 1.25, 10);
+    }
+
+    [Fact]
+    public void MultipleChildrenAccumulateRoundedDesiredSizesWithoutLastChildCompensation()
+    {
+        var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0.81 };
+        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var first = new TestNode { CoreDesiredSize = new Size(4, 12) };
+        var second = new TestNode { CoreDesiredSize = new Size(4, 12) };
+        var third = new TestNode { CoreDesiredSize = new Size(4, 12) };
+        panel.Children.Add(first);
+        panel.Children.Add(second);
+        panel.Children.Add(third);
+
+        panel.Measure(new Size(100, 100));
+
+        Assert.Equal(4, first.DesiredSize.Width, 10);
+        Assert.Equal(4, second.DesiredSize.Width, 10);
+        Assert.Equal(4, third.DesiredSize.Width, 10);
+        Assert.Equal(13.6, panel.DesiredSize.Width, 10);
+        Assert.Equal(
+            first.DesiredSize.Width + second.DesiredSize.Width + third.DesiredSize.Width + 0.8 + 0.8,
+            panel.DesiredSize.Width,
+            10);
+        var rawTotal = 3 * 4 + 2 * 0.81;
+        var onceRoundedTotal = Math.Ceiling(rawTotal * 1.25) / 1.25;
+        Assert.NotEqual(onceRoundedTotal, panel.DesiredSize.Width);
+
+        panel.Arrange(new Rect(0, 0, 100, 100));
+
+        var firstGap = second.LayoutBounds.X - (first.LayoutBounds.X + first.LayoutBounds.Width);
+        var secondGap = third.LayoutBounds.X - (second.LayoutBounds.X + second.LayoutBounds.Width);
+        Assert.Equal(0.8, firstGap, 10);
+        Assert.Equal(0.8, secondGap, 10);
+        Assert.Equal(1, firstGap * 1.25, 10);
+        Assert.Equal(1, secondGap * 1.25, 10);
+    }
+
     private static void ValidateLayout(UiNode node)
     {
         node.Measure(new Size(100, 100));
@@ -333,6 +484,7 @@ public sealed class StackPanelTests
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }
+        internal Size LastArrangeSize { get; private set; }
         internal int MeasureCount { get; private set; }
         internal int ArrangeCount { get; private set; }
         internal Action? MeasureAction { get; set; }
@@ -349,6 +501,7 @@ public sealed class StackPanelTests
         protected override void ArrangeCore(Size finalSize)
         {
             ArrangeCount++;
+            LastArrangeSize = finalSize;
             ArrangeAction?.Invoke();
         }
     }

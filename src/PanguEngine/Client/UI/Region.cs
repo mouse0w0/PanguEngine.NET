@@ -41,6 +41,10 @@ public abstract class Region : Parent
             Thickness.Zero,
             UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
 
+    private Rect _committedDecorationBounds;
+    private Rect _committedBorderInnerBounds;
+    private Rect _committedContentBounds;
+
     /// <summary>
     /// Initializes a UI region.
     /// </summary>
@@ -88,20 +92,13 @@ public abstract class Region : Parent
     /// Gets the arranged decoration boundary in local coordinates, or zero when arrangement is invalid.
     /// </summary>
     public Rect DecorationBounds =>
-        IsArrangeValid
-            ? new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height)
-            : Rect.Zero;
+        IsArrangeValid ? _committedDecorationBounds : Rect.Zero;
 
     /// <summary>
     /// Gets the arranged content boundary in local coordinates, or zero when arrangement is invalid.
     /// </summary>
     public Rect ContentBounds =>
-        IsArrangeValid
-            ? GetContentBounds(
-                new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height),
-                BorderThickness,
-                Padding)
-            : Rect.Zero;
+        IsArrangeValid ? _committedContentBounds : Rect.Zero;
 
     /// <summary>
     /// Measures the content within the size left after the border and padding.
@@ -135,8 +132,17 @@ public abstract class Region : Parent
     /// <inheritdoc />
     protected sealed override Size MeasureCore(Size availableSize)
     {
+        var screen = Screen;
+        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
+        var scale = screen?.Scale ?? 1;
         var borderThickness = BorderThickness;
         var padding = Padding;
+        if (useLayoutRounding)
+        {
+            borderThickness = UiLayoutHelper.RoundLayoutThickness(borderThickness, scale);
+            padding = UiLayoutHelper.RoundLayoutThickness(padding, scale);
+        }
+
         var innerAvailableSize = SubtractThickness(availableSize, borderThickness);
         var contentAvailableSize = SubtractThickness(innerAvailableSize, padding);
         var contentDesiredSize = MeasureContent(contentAvailableSize);
@@ -145,16 +151,35 @@ public abstract class Region : Parent
     }
 
     /// <inheritdoc />
-    protected sealed override void ArrangeCore(Size finalSize) =>
-        ArrangeContent(GetContentBounds(new Rect(0, 0, finalSize), BorderThickness, Padding));
+    protected sealed override void ArrangeCore(Size finalSize)
+    {
+        var screen = Screen;
+        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
+        var scale = screen?.Scale ?? 1;
+        var borderThickness = BorderThickness;
+        var padding = Padding;
+        if (useLayoutRounding)
+        {
+            borderThickness = UiLayoutHelper.RoundLayoutThickness(borderThickness, scale);
+            padding = UiLayoutHelper.RoundLayoutThickness(padding, scale);
+        }
+
+        var decorationBounds = new Rect(0, 0, finalSize);
+        var borderInnerBounds = DeflateBounds(decorationBounds, borderThickness);
+        var contentBounds = DeflateBounds(borderInnerBounds, padding);
+        ArrangeContent(contentBounds);
+        _committedDecorationBounds = decorationBounds;
+        _committedBorderInnerBounds = borderInnerBounds;
+        _committedContentBounds = contentBounds;
+    }
 
     /// <inheritdoc />
     protected override void DrawCore(UiDrawingContext context)
     {
-        var decorationBounds = DecorationBounds;
-        var borderBounds = DeflateBounds(decorationBounds, BorderThickness);
+        var decorationBounds = _committedDecorationBounds;
+        var borderInnerBounds = _committedBorderInnerBounds;
         if (Background is { } background)
-            context.FillRectangle(borderBounds, background);
+            context.FillRectangle(borderInnerBounds, background);
 
         if (BorderBrush is not { } borderBrush)
             return;
@@ -164,36 +189,31 @@ public abstract class Region : Parent
                 decorationBounds.X,
                 decorationBounds.Y,
                 decorationBounds.Width,
-                borderBounds.Y - decorationBounds.Y),
+                borderInnerBounds.Y - decorationBounds.Y),
             borderBrush);
         context.FillRectangle(
             new Rect(
-                borderBounds.X + borderBounds.Width,
-                borderBounds.Y,
-                decorationBounds.X + decorationBounds.Width - (borderBounds.X + borderBounds.Width),
-                borderBounds.Height),
+                borderInnerBounds.X + borderInnerBounds.Width,
+                borderInnerBounds.Y,
+                decorationBounds.X + decorationBounds.Width - (borderInnerBounds.X + borderInnerBounds.Width),
+                borderInnerBounds.Height),
             borderBrush);
         context.FillRectangle(
             new Rect(
                 decorationBounds.X,
-                borderBounds.Y + borderBounds.Height,
+                borderInnerBounds.Y + borderInnerBounds.Height,
                 decorationBounds.Width,
-                decorationBounds.Y + decorationBounds.Height - (borderBounds.Y + borderBounds.Height)),
+                decorationBounds.Y + decorationBounds.Height -
+                (borderInnerBounds.Y + borderInnerBounds.Height)),
             borderBrush);
         context.FillRectangle(
             new Rect(
                 decorationBounds.X,
-                borderBounds.Y,
-                borderBounds.X - decorationBounds.X,
-                borderBounds.Height),
+                borderInnerBounds.Y,
+                borderInnerBounds.X - decorationBounds.X,
+                borderInnerBounds.Height),
             borderBrush);
     }
-
-    private static Rect GetContentBounds(
-        Rect decorationBounds,
-        Thickness borderThickness,
-        Thickness padding) =>
-        DeflateBounds(DeflateBounds(decorationBounds, borderThickness), padding);
 
     private static Rect DeflateBounds(Rect bounds, Thickness thickness) =>
         new(

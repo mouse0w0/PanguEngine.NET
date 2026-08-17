@@ -6,6 +6,198 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiScreenTests
 {
     [Fact]
+    public void ScaleDefaultsToOneAndRejectsInvalidValuesWithoutChangingState()
+    {
+        var screen = new UiScreen();
+        Assert.Equal(1, screen.Scale);
+        Assert.True(screen.UseLayoutRounding);
+
+        screen.Scale = 1.5;
+
+        Assert.Equal(1.5, screen.Scale);
+        Assert.Throws<ArgumentOutOfRangeException>(() => screen.Scale = double.NaN);
+        Assert.Throws<ArgumentOutOfRangeException>(() => screen.Scale = double.PositiveInfinity);
+        Assert.Throws<ArgumentOutOfRangeException>(() => screen.Scale = 0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => screen.Scale = -1);
+        Assert.Equal(1.5, screen.Scale);
+    }
+
+    [Fact]
+    public void OpenUiScreenScaleRejectsWrongThread()
+    {
+        var screen = new UiScreen();
+        screen.Open();
+        Exception? error = null;
+        var thread = new Thread(() =>
+            error = Record.Exception(() => screen.Scale = 2));
+
+        thread.Start();
+        thread.Join();
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Equal(1, screen.Scale);
+        screen.Close();
+    }
+
+    [Fact]
+    public void OpenUiScreenLayoutRoundingRejectsWrongThreadButAllowsSameValue()
+    {
+        var screen = new UiScreen();
+        screen.Open();
+        Exception? changeError = null;
+        Exception? sameValueError = null;
+        var thread = new Thread(() =>
+        {
+            changeError = Record.Exception(() => screen.UseLayoutRounding = false);
+            sameValueError = Record.Exception(() => screen.UseLayoutRounding = true);
+        });
+
+        thread.Start();
+        thread.Join();
+
+        Assert.IsType<InvalidOperationException>(changeError);
+        Assert.Null(sameValueError);
+        Assert.True(screen.UseLayoutRounding);
+        screen.Close();
+    }
+
+    [Fact]
+    public void UiScreenScaleCannotChangeDuringLayout()
+    {
+        UiScreen screen = null!;
+        Exception? error = null;
+        var root = new LayoutNode
+        {
+            MeasureAction = () => error = Record.Exception(() => screen.Scale = 2)
+        };
+        screen = new UiScreen(root);
+        screen.Open();
+
+        screen.Update(new Size(100, 80));
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Equal(1, screen.Scale);
+        screen.Close();
+    }
+
+    [Fact]
+    public void UiScreenLayoutRoundingCannotChangeDuringLayout()
+    {
+        UiScreen screen = null!;
+        Exception? error = null;
+        var root = new LayoutNode
+        {
+            MeasureAction = () =>
+                error = Record.Exception(() => screen.UseLayoutRounding = false)
+        };
+        screen = new UiScreen(root);
+        screen.Open();
+
+        screen.Update(new Size(100, 80));
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.True(screen.UseLayoutRounding);
+        screen.Close();
+    }
+
+    [Fact]
+    public void ManualMeasureCallbackCanChangeScaleButCannotCommitInvalidatedPass()
+    {
+        UiScreen screen = null!;
+        Exception? error = null;
+        var root = new LayoutNode
+        {
+            MeasureAction = () => error = Record.Exception(() => screen.Scale = 2)
+        };
+        screen = new UiScreen(root);
+
+        root.Measure(new Size(100, 80));
+
+        Assert.Null(error);
+        Assert.Equal(2, screen.Scale);
+        Assert.False(root.IsMeasureValid);
+        Assert.False(root.IsArrangeValid);
+    }
+
+    [Fact]
+    public void ScaleChangeImmediatelyInvalidatesEntireRootSubtree()
+    {
+        var root = new Canvas();
+        var child = new Canvas();
+        var grandchild = new LayoutNode { Width = 1, Height = 1 };
+        child.Children.Add(grandchild);
+        root.Children.Add(child);
+        var screen = new UiScreen(root);
+        screen.Open();
+        screen.Update(new Size(100, 80));
+        Assert.True(root.IsMeasureValid);
+        Assert.True(child.IsMeasureValid);
+        Assert.True(grandchild.IsMeasureValid);
+
+        screen.Scale = 2;
+
+        Assert.False(root.IsMeasureValid);
+        Assert.False(root.IsArrangeValid);
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        screen.Close();
+    }
+
+    [Fact]
+    public void LayoutRoundingChangeImmediatelyInvalidatesEntireRootSubtree()
+    {
+        var root = new Canvas();
+        var child = new Canvas();
+        var grandchild = new LayoutNode { Width = 1, Height = 1 };
+        child.Children.Add(grandchild);
+        root.Children.Add(child);
+        var screen = new UiScreen(root);
+        screen.Open();
+        screen.Update(new Size(100, 80));
+
+        screen.UseLayoutRounding = false;
+
+        Assert.False(root.IsMeasureValid);
+        Assert.False(root.IsArrangeValid);
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        screen.Close();
+    }
+
+    [Fact]
+    public void ExtremelySmallScaleRejectsNonFiniteLogicalViewportBeforeLayout()
+    {
+        var root = new LayoutNode();
+        var screen = new UiScreen(root) { Scale = double.Epsilon };
+        screen.Open();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            screen.Update(new Size(100, 80)));
+
+        Assert.Equal(0, root.MeasureCalls);
+        Assert.Equal(0, root.ArrangeCalls);
+        screen.Close();
+    }
+
+    [Fact]
+    public void AssigningSameScaleDoesNotInvalidateLayout()
+    {
+        var root = new LayoutNode();
+        var screen = new UiScreen(root);
+        screen.Open();
+        screen.Update(new Size(100, 80));
+
+        screen.Scale = 1;
+
+        Assert.True(root.IsMeasureValid);
+        Assert.True(root.IsArrangeValid);
+        screen.Close();
+    }
+    [Fact]
     public void UiScreenSupportsOptionalRootAndAssociatesItWhileClosed()
     {
         var root = new LayoutNode();
@@ -70,6 +262,35 @@ public sealed class UiScreenTests
         Assert.Equal(new Rect(25, 25, 50, 50), incoming.LayoutBounds);
         Assert.Equal(2, incoming.ArrangeCalls);
         manager.Close();
+    }
+
+    [Fact]
+    public void RootTransferAcrossScreensWithEqualLayoutSettingsInvalidatesEntireSubtree()
+    {
+        var incoming = new Canvas();
+        var child = new Canvas();
+        var grandchild = new LayoutNode { Width = 1, Height = 1 };
+        child.Children.Add(grandchild);
+        incoming.Children.Add(child);
+        var source = new UiScreen(incoming);
+        var target = new UiScreen();
+        source.Open();
+        target.Open();
+        source.Update(new Size(100, 100));
+        Assert.True(incoming.IsMeasureValid);
+        Assert.True(child.IsMeasureValid);
+        Assert.True(grandchild.IsMeasureValid);
+
+        target.Root = incoming;
+
+        Assert.False(incoming.IsMeasureValid);
+        Assert.False(incoming.IsArrangeValid);
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        target.Close();
+        source.Close();
     }
 
     [Fact]
@@ -674,12 +895,15 @@ public sealed class UiScreenTests
     private sealed class LayoutNode : UiNode
     {
         internal Action? MeasureAction { get; set; }
+        internal Action? ArrangeAction { get; set; }
         internal Size LastMeasureConstraint { get; private set; }
         internal Size LastArrangeSize { get; private set; }
+        internal int MeasureCalls { get; private set; }
         internal int ArrangeCalls { get; private set; }
 
         protected override Size MeasureCore(Size availableSize)
         {
+            MeasureCalls++;
             MeasureAction?.Invoke();
             LastMeasureConstraint = availableSize;
             return availableSize;
@@ -687,6 +911,7 @@ public sealed class UiScreenTests
 
         protected override void ArrangeCore(Size finalSize)
         {
+            ArrangeAction?.Invoke();
             LastArrangeSize = finalSize;
             ArrangeCalls++;
         }

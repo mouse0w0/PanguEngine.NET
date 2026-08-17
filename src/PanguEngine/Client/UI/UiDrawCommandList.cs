@@ -9,12 +9,13 @@ public sealed class UiDrawCommandList : IReadOnlyList<UiDrawCommand>
 {
     private readonly UiDrawCommand[] _commands;
 
-    internal UiDrawCommandList(List<UiDrawCommand> commands)
+    internal UiDrawCommandList(List<UiDrawCommand> commands, double scale)
     {
         _commands = [.. commands];
+        Scale = scale;
     }
 
-    internal static UiDrawCommandList Empty { get; } = new([]);
+    internal double Scale { get; }
 
     /// <summary>
     /// Gets the number of commands in this snapshot.

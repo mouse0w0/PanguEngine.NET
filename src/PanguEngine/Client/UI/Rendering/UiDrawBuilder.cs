@@ -133,13 +133,17 @@ internal sealed class UiDrawBuilder
         UiDrawCommandList commands,
         uint framebufferWidth,
         uint framebufferHeight,
-        double uiScale,
         bool convertSrgbToLinear,
         UiImageResolver? imageResolver = null)
     {
         ArgumentNullException.ThrowIfNull(commands);
+        var uiScale = commands.Scale;
         if (!double.IsFinite(uiScale) || uiScale <= 0)
-            throw new ArgumentOutOfRangeException(nameof(uiScale), "UI scale must be finite and greater than zero.");
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(commands.Scale),
+                "UI drawing command scale must be finite and greater than zero.");
+        }
 
         _vertices.Clear();
         _indices.Clear();

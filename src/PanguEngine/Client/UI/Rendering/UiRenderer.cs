@@ -88,13 +88,11 @@ internal sealed class UiRenderer
         _imagePipeline = imagePipeline;
     }
 
-    internal void Draw(Frame frame, UiDrawCommandList commands, double uiScale)
+    internal void Draw(Frame frame, UiDrawCommandList commands)
     {
         ObjectDisposedException.ThrowIf(_destroyed, this);
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(commands);
-        if (!double.IsFinite(uiScale) || uiScale <= 0)
-            throw new ArgumentOutOfRangeException(nameof(uiScale), "UI scale must be finite and greater than zero.");
         if (frame.FrameSlot >= (uint)_frameResources.Length)
             throw new ArgumentOutOfRangeException(nameof(frame), "Frame slot exceeds the renderer frame resource count.");
 
@@ -103,7 +101,6 @@ internal sealed class UiRenderer
             commands,
             frame.Width,
             frame.Height,
-            uiScale,
             _convertSrgbToLinear,
             _resourceManager.ResolveImageBinding);
         if (_builder.RectangleCount == 0)

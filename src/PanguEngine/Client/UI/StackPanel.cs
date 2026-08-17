@@ -116,6 +116,10 @@ public sealed class StackPanel : Panel
         if (!double.IsFinite(spacing) || spacing < 0)
             throw new InvalidOperationException("Spacing must be a finite non-negative value.");
 
+        var screen = Screen;
+        if (screen?.UseLayoutRounding ?? true)
+            spacing = UiLayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1);
+
         return (orientation, spacing);
     }
 

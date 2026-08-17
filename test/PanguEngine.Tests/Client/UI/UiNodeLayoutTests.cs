@@ -82,6 +82,156 @@ public sealed class UiNodeLayoutTests
     }
 
     [Fact]
+    public void ScaleChangeRecomputesLayoutAfterRecursiveInvalidation()
+    {
+        var node = new TestNode { CoreDesiredSize = new Size(10.1, 5.1) };
+        var screen = new UiScreen(node) { Scale = 1 };
+
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+        screen.Scale = 2;
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(2, node.MeasureCoreCalls);
+        Assert.Equal(2, node.ArrangeCoreCalls);
+    }
+
+    [Fact]
+    public void ScaleChangeInvalidatesLayoutWhenRoundingIsDisabled()
+    {
+        var node = new TestNode
+        {
+            CoreDesiredSize = new Size(10.1, 5.1)
+        };
+        var screen = new UiScreen(node) { Scale = 1, UseLayoutRounding = false };
+
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+        screen.Scale = 2;
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(2, node.MeasureCoreCalls);
+        Assert.Equal(2, node.ArrangeCoreCalls);
+    }
+
+    [Fact]
+    public void DetachedNodeUsesScaleOneLayoutRoundingByDefault()
+    {
+        var node = new TestNode
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            CoreDesiredSize = new Size(10.25, 5.25)
+        };
+
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0.5, 1.5, 100, 100));
+
+        Assert.Equal(new Size(11, 6), node.DesiredSize);
+        Assert.Equal(new Rect(0, 2, 11, 6), node.LayoutBounds);
+    }
+
+    [Fact]
+    public void DisabledLayoutRoundingPreservesFractionalLayoutValues()
+    {
+        var node = new TestNode
+        {
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            CoreDesiredSize = new Size(10.25, 5.25)
+        };
+        _ = new UiScreen(node) { UseLayoutRounding = false };
+
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0.5, 1.5, 100, 100));
+
+        Assert.Equal(new Size(10.25, 5.25), node.DesiredSize);
+        Assert.Equal(new Rect(0.5, 1.5, 10.25, 5.25), node.LayoutBounds);
+    }
+
+    [Fact]
+    public void MeasureRoundsMarginAndDesiredSizeWithoutChangingPreciseContentSize()
+    {
+        var node = new TestNode
+        {
+            Margin = new Thickness(0.4),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+            CoreDesiredSize = new Size(10.1, 5.1)
+        };
+        _ = new UiScreen(node) { Scale = 1.25 };
+
+        node.Measure(new Size(20, 20));
+        node.Arrange(new Rect(0, 0, 20, 20));
+
+        Assert.Equal(20, node.LastMeasureConstraint.Width, 12);
+        Assert.Equal(20, node.LastMeasureConstraint.Height, 12);
+        Assert.Equal(10.4, node.DesiredSize.Width, 12);
+        Assert.Equal(5.6, node.DesiredSize.Height, 12);
+        Assert.Equal(new Rect(0, 0, 10.4, 5.6), node.LayoutBounds);
+        Assert.Equal(new Size(10.4, 5.6), node.LastArrangeSize);
+    }
+
+    [Fact]
+    public void ArrangeRoundsOriginAndRoundsSizeUp()
+    {
+        var node = new TestNode
+        {
+            Width = 2.2,
+            Height = 0.1,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+        _ = new UiScreen(node) { Scale = 2 };
+        node.Measure(new Size(10, 10));
+
+        node.Arrange(new Rect(0.25, -0.25, 10, 10));
+
+        Assert.Equal(new Rect(0, 0, 2.5, 0.5), node.LayoutBounds);
+        Assert.Equal(new Size(2.5, 0.5), node.LastArrangeSize);
+    }
+
+    [Fact]
+    public void ArrangeRejectsMeasureInvalidatedByScaleChange()
+    {
+        var node = new TestNode { CoreDesiredSize = new Size(10.1, 5.1) };
+        var screen = new UiScreen(node) { Scale = 1 };
+        node.Measure(new Size(100, 100));
+        screen.Scale = 2;
+
+        Assert.Throws<InvalidOperationException>(() =>
+            node.Arrange(new Rect(0, 0, 100, 100)));
+        Assert.False(node.IsArrangeValid);
+
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.True(node.IsArrangeValid);
+    }
+
+    [Fact]
+    public void CollapsedLayoutRevalidatesAfterScaleChangeWithoutCallingCore()
+    {
+        var node = new TestNode { Visibility = Visibility.Collapsed };
+        var screen = new UiScreen(node) { Scale = 1 };
+
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+        screen.Scale = 2;
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+        node.Measure(new Size(100, 100));
+        node.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(0, node.MeasureCoreCalls);
+        Assert.Equal(0, node.ArrangeCoreCalls);
+        Assert.Equal(Size.Zero, node.DesiredSize);
+        Assert.Equal(Rect.Zero, node.LayoutBounds);
+    }
+
+    [Fact]
     public void ArrangeRequiresValidMeasureAndCachesEqualRect()
     {
         var node = new TestNode { CoreDesiredSize = new Size(10, 10) };

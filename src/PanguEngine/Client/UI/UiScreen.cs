@@ -150,7 +150,7 @@ public partial class UiScreen
 
     internal void Update(Size viewportSize)
     {
-        var viewportBounds = CreateViewportBounds(viewportSize);
+        CreateViewportBounds(viewportSize);
         VerifyOwnerThread();
         VerifyNotTransitioningOrUpdatingLayout();
         BeginRuntimeOperation();
@@ -160,6 +160,11 @@ public partial class UiScreen
             if (!IsScreenActive())
                 return;
 
+            var scale = Scale;
+            var logicalViewportSize = new Size(
+                viewportSize.Width / scale,
+                viewportSize.Height / scale);
+            var viewportBounds = CreateViewportBounds(logicalViewportSize);
             var root = Root;
             if (root is null)
                 return;
@@ -167,7 +172,7 @@ public partial class UiScreen
             IsUpdatingLayout = true;
             try
             {
-                root.Measure(viewportSize);
+                root.Measure(logicalViewportSize);
                 if (root.IsMeasureValid)
                     root.Arrange(viewportBounds);
             }
@@ -237,6 +242,8 @@ public partial class UiScreen
             if (sourceScreen is not null && !ReferenceEquals(sourceScreen, this))
                 sourceOperation = sourceScreen.BeginRootTransferOperation();
 
+            var oldRoot = _root;
+            var oldRootScreen = oldRoot?.Screen;
             if (root is not null)
             {
                 root.Parent?.RemoveChildForRootTransfer(root);
@@ -244,11 +251,14 @@ public partial class UiScreen
                     sourceScreen.ClearRootForTransfer();
             }
 
-            var oldRoot = _root;
             _root = null;
             oldRoot?.SetScreenRecursive(null);
             _root = root;
             root?.SetScreenRecursive(this);
+            if (oldRoot is not null && !ReferenceEquals(oldRootScreen, oldRoot.Screen))
+                oldRoot.InvalidateMeasureSubtree();
+            if (root is not null && !ReferenceEquals(sourceScreen, root.Screen))
+                root.InvalidateMeasureSubtree();
             oldRoot?.InvalidateTreeStructure();
             root?.InvalidateTreeStructure();
 

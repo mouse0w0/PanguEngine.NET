@@ -288,27 +288,64 @@ public sealed class ParentTests
     }
 
     [Fact]
-    public void ReparentWithinSameScreenKeepsSubtreeActive()
+    public void ClearingScreenParentInvalidatesEveryRemovedSubtree()
     {
-        var root = new TestParent();
-        var oldParent = new TestParent();
-        var newParent = new TestParent();
-        var child = new TestParent();
-        var leaf = new TestNode();
-        child.Add(leaf);
-        oldParent.Add(child);
-        root.Add(oldParent);
-        root.Add(newParent);
+        var root = new Canvas();
+        var first = new Canvas();
+        var firstLeaf = new TestNode();
+        var second = new TestNode();
+        first.Children.Add(firstLeaf);
+        root.Children.Add(first);
+        root.Children.Add(second);
         var screen = new UiScreen(root);
         screen.Open();
+        screen.Update(new Size(100, 100));
+        Assert.True(first.IsMeasureValid);
+        Assert.True(firstLeaf.IsMeasureValid);
+        Assert.True(second.IsMeasureValid);
 
-        newParent.Add(child);
+        root.Children.Clear();
+
+        Assert.False(first.IsMeasureValid);
+        Assert.False(first.IsArrangeValid);
+        Assert.False(firstLeaf.IsMeasureValid);
+        Assert.False(firstLeaf.IsArrangeValid);
+        Assert.False(second.IsMeasureValid);
+        Assert.False(second.IsArrangeValid);
+        screen.Close();
+    }
+
+    [Fact]
+    public void ReparentWithinSameScreenKeepsSubtreeActive()
+    {
+        var root = new Canvas();
+        var oldParent = new Canvas();
+        var newParent = new Canvas();
+        var child = new Canvas();
+        var leaf = new TestNode();
+        child.Children.Add(leaf);
+        oldParent.Children.Add(child);
+        root.Children.Add(oldParent);
+        root.Children.Add(newParent);
+        var screen = new UiScreen(root);
+        screen.Open();
+        screen.Update(new Size(100, 100));
+        Assert.True(child.IsMeasureValid);
+        Assert.True(child.IsArrangeValid);
+        Assert.True(leaf.IsMeasureValid);
+        Assert.True(leaf.IsArrangeValid);
+
+        newParent.Children.Add(child);
 
         Assert.Empty(oldParent.Children);
         Assert.Equal(new UiNode[] { child }, newParent.Children);
         Assert.Same(newParent, child.Parent);
         Assert.Same(screen, child.Screen);
         Assert.Same(screen, leaf.Screen);
+        Assert.True(child.IsMeasureValid);
+        Assert.True(child.IsArrangeValid);
+        Assert.True(leaf.IsMeasureValid);
+        Assert.True(leaf.IsArrangeValid);
         screen.Close();
     }
 
@@ -335,6 +372,165 @@ public sealed class ParentTests
         Assert.Same(newScreen, leaf.Screen);
         newScreen.Close();
         oldScreen.Close();
+    }
+
+    [Fact]
+    public void ReparentAcrossDifferentScreenScalesInvalidatesEntireSubtree()
+    {
+        var oldRoot = new Canvas();
+        var newRoot = new Canvas();
+        var child = new Canvas();
+        var grandchild = new TestNode();
+        child.Children.Add(grandchild);
+        oldRoot.Children.Add(child);
+        var oldScreen = new UiScreen(oldRoot) { Scale = 2 };
+        var newScreen = new UiScreen(newRoot) { Scale = 3 };
+        oldScreen.Open();
+        newScreen.Open();
+        oldScreen.Update(new Size(100, 100));
+        Assert.True(child.IsMeasureValid);
+        Assert.True(grandchild.IsMeasureValid);
+
+        newRoot.Children.Add(child);
+
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        newScreen.Close();
+        oldScreen.Close();
+    }
+
+    [Fact]
+    public void ReparentAcrossDifferentRoundingModesInvalidatesEntireSubtree()
+    {
+        var oldRoot = new Canvas();
+        var newRoot = new Canvas();
+        var child = new Canvas();
+        var grandchild = new TestNode();
+        child.Children.Add(grandchild);
+        oldRoot.Children.Add(child);
+        var oldScreen = new UiScreen(oldRoot);
+        var newScreen = new UiScreen(newRoot) { UseLayoutRounding = false };
+        oldScreen.Open();
+        newScreen.Open();
+        oldScreen.Update(new Size(100, 100));
+
+        newRoot.Children.Add(child);
+
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        newScreen.Close();
+        oldScreen.Close();
+    }
+
+    [Fact]
+    public void ReparentAcrossScreensWithEqualLayoutSettingsInvalidatesEntireSubtree()
+    {
+        var oldRoot = new Canvas();
+        var newRoot = new Canvas();
+        var child = new Canvas();
+        var grandchild = new TestNode();
+        child.Children.Add(grandchild);
+        oldRoot.Children.Add(child);
+        var oldScreen = new UiScreen(oldRoot) { Scale = 2, UseLayoutRounding = false };
+        var newScreen = new UiScreen(newRoot) { Scale = 2, UseLayoutRounding = false };
+        oldScreen.Open();
+        newScreen.Open();
+        oldScreen.Update(new Size(100, 100));
+
+        newRoot.Children.Add(child);
+
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        newScreen.Close();
+        oldScreen.Close();
+    }
+
+    [Fact]
+    public void RemovingSubtreeFromScreenInvalidatesDescendants()
+    {
+        var root = new Canvas();
+        var child = new Canvas();
+        var grandchild = new TestNode();
+        child.Children.Add(grandchild);
+        root.Children.Add(child);
+        var screen = new UiScreen(root);
+        screen.Open();
+        screen.Update(new Size(100, 100));
+
+        root.Children.Remove(child);
+
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        screen.Close();
+    }
+
+    [Fact]
+    public void AddingDetachedSubtreeToScreenInvalidatesDescendants()
+    {
+        var root = new Canvas();
+        var child = new Canvas();
+        var grandchild = new TestNode();
+        child.Children.Add(grandchild);
+        child.Measure(new Size(100, 100));
+        child.Arrange(new Rect(0, 0, 100, 100));
+        Assert.True(child.IsMeasureValid);
+        Assert.True(grandchild.IsMeasureValid);
+        var screen = new UiScreen(root);
+        screen.Open();
+
+        root.Children.Add(child);
+
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(grandchild.IsMeasureValid);
+        Assert.False(grandchild.IsArrangeValid);
+        screen.Close();
+    }
+
+    [Fact]
+    public void ReplacingAcrossScreensInvalidatesIncomingAndReplacedSubtrees()
+    {
+        var sourceRoot = new Canvas();
+        var incoming = new Canvas();
+        var incomingLeaf = new TestNode();
+        incoming.Children.Add(incomingLeaf);
+        sourceRoot.Children.Add(incoming);
+        var targetRoot = new Canvas();
+        var replaced = new Canvas();
+        var replacedLeaf = new TestNode();
+        replaced.Children.Add(replacedLeaf);
+        targetRoot.Children.Add(replaced);
+        var sourceScreen = new UiScreen(sourceRoot);
+        var targetScreen = new UiScreen(targetRoot);
+        sourceScreen.Open();
+        targetScreen.Open();
+        sourceScreen.Update(new Size(100, 100));
+        targetScreen.Update(new Size(100, 100));
+        Assert.True(incoming.IsMeasureValid);
+        Assert.True(incomingLeaf.IsMeasureValid);
+        Assert.True(replaced.IsMeasureValid);
+        Assert.True(replacedLeaf.IsMeasureValid);
+
+        targetRoot.Children[0] = incoming;
+
+        Assert.False(incoming.IsMeasureValid);
+        Assert.False(incoming.IsArrangeValid);
+        Assert.False(incomingLeaf.IsMeasureValid);
+        Assert.False(incomingLeaf.IsArrangeValid);
+        Assert.False(replaced.IsMeasureValid);
+        Assert.False(replaced.IsArrangeValid);
+        Assert.False(replacedLeaf.IsMeasureValid);
+        Assert.False(replacedLeaf.IsArrangeValid);
+        targetScreen.Close();
+        sourceScreen.Close();
     }
 
     [Fact]

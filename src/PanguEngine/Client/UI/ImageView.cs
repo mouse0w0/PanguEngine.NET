@@ -122,11 +122,16 @@ public sealed class ImageView : UiNode
             return;
 
         var viewBounds = new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height);
+        var screen = Screen;
+        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
+        var scale = screen?.Scale ?? 1;
         var destinationBounds = GetDestinationBounds(
             viewBounds,
             sourceRect.Width,
             sourceRect.Height,
-            Stretch);
+            Stretch,
+            useLayoutRounding,
+            scale);
         using (context.PushClip(viewBounds))
         {
             context.DrawImage(destinationBounds, image, sourceRect, SamplingMode);
@@ -187,7 +192,9 @@ public sealed class ImageView : UiNode
         Rect viewBounds,
         double sourceWidth,
         double sourceHeight,
-        ImageStretch stretch)
+        ImageStretch stretch,
+        bool useLayoutRounding,
+        double layoutScale)
     {
         if (stretch == ImageStretch.Fill)
             return viewBounds;
@@ -199,10 +206,13 @@ public sealed class ImageView : UiNode
             stretch);
         var width = sourceWidth * scale;
         var height = sourceHeight * scale;
-        return new Rect(
+        var bounds = new Rect(
             (viewBounds.Width - width) / 2,
             (viewBounds.Height - height) / 2,
             width,
             height);
+        return useLayoutRounding
+            ? UiLayoutHelper.RoundLayoutRect(bounds, layoutScale)
+            : bounds;
     }
 }

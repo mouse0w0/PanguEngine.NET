@@ -251,6 +251,119 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void MeasureRoundsBorderAndPaddingEdgesToPhysicalPixels()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(0.6),
+            Padding = new Thickness(0.6),
+            ContentDesiredSize = Size.Zero
+        };
+        _ = new UiScreen(region) { Scale = 1.25 };
+
+        region.Measure(new Size(100, 100));
+
+        Assert.Equal(96.8, region.LastMeasureConstraint.Width, 12);
+        Assert.Equal(96.8, region.LastMeasureConstraint.Height, 12);
+        Assert.Equal(3.2, region.DesiredSize.Width, 12);
+        Assert.Equal(3.2, region.DesiredSize.Height, 12);
+    }
+
+    [Fact]
+    public void ArrangeCommitsContentBoundsPassedToArrangeContent()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(0.6),
+            Padding = new Thickness(0.6),
+            ContentDesiredSize = Size.Zero
+        };
+        _ = new UiScreen(region) { Scale = 1.25 };
+        region.Measure(new Size(100, 100));
+
+        region.Arrange(new Rect(10, 20, 100, 120));
+
+        Assert.Equal(new Rect(0, 0, 100, 120), region.DecorationBounds);
+        Assert.Equal(1.6, region.ContentBounds.X, 12);
+        Assert.Equal(1.6, region.ContentBounds.Y, 12);
+        Assert.Equal(96.8, region.ContentBounds.Width, 12);
+        Assert.Equal(116.8, region.ContentBounds.Height, 12);
+        Assert.Equal(region.ContentBounds, region.LastArrangeBounds);
+    }
+
+    [Fact]
+    public void DisabledRoundingKeepsFractionalRegionEdges()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(0.4),
+            Padding = new Thickness(0.4),
+            ContentDesiredSize = Size.Zero
+        };
+        var screen = new UiScreen(region) { Scale = 1.25, UseLayoutRounding = false };
+        region.Measure(new Size(100, 100));
+
+        region.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(0.8, region.ContentBounds.X, 12);
+        Assert.Equal(98.4, region.ContentBounds.Width, 12);
+
+        screen.UseLayoutRounding = true;
+        region.Measure(new Size(100, 100));
+        region.Arrange(new Rect(0, 0, 100, 100));
+
+        Assert.Equal(0, region.ContentBounds.X, 12);
+        Assert.Equal(100, region.ContentBounds.Width, 12);
+    }
+
+    [Fact]
+    public void ScaleChangeHidesCommittedBoundsUntilLayoutRecomputesThem()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(0.6),
+            Padding = new Thickness(0.6),
+            ContentDesiredSize = Size.Zero
+        };
+        var screen = new UiScreen(region) { Scale = 1.25 };
+        region.Measure(new Size(100, 100));
+        region.Arrange(new Rect(10, 20, 100, 120));
+        screen.Scale = 2;
+
+        Assert.Equal(Rect.Zero, region.ContentBounds);
+        Assert.Equal(Rect.Zero, region.DecorationBounds);
+
+        region.Measure(new Size(100, 100));
+        region.Arrange(new Rect(10, 20, 100, 120));
+
+        Assert.Equal(1, region.ContentBounds.X, 12);
+        Assert.Equal(1, region.ContentBounds.Y, 12);
+        Assert.Equal(98, region.ContentBounds.Width, 12);
+        Assert.Equal(118, region.ContentBounds.Height, 12);
+    }
+
+    [Fact]
+    public void InvalidatedArrangeHidesPriorCommittedBounds()
+    {
+        var region = new HookRegion
+        {
+            BorderThickness = new Thickness(0.4),
+            Padding = new Thickness(0.4),
+            ContentDesiredSize = Size.Zero
+        };
+        _ = new UiScreen(region) { Scale = 1.25 };
+        region.Measure(new Size(100, 100));
+        region.Arrange(new Rect(0, 0, 100, 100));
+        Assert.NotEqual(Rect.Zero, region.ContentBounds);
+
+        region.InvalidateArrange();
+
+        Assert.False(region.IsArrangeValid);
+        Assert.Equal(Rect.Zero, region.DecorationBounds);
+        Assert.Equal(Rect.Zero, region.ContentBounds);
+    }
+
+    [Fact]
     public void DefaultArrangePassesSameContentBoundsToEveryChild()
     {
         var region = new TestRegion

@@ -729,6 +729,232 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
+    public void ScaleChangeInHandlerKeepsCurrentEventAndInvalidatesNewHitTests()
+    {
+        var manager = new UiManager();
+        var root = new Canvas();
+        var leaf = new TestNode { Width = 10, Height = 10 };
+        Canvas.SetLeft(leaf, 10);
+        Canvas.SetTop(leaf, 0);
+        root.Children.Add(leaf);
+        var screen = new UiScreen(root) { Scale = 2 };
+        UiPointerEventArgs? moved = null;
+        UiPointerWheelEventArgs? wheel = null;
+        leaf.PointerMoved += (_, eventArgs) =>
+        {
+            moved = eventArgs;
+            screen.Scale = 4;
+        };
+        leaf.PointerWheel += (_, eventArgs) => wheel = eventArgs;
+        manager.Open(screen);
+        manager.Update(new Size(100, 80));
+
+        manager.ProcessPointerMoved(new Point(24, 8));
+
+        Assert.NotNull(moved);
+        Assert.Equal(new Point(12, 4), moved.ScreenPosition);
+        Assert.Equal(new Point(2, 4), moved.GetPosition(leaf));
+        Assert.Equal(4, screen.Scale);
+        Assert.Null(screen.HitTest(new Point(12, 4)));
+        Assert.False(root.IsArrangeValid);
+        Assert.False(leaf.IsArrangeValid);
+
+        manager.Update(new Size(100, 80));
+        manager.ProcessPointerWheel(new Point(48, 16), 3, -5);
+
+        Assert.NotNull(wheel);
+        Assert.Equal(new Point(12, 4), wheel.ScreenPosition);
+        Assert.Equal(3, wheel.DeltaX);
+        Assert.Equal(-5, wheel.DeltaY);
+        manager.Close();
+    }
+
+    [Fact]
+    public void MeasureCallbackReentrantPointerRoutingFailsAndRecoversAfterFinally()
+    {
+        var manager = new UiManager();
+        var root = new LayoutActionNode();
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+
+        root.MeasureAction = () => manager.ProcessPointerMoved(new Point(1, 1));
+
+        Assert.Throws<InvalidOperationException>(() => manager.Update(new Size(200, 200)));
+        root.MeasureAction = null;
+
+        Assert.Null(Record.Exception(() =>
+        {
+            manager.Update(new Size(100, 100));
+            manager.ProcessPointerMoved(new Point(1, 1));
+        }));
+        manager.Close();
+    }
+
+    [Fact]
+    public void ArrangeCallbackReentrantPointerRoutingFailsAndRecoversAfterFinally()
+    {
+        var manager = new UiManager();
+        var root = new LayoutActionNode();
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+
+        root.ArrangeAction = () => manager.ProcessPointerMoved(new Point(1, 1));
+
+        Assert.Throws<InvalidOperationException>(() => manager.Update(new Size(200, 200)));
+        root.ArrangeAction = null;
+
+        Assert.Null(Record.Exception(() =>
+        {
+            manager.Update(new Size(100, 100));
+            manager.ProcessPointerMoved(new Point(1, 1));
+        }));
+        manager.Close();
+    }
+
+    [Fact]
+    public void PendingActionInputUsesCurrentScaleAndSkipsInvalidLayout()
+    {
+        var manager = new UiManager();
+        var root = new Canvas();
+        var leaf = new TestNode { Width = 10, Height = 10 };
+        Canvas.SetLeft(leaf, 15);
+        Canvas.SetTop(leaf, 0);
+        root.Children.Add(leaf);
+        var screen = new UiScreen(root);
+        var positions = new List<Point>();
+        var leafPositions = new List<Point>();
+        leaf.PointerMoved += (_, eventArgs) =>
+        {
+            positions.Add(eventArgs.ScreenPosition);
+            leafPositions.Add(eventArgs.GetPosition(leaf));
+        };
+        manager.Open(screen);
+        manager.Update(new Size(100, 80));
+
+        screen.Post(() =>
+        {
+            screen.Scale = 2;
+            manager.ProcessPointerMoved(new Point(24, 8));
+        });
+        manager.Update(new Size(100, 80));
+        manager.ProcessPointerMoved(new Point(40, 16));
+
+        Assert.Equal(2, screen.Scale);
+        Assert.Equal([new Point(20, 8)], positions);
+        Assert.Equal([new Point(5, 8)], leafPositions);
+        manager.Close();
+    }
+
+    [Fact]
+    public void HandlerLayoutChangesKeepCurrentRouteAndWheelDelta()
+    {
+        var manager = new UiManager();
+        var root = new Canvas();
+        var leaf = new TestNode { Width = 20, Height = 20 };
+        Canvas.SetLeft(leaf, 20);
+        Canvas.SetTop(leaf, 0);
+        root.Children.Add(leaf);
+        var screen = new UiScreen(root) { Scale = 2 };
+        var events = new List<string>();
+        Point? movedPosition = null;
+        Point? movedLeafPosition = null;
+        leaf.PointerMoved += (_, eventArgs) =>
+        {
+            events.Add("leaf-move");
+            movedPosition = eventArgs.ScreenPosition;
+            movedLeafPosition = eventArgs.GetPosition(leaf);
+            screen.Scale = 4;
+            screen.UseLayoutRounding = false;
+        };
+        root.PointerMoved += (_, _) => events.Add("root-move");
+        double? wheelX = null;
+        double? wheelY = null;
+        leaf.PointerWheel += (_, eventArgs) =>
+        {
+            events.Add("leaf-wheel");
+            wheelX = eventArgs.DeltaX;
+            wheelY = eventArgs.DeltaY;
+            screen.Scale = 5;
+            screen.UseLayoutRounding = true;
+        };
+        root.PointerWheel += (_, _) => events.Add("root-wheel");
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+
+        manager.ProcessPointerMoved(new Point(44, 8));
+
+        Assert.Equal(["leaf-move", "root-move"], events);
+        Assert.Equal(new Point(22, 4), movedPosition);
+        Assert.Equal(new Point(2, 4), movedLeafPosition);
+        Assert.Equal(4, screen.Scale);
+        Assert.False(screen.UseLayoutRounding);
+        Assert.False(leaf.IsArrangeValid);
+
+        events.Clear();
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerWheel(new Point(84, 8), 2.5, -1.5);
+
+        Assert.Equal(["leaf-wheel", "root-wheel"], events);
+        Assert.Equal(2.5, wheelX);
+        Assert.Equal(-1.5, wheelY);
+        Assert.Equal(5, screen.Scale);
+        Assert.True(screen.UseLayoutRounding);
+        Assert.False(leaf.IsArrangeValid);
+        manager.Close();
+    }
+
+    [Fact]
+    public void ScaleChangeReprojectsStoredOutputPointerWhenHoverRefreshes()
+    {
+        var manager = new UiManager();
+        var root = new Canvas();
+        var leaf = new TestNode { Width = 20, Height = 20 };
+        Canvas.SetLeft(leaf, 30);
+        Canvas.SetTop(leaf, 0);
+        root.Children.Add(leaf);
+        var screen = new UiScreen(root);
+        var events = new List<string>();
+        Point? enteredPosition = null;
+        Point? exitedPosition = null;
+        Point? movedPosition = null;
+        leaf.PointerEntered += (_, eventArgs) =>
+        {
+            events.Add("enter");
+            enteredPosition = eventArgs.ScreenPosition;
+        };
+        leaf.PointerExited += (_, eventArgs) =>
+        {
+            events.Add("exit");
+            exitedPosition = eventArgs.ScreenPosition;
+        };
+        leaf.PointerMoved += (_, eventArgs) => movedPosition = eventArgs.ScreenPosition;
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerMoved(new Point(15, 5));
+
+        screen.Scale = 0.5;
+        manager.ProcessPointerMoved(new Point(15, 5));
+        Assert.Empty(events);
+
+        manager.Update(new Size(100, 100));
+
+        Assert.Equal(["enter"], events);
+        Assert.Equal(new Point(30, 10), enteredPosition);
+
+        manager.ProcessPointerMoved(new Point(16, 6));
+        Assert.Equal(new Point(32, 12), movedPosition);
+
+        screen.Scale = 2;
+        manager.Update(new Size(100, 100));
+
+        Assert.Equal(["enter", "exit"], events);
+        Assert.Equal(new Point(8, 3), exitedPosition);
+        manager.Close();
+    }
+
+    [Fact]
     public void ScreenCloseAndReuseStartsWithEmptyInteractionState()
     {
         var manager = new UiManager();
@@ -1340,6 +1566,21 @@ public sealed class UiInputRoutingTests
 
     private sealed class TestNode : UiNode
     {
+    }
+
+    private sealed class LayoutActionNode : UiNode
+    {
+        internal Action? MeasureAction { get; set; }
+        internal Action? ArrangeAction { get; set; }
+
+        protected override Size MeasureCore(Size availableSize)
+        {
+            MeasureAction?.Invoke();
+            return new Size(10, 10);
+        }
+
+        protected override void ArrangeCore(Size finalSize) =>
+            ArrangeAction?.Invoke();
     }
 
     private sealed class RecordingUiScreen(UiNode? root = null) : UiScreen(root)

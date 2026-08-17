@@ -10,15 +10,15 @@ public sealed class UiDrawBuilderTests
     public void InvalidScaleFailsBeforePreviousResultChanges()
     {
         var builder = new UiDrawBuilder();
-        builder.Build(Commands(Fill(new Rect(1, 2, 3, 4), new Color(1, 2, 3))), 100, 100, 1, false);
+        builder.Build(Commands(Fill(new Rect(1, 2, 3, 4), new Color(1, 2, 3))), 100, 100, false);
         var previous = builder.Vertices.ToArray();
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            builder.Build(UiDrawCommandList.Empty, 100, 100, double.NaN, false));
+            builder.Build(Commands(double.NaN), 100, 100, false));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            builder.Build(UiDrawCommandList.Empty, 100, 100, 0, false));
+            builder.Build(Commands(0), 100, 100, false));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            builder.Build(UiDrawCommandList.Empty, 100, 100, -1, false));
+            builder.Build(Commands(-1), 100, 100, false));
         Assert.Equal(previous, builder.Vertices.ToArray());
     }
 
@@ -28,7 +28,7 @@ public sealed class UiDrawBuilderTests
         var builder = new UiDrawBuilder();
         var commands = Commands(Fill(new Rect(1, 2, 3, 4), new Color(1, 2, 3)));
 
-        builder.Build(commands, 0, 100, 1, false);
+        builder.Build(commands, 0, 100, false);
 
         Assert.Empty(builder.Vertices.ToArray());
         Assert.Empty(builder.Indices.ToArray());
@@ -41,10 +41,9 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(new Rect(-2, 4, 12, 20), new Color(255, 0, 0))),
+            Commands(1.5, Fill(new Rect(-2, 4, 12, 20), new Color(255, 0, 0))),
             12,
             20,
-            1.5,
             false);
 
         Assert.Equal(
@@ -58,6 +57,21 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
+    public void ReusedBuilderUsesEachSnapshotScaleIndependently()
+    {
+        var command = Fill(new Rect(1, 2, 3, 4), new Color(255, 255, 255));
+        var first = new UiDrawCommandList([command], 2);
+        var second = new UiDrawCommandList([command], 0.5);
+        var builder = new UiDrawBuilder();
+
+        builder.Build(first, 100, 100, false);
+        Assert.Equal(new UiVertex(2, 4, 1, 1, 1, 1), builder.Vertices[0]);
+
+        builder.Build(second, 100, 100, false);
+        Assert.Equal(new UiVertex(0.5f, 1, 1, 1, 1, 1), builder.Vertices[0]);
+    }
+
+    [Fact]
     public void CompletelyOutsideBoundsProduceNoGeometry()
     {
         var builder = new UiDrawBuilder();
@@ -65,7 +79,6 @@ public sealed class UiDrawBuilderTests
             Commands(Fill(new Rect(20, 20, 5, 5), new Color(255, 255, 255))),
             10,
             10,
-            1,
             false);
 
         Assert.Empty(builder.Vertices.ToArray());
@@ -78,10 +91,9 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(new Rect(0, 0, double.MaxValue, 1), new Color(255, 255, 255))),
+            Commands(double.MaxValue, Fill(new Rect(0, 0, double.MaxValue, 1), new Color(255, 255, 255))),
             64,
             48,
-            double.MaxValue,
             false);
 
         Assert.All(builder.Vertices.ToArray(), vertex =>
@@ -96,13 +108,12 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(
+            Commands(1.5, Fill(
                 new Rect(0, 0, 20, 20),
                 new Color(255, 255, 255),
                 new Rect(1.2, 2.2, 3.1, 4.1))),
             100,
             100,
-            1.5,
             false);
 
         var batch = Assert.Single(builder.Batches.ToArray());
@@ -117,7 +128,6 @@ public sealed class UiDrawBuilderTests
             Commands(Fill(new Rect(0, 0, 5, 5), new Color(255, 255, 255))),
             80,
             60,
-            1,
             false);
 
         Assert.Equal(new UiScissor(0, 0, 80, 60), Assert.Single(builder.Batches.ToArray()).Scissor);
@@ -133,7 +143,6 @@ public sealed class UiDrawBuilderTests
                 Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255), new Rect(1, 0, 1, 1))),
             10,
             10,
-            1,
             false);
 
         Assert.Empty(builder.Vertices.ToArray());
@@ -151,7 +160,6 @@ public sealed class UiDrawBuilderTests
                 new Rect(-1, -1, 3, 3))),
             10,
             10,
-            1,
             false);
 
         Assert.Equal(new UiScissor(0, 0, 2, 2), Assert.Single(builder.Batches.ToArray()).Scissor);
@@ -165,7 +173,6 @@ public sealed class UiDrawBuilderTests
             Commands(Fill(new Rect(0, 0, 1, 1), new Color(128, 64, 32, 128), opacity: 0.25)),
             10,
             10,
-            1,
             false);
 
         var vertex = builder.Vertices[0];
@@ -183,7 +190,6 @@ public sealed class UiDrawBuilderTests
             Commands(Fill(new Rect(0, 0, 1, 1), new Color(128, 255, 0, 64), opacity: 0.5)),
             10,
             10,
-            1,
             true);
 
         var vertex = builder.Vertices[0];
@@ -203,7 +209,6 @@ public sealed class UiDrawBuilderTests
             Commands(Fill(new Rect(0, 0, 1, 1), new Color(10, 0, 0))),
             10,
             10,
-            1,
             true);
 
         Assert.Equal(10 / 255f / 12.92f, builder.Vertices[0].R);
@@ -223,7 +228,6 @@ public sealed class UiDrawBuilderTests
                 Fill(new Rect(4, 0, 2, 2), new Color(4, 0, 0), firstClip)),
             100,
             100,
-            1,
             false);
 
         Assert.Equal(
@@ -259,7 +263,6 @@ public sealed class UiDrawBuilderTests
                 Fill(new Rect(2, 0, 2, 2), new Color(3, 0, 0), clip)),
             20,
             20,
-            1,
             false);
 
         Assert.Equal(12u, Assert.Single(builder.Batches.ToArray()).IndexCount);
@@ -288,7 +291,6 @@ public sealed class UiDrawBuilderTests
                 0.5)),
             16,
             16,
-            1,
             false,
             _ => new UiImageRenderBinding(17, descriptorSet));
 
@@ -321,7 +323,6 @@ public sealed class UiDrawBuilderTests
                 Fill(new Rect(2, 0, 1, 1), new Color(0, 1, 0), clip)),
             10,
             10,
-            1,
             false,
             static _ => null);
 
@@ -349,7 +350,6 @@ public sealed class UiDrawBuilderTests
                     ImageSamplingMode.Linear, null, 1)),
             10,
             10,
-            1,
             false,
             command => command.Image == firstImage
                 ? new UiImageRenderBinding(
@@ -370,7 +370,10 @@ public sealed class UiDrawBuilderTests
     }
 
     private static UiDrawCommandList Commands(params UiDrawCommand[] commands) =>
-        new(commands.ToList());
+        new(commands.ToList(), 1);
+
+    private static UiDrawCommandList Commands(double scale, params UiDrawCommand[] commands) =>
+        new(commands.ToList(), scale);
 
     private static UiFillRectangleCommand Fill(
         Rect bounds,

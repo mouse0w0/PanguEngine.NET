@@ -218,11 +218,124 @@ public sealed class UiManagerTests
         };
         var screen = new UiScreen(root);
         manager.Open(screen);
-        screen.Post(() => events.Add("post"));
+        screen.Post(() =>
+        {
+            screen.Scale = 2;
+            events.Add("post");
+        });
 
         manager.Update(new Size(20, 10));
 
         Assert.Equal(["post", "measure", "arrange"], events);
+        Assert.Equal(new Size(10, 5), root.LastMeasureConstraint);
+        manager.Close();
+    }
+
+    [Fact]
+    public void PostedLayoutRoundingChangeAppliesDuringTheSameUpdate()
+    {
+        var manager = new UiManager();
+        var root = new TestNode { CoreDesiredSize = new Size(10.25, 10.25) };
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        screen.Post(() => screen.UseLayoutRounding = false);
+
+        manager.Update(new Size(100, 100));
+
+        Assert.Equal(new Size(10.25, 10.25), root.DesiredSize);
+        manager.Close();
+    }
+
+    [Fact]
+    public void LayoutRoundingChangeInvalidatesAndReflowsLayout()
+    {
+        var manager = new UiManager();
+        var root = new TestNode { CoreDesiredSize = new Size(10.25, 10.25) };
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        Assert.Equal(new Size(11, 11), root.DesiredSize);
+
+        screen.UseLayoutRounding = false;
+
+        Assert.False(root.IsMeasureValid);
+        Assert.False(root.IsArrangeValid);
+        manager.Update(new Size(100, 100));
+        Assert.Equal(new Size(10.25, 10.25), root.DesiredSize);
+        manager.Close();
+    }
+
+    [Fact]
+    public void UpdateAppliesCurrentScreenScaleAndReflowsWhenScaleChanges()
+    {
+        var manager = new UiManager();
+        var root = new TestNode { CoreDesiredSize = new Size(5, 5) };
+        var screen = new UiScreen(root) { Scale = 2 };
+        manager.Open(screen);
+
+        manager.Update(new Size(100, 80));
+
+        Assert.Equal(new Size(50, 40), root.LastMeasureConstraint);
+        Assert.Equal(new Rect(0, 0, 50, 40), root.LayoutBounds);
+
+        screen.Scale = 4;
+        Assert.Equal(new Size(50, 40), root.LastMeasureConstraint);
+        Assert.False(root.IsMeasureValid);
+        Assert.False(root.IsArrangeValid);
+
+        manager.Update(new Size(100, 80));
+
+        Assert.Equal(new Size(25, 20), root.LastMeasureConstraint);
+        Assert.Equal(new Rect(0, 0, 25, 20), root.LayoutBounds);
+        manager.Close();
+    }
+
+    [Fact]
+    public void ScreensKeepIndependentScaleConfigurations()
+    {
+        var manager = new UiManager();
+        var firstRoot = new TestNode { CoreDesiredSize = new Size(5, 5) };
+        var secondRoot = new TestNode { CoreDesiredSize = new Size(5, 5) };
+        var first = new UiScreen(firstRoot) { Scale = 2 };
+        var second = new UiScreen(secondRoot) { Scale = 4 };
+
+        manager.Open(first);
+        manager.Update(new Size(100, 80));
+        manager.Open(second);
+        manager.Update(new Size(100, 80));
+
+        Assert.Equal(2, first.Scale);
+        Assert.Equal(new Size(50, 40), firstRoot.LastMeasureConstraint);
+        Assert.Equal(4, second.Scale);
+        Assert.Equal(new Size(25, 20), secondRoot.LastMeasureConstraint);
+        manager.Close();
+    }
+
+    [Fact]
+    public void ReopeningReusesLayoutCacheUntilLayoutEnvironmentChanges()
+    {
+        var manager = new UiManager();
+        var root = new TestNode { CoreDesiredSize = new Size(10.25, 10.25) };
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        manager.Close();
+        var measureCalls = root.MeasureCalls;
+        var arrangeCalls = root.ArrangeCalls;
+
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+        manager.Close();
+
+        Assert.Equal(measureCalls, root.MeasureCalls);
+        Assert.Equal(arrangeCalls, root.ArrangeCalls);
+
+        screen.UseLayoutRounding = false;
+        manager.Open(screen);
+        manager.Update(new Size(100, 100));
+
+        Assert.Equal(measureCalls + 1, root.MeasureCalls);
+        Assert.Equal(arrangeCalls + 1, root.ArrangeCalls);
         manager.Close();
     }
 

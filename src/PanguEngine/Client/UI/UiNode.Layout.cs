@@ -225,6 +225,9 @@ public abstract partial class UiNode
     {
         VerifyLayoutMutationAccess();
         VerifyLayoutProperties();
+        var screen = Screen;
+        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
+        var scale = screen?.Scale ?? 1;
         if (IsMeasureValid && _lastMeasureConstraint == availableSize)
             return;
 
@@ -240,6 +243,8 @@ public abstract partial class UiNode
         }
 
         var margin = Margin;
+        if (useLayoutRounding)
+            margin = UiLayoutHelper.RoundLayoutThickness(margin, scale);
         var width = Width;
         var height = Height;
         var minWidth = MinWidth;
@@ -278,9 +283,12 @@ public abstract partial class UiNode
         var desiredContentSize = new Size(
             ResolveDesiredDimension(coreDesiredSize.Width, width, minWidth, effectiveMaxWidth),
             ResolveDesiredDimension(coreDesiredSize.Height, height, minHeight, effectiveMaxHeight));
+        var layoutDesiredContentSize = useLayoutRounding
+            ? UiLayoutHelper.RoundLayoutSizeUp(desiredContentSize, scale)
+            : desiredContentSize;
         var desiredSize = new Size(
-            AddMargin(desiredContentSize.Width, margin.Left, margin.Right),
-            AddMargin(desiredContentSize.Height, margin.Top, margin.Bottom));
+            AddMargin(layoutDesiredContentSize.Width, margin.Left, margin.Right),
+            AddMargin(layoutDesiredContentSize.Height, margin.Top, margin.Bottom));
 
         _lastMeasureConstraint = availableSize;
         _desiredContentSize = desiredContentSize;
@@ -300,6 +308,9 @@ public abstract partial class UiNode
     {
         VerifyLayoutMutationAccess();
         VerifyLayoutProperties();
+        var screen = Screen;
+        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
+        var scale = screen?.Scale ?? 1;
         if (!IsMeasureValid)
             throw new InvalidOperationException("A UI node must have a valid measure before it can be arranged.");
         if (IsArrangeValid && _lastArrangeRect == finalRect)
@@ -317,6 +328,8 @@ public abstract partial class UiNode
         }
 
         var margin = Margin;
+        if (useLayoutRounding)
+            margin = UiLayoutHelper.RoundLayoutThickness(margin, scale);
         var width = Width;
         var height = Height;
         var minWidth = MinWidth;
@@ -339,14 +352,23 @@ public abstract partial class UiNode
             minHeight,
             effectiveMaxHeight,
             VerticalAlignment == VerticalAlignment.Stretch);
-        var horizontalRemaining = slotWidth - actualWidth;
-        var verticalRemaining = slotHeight - actualHeight;
+        var actualSize = new Size(actualWidth, actualHeight);
+        if (useLayoutRounding)
+            actualSize = UiLayoutHelper.RoundLayoutSizeUp(actualSize, scale);
+        var horizontalRemaining = slotWidth - actualSize.Width;
+        var verticalRemaining = slotHeight - actualSize.Height;
         var x = finalRect.X + margin.Left + GetHorizontalOffset(horizontalRemaining);
         var y = finalRect.Y + margin.Top + GetVerticalOffset(verticalRemaining);
         if (!double.IsFinite(x) || !double.IsFinite(y))
             throw new InvalidOperationException("Arrangement produced a non-finite layout origin.");
 
-        var actualSize = new Size(actualWidth, actualHeight);
+        if (useLayoutRounding)
+        {
+            var origin = UiLayoutHelper.RoundLayoutPoint(new Point(x, y), scale);
+            x = origin.X;
+            y = origin.Y;
+        }
+
         var layoutBounds = new Rect(x, y, actualSize);
         var invalidationVersion = _arrangeInvalidationVersion;
         _arrangePassDepth++;
@@ -433,6 +455,16 @@ public abstract partial class UiNode
     {
         for (var node = this; node is not null; node = node.Parent)
             node.InvalidateMeasureState();
+    }
+
+    internal void InvalidateMeasureSubtree()
+    {
+        InvalidateMeasureState();
+        if (this is not Parent parent)
+            return;
+
+        foreach (var child in parent.Children)
+            child.InvalidateMeasureSubtree();
     }
 
     private void InvalidateArrangeCore()

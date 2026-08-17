@@ -35,12 +35,16 @@ internal sealed class UiBatchScene : IClientTestScene
         _firstImage = CreateCheckerImage(16, 16, new Color(240, 70, 80), new Color(40, 205, 160));
         _secondImage = CreateCheckerImage(12, 20, new Color(70, 125, 245), new Color(245, 215, 70));
         _root = new UiBatchNode(_firstImage, _secondImage);
-        _screen = new UiScreen(_root);
+        _screen = new UiScreen(_root) { Scale = UiScale };
+        _screen.Open();
         window.Render += (_, _) => DrawFrame();
     }
 
-    public void Destroy() =>
+    public void Destroy()
+    {
+        _screen.Close();
         _renderer.Destroy();
+    }
 
     private void DrawFrame()
     {
@@ -59,9 +63,7 @@ internal sealed class UiBatchScene : IClientTestScene
             }
 
             _root.Dense = frame.FrameNumber >= _presenter.MaxFramesInFlight;
-            var logicalSize = new Size(frame.Width / UiScale, frame.Height / UiScale);
-            _root.Measure(logicalSize);
-            _root.Arrange(new Rect(0, 0, logicalSize));
+            _screen.Update(new Size(frame.Width, frame.Height));
             var drawCommands = _screen.CreateDrawCommandList();
 
             commandList.BeginRendering(new RenderingDescription
@@ -75,7 +77,7 @@ internal sealed class UiBatchScene : IClientTestScene
                         new ClearColor(0.015f, 0.018f, 0.024f, 1))
                 ]
             });
-            _renderer.Draw(frame, drawCommands, UiScale);
+            _renderer.Draw(frame, drawCommands);
             commandList.EndRendering();
             commandList.PrepareForPresent(frame.ColorOutput);
             commandList.EndRecording();

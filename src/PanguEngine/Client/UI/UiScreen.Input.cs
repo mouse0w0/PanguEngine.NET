@@ -9,6 +9,7 @@ public partial class UiScreen
     private readonly UiNode?[] _pressedTargets =
         new UiNode?[(int)MouseButton.Button12 - (int)MouseButton.Left + 1];
     private Control[]? _leftPressedControls;
+    private Point _pointerOutputPosition;
     private Point _pointerPosition;
     private bool _hasPointerPosition;
     private bool _isChangingFocus;
@@ -43,9 +44,9 @@ public partial class UiScreen
     public UiNode? FocusedNode { get; private set; }
 
     /// <summary>
-    /// Finds the frontmost deepest node at a point in screen coordinates.
+    /// Finds the frontmost deepest node at a point in screen logical coordinates.
     /// </summary>
-    /// <param name="screenPoint">The point in screen coordinates.</param>
+    /// <param name="screenPoint">The point in screen logical coordinates.</param>
     /// <returns>The deepest hit node, or null when the root subtree is not hit.</returns>
     public UiNode? HitTest(Point screenPoint)
     {
@@ -87,7 +88,7 @@ public partial class UiScreen
         BeginInputRouting();
         try
         {
-            UpdateHover(_pointerPosition);
+            UpdateHover(ToLogicalPoint(_pointerOutputPosition));
         }
         finally
         {
@@ -100,12 +101,13 @@ public partial class UiScreen
         BeginInputRouting();
         try
         {
-            UpdateHover(position);
+            var logicalPosition = UpdatePointerPosition(position);
+            UpdateHover(logicalPosition);
             if (!IsScreenActive() || _hoverPath.Count == 0)
                 return;
 
             var path = _hoverPath.ToArray();
-            var args = new UiPointerEventArgs(path[^1].Node, position, path);
+            var args = new UiPointerEventArgs(path[^1].Node, logicalPosition, path);
             Bubble(
                 path,
                 args,
@@ -125,7 +127,8 @@ public partial class UiScreen
         BeginInputRouting(button);
         try
         {
-            UpdateHover(position);
+            var logicalPosition = UpdatePointerPosition(position);
+            UpdateHover(logicalPosition);
             if (!IsScreenActive())
                 return;
 
@@ -163,7 +166,7 @@ public partial class UiScreen
 
             var args = new UiPointerButtonEventArgs(
                 path[^1].Node,
-                position,
+                logicalPosition,
                 button,
                 modifiers,
                 path);
@@ -186,7 +189,8 @@ public partial class UiScreen
         BeginInputRouting(button);
         try
         {
-            UpdateHover(position);
+            var logicalPosition = UpdatePointerPosition(position);
+            UpdateHover(logicalPosition);
             if (!IsScreenActive())
                 return;
 
@@ -205,13 +209,13 @@ public partial class UiScreen
             if (target is null || !IsActive(target))
                 return;
 
-            var path = BuildPathForNode(target, position);
+            var path = BuildPathForNode(target, logicalPosition);
             if (path.Count == 0)
                 return;
 
             var args = new UiPointerButtonEventArgs(
                 target,
-                position,
+                logicalPosition,
                 button,
                 modifiers,
                 path);
@@ -223,13 +227,13 @@ public partial class UiScreen
             if (!IsScreenActive() || !IsActive(target))
                 return;
 
-            var currentPath = BuildHitPath(position);
+            var currentPath = BuildHitPath(logicalPosition);
             if (currentPath.Count == 0 || !ReferenceEquals(currentPath[^1].Node, target))
                 return;
 
             var pointerClickedArgs = new UiPointerButtonEventArgs(
                 target,
-                position,
+                logicalPosition,
                 button,
                 modifiers,
                 currentPath);
@@ -249,14 +253,15 @@ public partial class UiScreen
         BeginInputRouting(deltaX, deltaY);
         try
         {
-            UpdateHover(position);
+            var logicalPosition = UpdatePointerPosition(position);
+            UpdateHover(logicalPosition);
             if (!IsScreenActive() || _hoverPath.Count == 0)
                 return;
 
             var path = _hoverPath.ToArray();
             var args = new UiPointerWheelEventArgs(
                 path[^1].Node,
-                position,
+                logicalPosition,
                 deltaX,
                 deltaY,
                 path);
@@ -389,6 +394,7 @@ public partial class UiScreen
     private InputStateCleanupSnapshot? CommitInputStateForClose()
     {
         var snapshot = CommitInputStateCore(clearAll: true);
+        _pointerOutputPosition = Point.Zero;
         _pointerPosition = Point.Zero;
         _hasPointerPosition = false;
         return snapshot;
@@ -549,7 +555,6 @@ public partial class UiScreen
             return;
 
         _pointerPosition = screenPosition;
-        _hasPointerPosition = true;
         var oldPath = _hoverPath.ToArray();
         var newPath = BuildHitPath(screenPosition).ToArray();
         _hoverPath.Clear();
@@ -633,6 +638,14 @@ public partial class UiScreen
         }
 
         ThrowInputErrors(errors);
+    }
+
+    private Point UpdatePointerPosition(Point outputPosition)
+    {
+        var logicalPosition = ToLogicalPoint(outputPosition);
+        _pointerOutputPosition = outputPosition;
+        _hasPointerPosition = true;
+        return logicalPosition;
     }
 
     private bool ChangeFocus(UiNode? next)
@@ -939,6 +952,8 @@ public partial class UiScreen
         }
 
         VerifyOwnerThread();
+        if (IsUpdatingLayout)
+            throw new InvalidOperationException("The UI screen cannot route input during layout.");
         if (_isTransitioning)
             throw new InvalidOperationException("The UI screen cannot route input during a lifecycle transition.");
         if (_isRoutingInput)

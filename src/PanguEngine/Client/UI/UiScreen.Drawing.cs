@@ -8,6 +8,9 @@ public partial class UiScreen
     /// Creates an immutable snapshot of drawing commands for the current root subtree.
     /// </summary>
     /// <returns>The commands in stable drawing order.</returns>
+    /// <remarks>
+    /// An open screen must be updated before its first draw and after its output size or scale changes.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the open screen is accessed from the wrong thread, the screen is changing lifecycle
     /// or layout state, command generation is reentered, or drawing code mutates UI state.
@@ -17,17 +20,16 @@ public partial class UiScreen
         BeginDrawing();
         try
         {
+            var snapshotScale = Scale;
             var root = Root;
             if (root is null)
-                return UiDrawCommandList.Empty;
+                return new UiDrawCommandList([], snapshotScale);
 
             var commands = new List<UiDrawCommand>();
             root.AppendDrawCommands(
                 commands,
                 new UiDrawingState(0, 0, null, false, 1));
-            return commands.Count == 0
-                ? UiDrawCommandList.Empty
-                : new UiDrawCommandList(commands);
+            return new UiDrawCommandList(commands, snapshotScale);
         }
         finally
         {

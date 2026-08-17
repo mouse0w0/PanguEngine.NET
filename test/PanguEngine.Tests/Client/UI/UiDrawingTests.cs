@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Rendering;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -55,6 +56,103 @@ public sealed class UiDrawingTests
         var transparentScreen = new UiScreen(transparent);
         Arrange(transparent, new Rect(0, 0, 10, 10));
         Assert.Empty(transparentScreen.CreateDrawCommandList());
+    }
+
+    [Fact]
+    public void ClosedScreenDrawSnapshotsCaptureCurrentScaleWhenEmptyOrNonEmpty()
+    {
+        var emptyScreen = new UiScreen { Scale = 1.5 };
+        var node = new DrawingNode { DrawAction = DrawUnitRectangle };
+        var screen = new UiScreen(node) { Scale = 2 };
+        Arrange(node, new Rect(0, 0, 10, 10));
+
+        var empty = emptyScreen.CreateDrawCommandList();
+        var nonEmpty = screen.CreateDrawCommandList();
+
+        Assert.Empty(empty);
+        Assert.Equal(1.5, empty.Scale);
+        Assert.Single(nonEmpty);
+        Assert.Equal(2, nonEmpty.Scale);
+    }
+
+    [Fact]
+    public void ScaleChangeProducesEmptyCurrentScaleSnapshotUntilLayoutUpdates()
+    {
+        var node = new DrawingNode { DrawAction = DrawUnitRectangle };
+        var screen = new UiScreen(node);
+        screen.Open();
+        screen.Update(new Size(100, 100));
+        var before = screen.CreateDrawCommandList();
+
+        screen.Scale = 2;
+        var pending = screen.CreateDrawCommandList();
+        screen.Update(new Size(100, 100));
+        var after = screen.CreateDrawCommandList();
+
+        Assert.Empty(pending);
+        Assert.Equal(2, pending.Scale);
+        Assert.Single(after);
+        Assert.Equal(2, after.Scale);
+        Assert.Single(before);
+        Assert.Equal(1, before.Scale);
+        screen.Close();
+    }
+
+    [Fact]
+    public void LayoutRoundingChangeProducesEmptySnapshotUntilLayoutUpdates()
+    {
+        var node = new DrawingNode { DrawAction = DrawUnitRectangle };
+        var screen = new UiScreen(node);
+        screen.Open();
+        screen.Update(new Size(100, 100));
+        var before = screen.CreateDrawCommandList();
+
+        screen.UseLayoutRounding = false;
+        var pending = screen.CreateDrawCommandList();
+        screen.Update(new Size(100, 100));
+        var after = screen.CreateDrawCommandList();
+
+        Assert.Single(before);
+        Assert.Empty(pending);
+        Assert.Single(after);
+        Assert.Equal(1, before.Scale);
+        Assert.Equal(1, pending.Scale);
+        Assert.Equal(1, after.Scale);
+        screen.Close();
+    }
+
+    [Fact]
+    public void OpenEmptyScreenDrawSnapshotCapturesCurrentScale()
+    {
+        var screen = new UiScreen { Scale = 2 };
+        screen.Open();
+        screen.Update(new Size(100, 100));
+
+        var commands = screen.CreateDrawCommandList();
+
+        Assert.Empty(commands);
+        Assert.Equal(2, commands.Scale);
+        screen.Close();
+    }
+
+    [Fact]
+    public void CustomFractionalDrawBoundsRemainUnroundedThroughBuilder()
+    {
+        var node = new DrawingNode
+        {
+            DrawAction = context => context.FillRectangle(
+                new Rect(0.3, 0.7, 3.1, 4.1),
+                new Color(255, 255, 255))
+        };
+        var screen = new UiScreen(node) { Scale = 1.5 };
+        Arrange(node, new Rect(0, 0, 10, 10));
+        var commands = screen.CreateDrawCommandList();
+        var builder = new UiDrawBuilder();
+
+        builder.Build(commands, 100, 100, false);
+
+        Assert.Equal(new UiVertex(0.45f, 1.05f, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(5.1f, 7.2f, 1, 1, 1, 1), builder.Vertices[2]);
     }
 
     [Fact]
@@ -189,6 +287,51 @@ public sealed class UiDrawingTests
             Assert.Single(screen.CreateDrawCommandList()));
 
         Assert.Equal(new Rect(0, 0, 4, 30), command.Bounds);
+    }
+
+    [Fact]
+    public void RegionDrawingUsesCommittedBorderInnerBounds()
+    {
+        var background = new Color(10, 20, 30, 140);
+        var border = new Color(40, 50, 60, 170);
+        var region = new DrawingRegion
+        {
+            Background = new SolidColorBrush(background),
+            BorderBrush = new SolidColorBrush(border),
+            BorderThickness = new Thickness(0.6)
+        };
+        var screen = new UiScreen(region) { Scale = 1.25 };
+        Arrange(region, new Rect(0, 0, 40, 30));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiFillRectangleCommand>()
+            .ToArray();
+
+        Assert.Equal(5, commands.Length);
+        Assert.Equal(background, commands[0].Color);
+        AssertBounds(new Rect(0.8, 0.8, 38.4, 28.8), commands[0].Bounds);
+        AssertBounds(new Rect(0, 0, 40, 0.8), commands[1].Bounds);
+        AssertBounds(new Rect(39.2, 0.8, 0.8, 28.8), commands[2].Bounds);
+        AssertBounds(new Rect(0, 29.6, 40, 0.8), commands[3].Bounds);
+        AssertBounds(new Rect(0, 0.8, 0.8, 28.8), commands[4].Bounds);
+    }
+
+    [Fact]
+    public void InvalidatedRegionHidesPriorDecorationFromDrawing()
+    {
+        var region = new DrawingRegion
+        {
+            Background = new SolidColorBrush(new Color(10, 20, 30)),
+            BorderBrush = new SolidColorBrush(new Color(40, 50, 60)),
+            BorderThickness = new Thickness(2)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 20, 20));
+        Assert.NotEmpty(screen.CreateDrawCommandList());
+
+        region.InvalidateArrange();
+
+        Assert.Empty(screen.CreateDrawCommandList());
     }
 
     [Fact]
@@ -639,6 +782,8 @@ public sealed class UiDrawingTests
         Arrange(root, new Rect(0, 0, 100, 100));
         Arrange(first, new Rect(0, 0, 10, 10));
         Arrange(second, new Rect(20, 0, 10, 10));
+        screen.Open();
+        screen.Update(new Size(100, 100));
         var errors = new List<Exception?>();
         root.DrawAction = _ =>
         {
@@ -654,11 +799,13 @@ public sealed class UiDrawingTests
             errors.Add(Record.Exception(() => root.Opacity = 0.5));
             errors.Add(Record.Exception(() => root.Width = 50));
             errors.Add(Record.Exception(() => root.Focusable = true));
+            errors.Add(Record.Exception(() => screen.Scale = 2));
+            errors.Add(Record.Exception(() => screen.UseLayoutRounding = false));
         };
 
         _ = screen.CreateDrawCommandList();
 
-        Assert.Equal(12, errors.Count);
+        Assert.Equal(14, errors.Count);
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
         Assert.Same(root, screen.Root);
         Assert.Equal(new UiNode[] { first, second }, root.Children);
@@ -667,8 +814,11 @@ public sealed class UiDrawingTests
         Assert.Equal(1, root.Opacity);
         Assert.True(double.IsNaN(root.Width));
         Assert.False(root.Focusable);
+        Assert.Equal(1, screen.Scale);
+        Assert.True(screen.UseLayoutRounding);
         Assert.True(root.IsMeasureValid);
         Assert.True(root.IsArrangeValid);
+        screen.Close();
     }
 
     [Fact]
@@ -884,6 +1034,14 @@ public sealed class UiDrawingTests
         context.FillRectangle(
             new Rect(0, 0, 1, 1),
             new Color(1, 1, 1));
+
+    private static void AssertBounds(Rect expected, Rect actual)
+    {
+        Assert.Equal(expected.X, actual.X, 12);
+        Assert.Equal(expected.Y, actual.Y, 12);
+        Assert.Equal(expected.Width, actual.Width, 12);
+        Assert.Equal(expected.Height, actual.Height, 12);
+    }
 
     private static void Arrange(UiNode node, Rect bounds)
     {

@@ -98,6 +98,8 @@ public abstract class Parent : UiNode
             if (!ReferenceEquals(oldScreen, newScreen))
                 child.SetScreenRecursive(newScreen);
 
+            if (!ReferenceEquals(oldScreen, child.Screen))
+                child.InvalidateMeasureSubtree();
             oldParent?.InvalidateTreeStructure();
             InvalidateTreeStructure();
             CommitAndNotifyInputState(activeScreens);
@@ -161,6 +163,9 @@ public abstract class Parent : UiNode
 
         var screen = Screen;
         screen?.VerifyTreeMutationAccess();
+        var oldScreens = _children
+            .Select(child => (Child: child, Screen: child.Screen))
+            .ToArray();
         var affectedScreens = new List<UiScreen>();
         AddAffectedScreen(affectedScreens, screen);
         var activeScreens = BeginRuntimeOperations(affectedScreens);
@@ -175,6 +180,11 @@ public abstract class Parent : UiNode
             }
 
             _children.Clear();
+            foreach (var (child, oldScreen) in oldScreens)
+            {
+                if (!ReferenceEquals(oldScreen, child.Screen))
+                    child.InvalidateMeasureSubtree();
+            }
             InvalidateTreeStructure();
             CommitAndNotifyInputState(activeScreens);
         }
@@ -200,6 +210,7 @@ public abstract class Parent : UiNode
         var oldScreen = child.Screen;
         var newScreen = Screen;
         VerifyScreens(oldScreen, newScreen);
+        var replacedScreen = replacedChild.Screen;
         var affectedScreens = new List<UiScreen>();
         if (oldScreen is not null && !ReferenceEquals(oldScreen, newScreen))
             AddAffectedScreen(affectedScreens, oldScreen);
@@ -219,6 +230,10 @@ public abstract class Parent : UiNode
             if (newScreen is not null)
                 replacedChild.SetScreenRecursive(null);
 
+            if (!ReferenceEquals(oldScreen, child.Screen))
+                child.InvalidateMeasureSubtree();
+            if (!ReferenceEquals(replacedScreen, replacedChild.Screen))
+                replacedChild.InvalidateMeasureSubtree();
             oldParent?.InvalidateTreeStructure();
             InvalidateTreeStructure();
             CommitAndNotifyInputState(activeScreens);
@@ -262,6 +277,8 @@ public abstract class Parent : UiNode
             child.SetParent(null);
             if (screen is not null)
                 child.SetScreenRecursive(null);
+            if (!ReferenceEquals(screen, child.Screen))
+                child.InvalidateMeasureSubtree();
             InvalidateTreeStructure();
             CommitAndNotifyInputState(activeScreens);
         }
