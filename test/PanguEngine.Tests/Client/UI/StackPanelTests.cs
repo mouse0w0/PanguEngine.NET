@@ -238,17 +238,6 @@ public sealed class StackPanelTests
     }
 
     [Fact]
-    public void InvalidOrientationFailsBeforeMeasuringChildren()
-    {
-        var panel = new StackPanel { Orientation = (Orientation)99 };
-        var child = new TestNode();
-        panel.Children.Add(child);
-
-        Assert.Throws<InvalidOperationException>(() => panel.Measure(new Size(100, 100)));
-        Assert.Equal(0, child.MeasureCount);
-    }
-
-    [Fact]
     public void MainAxisMeasurementOverflowDoesNotCommitPanelMeasure()
     {
         var panel = new StackPanel { Spacing = 1 };

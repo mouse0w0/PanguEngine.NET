@@ -485,32 +485,6 @@ public abstract partial class UiNode
         VerifyMinimumDimension(MinHeight, nameof(MinHeight));
         VerifyMaximumDimension(MaxWidth, nameof(MaxWidth));
         VerifyMaximumDimension(MaxHeight, nameof(MaxHeight));
-
-        if (HorizontalAlignment is not (
-                HorizontalAlignment.Left or
-                HorizontalAlignment.Center or
-                HorizontalAlignment.Right or
-                HorizontalAlignment.Stretch))
-        {
-            throw new InvalidOperationException("HorizontalAlignment has an undefined value.");
-        }
-
-        if (VerticalAlignment is not (
-                VerticalAlignment.Top or
-                VerticalAlignment.Center or
-                VerticalAlignment.Bottom or
-                VerticalAlignment.Stretch))
-        {
-            throw new InvalidOperationException("VerticalAlignment has an undefined value.");
-        }
-
-        if (Visibility is not (
-                Visibility.Visible or
-                Visibility.Hidden or
-                Visibility.Collapsed))
-        {
-            throw new InvalidOperationException("Visibility has an undefined value.");
-        }
     }
 
     private double GetHorizontalOffset(double remaining) =>

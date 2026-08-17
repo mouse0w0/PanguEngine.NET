@@ -112,13 +112,6 @@ public sealed class StackPanel : Panel
     private (Orientation Orientation, double Spacing) GetLayoutProperties()
     {
         var orientation = Orientation;
-        if (orientation is not (
-                Orientation.Horizontal or
-                Orientation.Vertical))
-        {
-            throw new InvalidOperationException("Orientation has an undefined value.");
-        }
-
         var spacing = Spacing;
         if (!double.IsFinite(spacing) || spacing < 0)
             throw new InvalidOperationException("Spacing must be a finite non-negative value.");
