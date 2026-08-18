@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics;
+using PanguEngine.Graphics.Text;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -272,6 +273,102 @@ public sealed class UiResourceManagerTests
         manager.Destroy();
     }
 
+    [Fact]
+    public void ManagerWithoutGraphicsDeviceRejectsGlyphResolution()
+    {
+        using var fonts = new GlyphManagerContext();
+        var manager = new UiResourceManager();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            manager.ResolveGlyphBinding(fonts.CreateKey("A", 16)));
+
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void GlyphBindingWaitsForUploadAndReadyCanBecomeFaulted()
+    {
+        var upload = new MutableImageTestUploadHandle();
+        using var fonts = new GlyphManagerContext();
+        var device = new ImageTestGraphicsDevice(uploadHandle: upload);
+        var logger = new CapturingLogger();
+        var manager = new UiResourceManager(
+            device,
+            fonts.FontManager,
+            new ImageTestDescriptorSetLayout(),
+            logger);
+        var key = fonts.CreateKey("A", 16);
+
+        Assert.Null(manager.ResolveGlyphBinding(key));
+        upload.SetReady();
+        var ready = Assert.IsType<UiGlyphRenderBinding>(manager.ResolveGlyphBinding(key));
+        Assert.NotEqual(0UL, ready.ResourceId);
+
+        var failure = new InvalidOperationException("late glyph upload");
+        upload.SetFaulted(failure);
+        Assert.Null(manager.ResolveGlyphBinding(key));
+        Assert.Null(manager.ResolveGlyphBinding(key));
+
+        Assert.Equal(1, device.UploadCount);
+        Assert.Equal(1, logger.ErrorCount);
+        Assert.Same(failure, logger.LastException);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void EmptyGlyphDoesNotCreateAtlasPageOrUpload()
+    {
+        using var fonts = new GlyphManagerContext();
+        var device = new ImageTestGraphicsDevice();
+        var manager = new UiResourceManager(
+            device,
+            fonts.FontManager,
+            new ImageTestDescriptorSetLayout());
+
+        Assert.Null(manager.ResolveGlyphBinding(fonts.CreateKey(" ", 16)));
+
+        Assert.Equal(0, device.TextureCount);
+        Assert.Equal(0, device.UploadCount);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void GlyphKeyFromDifferentFontManagerIsRejected()
+    {
+        using var firstFonts = new GlyphManagerContext();
+        using var secondFonts = new GlyphManagerContext();
+        var manager = new UiResourceManager(
+            new ImageTestGraphicsDevice(),
+            secondFonts.FontManager,
+            new ImageTestDescriptorSetLayout());
+
+        Assert.Throws<ArgumentException>(() =>
+            manager.ResolveGlyphBinding(firstFonts.CreateKey("A", 16)));
+
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void GlyphResolutionRequiresOwnerThread()
+    {
+        using var fonts = new GlyphManagerContext();
+        var manager = new UiResourceManager(
+            new ImageTestGraphicsDevice(),
+            fonts.FontManager,
+            new ImageTestDescriptorSetLayout());
+        var key = fonts.CreateKey("A", 16);
+        Exception? exception = null;
+        var thread = new Thread(() =>
+            exception = Record.Exception(() =>
+                manager.ResolveGlyphBinding(key)));
+
+        thread.Start();
+        thread.Join();
+
+        Assert.IsType<InvalidOperationException>(exception);
+        manager.Destroy();
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference<UiImage> RegisterUnrootedImage(
         UiResourceManager manager,
@@ -300,6 +397,50 @@ public sealed class UiResourceManagerTests
 
     private static UiImage CreateImage() =>
         UiImage.FromRgba(new byte[] { 1, 2, 3, 4 }, 1, 1);
+
+    private sealed class GlyphManagerContext : IDisposable
+    {
+        private static readonly string FontPath = Path.Combine(
+            AppContext.BaseDirectory,
+            "Assets",
+            "Fonts",
+            "SourceHanSansCN-Regular.otf");
+
+        private readonly TextLayoutEngine _layoutEngine;
+        private readonly FontFace _face;
+
+        internal GlyphManagerContext()
+        {
+            FontManager = new FontManager();
+            using var stream = File.OpenRead(FontPath);
+            var font = Assert.Single(FontManager.Register(stream, 0));
+            FontManager.DefaultFont = font;
+            _face = FontManager.Match(font);
+            _layoutEngine = new TextLayoutEngine(FontManager);
+        }
+
+        internal FontManager FontManager { get; }
+
+        internal GlyphRasterKey CreateKey(string text, uint pixelSize)
+        {
+            var layout = _layoutEngine.Layout(new TextLayoutRequest(
+                text,
+                _face.Font,
+                16,
+                double.PositiveInfinity,
+                1,
+                TextWrapping.NoWrap,
+                TextAlignment.Left));
+            var glyph = Assert.Single(Assert.Single(layout.Lines).GlyphRuns).Glyphs[0];
+            return new GlyphRasterKey(
+                _face,
+                pixelSize,
+                glyph.GlyphId,
+                GlyphRasterizationMode.Grayscale);
+        }
+
+        public void Dispose() => FontManager.Dispose();
+    }
 
     private static void CollectUntilDead<T>(WeakReference<T> reference) where T : class
     {
@@ -362,6 +503,8 @@ internal sealed class ImageTestGraphicsDevice(
     UploadHandle? uploadHandle = null) : GraphicsDevice
 {
     internal int UploadCount { get; private set; }
+    internal List<ImageTestTexture> Textures { get; } = [];
+    internal int TextureCount => Textures.Count;
 
     public override uint MaxTextureDimension2D => 4096;
     public override uint MaxDrawIndirectCount => 1;
@@ -374,8 +517,12 @@ internal sealed class ImageTestGraphicsDevice(
         ReadOnlySpan<T> data,
         ulong destinationOffset = 0) => throw new NotSupportedException();
 
-    public override Texture CreateTexture(in TextureDescription description) =>
-        new ImageTestTexture(description);
+    public override Texture CreateTexture(in TextureDescription description)
+    {
+        var texture = new ImageTestTexture(description);
+        Textures.Add(texture);
+        return texture;
+    }
 
     public override TextureView CreateTextureView(
         Texture texture,
@@ -393,17 +540,23 @@ internal sealed class ImageTestGraphicsDevice(
     public override UploadHandle UploadTexture(
         Texture destination,
         ReadOnlySpan<byte> data,
-        in TextureUploadRegion region) => throw new NotSupportedException();
+        in TextureUploadRegion region)
+    {
+        UploadCount++;
+        if (uploadException is not null)
+            throw uploadException;
+        return uploadHandle ?? ImageTestUploadHandle.Ready;
+    }
 
     public override UploadHandle GenerateMipmaps(Texture texture) => throw new NotSupportedException();
-    public override Sampler CreateSampler(in SamplerDescription description) => throw new NotSupportedException();
+    public override Sampler CreateSampler(in SamplerDescription description) => new ImageTestSampler();
     public override Shader CreateShader(in ShaderDescription description) => throw new NotSupportedException();
 
     public override DescriptorSetLayout CreateDescriptorSetLayout(
         in DescriptorSetLayoutDescription description) => throw new NotSupportedException();
 
     public override DescriptorSet CreateDescriptorSet(
-        in DescriptorSetDescription description) => throw new NotSupportedException();
+        in DescriptorSetDescription description) => new ImageTestDescriptorSet();
 
     public override ulong GetAlignedUniformSize(ulong rawSize) => throw new NotSupportedException();
 
@@ -469,4 +622,36 @@ internal sealed class ImageTestUploadHandle : UploadHandle
         _exception is null ? UploadState.Ready : UploadState.Faulted;
 
     public override Exception? Exception => _exception;
+}
+
+internal sealed class MutableImageTestUploadHandle : UploadHandle
+{
+    private UploadState _state;
+    private Exception? _exception;
+
+    protected override UploadState State => _state;
+    public override Exception? Exception => _exception;
+
+    internal void SetReady() => _state = UploadState.Ready;
+
+    internal void SetFaulted(Exception exception)
+    {
+        _exception = exception;
+        _state = UploadState.Faulted;
+    }
+}
+
+internal sealed class ImageTestSampler : Sampler
+{
+    public override void Destroy() => MarkDestroyed();
+}
+
+internal sealed class ImageTestDescriptorSetLayout : DescriptorSetLayout
+{
+    public override void Destroy() => MarkDestroyed();
+}
+
+internal sealed class ImageTestDescriptorSet : DescriptorSet
+{
+    public override void Destroy() => MarkDestroyed();
 }

@@ -52,16 +52,6 @@ public sealed class ClientEngine
     /// </summary>
     public AudioSystem Audio { get; private set; } = null!;
 
-    /// <summary>
-    /// The client font manager.
-    /// </summary>
-    public FontManager FontManager { get; private set; } = null!;
-
-    /// <summary>
-    /// The client CPU text layout engine.
-    /// </summary>
-    public TextLayoutEngine TextLayoutEngine { get; private set; } = null!;
-
     private ClientGame Game { get; set; } = null!;
 
     internal BlockModelManager BlockModelManager { get; private set; } = null!;
@@ -146,25 +136,23 @@ public sealed class ClientEngine
     {
         Game.Destroy();
         Audio.Destroy();
-        FontManager.Dispose();
+        TextServices.Dispose();
         GraphicsBackend.Destroy();
 
         Engine.Shutdown();
     }
 
-    private void InitializeTextServices()
+    private static void InitializeTextServices()
     {
-        var fontManager = new FontManager(Engine.ResourceManager);
+        TextServices.Initialize();
         try
         {
-            fontManager.DefaultFont = new Font("Source Han Sans CN");
-            var textLayoutEngine = new TextLayoutEngine(fontManager);
-            FontManager = fontManager;
-            TextLayoutEngine = textLayoutEngine;
+            TextServices.FontManager.RegisterResources(Engine.ResourceManager);
+            TextServices.FontManager.DefaultFont = new Font("Source Han Sans CN");
         }
         catch
         {
-            fontManager.Dispose();
+            TextServices.Dispose();
             throw;
         }
     }

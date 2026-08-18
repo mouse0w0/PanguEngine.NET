@@ -1,3 +1,5 @@
+using PanguEngine.Graphics.Text;
+
 namespace PanguEngine.Client.UI;
 
 internal readonly record struct UiDrawingState(
@@ -122,6 +124,42 @@ public sealed class UiDrawingContext
     }
 
     /// <summary>
+    /// Appends an immutable text layout using local node coordinates.
+    /// </summary>
+    /// <param name="origin">The layout origin in local node coordinates.</param>
+    /// <param name="layout">The immutable CPU text layout.</param>
+    /// <param name="fontSize">The font size in logical pixels used to rasterize the layout.</param>
+    /// <param name="color">The non-premultiplied text color.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="layout"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is no longer active.</exception>
+    public void DrawText(
+        Point origin,
+        TextLayout layout,
+        double fontSize,
+        Color color)
+    {
+        VerifyActive();
+        ArgumentNullException.ThrowIfNull(layout);
+        if (color.A == 0 ||
+            _state.Opacity == 0 ||
+            _state.IsClipEmpty ||
+            !ContainsGlyph(layout))
+        {
+            return;
+        }
+
+        _commands.Add(new UiDrawTextCommand(
+            new Point(
+                AddCoordinate(_state.OriginX, origin.X),
+                AddCoordinate(_state.OriginY, origin.Y)),
+            layout,
+            fontSize,
+            color,
+            _state.Clip,
+            _state.Opacity));
+    }
+
+    /// <summary>
     /// Pushes a rectangular clip expressed in local node coordinates.
     /// </summary>
     /// <param name="clip">The local clip rectangle.</param>
@@ -243,6 +281,19 @@ public sealed class UiDrawingContext
         _states.Add(new StateEntry(token, _state));
         _state = state;
         return new UiDrawingScope(this, token);
+    }
+
+    private static bool ContainsGlyph(TextLayout layout)
+    {
+        foreach (var line in layout.Lines)
+        {
+            foreach (var run in line.GlyphRuns)
+            {
+                if (run.Glyphs.Count > 0)
+                    return true;
+            }
+        }
+        return false;
     }
 
     private void VerifyActive()

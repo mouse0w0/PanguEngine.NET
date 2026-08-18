@@ -26,22 +26,8 @@ public sealed class FontManager : IDisposable
     /// <summary>
     /// Initializes an empty font manager.
     /// </summary>
-    public FontManager()
+    internal FontManager()
     {
-    }
-
-    internal FontManager(ResourceManager resources) : this()
-    {
-        ArgumentNullException.ThrowIfNull(resources);
-        try
-        {
-            RegisterResources(resources);
-        }
-        catch
-        {
-            Dispose();
-            throw;
-        }
     }
 
     /// <summary>
@@ -62,6 +48,8 @@ public sealed class FontManager : IDisposable
             ThrowIfDisposed();
             if (!_faces.TryGetValue(value, out var face))
                 throw new ArgumentException("The default font must be registered with this font manager.", nameof(value));
+            if (ReferenceEquals(_defaultFace, face))
+                return;
 
             _defaultFace = face;
             _matches.Clear();
@@ -248,6 +236,22 @@ public sealed class FontManager : IDisposable
             throw new ArgumentException("The font face belongs to a different font manager.", nameof(face));
     }
 
+    internal void VerifyServiceAccess()
+    {
+        VerifyAccess();
+        ThrowIfDisposed();
+    }
+
+    internal GlyphBitmap Rasterize(
+        FontFace face,
+        uint pixelSize,
+        uint glyphId,
+        GlyphRasterizationMode mode)
+    {
+        VerifyFace(face);
+        return face.NativeFace.Rasterize(pixelSize, glyphId, mode);
+    }
+
     internal bool Supports(FontFace face, uint scalar)
     {
         VerifyFace(face);
@@ -292,7 +296,7 @@ public sealed class FontManager : IDisposable
             ?? throw new InvalidOperationException("The default font has not been initialized.");
     }
 
-    private void RegisterResources(ResourceManager resources)
+    internal void RegisterResources(ResourceManager resources)
     {
         var sources = resources.Sources;
         var sourcePriorities = new Dictionary<IResourceSource, int>(ReferenceEqualityComparer.Instance);

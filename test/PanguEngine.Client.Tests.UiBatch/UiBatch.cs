@@ -2,6 +2,7 @@ using PanguEngine.Client.Tests;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics;
+using PanguEngine.Graphics.Text;
 using PanguEngine.Windowing;
 
 namespace PanguEngine.Client.Tests.UiBatch;
@@ -17,6 +18,7 @@ internal sealed class UiBatchScene : IClientTestScene
     private const double UiScale = 1.25;
     private Presenter _presenter = null!;
     private UiRenderer _renderer = null!;
+    private UiManager _uiManager = null!;
     private UiBatchNode _root = null!;
     private UiScreen _screen = null!;
     private UiImage _firstImage = null!;
@@ -27,8 +29,20 @@ internal sealed class UiBatchScene : IClientTestScene
     public void Initialize(Window window)
     {
         _presenter = window.Presenter;
+        TextServices.Initialize();
+        try
+        {
+            TextServices.FontManager.RegisterResources(Engine.ResourceManager);
+            TextServices.FontManager.DefaultFont = new Font("Source Han Sans CN");
+        }
+        catch
+        {
+            TextServices.Dispose();
+            throw;
+        }
         _renderer = new UiRenderer(
             ClientTestApp.Current.Device,
+            TextServices.FontManager,
             _presenter.ColorFormat,
             TextureFormat.Undefined,
             _presenter.MaxFramesInFlight);
@@ -36,14 +50,28 @@ internal sealed class UiBatchScene : IClientTestScene
         _secondImage = CreateCheckerImage(12, 20, new Color(70, 125, 245), new Color(245, 215, 70));
         _root = new UiBatchNode(_firstImage, _secondImage);
         _screen = new UiScreen(_root) { Scale = UiScale };
-        _screen.Open();
+        _uiManager = new UiManager();
+        _uiManager.Open(_screen);
         window.Render += (_, _) => DrawFrame();
     }
 
     public void Destroy()
     {
-        _screen.Close();
-        _renderer.Destroy();
+        try
+        {
+            _uiManager.Shutdown();
+        }
+        finally
+        {
+            try
+            {
+                _renderer.Destroy();
+            }
+            finally
+            {
+                TextServices.Dispose();
+            }
+        }
     }
 
     private void DrawFrame()
@@ -63,7 +91,7 @@ internal sealed class UiBatchScene : IClientTestScene
             }
 
             _root.Dense = frame.FrameNumber >= _presenter.MaxFramesInFlight;
-            _screen.Update(new Size(frame.Width, frame.Height));
+            _uiManager.Update(new Size(frame.Width, frame.Height));
             var drawCommands = _screen.CreateDrawCommandList();
 
             commandList.BeginRendering(new RenderingDescription
@@ -126,6 +154,8 @@ internal sealed class UiBatchScene : IClientTestScene
         private readonly UiImage _firstImage;
         private readonly UiImage _secondImage;
         private readonly ImageView[] _imageViews;
+        private readonly Text[] _textNodes;
+        private readonly TextClipPanel _textClipPanel;
         private readonly DecorationPanel _decorationPanel;
 
         internal UiBatchNode(UiImage firstImage, UiImage secondImage)
@@ -139,8 +169,47 @@ internal sealed class UiBatchScene : IClientTestScene
                 CreateImageView(_secondImage, ImageStretch.Uniform),
                 CreateImageView(_secondImage, ImageStretch.UniformToFill)
             ];
-            foreach (var imageView in _imageViews)
-                Children.Add(imageView);
+            _textNodes =
+            [
+                new Text
+                {
+                    Content = "Dynamic glyph atlas  Aa 0123",
+                    FontSize = 24,
+                    Color = new Color(245, 245, 245),
+                    Wrapping = TextWrapping.NoWrap
+                },
+                new Text
+                {
+                    Content = "动态字形图集与简体中文换行",
+                    Font = new Font("Missing UI Family"),
+                    FontSize = 18,
+                    Color = new Color(95, 225, 185),
+                    Wrapping = TextWrapping.Wrap,
+                    Alignment = TextAlignment.Center
+                },
+                new Text
+                {
+                    Content = "Right aligned\nshort line",
+                    FontSize = 14,
+                    Color = new Color(245, 210, 70),
+                    Wrapping = TextWrapping.NoWrap,
+                    Alignment = TextAlignment.Right,
+                    Opacity = 0.65
+                }
+            ];
+            _textClipPanel = new TextClipPanel(_textNodes[1])
+            {
+                ClipToBounds = true,
+                Background = new SolidColorBrush(new Color(25, 60, 55, 180)),
+                Padding = new Thickness(4)
+            };
+            Children.Add(_imageViews[0]);
+            Children.Add(_textNodes[0]);
+            Children.Add(_imageViews[1]);
+            Children.Add(_textClipPanel);
+            Children.Add(_imageViews[2]);
+            Children.Add(_textNodes[2]);
+            Children.Add(_imageViews[3]);
 
             _decorationPanel = new DecorationPanel
             {
@@ -159,6 +228,9 @@ internal sealed class UiBatchScene : IClientTestScene
         {
             foreach (var imageView in _imageViews)
                 imageView.Measure(Size.Infinite);
+            _textNodes[0].Measure(Size.Infinite);
+            _textClipPanel.Measure(new Size(220, 52));
+            _textNodes[2].Measure(Size.Infinite);
             _decorationPanel.Measure(Size.Infinite);
 
             return Size.Zero;
@@ -179,6 +251,13 @@ internal sealed class UiBatchScene : IClientTestScene
 
             for (var index = 0; index < _imageViews.Length; index++)
                 _imageViews[index].Arrange(Scale(imageBounds[index], layoutScale, offsetX, offsetY));
+
+            _textNodes[0].Arrange(
+                Scale(new Rect(50, 215, 350, 30), layoutScale, offsetX, offsetY));
+            _textClipPanel.Arrange(
+                Scale(new Rect(360, 188, 220, 54), layoutScale, offsetX, offsetY));
+            _textNodes[2].Arrange(
+                Scale(new Rect(250, 305, 350, 42), layoutScale, offsetX, offsetY));
 
             _decorationPanel.Arrange(
                 Scale(new Rect(160, 460, 320, 70), layoutScale, offsetX, offsetY));
@@ -254,6 +333,11 @@ internal sealed class UiBatchScene : IClientTestScene
                 context.FillRectangle(
                     new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height),
                     new Color(245, 245, 245, 210));
+        }
+
+        private sealed class TextClipPanel : Panel
+        {
+            internal TextClipPanel(Text child) => Children.Add(child);
         }
 
         private static Rect Scale(Rect rect, double layoutScale, double offsetX, double offsetY) =>

@@ -4,6 +4,7 @@ using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Graphics;
+using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI.Rendering;
 
@@ -36,8 +37,13 @@ internal sealed class UiResourceManager
         LogLevel.Error,
         new EventId(1, nameof(LogImageUploadFailure)),
         "UI image resource {ResourceId} upload failed; subsequent draws will be skipped");
+    private static readonly Action<ILogger, uint, Exception?> LogGlyphUploadFailure = LoggerMessage.Define<uint>(
+        LogLevel.Error,
+        new EventId(2, nameof(LogGlyphUploadFailure)),
+        "UI glyph {GlyphId} upload failed; subsequent draws will be skipped");
 
     private readonly GraphicsDevice? _device;
+    private readonly FontManager? _fontManager;
     private readonly DescriptorSetLayout? _imageDescriptorLayout;
     private readonly ILogger _logger;
     private readonly Thread _ownerThread = Thread.CurrentThread;
@@ -50,6 +56,7 @@ internal sealed class UiResourceManager
     private bool _destroyed;
     private Sampler? _linearSampler;
     private Sampler? _nearestSampler;
+    private GlyphAtlas? _glyphAtlas;
 
     internal UiResourceManager()
     {
@@ -63,6 +70,21 @@ internal sealed class UiResourceManager
     {
         ArgumentNullException.ThrowIfNull(device);
         _device = device;
+        _imageDescriptorLayout = imageDescriptorLayout;
+        _logger = logger ?? NullLogger.Instance;
+    }
+
+    internal UiResourceManager(
+        GraphicsDevice device,
+        FontManager fontManager,
+        DescriptorSetLayout? imageDescriptorLayout = null,
+        ILogger? logger = null)
+    {
+        ArgumentNullException.ThrowIfNull(device);
+        ArgumentNullException.ThrowIfNull(fontManager);
+        fontManager.VerifyServiceAccess();
+        _device = device;
+        _fontManager = fontManager;
         _imageDescriptorLayout = imageDescriptorLayout;
         _logger = logger ?? NullLogger.Instance;
     }
@@ -232,6 +254,34 @@ internal sealed class UiResourceManager
         return new UiImageRenderBinding(state.ResourceId, descriptorSet);
     }
 
+    internal UiGlyphRenderBinding? ResolveGlyphBinding(GlyphRasterKey key)
+    {
+        VerifyOwnerThread();
+        ObjectDisposedException.ThrowIf(_destroyed, this);
+        var atlas = GetGlyphAtlas();
+        var entry = atlas.Resolve(key);
+        if (entry.IsEmpty)
+            return null;
+        if (entry.TryObserveUploadFailure(out var uploadFailure, out var firstObservation))
+        {
+            if (firstObservation)
+                LogGlyphUploadFailure(_logger, key.GlyphId, uploadFailure);
+            return null;
+        }
+        if (!entry.IsUploadReady)
+            return null;
+
+        var page = entry.Page!;
+        return new UiGlyphRenderBinding(
+            page.ResourceId,
+            page.DescriptorSet,
+            page.Width,
+            page.Height,
+            entry.Region,
+            entry.BearingX,
+            entry.BearingY);
+    }
+
     internal DescriptorSet CreateImageDescriptorSet(
         GpuImage state,
         ImageSamplingMode samplingMode,
@@ -267,6 +317,18 @@ internal sealed class UiResourceManager
         _destroyed = true;
         _imageRegistrations.Clear();
         var errors = new List<Exception>();
+        if (_glyphAtlas is not null)
+        {
+            try
+            {
+                _glyphAtlas.Destroy();
+            }
+            catch (Exception exception)
+            {
+                errors.Add(exception);
+            }
+            _glyphAtlas = null;
+        }
         DrainFinalizedResourcesCore(errors.Add);
 
         foreach (var state in _states.Values)
@@ -316,6 +378,21 @@ internal sealed class UiResourceManager
     {
         if (!ReferenceEquals(Thread.CurrentThread, _ownerThread))
             throw new InvalidOperationException("UI resource manager access must occur on its owner thread.");
+    }
+
+    private GlyphAtlas GetGlyphAtlas()
+    {
+        if (_glyphAtlas is not null)
+            return _glyphAtlas;
+
+        var device = _device ?? throw new InvalidOperationException(
+            "The UI resource manager has no graphics device.");
+        var fontManager = _fontManager ?? throw new InvalidOperationException(
+            "The UI resource manager has no font manager.");
+        var layout = _imageDescriptorLayout ?? throw new InvalidOperationException(
+            "The UI resource manager has no sampled image descriptor layout.");
+        _glyphAtlas = new GlyphAtlas(device, fontManager, layout, GetSampler(false));
+        return _glyphAtlas;
     }
 
     private static SamplerDescription CreateSamplerDescription(FilterMode filter) =>

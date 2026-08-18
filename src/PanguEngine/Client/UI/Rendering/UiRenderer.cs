@@ -1,11 +1,15 @@
 using System.Runtime.InteropServices;
+using System.Runtime.ExceptionServices;
 using PanguEngine.Graphics;
+using PanguEngine.Graphics.Text;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Client.UI.Rendering;
 
 internal sealed class UiRenderer
 {
+    private const string CleanupFailuresDataKey = "UiRenderer.CleanupFailures";
+
     private readonly GraphicsDevice _device;
     private readonly bool _convertSrgbToLinear;
     private readonly UiDrawBuilder _builder = new();
@@ -14,16 +18,20 @@ internal sealed class UiRenderer
     private readonly GraphicsPipeline _pipeline;
     private readonly DescriptorSetLayout _imageDescriptorLayout;
     private readonly GraphicsPipeline _imagePipeline;
+    private readonly GraphicsPipeline _textPipeline;
     private bool _destroyed;
 
     internal UiRenderer(
         GraphicsDevice device,
+        FontManager fontManager,
         TextureFormat colorFormat,
         TextureFormat depthStencilFormat,
         uint frameSlotCount)
     {
         ArgumentNullException.ThrowIfNull(device);
+        ArgumentNullException.ThrowIfNull(fontManager);
         ArgumentOutOfRangeException.ThrowIfZero(frameSlotCount);
+        fontManager.VerifyServiceAccess();
 
         _device = device;
         _convertSrgbToLinear = colorFormat is TextureFormat.R8G8B8A8Srgb or TextureFormat.B8G8R8A8Srgb;
@@ -31,19 +39,22 @@ internal sealed class UiRenderer
         for (var index = 0; index < _frameResources.Length; index++)
             _frameResources[index] = new FrameResources();
 
-        _imageDescriptorLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
+        var imageDescriptorLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
             [new DescriptorSetLayoutBinding(
                 0,
                 DescriptorType.CombinedImageSampler,
                 ShaderStageFlags.Fragment)]));
-        _resourceManager = new UiResourceManager(
-            device,
-            _imageDescriptorLayout,
-            Log.CreateLogger("UI"));
-
-        GraphicsPipeline solidPipeline;
+        UiResourceManager? resourceManager = null;
+        GraphicsPipeline? solidPipeline = null;
+        GraphicsPipeline? imagePipeline = null;
+        GraphicsPipeline? textPipeline = null;
         try
         {
+            resourceManager = new UiResourceManager(
+                device,
+                fontManager,
+                imageDescriptorLayout,
+                Log.CreateLogger("UI"));
             solidPipeline = CreatePipeline(
                 device,
                 colorFormat,
@@ -54,17 +65,6 @@ internal sealed class UiRenderer
                 "ui_solid.frag",
                 UiVertex.SolidVertexInput,
                 []);
-        }
-        catch
-        {
-            _resourceManager.Destroy();
-            _imageDescriptorLayout.Destroy();
-            throw;
-        }
-
-        GraphicsPipeline imagePipeline;
-        try
-        {
             imagePipeline = CreatePipeline(
                 device,
                 colorFormat,
@@ -73,19 +73,37 @@ internal sealed class UiRenderer
                 "pangu/shaders/ui_image.frag",
                 "ui_image.vert",
                 "ui_image.frag",
-                UiVertex.ImageVertexInput,
-                [_imageDescriptorLayout]);
+                UiVertex.TexturedVertexInput,
+                [imageDescriptorLayout]);
+            textPipeline = CreatePipeline(
+                device,
+                colorFormat,
+                depthStencilFormat,
+                "pangu/shaders/ui_text.vert",
+                "pangu/shaders/ui_text.frag",
+                "ui_text.vert",
+                "ui_text.frag",
+                UiVertex.TexturedVertexInput,
+                [imageDescriptorLayout]);
         }
-        catch
+        catch (Exception exception)
         {
-            solidPipeline.Destroy();
-            _resourceManager.Destroy();
-            _imageDescriptorLayout.Destroy();
+            var cleanupFailures = new List<Exception>();
+            Destroy(textPipeline, cleanupFailures);
+            Destroy(imagePipeline, cleanupFailures);
+            Destroy(solidPipeline, cleanupFailures);
+            Destroy(resourceManager, cleanupFailures);
+            Destroy(imageDescriptorLayout, cleanupFailures);
+            if (cleanupFailures.Count > 0)
+                exception.Data[CleanupFailuresDataKey] = cleanupFailures.ToArray();
             throw;
         }
 
         _pipeline = solidPipeline;
         _imagePipeline = imagePipeline;
+        _textPipeline = textPipeline;
+        _resourceManager = resourceManager;
+        _imageDescriptorLayout = imageDescriptorLayout;
     }
 
     internal void Draw(Frame frame, UiDrawCommandList commands)
@@ -102,7 +120,8 @@ internal sealed class UiRenderer
             frame.Width,
             frame.Height,
             _convertSrgbToLinear,
-            _resourceManager.ResolveImageBinding);
+            _resourceManager.ResolveImageBinding,
+            _resourceManager.ResolveGlyphBinding);
         if (_builder.RectangleCount == 0)
             return;
 
@@ -120,14 +139,21 @@ internal sealed class UiRenderer
         var projection = new UiProjection(2f / frame.Width, 2f / frame.Height);
         foreach (var batch in _builder.Batches)
         {
-            if (batch.Material.Kind == UiMaterialKind.Image)
+            switch (batch.Material.Kind)
             {
-                commandList.SetGraphicsPipeline(_imagePipeline);
-                commandList.SetDescriptorSet(0, batch.Material.DescriptorSet!);
-            }
-            else
-            {
-                commandList.SetGraphicsPipeline(_pipeline);
+                case UiMaterialKind.Solid:
+                    commandList.SetGraphicsPipeline(_pipeline);
+                    break;
+                case UiMaterialKind.Image:
+                    commandList.SetGraphicsPipeline(_imagePipeline);
+                    commandList.SetDescriptorSet(0, batch.Material.DescriptorSet!);
+                    break;
+                case UiMaterialKind.Text:
+                    commandList.SetGraphicsPipeline(_textPipeline);
+                    commandList.SetDescriptorSet(0, batch.Material.DescriptorSet!);
+                    break;
+                default:
+                    throw new InvalidOperationException("UI material kind has an undefined value.");
             }
 
             commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, projection);
@@ -144,17 +170,22 @@ internal sealed class UiRenderer
     {
         if (_destroyed)
             return;
+        _destroyed = true;
 
-        _resourceManager.Destroy();
-        _imagePipeline.Destroy();
-        _imageDescriptorLayout.Destroy();
+        var errors = new List<Exception>();
+        Destroy(_resourceManager, errors);
+        Destroy(_textPipeline, errors);
+        Destroy(_imagePipeline, errors);
+        Destroy(_imageDescriptorLayout, errors);
         foreach (var frame in _frameResources)
         {
-            frame.IndexBuffer?.Destroy();
-            frame.VertexBuffer?.Destroy();
+            Destroy(frame.IndexBuffer, errors);
+            Destroy(frame.VertexBuffer, errors);
         }
-        _pipeline.Destroy();
-        _destroyed = true;
+        Destroy(_pipeline, errors);
+
+        if (errors.Count > 0)
+            ExceptionDispatchInfo.Capture(errors[0]).Throw();
     }
 
     private static GraphicsPipeline CreatePipeline(
@@ -237,6 +268,30 @@ internal sealed class UiRenderer
         frame.Capacity = newCapacity;
         oldIndexBuffer?.Destroy();
         oldVertexBuffer?.Destroy();
+    }
+
+    private static void Destroy(GraphicsResource? resource, List<Exception> errors)
+    {
+        try
+        {
+            resource?.Destroy();
+        }
+        catch (Exception exception)
+        {
+            errors.Add(exception);
+        }
+    }
+
+    private static void Destroy(UiResourceManager? manager, List<Exception> errors)
+    {
+        try
+        {
+            manager?.Destroy();
+        }
+        catch (Exception exception)
+        {
+            errors.Add(exception);
+        }
     }
 
     [StructLayout(LayoutKind.Sequential)]

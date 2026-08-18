@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using PanguEngine.Graphics;
+using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI.Rendering;
 
@@ -15,7 +16,7 @@ internal readonly struct UiVertex
             new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x4, 8)
         ]);
 
-    internal static readonly VertexInputDescription ImageVertexInput = new(
+    internal static readonly VertexInputDescription TexturedVertexInput = new(
         [new VertexBufferLayoutDescription(0, SizeInBytes)],
         [
             new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
@@ -71,7 +72,8 @@ internal readonly record struct UiScissor(int X, int Y, uint Width, uint Height)
 internal enum UiMaterialKind
 {
     Solid,
-    Image
+    Image,
+    Text
 }
 
 internal readonly record struct UiBatchMaterial(
@@ -87,6 +89,15 @@ internal readonly record struct UiBatchMaterial(
 internal readonly record struct UiImageRenderBinding(
     ulong ResourceId,
     DescriptorSet DescriptorSet);
+
+internal readonly record struct UiGlyphRenderBinding(
+    ulong ResourceId,
+    DescriptorSet DescriptorSet,
+    uint PageWidth,
+    uint PageHeight,
+    GlyphAtlasRegion Region,
+    int Left,
+    int Top);
 
 internal readonly record struct UiBatch
 {
@@ -118,6 +129,8 @@ internal readonly record struct UiBatch
 
 internal delegate UiImageRenderBinding? UiImageResolver(UiDrawImageCommand command);
 
+internal delegate UiGlyphRenderBinding? UiGlyphResolver(GlyphRasterKey key);
+
 internal sealed class UiDrawBuilder
 {
     private readonly List<UiVertex> _vertices = [];
@@ -134,14 +147,16 @@ internal sealed class UiDrawBuilder
         uint framebufferWidth,
         uint framebufferHeight,
         bool convertSrgbToLinear,
-        UiImageResolver? imageResolver = null)
+        UiImageResolver? imageResolver = null,
+        UiGlyphResolver? glyphResolver = null)
     {
         ArgumentNullException.ThrowIfNull(commands);
         var uiScale = commands.Scale;
         if (!double.IsFinite(uiScale) || uiScale <= 0)
         {
             throw new ArgumentOutOfRangeException(
-                nameof(commands.Scale),
+                nameof(commands),
+                uiScale,
                 "UI drawing command scale must be finite and greater than zero.");
         }
 
@@ -175,6 +190,17 @@ internal sealed class UiDrawBuilder
                             framebufferHeight,
                             uiScale);
                     }
+                    break;
+                case UiDrawTextCommand text:
+                    if (glyphResolver is null)
+                        throw new NotSupportedException("Text drawing requires a glyph resource resolver.");
+                    AppendText(
+                        text,
+                        glyphResolver,
+                        framebufferWidth,
+                        framebufferHeight,
+                        uiScale,
+                        convertSrgbToLinear);
                     break;
                 default:
                     throw new NotSupportedException($"UI draw command '{command.GetType().Name}' is not supported.");
@@ -280,6 +306,83 @@ internal sealed class UiDrawBuilder
             (float)clampMaxV,
             (float)u1,
             (float)v1);
+    }
+
+    private void AppendText(
+        UiDrawTextCommand command,
+        UiGlyphResolver glyphResolver,
+        uint framebufferWidth,
+        uint framebufferHeight,
+        double uiScale,
+        bool convertSrgbToLinear)
+    {
+        if (!TryGetScissor(command.Clip, framebufferWidth, framebufferHeight, uiScale, out var scissor))
+            return;
+
+        var pixelSize = GlyphRasterization.GetPixelSize(command.FontSize, uiScale);
+        var color = command.Color;
+        var r = ToColorChannel(color.R, convertSrgbToLinear);
+        var g = ToColorChannel(color.G, convertSrgbToLinear);
+        var b = ToColorChannel(color.B, convertSrgbToLinear);
+        var a = (float)(color.A / 255.0 * command.Opacity);
+        foreach (var line in command.Layout.Lines)
+        {
+            foreach (var run in line.GlyphRuns)
+            {
+                foreach (var glyph in run.Glyphs)
+                {
+                    var key = new GlyphRasterKey(
+                        run.FontFace,
+                        pixelSize,
+                        glyph.GlyphId,
+                        GlyphRasterizationMode.Grayscale);
+                    if (glyphResolver(key) is not { } binding)
+                        continue;
+
+                    var penX = (command.Origin.X + glyph.X + glyph.XOffset) * uiScale;
+                    var baselineY = (command.Origin.Y + glyph.Y + glyph.YOffset) * uiScale;
+                    var bounds = new PhysicalBounds(
+                        penX + binding.Left,
+                        baselineY - binding.Top,
+                        penX + binding.Left + binding.Region.Width,
+                        baselineY - binding.Top + binding.Region.Height);
+                    if (!Intersects(bounds, scissor))
+                        continue;
+
+                    var pageWidth = (double)binding.PageWidth;
+                    var pageHeight = (double)binding.PageHeight;
+                    var region = binding.Region;
+                    var u0 = region.X / pageWidth;
+                    var v0 = region.Y / pageHeight;
+                    var u1 = (region.X + region.Width) / pageWidth;
+                    var v1 = (region.Y + region.Height) / pageHeight;
+                    var clampMinU = (region.X + 0.5) / pageWidth;
+                    var clampMinV = (region.Y + 0.5) / pageHeight;
+                    var clampMaxU = (region.X + region.Width - 0.5) / pageWidth;
+                    var clampMaxV = (region.Y + region.Height - 0.5) / pageHeight;
+                    AppendGeometry(
+                        bounds,
+                        scissor,
+                        new UiBatchMaterial(
+                            UiMaterialKind.Text,
+                            binding.ResourceId,
+                            binding.DescriptorSet,
+                            ImageSamplingMode.Linear),
+                        r,
+                        g,
+                        b,
+                        a,
+                        (float)u0,
+                        (float)v0,
+                        (float)clampMinU,
+                        (float)clampMinV,
+                        (float)clampMaxU,
+                        (float)clampMaxV,
+                        (float)u1,
+                        (float)v1);
+                }
+            }
+        }
     }
 
     private void AppendGeometry(

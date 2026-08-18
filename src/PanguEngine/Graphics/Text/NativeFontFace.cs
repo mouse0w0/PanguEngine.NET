@@ -84,7 +84,7 @@ internal sealed unsafe class NativeFontFace
                 &freeTypeFace);
             if (error != FT_Error.FT_Err_Ok || freeTypeFace == null)
                 throw new InvalidDataException($"FreeType could not load face {faceIndex} ({error}).");
-            if ((freeTypeFace->face_flags & (nint)FT_FACE_FLAG.FT_FACE_FLAG_SFNT) == 0)
+            if ((freeTypeFace->face_flags.ToInt64() & (int)FT_FACE_FLAG.FT_FACE_FLAG_SFNT) == 0)
                 throw new InvalidDataException($"Font face {faceIndex} is not an SFNT OpenType face.");
 
             error = FT.FT_Select_Charmap(freeTypeFace, FT_Encoding_.FT_ENCODING_UNICODE);
@@ -119,7 +119,7 @@ internal sealed unsafe class NativeFontFace
     internal bool Supports(uint scalar)
     {
         ThrowIfDestroyed();
-        return FT.FT_Get_Char_Index(_freeTypeFace, (UIntPtr)scalar) != 0;
+        return FT.FT_Get_Char_Index(_freeTypeFace, scalar) != 0;
     }
 
     internal int GetHorizontalAdvance(uint glyphId)
@@ -132,6 +132,51 @@ internal sealed unsafe class NativeFontFace
     {
         ThrowIfDestroyed();
         return HarfBuzzFont.TryGetGlyphExtents(glyphId, out extents);
+    }
+
+    internal GlyphBitmap Rasterize(
+        uint pixelSize,
+        uint glyphId,
+        GlyphRasterizationMode mode)
+    {
+        ThrowIfDestroyed();
+        const FT_LOAD loadFlags = FT_LOAD.FT_LOAD_NO_BITMAP;
+        var renderMode = mode switch
+        {
+            GlyphRasterizationMode.Grayscale => FT_Render_Mode_.FT_RENDER_MODE_NORMAL,
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "Unsupported glyph rasterization mode.")
+        };
+        var error = FT.FT_Set_Pixel_Sizes(_freeTypeFace, 0, pixelSize);
+        if (error != FT_Error.FT_Err_Ok)
+            throw new InvalidOperationException($"FreeType could not set glyph pixel size ({error}).");
+
+        error = FT.FT_Load_Glyph(_freeTypeFace, glyphId, loadFlags);
+        if (error != FT_Error.FT_Err_Ok)
+            throw new InvalidOperationException($"FreeType could not load glyph {glyphId} ({error}).");
+
+        error = FT.FT_Render_Glyph(
+            _freeTypeFace->glyph,
+            renderMode);
+        if (error != FT_Error.FT_Err_Ok)
+            throw new InvalidOperationException($"FreeType could not render glyph {glyphId} ({error}).");
+
+        var slot = _freeTypeFace->glyph;
+        var bitmap = slot->bitmap;
+        var width = checked((int)bitmap.width);
+        var height = checked((int)bitmap.rows);
+        if (width == 0 || height == 0)
+            return new GlyphBitmap([], width, height, slot->bitmap_left, slot->bitmap_top);
+        if (bitmap.pixel_mode != FT_Pixel_Mode_.FT_PIXEL_MODE_GRAY)
+            throw new InvalidOperationException("FreeType produced a non-grayscale glyph bitmap.");
+
+        var pixels = new byte[checked(width * height)];
+        for (var row = 0; row < height; row++)
+        {
+            new ReadOnlySpan<byte>(bitmap.buffer + row * bitmap.pitch, width)
+                .CopyTo(pixels.AsSpan(row * width, width));
+        }
+
+        return new GlyphBitmap(pixels, width, height, slot->bitmap_left, slot->bitmap_top);
     }
 
     internal void Destroy()

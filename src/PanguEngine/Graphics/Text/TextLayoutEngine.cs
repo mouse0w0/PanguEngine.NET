@@ -15,7 +15,15 @@ public sealed class TextLayoutEngine
 
     internal TextLayoutEngine(FontManager fontManager)
     {
+        ArgumentNullException.ThrowIfNull(fontManager);
+        fontManager.VerifyServiceAccess();
         _fontManager = fontManager;
+    }
+
+    internal void VerifyServiceAccess()
+    {
+        VerifyAccess();
+        _fontManager.VerifyServiceAccess();
     }
 
     /// <summary>
@@ -25,7 +33,7 @@ public sealed class TextLayoutEngine
     /// <returns>An immutable CPU text layout.</returns>
     public TextLayout Layout(TextLayoutRequest request)
     {
-        VerifyAccess();
+        VerifyServiceAccess();
         ArgumentNullException.ThrowIfNull(request.Text);
         ArgumentNullException.ThrowIfNull(request.Font);
         var preferredFace = _fontManager.Match(request.Font);
