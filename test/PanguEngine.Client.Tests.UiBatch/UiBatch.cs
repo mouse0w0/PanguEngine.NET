@@ -3,6 +3,7 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
+using PanguEngine.Input;
 using PanguEngine.Windowing;
 
 namespace PanguEngine.Client.Tests.UiBatch;
@@ -23,6 +24,7 @@ internal sealed class UiBatchScene : IClientTestScene
     private UiScreen _screen = null!;
     private UiImage _firstImage = null!;
     private UiImage _secondImage = null!;
+    private bool _buttonStatesInitialized;
 
     public string Name => "UI Batch";
 
@@ -92,6 +94,11 @@ internal sealed class UiBatchScene : IClientTestScene
 
             _root.Dense = frame.FrameNumber >= _presenter.MaxFramesInFlight;
             _uiManager.Update(new Size(frame.Width, frame.Height));
+            if (!_buttonStatesInitialized)
+            {
+                _root.EstablishButtonStates(_uiManager);
+                _buttonStatesInitialized = true;
+            }
             var drawCommands = _screen.CreateDrawCommandList();
 
             commandList.BeginRendering(new RenderingDescription
@@ -150,13 +157,14 @@ internal sealed class UiBatchScene : IClientTestScene
     private sealed class UiBatchNode : Panel
     {
         private const double DesignWidth = 640;
-        private const double DesignHeight = 560;
+        private const double DesignHeight = 750;
         private readonly UiImage _firstImage;
         private readonly UiImage _secondImage;
         private readonly ImageView[] _imageViews;
         private readonly Text[] _textNodes;
         private readonly TextClipPanel _textClipPanel;
         private readonly DecorationPanel _decorationPanel;
+        private readonly ButtonPanel _buttonPanel;
 
         internal UiBatchNode(UiImage firstImage, UiImage secondImage)
         {
@@ -220,9 +228,15 @@ internal sealed class UiBatchScene : IClientTestScene
             };
             _decorationPanel.Children.Add(new DecorationContentNode());
             Children.Add(_decorationPanel);
+
+            _buttonPanel = new ButtonPanel(_firstImage);
+            Children.Add(_buttonPanel);
         }
 
         internal bool Dense { get; set; }
+
+        internal void EstablishButtonStates(UiManager manager) =>
+            _buttonPanel.EstablishStates(manager);
 
         protected override Size MeasureContent(Size availableSize)
         {
@@ -232,6 +246,7 @@ internal sealed class UiBatchScene : IClientTestScene
             _textClipPanel.Measure(new Size(220, 52));
             _textNodes[2].Measure(Size.Infinite);
             _decorationPanel.Measure(Size.Infinite);
+            _buttonPanel.Measure(new Size(560, 150));
 
             return Size.Zero;
         }
@@ -261,6 +276,8 @@ internal sealed class UiBatchScene : IClientTestScene
 
             _decorationPanel.Arrange(
                 Scale(new Rect(160, 460, 320, 70), layoutScale, offsetX, offsetY));
+            _buttonPanel.Arrange(
+                Scale(new Rect(40, 560, 560, 150), layoutScale, offsetX, offsetY));
         }
 
         protected override void DrawCore(UiDrawingContext context)
@@ -338,6 +355,91 @@ internal sealed class UiBatchScene : IClientTestScene
         private sealed class TextClipPanel : Panel
         {
             internal TextClipPanel(Text child) => Children.Add(child);
+        }
+
+        private sealed class ButtonPanel : Panel
+        {
+            private const int ColumnCount = 4;
+            private readonly Button _hoverButton;
+            private readonly Button _pressedButton;
+            private readonly Button _focusedButton;
+
+            internal ButtonPanel(UiImage image)
+            {
+                var buttons = new Button[]
+                {
+                    new() { Text = "Normal" },
+                    new() { Text = "Hover" },
+                    new() { Text = "Pressed" },
+                    new() { Text = "Focused" },
+                    new() { Text = "Disabled", IsEnabled = false },
+                    new() { Text = "Mix", Icon = image },
+                    new() { Icon = image },
+                    new()
+                };
+                _hoverButton = buttons[1];
+                _pressedButton = buttons[2];
+                _focusedButton = buttons[3];
+                foreach (var button in buttons)
+                    Children.Add(button);
+            }
+
+            internal void EstablishStates(UiManager manager)
+            {
+                var pressedCenter = GetOutputCenter(_pressedButton);
+                manager.ProcessPointerMoved(pressedCenter);
+                manager.ProcessPointerPressed(
+                    pressedCenter,
+                    MouseButton.Left,
+                    KeyModifiers.None);
+                _ = _focusedButton.Focus();
+                manager.ProcessPointerMoved(GetOutputCenter(_hoverButton));
+            }
+
+            protected override Size MeasureContent(Size availableSize)
+            {
+                var (cellSize, _, _) = GetGridMetrics(availableSize);
+                foreach (var child in Children)
+                    child.Measure(cellSize);
+                return availableSize;
+            }
+
+            protected override void ArrangeContent(Rect contentBounds)
+            {
+                var (cellSize, columnSpacing, rowSpacing) = GetGridMetrics(
+                    new Size(contentBounds.Width, contentBounds.Height));
+                for (var index = 0; index < Children.Count; index++)
+                {
+                    var column = index % ColumnCount;
+                    var row = index / ColumnCount;
+                    Children[index].Arrange(new Rect(
+                        contentBounds.X + column * (cellSize.Width + columnSpacing),
+                        contentBounds.Y + row * (cellSize.Height + rowSpacing),
+                        cellSize));
+                }
+            }
+
+            private static (Size CellSize, double ColumnSpacing, double RowSpacing) GetGridMetrics(
+                Size availableSize)
+            {
+                var columnSpacing = availableSize.Width / 56;
+                var rowSpacing = availableSize.Height * 0.08;
+                return (
+                    new Size(
+                        (availableSize.Width - (ColumnCount - 1) * columnSpacing) / ColumnCount,
+                        (availableSize.Height - rowSpacing) / 2),
+                    columnSpacing,
+                    rowSpacing);
+            }
+
+            private static Point GetOutputCenter(Button button)
+            {
+                var logicalCenter = button.LocalToScreen(new Point(
+                    button.LayoutBounds.Width / 2,
+                    button.LayoutBounds.Height / 2));
+                var scale = button.Screen!.Scale;
+                return new Point(logicalCenter.X * scale, logicalCenter.Y * scale);
+            }
         }
 
         private static Rect Scale(Rect rect, double layoutScale, double offsetX, double offsetY) =>
