@@ -3,12 +3,12 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Provides a UI region whose child collection can be modified by callers.
 /// </summary>
-public abstract class Panel : Region
+public class Panel : Region
 {
     /// <summary>
     /// Initializes a UI panel.
     /// </summary>
-    protected Panel()
+    public Panel()
     {
         Children = new UiNodeCollection(this);
     }

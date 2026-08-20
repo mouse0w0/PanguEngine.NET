@@ -6,6 +6,46 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class PanelTests
 {
     [Fact]
+    public void ConcretePanelDesiredSizeUsesPerAxisMaximum()
+    {
+        var panel = new Panel
+        {
+            Padding = new Thickness(10, 20, 30, 40)
+        };
+        panel.Children.Add(new TestNode { Width = 12, Height = 30 });
+        panel.Children.Add(new TestNode { Width = 25, Height = 8 });
+
+        panel.Measure(new Size(100, 120));
+
+        Assert.Equal(new Size(65, 90), panel.DesiredSize);
+    }
+
+    [Fact]
+    public void ConcretePanelChildrenShareContentSlotAndRespectAlignment()
+    {
+        var panel = new Panel
+        {
+            Padding = new Thickness(10, 20, 30, 40)
+        };
+        var stretched = new TestNode();
+        var centered = new TestNode
+        {
+            Width = 20,
+            Height = 10,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        panel.Children.Add(stretched);
+        panel.Children.Add(centered);
+
+        panel.Measure(new Size(200, 120));
+        panel.Arrange(new Rect(0, 0, 200, 120));
+
+        Assert.Equal(new Rect(10, 20, 160, 60), stretched.LayoutBounds);
+        Assert.Equal(new Rect(80, 45, 20, 10), centered.LayoutBounds);
+    }
+
+    [Fact]
     public void ChildrenExposesStableMutableAndReadOnlyViews()
     {
         var panel = new TestPanel();
