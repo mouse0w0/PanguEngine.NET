@@ -83,8 +83,8 @@ public sealed class Button : Control
     {
         Focusable = true;
         Padding = new Thickness(12, 7);
-        Background = new SolidColorBrush(new Color(48, 54, 62));
-        BorderBrush = new SolidColorBrush(new Color(92, 103, 116));
+        Background = new SolidColorBrush(48, 54, 62);
+        BorderBrush = new SolidColorBrush(92, 103, 116);
         BorderThickness = new Thickness(1);
     }
 

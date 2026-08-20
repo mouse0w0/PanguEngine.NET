@@ -21,8 +21,8 @@ internal sealed class PauseScreen : UiScreen
             Text = "退出游戏",
             MinWidth = 220,
             MinHeight = 42,
-            Background = new SolidColorBrush(new Color(104, 43, 45)),
-            BorderBrush = new SolidColorBrush(new Color(157, 73, 77))
+            Background = new SolidColorBrush(104, 43, 45),
+            BorderBrush = new SolidColorBrush(157, 73, 77)
         };
         resumeButton.Click += (_, _) => ClientEngine.Current.ResumeGame();
         exitButton.Click += (_, _) => ClientEngine.Current.PrimaryWindow.CloseWindow();
@@ -36,8 +36,8 @@ internal sealed class PauseScreen : UiScreen
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center,
             Padding = new Thickness(24),
-            Background = new SolidColorBrush(new Color(20, 24, 30, 235)),
-            BorderBrush = new SolidColorBrush(new Color(90, 102, 116)),
+            Background = new SolidColorBrush(20, 24, 30, 235),
+            BorderBrush = new SolidColorBrush(90, 102, 116),
             BorderThickness = new Thickness(1)
         };
         panel.Children.Add(title);
@@ -46,7 +46,7 @@ internal sealed class PauseScreen : UiScreen
 
         var mask = new Panel
         {
-            Background = new SolidColorBrush(new Color(0, 0, 0, 128))
+            Background = new SolidColorBrush(0, 0, 0, 128)
         };
         mask.Children.Add(panel);
         return mask;

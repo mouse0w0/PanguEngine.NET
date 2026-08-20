@@ -33,9 +33,9 @@ public sealed class RegionTests
     [Fact]
     public void SolidColorBrushStoresColorAndUsesValueEquality()
     {
-        var first = new SolidColorBrush(new Color(10, 20, 30, 40));
-        var equivalent = new SolidColorBrush(new Color(10, 20, 30, 40));
-        var different = new SolidColorBrush(new Color(10, 20, 30, 41));
+        var first = new SolidColorBrush(10, 20, 30, 40);
+        var equivalent = new SolidColorBrush(10, 20, 30, 40);
+        var different = new SolidColorBrush(10, 20, 30, 41);
 
         Assert.Equal(new Color(10, 20, 30, 40), first.Color);
         Assert.True(first.Equals(equivalent));
@@ -50,7 +50,7 @@ public sealed class RegionTests
     {
         var region = new TestRegion
         {
-            Background = new SolidColorBrush(new Color(10, 20, 30, 40))
+            Background = new SolidColorBrush(10, 20, 30, 40)
         };
         var changes = 0;
         region.PropertyChanged += (_, eventArgs) =>
@@ -59,7 +59,7 @@ public sealed class RegionTests
                 changes++;
         };
 
-        region.Background = new SolidColorBrush(new Color(10, 20, 30, 40));
+        region.Background = new SolidColorBrush(10, 20, 30, 40);
 
         Assert.Equal(0, changes);
     }
@@ -163,7 +163,7 @@ public sealed class RegionTests
         var desiredSize = region.DesiredSize;
         var layoutBounds = region.LayoutBounds;
 
-        region.Background = new SolidColorBrush(new Color(1, 2, 3));
+        region.Background = new SolidColorBrush(1, 2, 3);
 
         Assert.Equal(desiredSize, region.DesiredSize);
         Assert.Equal(layoutBounds, region.LayoutBounds);
@@ -481,7 +481,7 @@ public sealed class RegionTests
         var region = new TestRegion();
         ValidateLayout(region);
 
-        region.BorderBrush = new SolidColorBrush(new Color(10, 20, 30));
+        region.BorderBrush = new SolidColorBrush(10, 20, 30);
 
         Assert.True(region.IsMeasureValid);
         Assert.True(region.IsArrangeValid);
@@ -619,7 +619,7 @@ public sealed class RegionTests
     public void InactiveRegionAllowsBackgroundThreadConfiguration()
     {
         var region = new TestRegion();
-        var expectedBackground = new SolidColorBrush(new Color(10, 20, 30));
+        var expectedBackground = new SolidColorBrush(10, 20, 30);
 
         RunOnBackgroundThread(() =>
         {
@@ -636,33 +636,32 @@ public sealed class RegionTests
     public void ActiveRegionRejectsWrongThreadRenderPropertyPathsWithoutPartialState()
     {
         var region = new TestRegion();
-        var original = new SolidColorBrush(new Color(10, 20, 30));
-        var changed = new SolidColorBrush(new Color(40, 50, 60));
+        var original = new SolidColorBrush(10, 20, 30);
+        var changed = new SolidColorBrush(40, 50, 60);
         region.Background = original;
         var screen = new UiScreen(region);
         ValidateLayout(region);
         screen.Open();
 
-        var setterError = RunOnBackgroundThread(
-            () => Record.Exception(() => region.Background = changed));
+        var setterError = RunOnBackgroundThread(() => Record.Exception(() => region.Background = changed));
         Assert.IsType<InvalidOperationException>(setterError);
         Assert.Same(original, region.Background);
         Assert.True(region.IsMeasureValid);
         Assert.True(region.IsArrangeValid);
 
-        var setValueError = RunOnBackgroundThread(
-            () => Record.Exception(() => region.SetValue(Region.BackgroundProperty, changed)));
+        var setValueError = RunOnBackgroundThread(() =>
+            Record.Exception(() => region.SetValue(Region.BackgroundProperty, changed)));
         Assert.IsType<InvalidOperationException>(setValueError);
         Assert.Same(original, region.Background);
 
-        var clearError = RunOnBackgroundThread(
-            () => Record.Exception(() => region.ClearValue(Region.BackgroundProperty)));
+        var clearError =
+            RunOnBackgroundThread(() => Record.Exception(() => region.ClearValue(Region.BackgroundProperty)));
         Assert.IsType<InvalidOperationException>(clearError);
         Assert.Same(original, region.Background);
 
         var source = new BackgroundSource { Background = changed };
-        var bindError = RunOnBackgroundThread(
-            () => Record.Exception(() => region.Bind(Region.BackgroundProperty, source, item => item.Background)));
+        var bindError = RunOnBackgroundThread(() =>
+            Record.Exception(() => region.Bind(Region.BackgroundProperty, source, item => item.Background)));
         Assert.IsType<InvalidOperationException>(bindError);
         Assert.False(region.IsBound(Region.BackgroundProperty));
         Assert.Same(original, region.Background);
@@ -671,15 +670,13 @@ public sealed class RegionTests
         Assert.True(region.IsBound(Region.BackgroundProperty));
         Assert.Same(changed, region.Background);
 
-        var update = new SolidColorBrush(new Color(70, 80, 90));
-        var updateError = RunOnBackgroundThread(
-            () => Record.Exception(() => source.Background = update));
+        var update = new SolidColorBrush(70, 80, 90);
+        var updateError = RunOnBackgroundThread(() => Record.Exception(() => source.Background = update));
         Assert.IsType<InvalidOperationException>(updateError);
         Assert.Same(changed, region.Background);
         Assert.True(region.IsBound(Region.BackgroundProperty));
 
-        var unbindError = RunOnBackgroundThread(
-            () => Record.Exception(() => region.Unbind(Region.BackgroundProperty)));
+        var unbindError = RunOnBackgroundThread(() => Record.Exception(() => region.Unbind(Region.BackgroundProperty)));
         Assert.IsType<InvalidOperationException>(unbindError);
         Assert.True(region.IsBound(Region.BackgroundProperty));
         Assert.Same(changed, region.Background);
@@ -692,8 +689,8 @@ public sealed class RegionTests
     [Fact]
     public void ActiveRegionRejectsWrongThreadBorderChangesWithoutPartialState()
     {
-        var originalBrush = new SolidColorBrush(new Color(10, 20, 30));
-        var changedBrush = new SolidColorBrush(new Color(40, 50, 60));
+        var originalBrush = new SolidColorBrush(10, 20, 30);
+        var changedBrush = new SolidColorBrush(40, 50, 60);
         var region = new TestRegion
         {
             BorderBrush = originalBrush,
@@ -703,10 +700,9 @@ public sealed class RegionTests
         ValidateLayout(region);
         screen.Open();
 
-        var brushError = RunOnBackgroundThread(
-            () => Record.Exception(() => region.BorderBrush = changedBrush));
-        var thicknessError = RunOnBackgroundThread(
-            () => Record.Exception(() => region.BorderThickness = new Thickness(2)));
+        var brushError = RunOnBackgroundThread(() => Record.Exception(() => region.BorderBrush = changedBrush));
+        var thicknessError =
+            RunOnBackgroundThread(() => Record.Exception(() => region.BorderThickness = new Thickness(2)));
 
         Assert.IsType<InvalidOperationException>(brushError);
         Assert.IsType<InvalidOperationException>(thicknessError);

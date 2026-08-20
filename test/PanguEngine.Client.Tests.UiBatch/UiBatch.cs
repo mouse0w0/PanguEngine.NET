@@ -1,4 +1,3 @@
-using PanguEngine.Client.Tests;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics;
@@ -42,6 +41,7 @@ internal sealed class UiBatchScene : IClientTestScene
             TextServices.Dispose();
             throw;
         }
+
         _renderer = new UiRenderer(
             ClientTestApp.Current.Device,
             TextServices.FontManager,
@@ -100,6 +100,7 @@ internal sealed class UiBatchScene : IClientTestScene
                 _root.EstablishButtonStates(_uiManager);
                 _buttonStatesInitialized = true;
             }
+
             var drawCommands = _screen.CreateDrawCommandList();
 
             commandList.BeginRendering(new RenderingDescription
@@ -209,7 +210,7 @@ internal sealed class UiBatchScene : IClientTestScene
             _textClipPanel = new TextClipPanel(_textNodes[1])
             {
                 ClipToBounds = true,
-                Background = new SolidColorBrush(new Color(25, 60, 55, 180)),
+                Background = new SolidColorBrush(25, 60, 55, 180),
                 Padding = new Thickness(4)
             };
             Children.Add(_imageViews[0]);
@@ -222,8 +223,8 @@ internal sealed class UiBatchScene : IClientTestScene
 
             _decorationPanel = new DecorationPanel
             {
-                Background = new SolidColorBrush(new Color(35, 150, 125, 145)),
-                BorderBrush = new SolidColorBrush(new Color(230, 75, 65, 185)),
+                Background = new SolidColorBrush(35, 150, 125, 145),
+                BorderBrush = new SolidColorBrush(230, 75, 65, 185),
                 BorderThickness = new Thickness(6, 10, 14, 8),
                 Padding = new Thickness(8)
             };
@@ -289,21 +290,26 @@ internal sealed class UiBatchScene : IClientTestScene
 
             using (context.PushClip(Scale(new Rect(40, 40, 300, 180), layoutScale, offsetX, offsetY)))
             {
-                context.FillRectangle(Scale(new Rect(20, 20, 260, 150), layoutScale, offsetX, offsetY), new Color(230, 64, 80, 180));
-                context.FillRectangle(Scale(new Rect(120, 70, 260, 150), layoutScale, offsetX, offsetY), new Color(40, 190, 150, 160));
+                context.FillRectangle(Scale(new Rect(20, 20, 260, 150), layoutScale, offsetX, offsetY),
+                    new Color(230, 64, 80, 180));
+                context.FillRectangle(Scale(new Rect(120, 70, 260, 150), layoutScale, offsetX, offsetY),
+                    new Color(40, 190, 150, 160));
                 var count = Dense ? 128 : 4;
                 for (var index = 0; index < count; index++)
                 {
                     var x = 48 + index % 16 * 17;
                     var y = 48 + index / 16 * 17;
-                    context.FillRectangle(Scale(new Rect(x, y, 12, 12), layoutScale, offsetX, offsetY), new Color(245, 210, 70, 150));
+                    context.FillRectangle(Scale(new Rect(x, y, 12, 12), layoutScale, offsetX, offsetY),
+                        new Color(245, 210, 70, 150));
                 }
             }
 
             using (context.PushClip(Scale(new Rect(380, 80, 220, 220), layoutScale, offsetX, offsetY)))
             {
-                context.FillRectangle(Scale(new Rect(340, 40, 300, 300), layoutScale, offsetX, offsetY), new Color(70, 110, 240, 150));
-                context.FillRectangle(Scale(new Rect(430, 130, 140, 140), layoutScale, offsetX, offsetY), new Color(245, 245, 245, 120));
+                context.FillRectangle(Scale(new Rect(340, 40, 300, 300), layoutScale, offsetX, offsetY),
+                    new Color(70, 110, 240, 150));
+                context.FillRectangle(Scale(new Rect(430, 130, 140, 140), layoutScale, offsetX, offsetY),
+                    new Color(245, 245, 245, 120));
             }
 
             var imagePanels = new[]
@@ -338,7 +344,6 @@ internal sealed class UiBatchScene : IClientTestScene
                     _secondImage,
                     samplingMode: ImageSamplingMode.Nearest);
             }
-
         }
 
         private sealed class DecorationPanel : Panel

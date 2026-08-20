@@ -19,6 +19,18 @@ public abstract class Brush
 public sealed class SolidColorBrush : Brush, IEquatable<SolidColorBrush>
 {
     /// <summary>
+    /// Initializes a solid color brush from red, green, blue, and alpha channels.
+    /// </summary>
+    /// <param name="r">The red channel.</param>
+    /// <param name="g">The green channel.</param>
+    /// <param name="b">The blue channel.</param>
+    /// <param name="a">The alpha channel.</param>
+    public SolidColorBrush(byte r, byte g, byte b, byte a = byte.MaxValue)
+        : this(new Color(r, g, b, a))
+    {
+    }
+
+    /// <summary>
     /// Initializes a solid color brush.
     /// </summary>
     /// <param name="color">The fill color.</param>

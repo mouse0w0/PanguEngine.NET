@@ -42,8 +42,8 @@ public sealed class ButtonTests
         AssertProperty(Button.SpacingProperty, 6d, UiPropertyInvalidation.Measure);
         Assert.True(button.Focusable);
         Assert.Equal(new Thickness(12, 7), button.Padding);
-        Assert.Equal(new SolidColorBrush(new Color(48, 54, 62)), button.Background);
-        Assert.Equal(new SolidColorBrush(new Color(92, 103, 116)), button.BorderBrush);
+        Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
+        Assert.Equal(new SolidColorBrush(92, 103, 116), button.BorderBrush);
         Assert.Equal(new Thickness(1), button.BorderThickness);
         Assert.False(button.ClipToBounds);
         Assert.Empty(button.Children);
@@ -57,6 +57,7 @@ public sealed class ButtonTests
                 propertyName,
                 BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
         }
+
         Assert.Null(typeof(Button).GetProperty(
             nameof(Parent.Children),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
@@ -680,6 +681,7 @@ public sealed class ButtonTests
                 manager.Close();
                 break;
         }
+
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
         Assert.Equal(0, clicks);

@@ -257,7 +257,7 @@ public sealed class UiDrawingTests
     {
         var region = new DrawingRegion
         {
-            BorderBrush = new SolidColorBrush(new Color(40, 50, 60, 170)),
+            BorderBrush = new SolidColorBrush(40, 50, 60, 170),
             BorderThickness = new Thickness(25, 20, 30, 15)
         };
         var screen = new UiScreen(region);
@@ -277,7 +277,7 @@ public sealed class UiDrawingTests
     {
         var region = new DrawingRegion
         {
-            BorderBrush = new SolidColorBrush(new Color(40, 50, 60)),
+            BorderBrush = new SolidColorBrush(40, 50, 60),
             BorderThickness = new Thickness(4, 0, 0, 0)
         };
         var screen = new UiScreen(region);
@@ -321,8 +321,8 @@ public sealed class UiDrawingTests
     {
         var region = new DrawingRegion
         {
-            Background = new SolidColorBrush(new Color(10, 20, 30)),
-            BorderBrush = new SolidColorBrush(new Color(40, 50, 60)),
+            Background = new SolidColorBrush(10, 20, 30),
+            BorderBrush = new SolidColorBrush(40, 50, 60),
             BorderThickness = new Thickness(2)
         };
         var screen = new UiScreen(region);
@@ -342,8 +342,8 @@ public sealed class UiDrawingTests
         var region = new DrawingRegion
         {
             DrawBase = false,
-            Background = new SolidColorBrush(new Color(10, 20, 30)),
-            BorderBrush = new SolidColorBrush(new Color(40, 50, 60)),
+            Background = new SolidColorBrush(10, 20, 30),
+            BorderBrush = new SolidColorBrush(40, 50, 60),
             BorderThickness = new Thickness(2),
             DrawAction = context =>
                 context.FillRectangle(new Rect(0, 0, 1, 1), customColor)
@@ -372,7 +372,7 @@ public sealed class UiDrawingTests
         var region = new DrawingRegion
         {
             Opacity = 0.5,
-            Background = new SolidColorBrush(new Color(10, 20, 30))
+            Background = new SolidColorBrush(10, 20, 30)
         };
         parent.Add(region);
         var screen = new UiScreen(parent);
@@ -396,7 +396,7 @@ public sealed class UiDrawingTests
         region.DrawAction = _ =>
         {
             brushError = Record.Exception(() =>
-                region.BorderBrush = new SolidColorBrush(new Color(10, 20, 30)));
+                region.BorderBrush = new SolidColorBrush(10, 20, 30));
             thicknessError = Record.Exception(() =>
                 region.BorderThickness = new Thickness(1));
         };
@@ -692,6 +692,7 @@ public sealed class UiDrawingTests
                 {
                     outOfOrderError = exception;
                 }
+
                 second.Dispose();
                 first.Dispose();
                 try
