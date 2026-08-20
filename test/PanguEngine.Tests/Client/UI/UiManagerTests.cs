@@ -447,25 +447,96 @@ public sealed class UiManagerTests
             (Open: Record.Exception(() => manager.Open(new UiScreen(new TestNode()))),
                 Close: Record.Exception(manager.Close),
                 Update: Record.Exception(() => manager.Update(new Size(20, 20))),
-                Shutdown: Record.Exception(manager.Shutdown)));
+                Destroy: Record.Exception(manager.Destroy)));
 
         Assert.IsType<InvalidOperationException>(errors.Open);
         Assert.IsType<InvalidOperationException>(errors.Close);
         Assert.IsType<InvalidOperationException>(errors.Update);
-        Assert.IsType<InvalidOperationException>(errors.Shutdown);
+        Assert.IsType<InvalidOperationException>(errors.Destroy);
         Assert.Same(screen, manager.CurrentScreen);
         manager.Close();
     }
 
     [Fact]
-    public void ShutdownClosesScreenAndIsIdempotent()
+    public void CurrentScreenChangedPublishesOnlyFinalTransitions()
+    {
+        var manager = new UiManager();
+        var first = new UiScreen(new TestNode());
+        var second = new UiScreen(new TestNode());
+        var changes = new List<(UiScreen? Old, UiScreen? New)>();
+        manager.CurrentScreenChanged += (oldScreen, newScreen) => changes.Add((oldScreen, newScreen));
+
+        manager.Open(first);
+        manager.Open(second);
+        manager.Open(second);
+        manager.Close();
+
+        Assert.Equal(3, changes.Count);
+        Assert.Null(changes[0].Old);
+        Assert.Same(first, changes[0].New);
+        Assert.Same(first, changes[1].Old);
+        Assert.Same(second, changes[1].New);
+        Assert.Same(second, changes[2].Old);
+        Assert.Null(changes[2].New);
+    }
+
+    [Fact]
+    public void FailedReplacementPublishesOldToNull()
+    {
+        var manager = new UiManager();
+        var expected = new InvalidOperationException("closing");
+        var oldScreen = new RecordingUiScreen(new TestNode())
+        {
+            Closing = () => throw expected
+        };
+        var replacement = new UiScreen(new TestNode());
+        var changes = new List<(UiScreen? Old, UiScreen? New)>();
+        manager.CurrentScreenChanged += (old, current) => changes.Add((old, current));
+        manager.Open(oldScreen);
+        changes.Clear();
+
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.Open(replacement));
+
+        Assert.Same(expected, actual);
+        Assert.Null(manager.CurrentScreen);
+        var change = Assert.Single(changes);
+        Assert.Same(oldScreen, change.Old);
+        Assert.Null(change.New);
+    }
+
+    [Fact]
+    public void DestroyPublishesFinalChangeAfterCloseFailure()
+    {
+        var manager = new UiManager();
+        var expected = new InvalidOperationException("closing");
+        var screen = new RecordingUiScreen(new TestNode())
+        {
+            Closing = () => throw expected
+        };
+        var changes = new List<(UiScreen? Old, UiScreen? New)>();
+        manager.CurrentScreenChanged += (old, current) => changes.Add((old, current));
+        manager.Open(screen);
+        changes.Clear();
+
+        var actual = Assert.Throws<InvalidOperationException>(manager.Destroy);
+        manager.Destroy();
+
+        Assert.Same(expected, actual);
+        Assert.Null(manager.CurrentScreen);
+        var change = Assert.Single(changes);
+        Assert.Same(screen, change.Old);
+        Assert.Null(change.New);
+    }
+
+    [Fact]
+    public void DestroyClosesScreenAndIsIdempotent()
     {
         var manager = new UiManager();
         var screen = new UiScreen(new TestNode());
         manager.Open(screen);
 
-        manager.Shutdown();
-        manager.Shutdown();
+        manager.Destroy();
+        manager.Destroy();
 
         Assert.Null(manager.CurrentScreen);
         Assert.Same(screen, screen.Root!.Screen);
@@ -475,7 +546,7 @@ public sealed class UiManagerTests
     }
 
     [Fact]
-    public void ShutdownDuringScreenPostCompletesActionAndSkipsLayout()
+    public void DestroyDuringScreenPostCompletesActionAndSkipsLayout()
     {
         var manager = new UiManager();
         var root = new TestNode { CoreDesiredSize = new Size(5, 5) };
@@ -485,7 +556,7 @@ public sealed class UiManagerTests
         screen.Post(() =>
         {
             events.Add("current-start");
-            manager.Shutdown();
+            manager.Destroy();
             events.Add("current-end");
         });
         screen.Post(() => events.Add("discarded"));
@@ -529,11 +600,13 @@ public sealed class UiManagerTests
     public void ClosedManagerRejectsOperationsWithObjectDisposedException()
     {
         var manager = new UiManager();
-        manager.Shutdown();
+        manager.Destroy();
 
         Assert.Throws<ObjectDisposedException>(() => manager.Open(new UiScreen(new TestNode())));
         Assert.Throws<ObjectDisposedException>(manager.Close);
         Assert.Throws<ObjectDisposedException>(() => manager.Update(new Size(20, 10)));
+        Assert.Throws<ObjectDisposedException>(() => manager.ProcessFocusChanged(false));
+        Assert.Throws<ObjectDisposedException>(() => manager.ProcessFocusChanged(true));
     }
 
     private static void CaptureNestedOperationErrors(
@@ -542,7 +615,7 @@ public sealed class UiManagerTests
     {
         errors.Add(Record.Exception(() => manager.Open(new UiScreen(new TestNode()))));
         errors.Add(Record.Exception(manager.Close));
-        errors.Add(Record.Exception(manager.Shutdown));
+        errors.Add(Record.Exception(manager.Destroy));
         errors.Add(Record.Exception(() => manager.Update(new Size(10, 10))));
     }
 

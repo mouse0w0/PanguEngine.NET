@@ -1,6 +1,8 @@
 using PanguEngine.Audio;
 using PanguEngine.Client.Game;
+using PanguEngine.Client.Rendering;
 using PanguEngine.Client.Resources.Models;
+using PanguEngine.Client.UI;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Registries;
@@ -52,7 +54,16 @@ public sealed class ClientEngine
     /// </summary>
     public AudioSystem Audio { get; private set; } = null!;
 
+    /// <summary>
+    /// Gets the client UI manager.
+    /// </summary>
+    public UiManager Ui { get; private set; } = null!;
+
     private ClientGame Game { get; set; } = null!;
+
+    internal ClientRenderer Renderer { get; private set; } = null!;
+
+    private ClientInputBridge InputBridge { get; set; } = null!;
 
     internal BlockModelManager BlockModelManager { get; private set; } = null!;
 
@@ -93,6 +104,7 @@ public sealed class ClientEngine
             EnableValidation = _launchOptions.GpuValidation,
             PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
         });
+        Ui = new UiManager();
 
         Audio = new AudioSystem(
             Engine.ResourceManager,
@@ -117,6 +129,14 @@ public sealed class ClientEngine
         Engine.ModManager.RunReady();
 
         Game = new ClientGame(this);
+        Renderer = new ClientRenderer(
+            Device,
+            PrimaryWindow.Presenter,
+            TextServices.FontManager,
+            Ui,
+            Game.World,
+            BlockModelManager);
+        InputBridge = new ClientInputBridge(PrimaryWindow, Ui, Game.Input, TryTogglePause);
     }
 
     private void OnRunning()
@@ -132,9 +152,34 @@ public sealed class ClientEngine
         Audio.Update();
     }
 
+    private bool TryTogglePause()
+    {
+        if (Game.IsPaused)
+        {
+            ResumeGame();
+            return true;
+        }
+
+        if (Ui.CurrentScreen is not null)
+            return false;
+
+        Ui.Open(new PauseScreen());
+        Game.Pause();
+        return true;
+    }
+
+    internal void ResumeGame()
+    {
+        Ui.Close();
+        Game.Resume();
+    }
+
     private void OnShutdown()
     {
+        Ui.Destroy();
+        InputBridge.Destroy();
         Game.Destroy();
+        Renderer.Destroy();
         Audio.Destroy();
         TextServices.Dispose();
         GraphicsBackend.Destroy();

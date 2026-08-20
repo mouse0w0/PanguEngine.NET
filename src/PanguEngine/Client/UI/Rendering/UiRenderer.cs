@@ -114,7 +114,6 @@ internal sealed class UiRenderer
         if (frame.FrameSlot >= (uint)_frameResources.Length)
             throw new ArgumentOutOfRangeException(nameof(frame), "Frame slot exceeds the renderer frame resource count.");
 
-        _resourceManager.DrainFinalizedResources();
         _builder.Build(
             commands,
             frame.Width,
@@ -164,6 +163,12 @@ internal sealed class UiRenderer
                 batch.Scissor.Height);
             commandList.DrawIndexed(batch.IndexCount, firstIndex: batch.FirstIndex);
         }
+    }
+
+    internal void ProcessFinalizedResources()
+    {
+        ObjectDisposedException.ThrowIf(_destroyed, this);
+        _resourceManager.DrainFinalizedResources();
     }
 
     internal void Destroy()

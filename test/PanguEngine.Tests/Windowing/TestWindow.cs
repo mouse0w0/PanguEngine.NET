@@ -10,15 +10,19 @@ namespace PanguEngine.Tests.Windowing;
 internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
 {
     private bool _isDestroyed;
+    private bool _isFocused = true;
+    private Vector2D<int>? _framebufferSize;
+    private Vector2D<float> _mousePosition;
+    private KeyModifiers _keyModifiers;
 
     public override bool IsDestroyed => _isDestroyed;
     public override string Title { get; set; } = "";
     public override Vector2D<int> Position { get; set; }
     public override Vector2D<int> Size { get; set; }
-    public override Vector2D<int> FramebufferSize => Size;
+    public override Vector2D<int> FramebufferSize => _framebufferSize ?? Size;
     public override Vector2D<int> FullSize => Size;
     public override Rectangle<int> BorderSize => default;
-    public override bool IsFocused => true;
+    public override bool IsFocused => _isFocused;
     public override WindowState WindowState { get; set; } = WindowState.Normal;
     public override DisplayMonitor? Monitor => null;
     public override VideoMode VideoMode => VideoMode.Default;
@@ -32,8 +36,8 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     public override Presenter Presenter => throw new NotSupportedException();
     public override CursorState CursorState { get; set; }
     public override CursorShape CursorShape { get; set; }
-    public override Vector2D<float> MousePosition => default;
-    public override KeyModifiers KeyModifiers => default;
+    public override Vector2D<float> MousePosition => _mousePosition;
+    public override KeyModifiers KeyModifiers => _keyModifiers;
     public override string ClipboardText { get; set; } = "";
     public override IReadOnlyList<Key> SupportedKeys => [];
     public override IReadOnlyList<MouseButton> SupportedMouseButtons => [];
@@ -80,5 +84,41 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     internal override void DoEvents() { }
     internal override void DoPreRender(double alpha) => PreRender?.Invoke(this, alpha);
     internal override void DoRender(double alpha) => Render?.Invoke(this, alpha);
+
+    internal void SetFramebufferSize(Vector2D<int> size) => _framebufferSize = size;
+
+    internal void SetKeyModifiers(KeyModifiers modifiers) => _keyModifiers = modifiers;
+
+    internal void SetMousePosition(Vector2D<float> position) => _mousePosition = position;
+
+    internal void RaiseKeyDown(KeyEventArgs args) => KeyDown?.Invoke(this, args);
+
+    internal void RaiseKeyUp(KeyEventArgs args) => KeyUp?.Invoke(this, args);
+
+    internal void RaiseMouseMove(MouseMoveEventArgs args)
+    {
+        _mousePosition = new Vector2D<float>(args.X, args.Y);
+        MouseMove?.Invoke(this, args);
+    }
+
+    internal void RaiseMouseDown(MouseClickEventArgs args)
+    {
+        _mousePosition = new Vector2D<float>(args.X, args.Y);
+        MouseDown?.Invoke(this, args);
+    }
+
+    internal void RaiseMouseUp(MouseClickEventArgs args)
+    {
+        _mousePosition = new Vector2D<float>(args.X, args.Y);
+        MouseUp?.Invoke(this, args);
+    }
+
+    internal void RaiseScroll(ScrollEventArgs args) => Scroll?.Invoke(this, args);
+
+    internal void RaiseFocusChanged(bool focused)
+    {
+        _isFocused = focused;
+        FocusChanged?.Invoke(this, focused);
+    }
 }
 #pragma warning restore CS0067

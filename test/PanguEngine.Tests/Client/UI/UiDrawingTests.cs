@@ -866,7 +866,7 @@ public sealed class UiDrawingTests
         {
             errors.Add(Record.Exception(() => manager.Open(new UiScreen())));
             errors.Add(Record.Exception(manager.Close));
-            errors.Add(Record.Exception(manager.Shutdown));
+            errors.Add(Record.Exception(manager.Destroy));
         };
 
         _ = screen.CreateDrawCommandList();

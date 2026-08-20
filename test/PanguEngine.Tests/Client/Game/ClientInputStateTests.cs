@@ -122,6 +122,45 @@ public sealed class ClientInputStateTests
     }
 
     [Fact]
+    public void SuspendForUiClearsGameStateAndReturnsPriorCapture()
+    {
+        var input = CreateInput(out var cursorStates);
+        var deltas = new List<Vector2D<float>>();
+        input.MouseDelta += deltas.Add;
+        input.HandleKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
+        input.HandleMouseDown(new MouseClickEventArgs(MouseButton.Left, 10, 20));
+        input.HandleMouseDown(new MouseClickEventArgs(MouseButton.Left, 10, 20));
+        input.HandleMouseDown(new MouseClickEventArgs(MouseButton.Right, 10, 20));
+        input.HandleMouseMove(new MouseMoveEventArgs(13, 18));
+        deltas.Clear();
+
+        var first = input.SuspendForUi();
+        var second = input.SuspendForUi();
+        input.HandleMouseMove(new MouseMoveEventArgs(30, 40));
+
+        Assert.True(first);
+        Assert.False(second);
+        Assert.False(input.IsKeyDown(Key.W));
+        Assert.False(input.ConsumeLeftClickRequest());
+        Assert.False(input.ConsumeRightClickRequest());
+        Assert.False(input.IsMouseCaptured);
+        Assert.Empty(deltas);
+        Assert.Equal(CursorState.Normal, cursorStates[^1]);
+    }
+
+    [Fact]
+    public void SuspendForUiKeepsUncapturedMouseNormal()
+    {
+        var input = CreateInput(out var cursorStates);
+
+        var wasMouseCaptured = input.SuspendForUi();
+
+        Assert.False(wasMouseCaptured);
+        Assert.False(input.IsMouseCaptured);
+        Assert.Equal([CursorState.Normal], cursorStates);
+    }
+
+    [Fact]
     public void DestroyReleasesMouseAndClearsState()
     {
         var input = CreateInput(out var cursorStates);

@@ -1,5 +1,4 @@
 using PanguEngine.Audio;
-using PanguEngine.Client.Rendering.World;
 using PanguEngine.Client.World;
 using PanguEngine.Input;
 using PanguEngine.World.Blocks;
@@ -14,23 +13,27 @@ namespace PanguEngine.Client.Game;
 /// </summary>
 public sealed class ClientGame
 {
+    private readonly ClientEngine _engine;
     private readonly Camera _camera;
     private readonly CameraController _cameraController;
     private readonly ClientInputState _input;
     private readonly AudioSystem _audio;
-    private readonly WorldRenderer _renderer;
 
     internal ClientGame(ClientEngine engine)
     {
+        _engine = engine;
         _camera = new Camera(new Vector3D<double>(8, 22, 24), -90, -20);
         _cameraController = new CameraController(_camera);
-        _input = new ClientInputState(engine.PrimaryWindow);
+        _input = new ClientInputState(state => engine.PrimaryWindow.CursorState = state);
         _audio = engine.Audio;
         _input.MouseDelta += _cameraController.ApplyMouseDelta;
         World = new ClientWorld();
         FlatWorldGenerator.Generate(World);
-        _renderer = new WorldRenderer(engine.Device, engine.PrimaryWindow.Presenter, World, engine.BlockModelManager);
     }
+
+    internal ClientInputState Input => _input;
+
+    internal bool IsPaused { get; private set; }
 
     /// <summary>The local client world state.</summary>
     public ClientWorld World { get; }
@@ -43,6 +46,9 @@ public sealed class ClientGame
     /// </summary>
     public void Update()
     {
+        if (IsPaused)
+            return;
+
         var forward = (_input.IsKeyDown(Key.W) ? 1 : 0)
                       - (_input.IsKeyDown(Key.S) ? 1 : 0);
         var right = (_input.IsKeyDown(Key.D) ? 1 : 0)
@@ -75,13 +81,17 @@ public sealed class ClientGame
         }
     }
 
+    internal void Pause() => IsPaused = true;
+
+    internal void Resume() => IsPaused = false;
+
     /// <summary>
     /// Prepares resources for the next client frame.
     /// </summary>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
     public void PrepareFrame(double alpha)
     {
-        _renderer.PrepareFrame(_camera, alpha);
+        _engine.Renderer.PrepareFrame(_camera, alpha);
     }
 
     /// <summary>
@@ -91,7 +101,7 @@ public sealed class ClientGame
     public void DrawFrame(double alpha)
     {
         var renderSelection = RaycastSelection(_camera.GetInterpolatedPosition(alpha));
-        _renderer.DrawFrame(_camera, renderSelection, alpha);
+        _engine.Renderer.DrawFrame(_camera, renderSelection, alpha);
     }
 
     internal static bool TryBreakBlock(ClientWorld world, BlockHit? selection)
@@ -138,6 +148,5 @@ public sealed class ClientGame
     {
         _input.MouseDelta -= _cameraController.ApplyMouseDelta;
         _input.Destroy();
-        _renderer.Destroy();
     }
 }

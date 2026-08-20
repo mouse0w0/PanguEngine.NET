@@ -10,24 +10,12 @@ namespace PanguEngine.Client.Game;
 internal sealed class ClientInputState
 {
     private readonly HashSet<Key> _pressedKeys = [];
-    private readonly Window? _window;
     private readonly Action<CursorState> _setCursorState;
     private Vector2D<float> _mouseBaseline;
     private bool _hasMouseBaseline;
     private bool _leftClickRequested;
     private bool _rightClickRequested;
     private bool _isDestroyed;
-
-    internal ClientInputState(Window window)
-    {
-        _window = window ?? throw new ArgumentNullException(nameof(window));
-        _setCursorState = state => window.CursorState = state;
-        window.KeyDown += OnKeyDown;
-        window.KeyUp += OnKeyUp;
-        window.MouseMove += OnMouseMove;
-        window.MouseDown += OnMouseDown;
-        window.FocusChanged += OnFocusChanged;
-    }
 
     internal ClientInputState(Action<CursorState> setCursorState)
     {
@@ -149,6 +137,18 @@ internal sealed class ClientInputState
         ReleaseMouse();
     }
 
+    internal bool SuspendForUi()
+    {
+        var wasMouseCaptured = IsMouseCaptured;
+        _pressedKeys.Clear();
+        _leftClickRequested = false;
+        _rightClickRequested = false;
+        ReleaseMouse();
+        if (!wasMouseCaptured)
+            _setCursorState(CursorState.Normal);
+        return wasMouseCaptured;
+    }
+
     /// <summary>
     /// Stops collecting input and restores the normal cursor state.
     /// </summary>
@@ -158,15 +158,6 @@ internal sealed class ClientInputState
             return;
 
         _isDestroyed = true;
-        if (_window is not null)
-        {
-            _window.KeyDown -= OnKeyDown;
-            _window.KeyUp -= OnKeyUp;
-            _window.MouseMove -= OnMouseMove;
-            _window.MouseDown -= OnMouseDown;
-            _window.FocusChanged -= OnFocusChanged;
-        }
-
         _pressedKeys.Clear();
         _leftClickRequested = false;
         _rightClickRequested = false;
@@ -190,13 +181,4 @@ internal sealed class ClientInputState
         _setCursorState(CursorState.Normal);
     }
 
-    private void OnKeyDown(Window window, KeyEventArgs args) => HandleKeyDown(args);
-
-    private void OnKeyUp(Window window, KeyEventArgs args) => HandleKeyUp(args);
-
-    private void OnMouseMove(Window window, MouseMoveEventArgs args) => HandleMouseMove(args);
-
-    private void OnMouseDown(Window window, MouseClickEventArgs args) => HandleMouseDown(args);
-
-    private void OnFocusChanged(Window window, bool focused) => HandleFocusChanged(focused);
 }

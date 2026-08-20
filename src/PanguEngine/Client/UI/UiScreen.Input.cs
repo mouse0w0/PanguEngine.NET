@@ -286,6 +286,24 @@ public partial class UiScreen
         ProcessKey(key, modifiers, static (node, eventArgs) => node.RaiseKeyUp(eventArgs));
     }
 
+    internal void ProcessFocusChanged(bool focused)
+    {
+        BeginInputRouting();
+        try
+        {
+            if (focused)
+                return;
+
+            var snapshot = CommitInputStateForClose();
+            if (snapshot is not null)
+                NotifyInputStateLoss(snapshot);
+        }
+        finally
+        {
+            EndInputRouting();
+        }
+    }
+
     internal InputStateCleanupSnapshot? CommitInputStateAfterTreeChange()
     {
         return CommitInputStateCore(clearAll: false);

@@ -361,6 +361,72 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
+    public void FocusLossClearsFocusHoverPressedAndPointerState()
+    {
+        var (manager, screen, root) = OpenScene();
+        var control = Place(root, new TestControl { Focusable = true }, 0, 0, 20, 20);
+        var events = new List<string>();
+        control.LostFocus += (_, _) => events.Add("lost");
+        control.PointerExited += (_, _) => events.Add("exit");
+        manager.ProcessPointerMoved(new Point(5, 5));
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.True(control.IsFocused);
+        Assert.True(control.IsHovered);
+        Assert.True(control.IsPressed);
+
+        manager.ProcessFocusChanged(false);
+        manager.ProcessFocusChanged(true);
+        manager.Update(new Size(100, 100));
+
+        Assert.False(control.IsFocused);
+        Assert.False(control.IsHovered);
+        Assert.False(control.IsPressed);
+        Assert.Null(screen.FocusedNode);
+        Assert.Equal(["lost", "exit"], events);
+    }
+
+    [Fact]
+    public void FocusLossAggregatesNotificationFailuresAfterStateCommit()
+    {
+        var (manager, screen, root) = OpenScene();
+        var control = Place(root, new TestControl { Focusable = true }, 0, 0, 20, 20);
+        var focusedError = new InvalidOperationException("focused");
+        var pressedError = new InvalidOperationException("pressed");
+        var hoveredError = new InvalidOperationException("hovered");
+        var lostError = new InvalidOperationException("lost");
+        var exitError = new InvalidOperationException("exit");
+        _ = control.Subscribe(UiNode.IsFocusedProperty, (_, args) =>
+        {
+            if (!args.NewValue)
+                throw focusedError;
+        });
+        _ = control.Subscribe(Control.IsPressedProperty, (_, args) =>
+        {
+            if (!args.NewValue)
+                throw pressedError;
+        });
+        _ = control.Subscribe(UiNode.IsHoveredProperty, (_, args) =>
+        {
+            if (!args.NewValue)
+                throw hoveredError;
+        });
+        control.LostFocus += (_, _) => throw lostError;
+        control.PointerExited += (_, _) => throw exitError;
+        manager.ProcessPointerMoved(new Point(5, 5));
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+
+        var aggregate = Assert.Throws<AggregateException>(() => manager.ProcessFocusChanged(false));
+
+        Assert.Equal(
+            [focusedError, pressedError, hoveredError, lostError, exitError],
+            aggregate.InnerExceptions);
+        Assert.False(control.IsFocused);
+        Assert.False(control.IsHovered);
+        Assert.False(control.IsPressed);
+        Assert.Null(screen.FocusedNode);
+    }
+
+    [Fact]
     public void FocusRequiresActiveVisibleArrangedFocusableNode()
     {
         var inactive = new TestNode { Focusable = true };
@@ -1033,7 +1099,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void ShutdownCompletesAfterCleanupFailure()
+    public void DestroyCompletesAfterCleanupFailure()
     {
         var manager = new UiManager();
         var root = new TestNode { Focusable = true };
@@ -1045,7 +1111,7 @@ public sealed class UiInputRoutingTests
         root.Arrange(new Rect(0, 0, 20, 20));
         Assert.True(root.Focus());
 
-        var actual = Assert.Throws<InvalidOperationException>(manager.Shutdown);
+        var actual = Assert.Throws<InvalidOperationException>(manager.Destroy);
 
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
@@ -1565,6 +1631,10 @@ public sealed class UiInputRoutingTests
     }
 
     private sealed class TestNode : UiNode
+    {
+    }
+
+    private sealed class TestControl : Control
     {
     }
 

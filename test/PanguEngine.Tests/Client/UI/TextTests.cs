@@ -69,7 +69,7 @@ public sealed class TextTests
         Assert.Same(context.DefaultFace, first.Layout.Lines[0].GlyphRuns[0].FontFace);
         Assert.Equal(text.DesiredSize.Width, first.Layout.Width);
         Assert.Equal(text.DesiredSize.Height, first.Layout.Height);
-        manager.Shutdown();
+        manager.Destroy();
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public sealed class TextTests
 
         Assert.Equal(Size.Zero, text.DesiredSize);
         Assert.Empty(screen.CreateDrawCommandList());
-        manager.Shutdown();
+        manager.Destroy();
     }
 
     [Fact]
@@ -109,7 +109,7 @@ public sealed class TextTests
         Assert.True(command.Layout.Width <= 60);
         Assert.All(command.Layout.Lines.SelectMany(line => line.GlyphRuns),
             run => Assert.Same(context.DefaultFace, run.FontFace));
-        manager.Shutdown();
+        manager.Destroy();
     }
 
     [Fact]
@@ -129,7 +129,7 @@ public sealed class TextTests
         Assert.Same(before.Layout, after.Layout);
         Assert.Equal(new Color(10, 20, 30), after.Color);
         Assert.True(text.IsMeasureValid);
-        manager.Shutdown();
+        manager.Destroy();
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public sealed class TextTests
         Assert.NotSame(previous, widthChanged);
         previous = widthChanged;
 
-        manager.Shutdown();
+        manager.Destroy();
 
         void ReplaceAfter(Action change)
         {
@@ -193,7 +193,7 @@ public sealed class TextTests
         Assert.Same(
             context.FontManager.Match(registered),
             refreshed.Lines[0].GlyphRuns[0].FontFace);
-        manager.Shutdown();
+        manager.Destroy();
     }
 
     [Fact]
@@ -220,7 +220,7 @@ public sealed class TextTests
         Assert.Same(
             context.FontManager.Match(replacement),
             refreshed.Lines[0].GlyphRuns[0].FontFace);
-        manager.Shutdown();
+        manager.Destroy();
     }
 
     [Fact]
@@ -242,7 +242,7 @@ public sealed class TextTests
         screen.UseLayoutRounding = false;
         manager.Update(new Size(800, 400));
         Assert.NotSame(scaled, GetCommand(screen).Layout);
-        manager.Shutdown();
+        manager.Destroy();
     }
 
     private static UiDrawTextCommand GetCommand(UiScreen screen) =>

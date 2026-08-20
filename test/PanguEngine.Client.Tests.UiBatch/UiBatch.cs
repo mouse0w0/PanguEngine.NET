@@ -61,7 +61,7 @@ internal sealed class UiBatchScene : IClientTestScene
     {
         try
         {
-            _uiManager.Shutdown();
+            _uiManager.Destroy();
         }
         finally
         {
@@ -78,6 +78,7 @@ internal sealed class UiBatchScene : IClientTestScene
 
     private void DrawFrame()
     {
+        _renderer.ProcessFinalizedResources();
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 

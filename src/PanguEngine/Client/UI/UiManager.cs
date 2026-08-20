@@ -11,7 +11,7 @@ public sealed class UiManager
     private readonly int _ownerThreadId;
     private bool _isTransitioning;
     private bool _isUpdating;
-    private bool _isShutdown;
+    private bool _destroyed;
 
     internal UiManager()
     {
@@ -22,6 +22,8 @@ public sealed class UiManager
     /// Gets the current screen, or null when no screen is open.
     /// </summary>
     public UiScreen? CurrentScreen { get; private set; }
+
+    internal event Action<UiScreen?, UiScreen?>? CurrentScreenChanged;
 
     /// <summary>
     /// Opens a screen, replacing the current screen when necessary.
@@ -42,15 +44,15 @@ public sealed class UiManager
             return;
 
         screen.VerifyCanOpen();
+        var oldScreen = CurrentScreen;
         _isTransitioning = true;
         try
         {
-            var old = CurrentScreen;
-            if (old is not null)
+            if (oldScreen is not null)
             {
-                old.VerifyCanClose();
+                oldScreen.VerifyCanClose();
                 CurrentScreen = null;
-                old.Close();
+                oldScreen.Close();
             }
 
             screen.Open();
@@ -59,6 +61,7 @@ public sealed class UiManager
         finally
         {
             _isTransitioning = false;
+            NotifyCurrentScreenChanged(oldScreen);
         }
     }
 
@@ -87,6 +90,7 @@ public sealed class UiManager
         finally
         {
             _isTransitioning = false;
+            NotifyCurrentScreenChanged(screen);
         }
     }
 
@@ -112,9 +116,9 @@ public sealed class UiManager
         }
     }
 
-    internal void Shutdown()
+    internal void Destroy()
     {
-        if (_isShutdown)
+        if (_destroyed)
             return;
 
         VerifyAccess();
@@ -137,13 +141,14 @@ public sealed class UiManager
                 }
             }
 
-            _isShutdown = true;
+            _destroyed = true;
         }
         finally
         {
             _isTransitioning = false;
         }
 
+        NotifyCurrentScreenChanged(screen);
         ThrowLifecycleErrors(errors);
     }
 
@@ -189,9 +194,22 @@ public sealed class UiManager
         CurrentScreen?.ProcessKeyUp(key, modifiers);
     }
 
+    internal void ProcessFocusChanged(bool focused)
+    {
+        VerifyAccess();
+        CurrentScreen?.ProcessFocusChanged(focused);
+    }
+
+    private void NotifyCurrentScreenChanged(UiScreen? oldScreen)
+    {
+        var newScreen = CurrentScreen;
+        if (!ReferenceEquals(oldScreen, newScreen))
+            CurrentScreenChanged?.Invoke(oldScreen, newScreen);
+    }
+
     private void VerifyAccess()
     {
-        ObjectDisposedException.ThrowIf(_isShutdown, this);
+        ObjectDisposedException.ThrowIf(_destroyed, this);
         if (_ownerThreadId != Environment.CurrentManagedThreadId)
             throw new InvalidOperationException("UI manager access requires its owner thread.");
     }
