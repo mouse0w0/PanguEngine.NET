@@ -3,9 +3,10 @@ using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Tests.Graphics.Text;
 
-public sealed class FontManagerTests
+public sealed class FontManagerTests : IDisposable
 {
     private const string AliasFamily = "Testxx Han Sans CN";
+    private readonly List<FontManager> _managers = [];
 
     [Fact]
     public void FontUsesCaseInsensitiveFamilyValueEquality()
@@ -21,7 +22,7 @@ public sealed class FontManagerTests
     [Fact]
     public void RegisterLoadsFontAndReleasesInputStreamOwnership()
     {
-        using var manager = new FontManager();
+        var manager = CreateEmptyManager();
         using var stream = OpenSourceHanSans();
 
         var font = Assert.Single(manager.Register(stream, 0));
@@ -40,7 +41,7 @@ public sealed class FontManagerTests
     [Fact]
     public void DefaultFontAndMatchRejectAccessBeforeInitialization()
     {
-        using var manager = new FontManager();
+        var manager = CreateEmptyManager();
         var request = new Font("Source Han Sans CN");
 
         Assert.Throws<InvalidOperationException>(() => manager.DefaultFont);
@@ -50,7 +51,7 @@ public sealed class FontManagerTests
     [Fact]
     public void DefaultFontRejectsUnregisteredFontWithoutChangingCurrentValue()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var current = manager.DefaultFont;
 
         Assert.Throws<ArgumentException>(() => manager.DefaultFont = new Font("Missing Family"));
@@ -61,7 +62,7 @@ public sealed class FontManagerTests
     [Fact]
     public void DefaultFontCanBeReplacedWithAnotherRegisteredFont()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var alias = RegisterAlias(manager, AliasFamily);
 
         manager.DefaultFont = new Font(AliasFamily);
@@ -73,7 +74,7 @@ public sealed class FontManagerTests
     [Fact]
     public void RegisterCopiesNonSeekableStreamAndReusesFontAndFaceIdentity()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         using var firstStream = new NonSeekableReadStream(ReadSourceHanSans());
         var first = Assert.Single(manager.Register(firstStream, 0));
         var firstFace = manager.Match(first);
@@ -91,7 +92,7 @@ public sealed class FontManagerTests
     [Fact]
     public void RegisterUsesFirstFaceWhenDifferentBytesHaveEqualMetadata()
     {
-        using var manager = new FontManager();
+        var manager = CreateEmptyManager();
         using var firstStream = OpenSourceHanSans();
         var first = Assert.Single(manager.Register(firstStream, 0));
         var data = ReadSourceHanSans();
@@ -107,7 +108,7 @@ public sealed class FontManagerTests
     [Fact]
     public void RegisterRejectsEmptyStreamWithoutChangingFonts()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var before = manager.Fonts.ToArray();
         using var stream = new MemoryStream();
 
@@ -119,7 +120,7 @@ public sealed class FontManagerTests
     [Fact]
     public void RegisterRejectsOutOfRangeFaceIndex()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         using var stream = OpenSourceHanSans();
 
         var exception = Assert.Throws<ArgumentOutOfRangeException>(() => manager.Register(stream, 1));
@@ -130,7 +131,7 @@ public sealed class FontManagerTests
     [Fact]
     public void MatchInvalidatesDefaultResultWhenRequestedFamilyIsRegistered()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
 
         var defaultMatch = manager.Match(new Font(AliasFamily));
         var resource = RegisterAlias(manager, AliasFamily);
@@ -145,7 +146,7 @@ public sealed class FontManagerTests
     [Fact]
     public void MatchUsesClosestFaceInRequestedFamily()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
 
         var face = manager.Match(new Font("Source Han Sans CN", FontWeight.Bold, FontStyle.Italic));
 
@@ -155,7 +156,7 @@ public sealed class FontManagerTests
     [Fact]
     public void ResolveFallbackKeepsCoveredPreferredResourceFace()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var resource = RegisterAlias(manager, AliasFamily);
         var resourceFace = manager.Match(resource);
 
@@ -170,7 +171,7 @@ public sealed class FontManagerTests
     [InlineData("盘")]
     public void ResolveFallbackKeepsCoveredDefaultFace(string text)
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var defaultFace = manager.Match(manager.DefaultFont);
 
         var result = manager.ResolveFallback(defaultFace, text, 0, text.Length);
@@ -182,7 +183,7 @@ public sealed class FontManagerTests
     [Fact]
     public void ResolveFallbackMarksUncoveredElementMissing()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var defaultFace = manager.Match(manager.DefaultFont);
 
         var result = manager.ResolveFallback(defaultFace, "\U0010FFFF", 0, 2);
@@ -194,7 +195,7 @@ public sealed class FontManagerTests
     [Fact]
     public void ResolveFallbackDoesNotRequireDefaultIgnorableGlyphs()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var defaultFace = manager.Match(manager.DefaultFont);
 
         var result = manager.ResolveFallback(defaultFace, "A\u2060", 0, 2);
@@ -206,7 +207,7 @@ public sealed class FontManagerTests
     [Fact]
     public void ResolveFallbackDoesNotIgnoreOtherFormatCharacters()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var defaultFace = manager.Match(manager.DefaultFont);
 
         var result = manager.ResolveFallback(defaultFace, "\u0600", 0, 1);
@@ -218,7 +219,7 @@ public sealed class FontManagerTests
     [Fact]
     public void RegisterRejectsAccessFromAnotherThread()
     {
-        using var manager = CreateManager();
+        var manager = CreateManager();
         var data = ReadSourceHanSans();
 
         Exception? exception = null;
@@ -234,14 +235,14 @@ public sealed class FontManagerTests
     }
 
     [Fact]
-    public void DisposeKeepsMetadataReadableButRejectsRegistration()
+    public void DestroyKeepsMetadataReadableButRejectsRegistration()
     {
         var manager = CreateManager();
         var font = manager.DefaultFont;
         var face = manager.Match(font);
 
-        manager.Dispose();
-        manager.Dispose();
+        manager.Destroy();
+        manager.Destroy();
 
         Assert.Equal("Source Han Sans CN", font.FamilyName);
         Assert.Equal(font, face.Font);
@@ -250,9 +251,15 @@ public sealed class FontManagerTests
         Assert.Throws<ObjectDisposedException>(() => manager.Register(stream, 0));
     }
 
-    private static FontManager CreateManager()
+    public void Dispose()
     {
-        var manager = new FontManager();
+        for (var i = _managers.Count - 1; i >= 0; i--)
+            _managers[i].Destroy();
+    }
+
+    private FontManager CreateManager()
+    {
+        var manager = CreateEmptyManager();
         try
         {
             using var stream = OpenSourceHanSans();
@@ -261,9 +268,16 @@ public sealed class FontManagerTests
         }
         catch
         {
-            manager.Dispose();
+            manager.Destroy();
             throw;
         }
+    }
+
+    private FontManager CreateEmptyManager()
+    {
+        var manager = new FontManager();
+        _managers.Add(manager);
+        return manager;
     }
 
     private static FileStream OpenSourceHanSans()
@@ -305,6 +319,7 @@ public sealed class FontManagerTests
             replacements++;
             i += source.Length - 1;
         }
+
         Assert.NotEqual(0, replacements);
     }
 
@@ -321,6 +336,7 @@ public sealed class FontManagerTests
         public override bool CanSeek => false;
         public override bool CanWrite => false;
         public override long Length => throw new NotSupportedException();
+
         public override long Position
         {
             get => throw new NotSupportedException();

@@ -6,6 +6,7 @@ namespace PanguEngine.Tests.Client.UI;
 internal sealed class UiTextTestContext : IDisposable
 {
     private const string SourceFamily = "Source Han Sans CN";
+
     private static readonly string FontPath = Path.Combine(
         AppContext.BaseDirectory,
         "Assets",
@@ -24,7 +25,7 @@ internal sealed class UiTextTestContext : IDisposable
         }
         catch
         {
-            TextServices.Dispose();
+            TextServices.Shutdown();
             throw;
         }
     }
@@ -48,11 +49,12 @@ internal sealed class UiTextTestContext : IDisposable
             replacements++;
             index += source.Length - 1;
         }
+
         Assert.NotEqual(0, replacements);
 
         using var stream = new MemoryStream(data, writable: false);
         return Assert.Single(FontManager.Register(stream, 0));
     }
 
-    public void Dispose() => TextServices.Dispose();
+    public void Dispose() => TextServices.Shutdown();
 }

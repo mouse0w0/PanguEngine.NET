@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Security.Cryptography;
 using System.Text;
 using FreeTypeSharp;
@@ -8,7 +9,7 @@ namespace PanguEngine.Graphics.Text;
 /// <summary>
 /// Loads, matches, and owns CPU font resources.
 /// </summary>
-public sealed class FontManager : IDisposable
+public sealed class FontManager
 {
     private readonly int _ownerThreadId = Environment.CurrentManagedThreadId;
     private readonly FreeTypeLibrary _freeTypeLibrary = new();
@@ -21,7 +22,7 @@ public sealed class FontManager : IDisposable
     private readonly Dictionary<Font, FontFace> _matches = [];
     private FontFace? _defaultFace;
     private ulong _nextFontId = 1;
-    private bool _disposed;
+    private bool _destroyed;
 
     /// <summary>
     /// Initializes an empty font manager.
@@ -38,16 +39,17 @@ public sealed class FontManager : IDisposable
         get
         {
             VerifyAccess();
-            ThrowIfDisposed();
+            ThrowIfDestroyed();
             return GetDefaultFace().Font;
         }
         set
         {
             ArgumentNullException.ThrowIfNull(value);
             VerifyAccess();
-            ThrowIfDisposed();
+            ThrowIfDestroyed();
             if (!_faces.TryGetValue(value, out var face))
-                throw new ArgumentException("The default font must be registered with this font manager.", nameof(value));
+                throw new ArgumentException("The default font must be registered with this font manager.",
+                    nameof(value));
             if (ReferenceEquals(_defaultFace, face))
                 return;
 
@@ -64,7 +66,7 @@ public sealed class FontManager : IDisposable
         get
         {
             VerifyAccess();
-            ThrowIfDisposed();
+            ThrowIfDestroyed();
             return _fontOrder.ToArray();
         }
     }
@@ -79,7 +81,7 @@ public sealed class FontManager : IDisposable
     {
         ArgumentNullException.ThrowIfNull(stream);
         VerifyAccess();
-        ThrowIfDisposed();
+        ThrowIfDestroyed();
         if (faceIndex < 0)
             throw new ArgumentOutOfRangeException(nameof(faceIndex));
 
@@ -141,6 +143,7 @@ public sealed class FontManager : IDisposable
                         stagedByFont.Add(font, face);
                         stagedFaces.Add(face);
                     }
+
                     stagedSources.Add((sourceKey, face));
                 }
 
@@ -172,6 +175,7 @@ public sealed class FontManager : IDisposable
                 _faceOrder.Add(face);
                 _nativeFaces.Add(face.NativeFace);
             }
+
             foreach (var (key, face) in stagedSources)
                 _sourceFaces.Add(key, face);
             if (stagedFaces.Count > 0)
@@ -199,7 +203,7 @@ public sealed class FontManager : IDisposable
     {
         ArgumentNullException.ThrowIfNull(font);
         VerifyAccess();
-        ThrowIfDisposed();
+        ThrowIfDestroyed();
         var defaultFace = GetDefaultFace();
         if (_matches.TryGetValue(font, out var cached))
             return cached;
@@ -231,7 +235,7 @@ public sealed class FontManager : IDisposable
     {
         ArgumentNullException.ThrowIfNull(face);
         VerifyAccess();
-        ThrowIfDisposed();
+        ThrowIfDestroyed();
         if (!ReferenceEquals(face.Owner, this))
             throw new ArgumentException("The font face belongs to a different font manager.", nameof(face));
     }
@@ -239,7 +243,7 @@ public sealed class FontManager : IDisposable
     internal void VerifyServiceAccess()
     {
         VerifyAccess();
-        ThrowIfDisposed();
+        ThrowIfDestroyed();
     }
 
     internal GlyphBitmap Rasterize(
@@ -275,11 +279,10 @@ public sealed class FontManager : IDisposable
         return new FontFallbackResult(defaultFace, true);
     }
 
-    /// <inheritdoc />
-    public void Dispose()
+    internal void Destroy()
     {
         VerifyAccess();
-        if (_disposed)
+        if (_destroyed)
             return;
 
         for (var i = _nativeFaces.Count - 1; i >= 0; i--)
@@ -287,13 +290,13 @@ public sealed class FontManager : IDisposable
         foreach (var block in _dataBlocks.Values)
             block.Destroy();
         _freeTypeLibrary.Dispose();
-        _disposed = true;
+        _destroyed = true;
     }
 
     private FontFace GetDefaultFace()
     {
         return _defaultFace
-            ?? throw new InvalidOperationException("The default font has not been initialized.");
+               ?? throw new InvalidOperationException("The default font has not been initialized.");
     }
 
     internal void RegisterResources(ResourceManager resources)
@@ -330,11 +333,12 @@ public sealed class FontManager : IDisposable
         for (var index = 0; index < span.Length;)
         {
             var status = Rune.DecodeFromUtf16(span[index..], out var rune, out var consumed);
-            if (status != System.Buffers.OperationStatus.Done)
+            if (status != OperationStatus.Done)
             {
                 rune = Rune.ReplacementChar;
                 consumed = 1;
             }
+
             index += consumed;
 
             if (IsDefaultIgnorable(rune.Value))
@@ -385,9 +389,9 @@ public sealed class FontManager : IDisposable
             throw new InvalidOperationException("Font services must be accessed from their owner thread.");
     }
 
-    private void ThrowIfDisposed()
+    private void ThrowIfDestroyed()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(_destroyed, this);
     }
 
     private readonly record struct FaceKey(string Hash, int FaceIndex);

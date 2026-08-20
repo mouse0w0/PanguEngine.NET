@@ -229,7 +229,7 @@ public sealed class GlyphAtlasTests
         public void Dispose()
         {
             Atlas.Destroy();
-            FontManager.Dispose();
+            FontManager.Destroy();
         }
     }
 
@@ -250,8 +250,12 @@ public sealed class GlyphAtlasTests
 
         public override uint MaxTextureDimension2D => 4096;
         public override uint MaxDrawIndirectCount => 1;
-        public override GraphicsBuffer CreateBuffer(in BufferDescription description) => throw new NotSupportedException();
-        public override UploadHandle UploadBuffer<T>(GraphicsBuffer destination, ReadOnlySpan<T> data, ulong destinationOffset = 0) => throw new NotSupportedException();
+
+        public override GraphicsBuffer CreateBuffer(in BufferDescription description) =>
+            throw new NotSupportedException();
+
+        public override UploadHandle UploadBuffer<T>(GraphicsBuffer destination, ReadOnlySpan<T> data,
+            ulong destinationOffset = 0) => throw new NotSupportedException();
 
         public override Texture CreateTexture(in TextureDescription description)
         {
@@ -267,7 +271,8 @@ public sealed class GlyphAtlasTests
             return view;
         }
 
-        public override UploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data) => throw new NotSupportedException();
+        public override UploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data) =>
+            throw new NotSupportedException();
 
         public override UploadHandle UploadTexture(
             Texture destination,
@@ -285,7 +290,9 @@ public sealed class GlyphAtlasTests
         public override UploadHandle GenerateMipmaps(Texture texture) => throw new NotSupportedException();
         public override Sampler CreateSampler(in SamplerDescription description) => throw new NotSupportedException();
         public override Shader CreateShader(in ShaderDescription description) => throw new NotSupportedException();
-        public override DescriptorSetLayout CreateDescriptorSetLayout(in DescriptorSetLayoutDescription description) => throw new NotSupportedException();
+
+        public override DescriptorSetLayout CreateDescriptorSetLayout(in DescriptorSetLayoutDescription description) =>
+            throw new NotSupportedException();
 
         public override DescriptorSet CreateDescriptorSet(in DescriptorSetDescription description)
         {
@@ -297,8 +304,13 @@ public sealed class GlyphAtlasTests
         }
 
         public override ulong GetAlignedUniformSize(ulong rawSize) => rawSize;
-        public override GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description) => throw new NotSupportedException();
-        public override void WaitIdle() { }
+
+        public override GraphicsPipeline CreateGraphicsPipeline(in GraphicsPipelineDescription description) =>
+            throw new NotSupportedException();
+
+        public override void WaitIdle()
+        {
+        }
 
         internal IEnumerable<byte> GetUploadBorder()
         {
@@ -309,6 +321,7 @@ public sealed class GlyphAtlasTests
                 yield return LastUploadData[x];
                 yield return LastUploadData[(height - 1) * width + x];
             }
+
             for (var y = 1; y < height - 1; y++)
             {
                 yield return LastUploadData[y * width];

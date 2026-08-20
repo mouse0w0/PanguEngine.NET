@@ -181,7 +181,7 @@ public sealed class ClientEngine
         Game.Destroy();
         Renderer.Destroy();
         Audio.Destroy();
-        TextServices.Dispose();
+        TextServices.Shutdown();
         GraphicsBackend.Destroy();
 
         Engine.Shutdown();
@@ -197,7 +197,7 @@ public sealed class ClientEngine
         }
         catch
         {
-            TextServices.Dispose();
+            TextServices.Shutdown();
             throw;
         }
     }

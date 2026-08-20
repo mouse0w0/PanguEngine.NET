@@ -439,7 +439,7 @@ public sealed class UiResourceManagerTests
                 GlyphRasterizationMode.Grayscale);
         }
 
-        public void Dispose() => FontManager.Dispose();
+        public void Dispose() => FontManager.Destroy();
     }
 
     private static void CollectUntilDead<T>(WeakReference<T> reference) where T : class

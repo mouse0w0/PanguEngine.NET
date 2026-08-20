@@ -143,6 +143,6 @@ public sealed class GlyphRasterizationTests
             return Assert.Single(Assert.Single(layout.Lines).GlyphRuns).Glyphs[0].GlyphId;
         }
 
-        public void Dispose() => FontManager.Dispose();
+        public void Dispose() => FontManager.Destroy();
     }
 }

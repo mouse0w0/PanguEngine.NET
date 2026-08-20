@@ -248,7 +248,7 @@ public sealed class UiTextDrawingTests
                 TextWrapping.NoWrap,
                 TextAlignment.Left));
 
-        public void Dispose() => _fontManager.Dispose();
+        public void Dispose() => _fontManager.Destroy();
     }
 
     private sealed class TestDescriptorSet : DescriptorSet

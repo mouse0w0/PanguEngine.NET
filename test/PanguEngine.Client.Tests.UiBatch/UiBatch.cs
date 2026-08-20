@@ -38,7 +38,7 @@ internal sealed class UiBatchScene : IClientTestScene
         }
         catch
         {
-            TextServices.Dispose();
+            TextServices.Shutdown();
             throw;
         }
 
@@ -71,7 +71,7 @@ internal sealed class UiBatchScene : IClientTestScene
             }
             finally
             {
-                TextServices.Dispose();
+                TextServices.Shutdown();
             }
         }
     }

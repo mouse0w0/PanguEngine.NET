@@ -27,18 +27,18 @@ public sealed class TextServicesTests
         }
         finally
         {
-            TextServices.Dispose();
+            TextServices.Shutdown();
         }
     }
 
     [Fact]
-    public void DisposeClearsAndReleasesServices()
+    public void ShutdownClearsAndReleasesServices()
     {
         TextServices.Initialize();
         var fontManager = TextServices.FontManager;
 
-        TextServices.Dispose();
-        TextServices.Dispose();
+        TextServices.Shutdown();
+        TextServices.Shutdown();
 
         Assert.Throws<InvalidOperationException>(() => TextServices.FontManager);
         Assert.Throws<InvalidOperationException>(() => TextServices.TextLayoutEngine);

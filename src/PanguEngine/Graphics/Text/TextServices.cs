@@ -34,18 +34,18 @@ public static class TextServices
         }
         catch
         {
-            fontManager.Dispose();
+            fontManager.Destroy();
             throw;
         }
     }
 
-    internal static void Dispose()
+    internal static void Shutdown()
     {
         var fontManager = _fontManager;
         if (fontManager is null)
             return;
 
-        fontManager.Dispose();
+        fontManager.Destroy();
         _textLayoutEngine = null;
         _fontManager = null;
     }

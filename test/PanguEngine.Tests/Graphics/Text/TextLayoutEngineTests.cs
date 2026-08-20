@@ -7,18 +7,25 @@ public sealed class TextLayoutEngineTests
     [Fact]
     public void LayoutRejectsRequestsBeforeDefaultFontInitialization()
     {
-        using var manager = new FontManager();
-        var engine = new TextLayoutEngine(manager);
-        var request = new TextLayoutRequest(
-            "Pangu",
-            new Font("Missing Family"),
-            16,
-            double.PositiveInfinity,
-            1,
-            TextWrapping.NoWrap,
-            TextAlignment.Left);
+        var manager = new FontManager();
+        try
+        {
+            var engine = new TextLayoutEngine(manager);
+            var request = new TextLayoutRequest(
+                "Pangu",
+                new Font("Missing Family"),
+                16,
+                double.PositiveInfinity,
+                1,
+                TextWrapping.NoWrap,
+                TextAlignment.Left);
 
-        Assert.Throws<InvalidOperationException>(() => engine.Layout(request));
+            Assert.Throws<InvalidOperationException>(() => engine.Layout(request));
+        }
+        finally
+        {
+            manager.Destroy();
+        }
     }
 
     [Fact]
@@ -251,7 +258,7 @@ public sealed class TextLayoutEngineTests
 
         public void Dispose()
         {
-            FontManager.Dispose();
+            FontManager.Destroy();
         }
     }
 
