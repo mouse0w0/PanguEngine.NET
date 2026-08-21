@@ -12,8 +12,8 @@ public sealed class GlyphAtlasTests
         using var context = new GlyphAtlasContext();
         var key = context.CreateKey("A", 20);
 
-        var first = context.Atlas.Resolve(key);
-        var second = context.Atlas.Resolve(key);
+        var first = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(key));
+        var second = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(key));
 
         Assert.Same(first, second);
         Assert.Equal(1, context.Device.UploadCount);
@@ -30,7 +30,7 @@ public sealed class GlyphAtlasTests
     {
         using var context = new GlyphAtlasContext();
 
-        var entry = context.Atlas.Resolve(context.CreateKey(" ", 20));
+        var entry = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(context.CreateKey(" ", 20)));
 
         Assert.True(entry.IsEmpty);
         Assert.Equal(0, context.Device.TextureCount);
@@ -42,13 +42,16 @@ public sealed class GlyphAtlasTests
     {
         using var context = new GlyphAtlasContext(MutableGlyphUploadHandle.Ready());
 
-        var first = context.Atlas.Resolve(context.CreateKey("A", 20));
-        var resourceId = Assert.IsType<GlyphAtlasPage>(first.Page).ResourceId;
-        var second = context.Atlas.Resolve(context.CreateKey("B", 20));
+        var first = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(context.CreateKey("A", 20)));
+        var firstPage = Assert.IsType<GlyphAtlasPage>(first.Page);
+        var second = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(context.CreateKey("B", 20)));
+        var secondPage = Assert.IsType<GlyphAtlasPage>(second.Page);
 
-        Assert.Same(first.Page, second.Page);
-        Assert.Equal(resourceId, second.Page!.ResourceId);
-        Assert.NotEqual(0UL, resourceId);
+        Assert.Same(firstPage, secondPage);
+        Assert.Equal(firstPage.Id, secondPage.Id);
+        Assert.Equal(firstPage.TextureIndex, secondPage.TextureIndex);
+        Assert.NotEqual(0UL, firstPage.Id);
+        Assert.Equal(0u, firstPage.TextureIndex);
         Assert.Equal(1, context.Device.TextureCount);
     }
 
@@ -57,15 +60,18 @@ public sealed class GlyphAtlasTests
     {
         using var context = new GlyphAtlasContext(MutableGlyphUploadHandle.Ready());
         var keys = context.CreateKeys("ABCDEFGHIJKLMNOPQRSTUVWXYZ", 400);
-        var first = context.Atlas.Resolve(keys[0]);
+        var first = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(keys[0]));
         var firstPage = Assert.IsType<GlyphAtlasPage>(first.Page);
         var firstRegion = first.Region;
 
-        var entries = keys.Skip(1).Select(key => context.Atlas.Resolve(key)).ToArray();
+        var entries = keys.Skip(1)
+            .Select(key => Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(key)))
+            .ToArray();
         var nextPageEntry = Assert.Single(entries.Where(entry =>
             !ReferenceEquals(entry.Page, firstPage)).Take(1));
 
         Assert.NotSame(firstPage, nextPageEntry.Page);
+        Assert.NotEqual(firstPage.TextureIndex, nextPageEntry.Page!.TextureIndex);
         Assert.Same(firstPage, first.Page);
         Assert.Equal(firstRegion, first.Region);
         Assert.True(context.Device.TextureCount >= 2);
@@ -76,7 +82,7 @@ public sealed class GlyphAtlasTests
     {
         using var context = new GlyphAtlasContext(MutableGlyphUploadHandle.Ready());
 
-        var entry = context.Atlas.Resolve(context.CreateKey("盘", 3000));
+        var entry = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(context.CreateKey("盘", 3000)));
         var page = Assert.IsType<GlyphAtlasPage>(entry.Page);
 
         Assert.True(page.IsDedicated);
@@ -104,7 +110,7 @@ public sealed class GlyphAtlasTests
     {
         var upload = new MutableGlyphUploadHandle();
         using var context = new GlyphAtlasContext(upload);
-        var entry = context.Atlas.Resolve(context.CreateKey("A", 20));
+        var entry = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(context.CreateKey("A", 20)));
 
         Assert.False(entry.IsUploadReady);
         upload.SetReady();
@@ -129,8 +135,8 @@ public sealed class GlyphAtlasTests
         using var context = new GlyphAtlasContext(uploadException: failure);
         var key = context.CreateKey("A", 20);
 
-        var first = context.Atlas.Resolve(key);
-        var second = context.Atlas.Resolve(key);
+        var first = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(key));
+        var second = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(key));
 
         Assert.Same(first, second);
         Assert.Equal(1, context.Device.UploadCount);
@@ -142,8 +148,8 @@ public sealed class GlyphAtlasTests
     [Fact]
     public void PageCreationFailureRollsBackWithoutPublishingOrCaching()
     {
-        var failure = new InvalidOperationException("descriptor");
-        using var context = new GlyphAtlasContext(descriptorException: failure);
+        var failure = new InvalidOperationException("view");
+        using var context = new GlyphAtlasContext(viewException: failure);
         var key = context.CreateKey("A", 20);
 
         Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => context.Atlas.Resolve(key)));
@@ -165,8 +171,26 @@ public sealed class GlyphAtlasTests
 
         Assert.All(context.Device.Textures, texture => Assert.True(texture.IsDestroyed));
         Assert.All(context.Device.Views, view => Assert.True(view.IsDestroyed));
-        Assert.All(context.Device.DescriptorSets, descriptor => Assert.True(descriptor.IsDestroyed));
         context.Dispose();
+    }
+
+    [Fact]
+    public void CapacityPendingGlyphCreatesPageWhenSlotBecomesAvailable()
+    {
+        using var context = new GlyphAtlasContext(hasFreeSlot: false);
+        var key = context.CreateKey("A", 20);
+
+        Assert.Null(context.Atlas.Resolve(key));
+        Assert.Null(context.Atlas.Resolve(key));
+        Assert.Equal(0, context.Device.TextureCount);
+        Assert.Equal(0, context.Device.UploadCount);
+
+        context.TextureRegistry.HasFreeSlot = true;
+        var entry = Assert.IsType<GlyphAtlasEntry>(context.Atlas.Resolve(key));
+
+        Assert.Equal(1, context.Device.TextureCount);
+        Assert.Equal(1, context.Device.UploadCount);
+        Assert.Equal(0u, entry.Page!.TextureIndex);
     }
 
     private sealed class GlyphAtlasContext : IDisposable
@@ -180,7 +204,8 @@ public sealed class GlyphAtlasTests
         internal GlyphAtlasContext(
             MutableGlyphUploadHandle? upload = null,
             Exception? uploadException = null,
-            Exception? descriptorException = null)
+            Exception? viewException = null,
+            bool hasFreeSlot = true)
         {
             FontManager = new FontManager();
             using var stream = File.OpenRead(FontPath);
@@ -188,17 +213,18 @@ public sealed class GlyphAtlasTests
             FontManager.DefaultFont = font;
             Face = FontManager.Match(font);
             LayoutEngine = new TextLayoutEngine(FontManager);
-            Device = new GlyphTestGraphicsDevice(upload, uploadException, descriptorException);
+            Device = new GlyphTestGraphicsDevice(upload, uploadException, viewException);
+            TextureRegistry = new GlyphTestTextureRegistry { HasFreeSlot = hasFreeSlot };
             Atlas = new GlyphAtlas(
                 Device,
                 FontManager,
-                new GlyphTestDescriptorSetLayout(),
-                new GlyphTestSampler());
+                TextureRegistry);
         }
 
         internal GlyphTestGraphicsDevice Device { get; }
         internal FontManager FontManager { get; }
         internal GlyphAtlas Atlas { get; }
+        internal GlyphTestTextureRegistry TextureRegistry { get; }
         private FontFace Face { get; }
         private TextLayoutEngine LayoutEngine { get; }
 
@@ -236,13 +262,12 @@ public sealed class GlyphAtlasTests
     private sealed class GlyphTestGraphicsDevice(
         MutableGlyphUploadHandle? upload,
         Exception? uploadException,
-        Exception? descriptorException) : GraphicsDevice
+        Exception? viewException) : GraphicsDevice
     {
         private readonly MutableGlyphUploadHandle _upload = upload ?? new MutableGlyphUploadHandle();
 
         internal List<GlyphTestTexture> Textures { get; } = [];
         internal List<GlyphTestTextureView> Views { get; } = [];
-        internal List<GlyphTestDescriptorSet> DescriptorSets { get; } = [];
         internal int TextureCount => Textures.Count;
         internal int UploadCount { get; private set; }
         internal byte[] LastUploadData { get; private set; } = [];
@@ -266,6 +291,8 @@ public sealed class GlyphAtlasTests
 
         public override TextureView CreateTextureView(Texture texture, in TextureViewDescription description)
         {
+            if (viewException is not null)
+                throw viewException;
             var view = new GlyphTestTextureView(texture, description);
             Views.Add(view);
             return view;
@@ -295,13 +322,7 @@ public sealed class GlyphAtlasTests
             throw new NotSupportedException();
 
         public override DescriptorSet CreateDescriptorSet(in DescriptorSetDescription description)
-        {
-            if (descriptorException is not null)
-                throw descriptorException;
-            var descriptor = new GlyphTestDescriptorSet();
-            DescriptorSets.Add(descriptor);
-            return descriptor;
-        }
+            => throw new NotSupportedException();
 
         public override ulong GetAlignedUniformSize(ulong rawSize) => rawSize;
 
@@ -385,18 +406,22 @@ public sealed class GlyphAtlasTests
         public override void Destroy() => MarkDestroyed();
     }
 
-    private sealed class GlyphTestDescriptorSet : DescriptorSet
+    private sealed class GlyphTestTextureRegistry : IGlyphTextureSlotRegistry
     {
-        public override void Destroy() => MarkDestroyed();
-    }
+        private uint _nextTextureIndex;
 
-    private sealed class GlyphTestDescriptorSetLayout : DescriptorSetLayout
-    {
-        public override void Destroy() => MarkDestroyed();
-    }
+        public bool HasFreeSlot { get; set; }
 
-    private sealed class GlyphTestSampler : Sampler
-    {
-        public override void Destroy() => MarkDestroyed();
+        public bool TryRegister(TextureView view, out uint textureIndex)
+        {
+            if (!HasFreeSlot)
+            {
+                textureIndex = 0;
+                return false;
+            }
+
+            textureIndex = _nextTextureIndex++;
+            return true;
+        }
     }
 }

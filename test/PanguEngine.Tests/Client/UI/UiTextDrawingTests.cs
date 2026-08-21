@@ -1,6 +1,5 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Rendering;
-using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -66,10 +65,8 @@ public sealed class UiTextDrawingTests
         using var fonts = new TextFontContext();
         var layout = fonts.CreateLayout("A");
         var glyph = Assert.Single(Assert.Single(layout.Lines).GlyphRuns).Glyphs[0];
-        var descriptor = new TestDescriptorSet();
         var binding = new UiGlyphRenderBinding(
             7,
-            descriptor,
             64,
             32,
             new GlyphAtlasRegion(2, 3, 5, 7),
@@ -112,10 +109,8 @@ public sealed class UiTextDrawingTests
         Assert.Equal(6.5f / 64, first.ClampMaxU);
         Assert.Equal(9.5f / 32, first.ClampMaxV);
         Assert.Equal((float)(128 / 255.0 * 0.5), first.A);
-        var batch = Assert.Single(builder.Batches.ToArray());
-        Assert.Equal(UiMaterialKind.Text, batch.Material.Kind);
-        Assert.Equal(7UL, batch.Material.ResourceId);
-        Assert.Same(descriptor, batch.Material.DescriptorSet);
+        Assert.Equal(PackMaterialData(UiMaterialKind.TextMask, 7), first.MaterialData);
+        Assert.Single(builder.Batches.ToArray());
     }
 
     [Fact]
@@ -125,10 +120,8 @@ public sealed class UiTextDrawingTests
         var layout = fonts.CreateLayout("AB");
         var glyphs = Assert.Single(Assert.Single(layout.Lines).GlyphRuns).Glyphs;
         Assert.Equal(2, glyphs.Count);
-        var descriptor = new TestDescriptorSet();
         var binding = new UiGlyphRenderBinding(
             11,
-            descriptor,
             64,
             64,
             new GlyphAtlasRegion(1, 1, 4, 5),
@@ -165,14 +158,11 @@ public sealed class UiTextDrawingTests
     }
 
     [Fact]
-    public void BuilderPreservesMaterialOrderAndSeparatesAtlasPages()
+    public void BuilderPreservesMaterialOrderAcrossTextureSlotsInOneBatch()
     {
         using var fonts = new TextFontContext();
         var layout = fonts.CreateLayout("AB");
         var glyphs = Assert.Single(Assert.Single(layout.Lines).GlyphRuns).Glyphs;
-        var firstDescriptor = new TestDescriptorSet();
-        var secondDescriptor = new TestDescriptorSet();
-        var imageDescriptor = new TestDescriptorSet();
         var image = UiImage.FromRgba(new byte[4], 1, 1);
         var text = new UiDrawTextCommand(
             Point.Zero,
@@ -195,19 +185,26 @@ public sealed class UiTextDrawingTests
             100,
             100,
             false,
-            _ => new UiImageRenderBinding(30, imageDescriptor),
+            _ => new UiImageRenderBinding(30, 1, 1, new UiImageAtlasRegion(0, 0, 1, 1)),
             key => key.GlyphId == glyphs[0].GlyphId
-                ? new UiGlyphRenderBinding(20, firstDescriptor, 64, 64,
+                ? new UiGlyphRenderBinding(20, 64, 64,
                     new GlyphAtlasRegion(1, 1, 4, 5), 0, 4)
-                : new UiGlyphRenderBinding(21, secondDescriptor, 64, 64,
+                : new UiGlyphRenderBinding(21, 64, 64,
                     new GlyphAtlasRegion(1, 1, 4, 5), 0, 4));
 
+        Assert.Equal(24u, Assert.Single(builder.Batches.ToArray()).IndexCount);
         Assert.Equal(
-            [UiMaterialKind.Solid, UiMaterialKind.Text, UiMaterialKind.Text, UiMaterialKind.Image],
-            builder.Batches.ToArray().Select(batch => batch.Material.Kind));
-        Assert.Equal([0UL, 20UL, 21UL, 30UL],
-            builder.Batches.ToArray().Select(batch => batch.Material.ResourceId));
+            [
+                PackMaterialData(UiMaterialKind.Solid, 0),
+                PackMaterialData(UiMaterialKind.TextMask, 20),
+                PackMaterialData(UiMaterialKind.TextMask, 21),
+                PackMaterialData(UiMaterialKind.ImageLinear, 30)
+            ],
+            builder.Vertices.ToArray().Chunk(4).Select(vertices => vertices[0].MaterialData));
     }
+
+    private static uint PackMaterialData(UiMaterialKind materialKind, uint textureIndex) =>
+        (textureIndex << 8) | (uint)materialKind;
 
     private static UiDrawingContext CreateDrawingContext(
         List<UiDrawCommand> commands,
@@ -251,8 +248,4 @@ public sealed class UiTextDrawingTests
         public void Dispose() => _fontManager.Destroy();
     }
 
-    private sealed class TestDescriptorSet : DescriptorSet
-    {
-        public override void Destroy() => MarkDestroyed();
-    }
 }

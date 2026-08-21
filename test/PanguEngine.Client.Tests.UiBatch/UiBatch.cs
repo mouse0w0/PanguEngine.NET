@@ -23,6 +23,9 @@ internal sealed class UiBatchScene : IClientTestScene
     private UiScreen _screen = null!;
     private UiImage _firstImage = null!;
     private UiImage _secondImage = null!;
+    private UiImage _thirdImage = null!;
+    private UiImage _fourthImage = null!;
+    private UiImage _oversizedImage = null!;
     private bool _buttonStatesInitialized;
 
     public string Name => "UI Batch";
@@ -50,7 +53,15 @@ internal sealed class UiBatchScene : IClientTestScene
             _presenter.MaxFramesInFlight);
         _firstImage = CreateCheckerImage(16, 16, new Color(240, 70, 80), new Color(40, 205, 160));
         _secondImage = CreateCheckerImage(12, 20, new Color(70, 125, 245), new Color(245, 215, 70));
-        _root = new UiBatchNode(_firstImage, _secondImage);
+        _thirdImage = CreateCheckerImage(24, 16, new Color(245, 140, 55), new Color(90, 220, 235));
+        _fourthImage = CreateCheckerImage(18, 14, new Color(175, 95, 235), new Color(230, 235, 245));
+        _oversizedImage = CreateCheckerImage(1025, 1, new Color(245, 245, 245), new Color(35, 45, 60));
+        _root = new UiBatchNode(
+            _firstImage,
+            _secondImage,
+            _thirdImage,
+            _fourthImage,
+            _oversizedImage);
         _screen = new UiScreen(_root) { Scale = UiScale };
         _uiManager = new UiManager();
         _uiManager.Open(_screen);
@@ -78,12 +89,12 @@ internal sealed class UiBatchScene : IClientTestScene
 
     private void DrawFrame()
     {
-        _renderer.ProcessFinalizedResources();
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
         try
         {
+            _renderer.PrepareFrame(frame);
             var commandList = frame.CommandList;
             commandList.BeginRecording();
             if (frame.Width == 0 || frame.Height == 0)
@@ -162,22 +173,33 @@ internal sealed class UiBatchScene : IClientTestScene
         private const double DesignHeight = 750;
         private readonly UiImage _firstImage;
         private readonly UiImage _secondImage;
+        private readonly UiImage _thirdImage;
+        private readonly UiImage _fourthImage;
+        private readonly UiImage _oversizedImage;
         private readonly ImageView[] _imageViews;
         private readonly Text[] _textNodes;
         private readonly TextClipPanel _textClipPanel;
         private readonly DecorationPanel _decorationPanel;
         private readonly ButtonPanel _buttonPanel;
 
-        internal UiBatchNode(UiImage firstImage, UiImage secondImage)
+        internal UiBatchNode(
+            UiImage firstImage,
+            UiImage secondImage,
+            UiImage thirdImage,
+            UiImage fourthImage,
+            UiImage oversizedImage)
         {
             _firstImage = firstImage;
             _secondImage = secondImage;
+            _thirdImage = thirdImage;
+            _fourthImage = fourthImage;
+            _oversizedImage = oversizedImage;
             _imageViews =
             [
                 CreateImageView(_firstImage, ImageStretch.None),
-                CreateImageView(_firstImage, ImageStretch.Fill),
-                CreateImageView(_secondImage, ImageStretch.Uniform),
-                CreateImageView(_secondImage, ImageStretch.UniformToFill)
+                CreateImageView(_secondImage, ImageStretch.Fill),
+                CreateImageView(_thirdImage, ImageStretch.Uniform),
+                CreateImageView(_fourthImage, ImageStretch.UniformToFill)
             ];
             _textNodes =
             [
@@ -328,11 +350,11 @@ internal sealed class UiBatchScene : IClientTestScene
                 samplingMode: ImageSamplingMode.Linear);
             context.DrawImage(
                 Scale(new Rect(180, 250, 120, 90), layoutScale, offsetX, offsetY),
-                _firstImage,
+                _secondImage,
                 samplingMode: ImageSamplingMode.Nearest);
             context.DrawImage(
                 Scale(new Rect(320, 250, 120, 90), layoutScale, offsetX, offsetY),
-                _firstImage,
+                _thirdImage,
                 new Rect(4, 4, 8, 8),
                 ImageSamplingMode.Linear);
 
@@ -341,9 +363,14 @@ internal sealed class UiBatchScene : IClientTestScene
             {
                 context.DrawImage(
                     Scale(new Rect(450, 235, 140, 120), layoutScale, offsetX, offsetY),
-                    _secondImage,
+                    _fourthImage,
                     samplingMode: ImageSamplingMode.Nearest);
             }
+
+            context.DrawImage(
+                Scale(new Rect(40, 538, 560, 10), layoutScale, offsetX, offsetY),
+                _oversizedImage,
+                samplingMode: ImageSamplingMode.Linear);
         }
 
         private sealed class DecorationPanel : Panel

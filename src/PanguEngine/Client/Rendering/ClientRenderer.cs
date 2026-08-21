@@ -63,7 +63,6 @@ internal sealed class ClientRenderer
 
     internal void DrawFrame(Camera camera, BlockHit? selection, double alpha)
     {
-        _uiRenderer.ProcessFinalizedResources();
         var screen = _uiManager.CurrentScreen;
         var uiCommands = screen?.CreateDrawCommandList();
         if (!_presenter.TryBeginFrame(out var frame))
@@ -72,6 +71,7 @@ internal sealed class ClientRenderer
         InvalidOperationException? uploadFailure = null;
         try
         {
+            _uiRenderer.PrepareFrame(frame);
             var commandList = frame.CommandList;
             if (frame.Width == 0 || frame.Height == 0
                                  || frame.Width != _depthStencilWidth

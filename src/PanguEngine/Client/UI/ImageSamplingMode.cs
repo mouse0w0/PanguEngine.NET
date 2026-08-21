@@ -5,9 +5,9 @@ namespace PanguEngine.Client.UI;
 /// </summary>
 public enum ImageSamplingMode
 {
-    /// <summary>Uses linear interpolation between neighboring texels.</summary>
-    Linear,
-
     /// <summary>Uses the nearest texel without interpolation.</summary>
-    Nearest
+    Nearest,
+
+    /// <summary>Uses linear interpolation between neighboring texels.</summary>
+    Linear
 }

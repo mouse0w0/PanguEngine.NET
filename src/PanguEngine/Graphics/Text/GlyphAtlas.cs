@@ -2,6 +2,12 @@ using System.Runtime.ExceptionServices;
 
 namespace PanguEngine.Graphics.Text;
 
+internal interface IGlyphTextureSlotRegistry
+{
+    bool HasFreeSlot { get; }
+    bool TryRegister(TextureView view, out uint textureIndex);
+}
+
 internal sealed class GlyphAtlas : GraphicsResource
 {
     private const uint PageSize = 1024;
@@ -9,52 +15,57 @@ internal sealed class GlyphAtlas : GraphicsResource
 
     private readonly GraphicsDevice _graphicsDevice;
     private readonly FontManager _fontManager;
-    private readonly DescriptorSetLayout _descriptorSetLayout;
-    private readonly Sampler _sampler;
+    private readonly IGlyphTextureSlotRegistry _textureRegistry;
     private readonly Thread _ownerThread = Thread.CurrentThread;
     private readonly Dictionary<GlyphRasterKey, GlyphAtlasEntry> _entries = [];
+    private readonly Dictionary<GlyphRasterKey, GlyphBitmap> _allocationPending = [];
     private readonly List<GlyphAtlasPage> _pages = [];
     private ulong _nextPageId;
 
     internal GlyphAtlas(
         GraphicsDevice graphicsDevice,
         FontManager fontManager,
-        DescriptorSetLayout descriptorSetLayout,
-        Sampler sampler)
+        IGlyphTextureSlotRegistry textureRegistry)
     {
         _graphicsDevice = graphicsDevice;
         _fontManager = fontManager;
-        _descriptorSetLayout = descriptorSetLayout;
-        _sampler = sampler;
+        _textureRegistry = textureRegistry;
     }
 
-    internal GlyphAtlasEntry Resolve(in GlyphRasterKey key)
+    internal GlyphAtlasEntry? Resolve(in GlyphRasterKey key)
     {
         VerifyOwnerThread();
         ObjectDisposedException.ThrowIf(IsDestroyed, this);
         if (_entries.TryGetValue(key, out var cached))
             return cached;
 
-        var bitmap = _fontManager.Rasterize(
-            key.FontFace,
-            key.PixelSize,
-            key.GlyphId,
-            key.Mode);
-        if (bitmap.Width == 0 || bitmap.Height == 0)
+        if (!_allocationPending.TryGetValue(key, out var bitmap))
         {
-            var empty = GlyphAtlasEntry.Empty(bitmap);
-            _entries.Add(key, empty);
-            return empty;
+            bitmap = _fontManager.Rasterize(
+                key.FontFace,
+                key.PixelSize,
+                key.GlyphId,
+                key.Mode);
+            if (bitmap.Width == 0 || bitmap.Height == 0)
+            {
+                var empty = GlyphAtlasEntry.Empty(bitmap);
+                _entries.Add(key, empty);
+                return empty;
+            }
         }
 
-        var page = AllocatePageRegion(bitmap, out var region);
+        if (!TryAllocatePageRegion(bitmap, out var page, out var region))
+        {
+            _allocationPending[key] = bitmap;
+            return null;
+        }
+
         var uploadRegion = TextureUploadRegion.Region2D(
             region.X - 1,
             region.Y - 1,
             region.Width + 2,
             region.Height + 2);
         var uploadData = AddTransparentPadding(bitmap);
-
         UploadHandle? upload = null;
         Exception? uploadFailure = null;
         try
@@ -67,6 +78,7 @@ internal sealed class GlyphAtlas : GraphicsResource
         }
 
         var entry = new GlyphAtlasEntry(bitmap, page, region, upload, uploadFailure);
+        _allocationPending.Remove(key);
         _entries.Add(key, entry);
         return entry;
     }
@@ -92,13 +104,15 @@ internal sealed class GlyphAtlas : GraphicsResource
         }
 
         _entries.Clear();
+        _allocationPending.Clear();
         _pages.Clear();
         if (firstFailure is not null)
             ExceptionDispatchInfo.Capture(firstFailure).Throw();
     }
 
-    private GlyphAtlasPage AllocatePageRegion(
+    private bool TryAllocatePageRegion(
         GlyphBitmap bitmap,
+        out GlyphAtlasPage page,
         out GlyphAtlasRegion region)
     {
         var paddedWidth = checked((uint)bitmap.Width + 2);
@@ -114,25 +128,32 @@ internal sealed class GlyphAtlas : GraphicsResource
                         (uint)bitmap.Height,
                         out region))
                 {
-                    return existing;
+                    page = existing;
+                    return true;
                 }
             }
         }
 
-        var page = CreatePage(
+        if (!_textureRegistry.HasFreeSlot)
+        {
+            page = null!;
+            region = default;
+            return false;
+        }
+
+        page = CreatePage(
             dedicated ? paddedWidth : PageSize,
             dedicated ? paddedHeight : PageSize,
             dedicated);
         if (!page.TryAllocate((uint)bitmap.Width, (uint)bitmap.Height, out region))
             throw new InvalidOperationException("A newly created glyph atlas page could not fit its glyph.");
-        return page;
+        return true;
     }
 
     private GlyphAtlasPage CreatePage(uint width, uint height, bool dedicated)
     {
         Texture? texture = null;
         TextureView? view = null;
-        DescriptorSet? descriptorSet = null;
         try
         {
             texture = _graphicsDevice.CreateTexture(new TextureDescription
@@ -148,15 +169,9 @@ internal sealed class GlyphAtlas : GraphicsResource
             });
             view = _graphicsDevice.CreateTextureView(
                 texture,
-                new TextureViewDescription(
-                    TextureViewDimension.Type2D,
-                    0,
-                    1,
-                    0,
-                    1));
-            descriptorSet = _graphicsDevice.CreateDescriptorSet(new DescriptorSetDescription(
-                _descriptorSetLayout,
-                [DescriptorSetBinding.CombinedImageSampler(0, view, _sampler)]));
+                new TextureViewDescription(TextureViewDimension.Type2D, 0, 1, 0, 1));
+            if (!_textureRegistry.TryRegister(view, out var textureIndex))
+                throw new InvalidOperationException("The UI texture table had no slot for a glyph atlas page.");
 
             var page = new GlyphAtlasPage(
                 ++_nextPageId,
@@ -165,17 +180,16 @@ internal sealed class GlyphAtlas : GraphicsResource
                 dedicated,
                 texture,
                 view,
-                descriptorSet);
+                textureIndex);
             _pages.Add(page);
             return page;
         }
         catch (Exception exception)
         {
             var cleanupFailures = new List<Exception>();
-            TryDestroy(descriptorSet, cleanupFailures);
             TryDestroy(view, cleanupFailures);
             TryDestroy(texture, cleanupFailures);
-            if (cleanupFailures.Count > 0)
+            if (cleanupFailures.Count != 0)
                 exception.Data[CleanupFailuresDataKey] = cleanupFailures.ToArray();
             throw;
         }
@@ -212,36 +226,24 @@ internal sealed class GlyphAtlas : GraphicsResource
     }
 }
 
-internal sealed class GlyphAtlasPage : GraphicsResource
+internal sealed class GlyphAtlasPage(
+    ulong id,
+    uint width,
+    uint height,
+    bool isDedicated,
+    Texture texture,
+    TextureView textureView,
+    uint textureIndex) : GraphicsResource
 {
-    private readonly GlyphAtlasAllocator _allocator;
+    private readonly GlyphAtlasAllocator _allocator = new(width, height);
 
-    internal GlyphAtlasPage(
-        ulong resourceId,
-        uint width,
-        uint height,
-        bool isDedicated,
-        Texture texture,
-        TextureView textureView,
-        DescriptorSet descriptorSet)
-    {
-        ResourceId = resourceId;
-        Width = width;
-        Height = height;
-        IsDedicated = isDedicated;
-        Texture = texture;
-        TextureView = textureView;
-        DescriptorSet = descriptorSet;
-        _allocator = new GlyphAtlasAllocator(width, height);
-    }
-
-    internal ulong ResourceId { get; }
-    internal uint Width { get; }
-    internal uint Height { get; }
-    internal bool IsDedicated { get; }
-    internal Texture Texture { get; }
-    internal TextureView TextureView { get; }
-    internal DescriptorSet DescriptorSet { get; }
+    internal ulong Id { get; } = id;
+    internal uint Width { get; } = width;
+    internal uint Height { get; } = height;
+    internal bool IsDedicated { get; } = isDedicated;
+    internal Texture Texture { get; } = texture;
+    internal TextureView TextureView { get; } = textureView;
+    internal uint TextureIndex { get; } = textureIndex;
 
     internal bool TryAllocate(uint width, uint height, out GlyphAtlasRegion region) =>
         _allocator.TryAllocate(width, height, out region);
@@ -255,19 +257,11 @@ internal sealed class GlyphAtlasPage : GraphicsResource
         Exception? firstFailure = null;
         try
         {
-            DescriptorSet.Destroy();
-        }
-        catch (Exception exception)
-        {
-            firstFailure = exception;
-        }
-        try
-        {
             TextureView.Destroy();
         }
         catch (Exception exception)
         {
-            firstFailure ??= exception;
+            firstFailure = exception;
         }
         try
         {
@@ -277,7 +271,6 @@ internal sealed class GlyphAtlasPage : GraphicsResource
         {
             firstFailure ??= exception;
         }
-
         if (firstFailure is not null)
             ExceptionDispatchInfo.Capture(firstFailure).Throw();
     }
@@ -316,7 +309,6 @@ internal sealed class GlyphAtlasEntry
     internal GlyphAtlasPage? Page { get; }
     internal GlyphAtlasRegion Region { get; }
     internal bool IsEmpty { get; }
-
     internal bool IsUploadReady =>
         _uploadFailure is null &&
         _upload is not null &&

@@ -7,22 +7,18 @@ namespace PanguEngine.Client.UI.Rendering;
 [StructLayout(LayoutKind.Sequential)]
 internal readonly struct UiVertex
 {
-    internal const uint SizeInBytes = 48;
+    private const int TextureIndexShift = 8;
 
-    internal static readonly VertexInputDescription SolidVertexInput = new(
-        [new VertexBufferLayoutDescription(0, SizeInBytes)],
-        [
-            new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
-            new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x4, 8)
-        ]);
+    internal const uint SizeInBytes = 52;
 
-    internal static readonly VertexInputDescription TexturedVertexInput = new(
+    internal static readonly VertexInputDescription VertexInput = new(
         [new VertexBufferLayoutDescription(0, SizeInBytes)],
         [
             new VertexAttributeDescription(0, 0, VertexAttributeFormat.Float32x2, 0),
             new VertexAttributeDescription(1, 0, VertexAttributeFormat.Float32x4, 8),
             new VertexAttributeDescription(2, 0, VertexAttributeFormat.Float32x2, 24),
-            new VertexAttributeDescription(3, 0, VertexAttributeFormat.Float32x4, 32)
+            new VertexAttributeDescription(3, 0, VertexAttributeFormat.Float32x4, 32),
+            new VertexAttributeDescription(4, 0, VertexAttributeFormat.UInt32, 48)
         ]);
 
     internal UiVertex(
@@ -37,7 +33,9 @@ internal readonly struct UiVertex
         float clampMinU = 0,
         float clampMinV = 0,
         float clampMaxU = 0,
-        float clampMaxV = 0)
+        float clampMaxV = 0,
+        UiMaterialKind materialKind = UiMaterialKind.Solid,
+        uint textureIndex = 0)
     {
         X = x;
         Y = y;
@@ -51,6 +49,7 @@ internal readonly struct UiVertex
         ClampMinV = clampMinV;
         ClampMaxU = clampMaxU;
         ClampMaxV = clampMaxV;
+        MaterialData = (textureIndex << TextureIndexShift) | (uint)materialKind;
     }
 
     internal readonly float X;
@@ -65,34 +64,27 @@ internal readonly struct UiVertex
     internal readonly float ClampMinV;
     internal readonly float ClampMaxU;
     internal readonly float ClampMaxV;
+    internal readonly uint MaterialData;
 }
 
 internal readonly record struct UiScissor(int X, int Y, uint Width, uint Height);
 
-internal enum UiMaterialKind
+internal enum UiMaterialKind : uint
 {
     Solid,
-    Image,
-    Text
-}
-
-internal readonly record struct UiBatchMaterial(
-    UiMaterialKind Kind,
-    ulong ResourceId,
-    DescriptorSet? DescriptorSet,
-    ImageSamplingMode SamplingMode)
-{
-    internal static UiBatchMaterial Solid =>
-        new(UiMaterialKind.Solid, 0, null, ImageSamplingMode.Linear);
+    ImageNearest,
+    ImageLinear,
+    TextMask
 }
 
 internal readonly record struct UiImageRenderBinding(
-    ulong ResourceId,
-    DescriptorSet DescriptorSet);
+    uint TextureIndex,
+    uint TextureWidth,
+    uint TextureHeight,
+    UiImageAtlasRegion Region);
 
 internal readonly record struct UiGlyphRenderBinding(
-    ulong ResourceId,
-    DescriptorSet DescriptorSet,
+    uint TextureIndex,
     uint PageWidth,
     uint PageHeight,
     GlyphAtlasRegion Region,
@@ -105,24 +97,13 @@ internal readonly record struct UiBatch
         UiScissor scissor,
         uint firstIndex,
         uint indexCount)
-        : this(scissor, UiBatchMaterial.Solid, firstIndex, indexCount)
-    {
-    }
-
-    internal UiBatch(
-        UiScissor scissor,
-        UiBatchMaterial material,
-        uint firstIndex,
-        uint indexCount)
     {
         Scissor = scissor;
-        Material = material;
         FirstIndex = firstIndex;
         IndexCount = indexCount;
     }
 
     internal UiScissor Scissor { get; }
-    internal UiBatchMaterial Material { get; }
     internal uint FirstIndex { get; }
     internal uint IndexCount { get; }
 }
@@ -247,7 +228,8 @@ internal sealed class UiDrawBuilder
         AppendGeometry(
             bounds,
             scissor,
-            UiBatchMaterial.Solid,
+            UiMaterialKind.Solid,
+            0,
             r,
             g,
             b,
@@ -275,35 +257,34 @@ internal sealed class UiDrawBuilder
         }
 
         var source = command.SourceRect;
-        var imageWidth = (double)command.Image.PixelWidth;
-        var imageHeight = (double)command.Image.PixelHeight;
-        var u0 = source.X / imageWidth;
-        var v0 = source.Y / imageHeight;
-        var u1 = (source.X + source.Width) / imageWidth;
-        var v1 = (source.Y + source.Height) / imageHeight;
-        var clampMinU = (source.X + 0.5) / imageWidth;
-        var clampMinV = (source.Y + 0.5) / imageHeight;
-        var clampMaxU = (source.X + source.Width - 0.5) / imageWidth;
-        var clampMaxV = (source.Y + source.Height - 0.5) / imageHeight;
-        var material = new UiBatchMaterial(
-            UiMaterialKind.Image,
-            binding.ResourceId,
-            binding.DescriptorSet,
-            command.SamplingMode);
+        var textureWidth = (double)binding.TextureWidth;
+        var textureHeight = (double)binding.TextureHeight;
+        var sourceX = binding.Region.X + source.X;
+        var sourceY = binding.Region.Y + source.Y;
+        var u0 = sourceX / textureWidth;
+        var v0 = sourceY / textureHeight;
+        var u1 = (sourceX + source.Width) / textureWidth;
+        var v1 = (sourceY + source.Height) / textureHeight;
+        var (clampMinU, clampMaxU) = GetNormalizedClamp(sourceX, source.Width, textureWidth);
+        var (clampMinV, clampMaxV) = GetNormalizedClamp(sourceY, source.Height, textureHeight);
+        var materialKind = command.SamplingMode == ImageSamplingMode.Nearest
+            ? UiMaterialKind.ImageNearest
+            : UiMaterialKind.ImageLinear;
         AppendGeometry(
             bounds,
             scissor,
-            material,
+            materialKind,
+            binding.TextureIndex,
             1,
             1,
             1,
             (float)command.Opacity,
             (float)u0,
             (float)v0,
-            (float)clampMinU,
-            (float)clampMinV,
-            (float)clampMaxU,
-            (float)clampMaxV,
+            clampMinU,
+            clampMinV,
+            clampMaxU,
+            clampMaxV,
             (float)u1,
             (float)v1);
     }
@@ -356,28 +337,29 @@ internal sealed class UiDrawBuilder
                     var v0 = region.Y / pageHeight;
                     var u1 = (region.X + region.Width) / pageWidth;
                     var v1 = (region.Y + region.Height) / pageHeight;
-                    var clampMinU = (region.X + 0.5) / pageWidth;
-                    var clampMinV = (region.Y + 0.5) / pageHeight;
-                    var clampMaxU = (region.X + region.Width - 0.5) / pageWidth;
-                    var clampMaxV = (region.Y + region.Height - 0.5) / pageHeight;
+                    var (clampMinU, clampMaxU) = GetNormalizedClamp(
+                        region.X,
+                        region.Width,
+                        pageWidth);
+                    var (clampMinV, clampMaxV) = GetNormalizedClamp(
+                        region.Y,
+                        region.Height,
+                        pageHeight);
                     AppendGeometry(
                         bounds,
                         scissor,
-                        new UiBatchMaterial(
-                            UiMaterialKind.Text,
-                            binding.ResourceId,
-                            binding.DescriptorSet,
-                            ImageSamplingMode.Linear),
+                        UiMaterialKind.TextMask,
+                        binding.TextureIndex,
                         r,
                         g,
                         b,
                         a,
                         (float)u0,
                         (float)v0,
-                        (float)clampMinU,
-                        (float)clampMinV,
-                        (float)clampMaxU,
-                        (float)clampMaxV,
+                        clampMinU,
+                        clampMinV,
+                        clampMaxU,
+                        clampMaxV,
                         (float)u1,
                         (float)v1);
                 }
@@ -388,7 +370,8 @@ internal sealed class UiDrawBuilder
     private void AppendGeometry(
         PhysicalBounds bounds,
         UiScissor scissor,
-        UiBatchMaterial material,
+        UiMaterialKind materialKind,
+        uint textureIndex,
         float r,
         float g,
         float b,
@@ -415,7 +398,9 @@ internal sealed class UiDrawBuilder
             clampMinU,
             clampMinV,
             clampMaxU,
-            clampMaxV));
+            clampMaxV,
+            materialKind,
+            textureIndex));
         _vertices.Add(new UiVertex(
             (float)bounds.Right,
             (float)bounds.Top,
@@ -428,7 +413,9 @@ internal sealed class UiDrawBuilder
             clampMinU,
             clampMinV,
             clampMaxU,
-            clampMaxV));
+            clampMaxV,
+            materialKind,
+            textureIndex));
         _vertices.Add(new UiVertex(
             (float)bounds.Right,
             (float)bounds.Bottom,
@@ -441,7 +428,9 @@ internal sealed class UiDrawBuilder
             clampMinU,
             clampMinV,
             clampMaxU,
-            clampMaxV));
+            clampMaxV,
+            materialKind,
+            textureIndex));
         _vertices.Add(new UiVertex(
             (float)bounds.Left,
             (float)bounds.Bottom,
@@ -454,7 +443,9 @@ internal sealed class UiDrawBuilder
             clampMinU,
             clampMinV,
             clampMaxU,
-            clampMaxV));
+            clampMaxV,
+            materialKind,
+            textureIndex));
 
         var firstIndex = checked((uint)_indices.Count);
         _indices.Add(vertexBase);
@@ -464,27 +455,29 @@ internal sealed class UiDrawBuilder
         _indices.Add(checked(vertexBase + 3));
         _indices.Add(vertexBase);
 
-        if (_batches.Count > 0 &&
-            _batches[^1].Scissor == scissor &&
-            SameMaterial(_batches[^1].Material, material))
+        if (_batches.Count > 0 && _batches[^1].Scissor == scissor)
         {
             var previous = _batches[^1];
             _batches[^1] = new UiBatch(
                 previous.Scissor,
-                previous.Material,
                 previous.FirstIndex,
                 checked(previous.IndexCount + 6));
         }
         else
         {
-            _batches.Add(new UiBatch(scissor, material, firstIndex, 6));
+            _batches.Add(new UiBatch(scissor, firstIndex, 6));
         }
     }
 
-    private static bool SameMaterial(UiBatchMaterial first, UiBatchMaterial second) =>
-        first.Kind == second.Kind &&
-        first.ResourceId == second.ResourceId &&
-        first.SamplingMode == second.SamplingMode;
+    private static (float Min, float Max) GetNormalizedClamp(
+        double origin,
+        double length,
+        double textureLength)
+    {
+        var min = length >= 1 ? origin + 0.5 : origin + length / 2;
+        var max = length >= 1 ? origin + length - 0.5 : min;
+        return ((float)(min / textureLength), (float)(max / textureLength));
+    }
 
     private static bool TryGetPhysicalBounds(
         Rect bounds,

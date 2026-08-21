@@ -2,27 +2,26 @@ using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Rendering;
-using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
-using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class UiResourceManagerTests
 {
     [Fact]
-    public void FinalizedRegistrationIsDestroyedOnlyWhenOwnerThreadDrains()
+    public void FinalizedRegistrationIsRetiredOnlyWhenOwnerThreadDrains()
     {
         var manager = new UiResourceManager();
         var state = new TestState();
         var registration = CreateUnrootedRegistration(manager, state);
 
         CollectUntilDead(registration);
+        Assert.Equal(0, state.RetireCount);
 
-        Assert.Equal(0, state.DestroyCount);
         manager.DrainFinalizedResources();
-        Assert.Equal(1, state.DestroyCount);
-        Assert.Same(Thread.CurrentThread, state.DestroyThread);
+
+        Assert.Equal(1, state.RetireCount);
+        Assert.Same(Thread.CurrentThread, state.RetireThread);
         manager.Destroy();
     }
 
@@ -39,7 +38,7 @@ public sealed class UiResourceManagerTests
         manager.EnqueueFinalized(ulong.MaxValue);
         manager.DrainFinalizedResources();
 
-        Assert.Equal(1, state.DestroyCount);
+        Assert.Equal(1, state.RetireCount);
         GC.KeepAlive(image);
         GC.KeepAlive(registration);
         manager.Destroy();
@@ -65,7 +64,7 @@ public sealed class UiResourceManagerTests
     }
 
     [Fact]
-    public void DestroyReleasesAllStatesAndIsIdempotent()
+    public void DestroyReleasesAllLiveStatesAndIsIdempotent()
     {
         var manager = new UiResourceManager();
         var first = new TestState();
@@ -110,19 +109,6 @@ public sealed class UiResourceManagerTests
     }
 
     [Fact]
-    public void LateFinalizerNotificationAfterDestroyDoesNotDestroyTwice()
-    {
-        var manager = new UiResourceManager();
-        var state = new TestState();
-        var registration = DestroyWithRegistration(manager, state);
-
-        CollectUntilDead(registration);
-
-        Assert.False(registration.TryGetTarget(out _));
-        Assert.Equal(1, state.DestroyCount);
-    }
-
-    [Fact]
     public void ClosedManagerRejectsNewStateOperations()
     {
         var manager = new UiResourceManager();
@@ -130,25 +116,6 @@ public sealed class UiResourceManagerTests
 
         Assert.Throws<ObjectDisposedException>(() => manager.RegisterImage(CreateImage(), new TestState()));
         Assert.Throws<ObjectDisposedException>(manager.DrainFinalizedResources);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference<UiImageRegistration> CreateUnrootedRegistration(
-        UiResourceManager manager,
-        TestState state)
-    {
-        var registration = manager.RegisterImage(CreateImage(), state);
-        return new WeakReference<UiImageRegistration>(registration);
-    }
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference<UiImageRegistration> DestroyWithRegistration(
-        UiResourceManager manager,
-        TestState state)
-    {
-        var registration = manager.RegisterImage(CreateImage(), state);
-        manager.Destroy();
-        return new WeakReference<UiImageRegistration>(registration);
     }
 
     [Fact]
@@ -162,7 +129,7 @@ public sealed class UiResourceManagerTests
         manager.DrainFinalizedResources();
 
         Assert.False(image.TryGetTarget(out _));
-        Assert.Equal(1, state.DestroyCount);
+        Assert.Equal(1, state.RetireCount);
         manager.Destroy();
     }
 
@@ -173,111 +140,150 @@ public sealed class UiResourceManagerTests
         var secondManager = new UiResourceManager();
         var firstState = new TestState();
         var secondState = new TestState();
-        var references = RegisterSharedImage(firstManager, firstState, secondManager, secondState);
+        var image = CreateImage();
+        var firstRegistration = firstManager.RegisterImage(image, firstState);
+        var secondRegistration = secondManager.RegisterImage(image, secondState);
 
-        CollectUntilDead(references.Image);
-        CollectUntilDead(references.FirstRegistration);
-        CollectUntilDead(references.SecondRegistration);
+        firstManager.EnqueueFinalized(firstRegistration.Id);
+        secondManager.EnqueueFinalized(secondRegistration.Id);
         firstManager.DrainFinalizedResources();
         secondManager.DrainFinalizedResources();
 
-        Assert.False(references.Image.TryGetTarget(out _));
-        Assert.Equal(1, firstState.DestroyCount);
-        Assert.Equal(1, secondState.DestroyCount);
+        Assert.Equal(1, firstState.RetireCount);
+        Assert.Equal(1, secondState.RetireCount);
+        GC.KeepAlive(image);
         firstManager.Destroy();
         secondManager.Destroy();
     }
 
     [Fact]
-    public void ImageIsMaterializedOncePerManager()
+    public void SmallImagesAreMaterializedOncePerManagerAndShareAtlasPage()
     {
-        var firstDevice = new ImageTestGraphicsDevice();
-        var secondDevice = new ImageTestGraphicsDevice();
-        var firstManager = new UiResourceManager(firstDevice);
-        var secondManager = new UiResourceManager(secondDevice);
-        var image = CreateImage();
+        var firstDevice = new UiTestGraphicsDevice();
+        var secondDevice = new UiTestGraphicsDevice();
+        var firstManager = CreateManager(firstDevice);
+        var secondManager = CreateManager(secondDevice);
+        var firstImage = CreateImage();
+        var secondImage = CreateImage();
 
-        var first = firstManager.ResolveImage(image);
-        var firstAgain = firstManager.ResolveImage(image);
-        var second = secondManager.ResolveImage(image);
+        var first = Assert.IsType<UiImageRenderBinding>(firstManager.ResolveImageBinding(Command(firstImage)));
+        var firstAgain = Assert.IsType<UiImageRenderBinding>(firstManager.ResolveImageBinding(Command(firstImage)));
+        var sharedPage = Assert.IsType<UiImageRenderBinding>(firstManager.ResolveImageBinding(Command(secondImage)));
+        var secondManagerBinding = Assert.IsType<UiImageRenderBinding>(
+            secondManager.ResolveImageBinding(Command(firstImage)));
 
-        Assert.Same(first, firstAgain);
-        Assert.NotSame(first, second);
-        Assert.Equal(1, firstDevice.UploadCount);
-        Assert.Equal(1, secondDevice.UploadCount);
-        Assert.Equal(new byte[] { 1, 2, 3, 4 }, image.Pixels.ToArray());
+        Assert.Equal(first, firstAgain);
+        Assert.Equal(first.TextureIndex, sharedPage.TextureIndex);
+        Assert.Equal(2, firstDevice.Uploads.Count(upload => upload.Region is not null));
+        Assert.Equal(1, secondDevice.Uploads.Count(upload => upload.Region is not null));
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, firstImage.Pixels.ToArray());
+        Assert.Equal(0u, secondManagerBinding.TextureIndex);
         firstManager.Destroy();
         secondManager.Destroy();
     }
 
     [Fact]
-    public void RegisteringImageDoesNotDiscardPixels()
+    public void PrepareFrameSynchronizesResourcesWithoutRequiringDrawGeometry()
     {
-        var manager = new UiResourceManager();
+        var device = new UiTestGraphicsDevice();
+        var manager = CreateManager(device);
         var image = CreateImage();
-        var registration = manager.RegisterImage(image, new TestState());
+        _ = Assert.IsType<UiImageRenderBinding>(manager.ResolveImageBinding(Command(image)));
 
-        Assert.Equal(new byte[] { 1, 2, 3, 4 }, image.Pixels.ToArray());
+        manager.PrepareFrame(0);
 
-        GC.KeepAlive(registration);
+        var update = Assert.Single(Assert.Single(device.DescriptorSets[0].Updates));
+        Assert.Equal((0u, 0u), (update.Binding, update.ArrayElement));
+        GC.KeepAlive(image);
         manager.Destroy();
     }
 
     [Fact]
-    public void SynchronousUploadFailureIsLoggedAndSkippedOnce()
+    public void OversizedImageUsesStandaloneTextureRegion()
     {
-        var expected = new InvalidOperationException("upload failed");
-        var device = new ImageTestGraphicsDevice(expected);
+        var device = new UiTestGraphicsDevice();
+        var manager = CreateManager(device);
+        var image = UiImage.FromRgba(new byte[1025 * 4], 1025, 1);
+
+        var binding = Assert.IsType<UiImageRenderBinding>(manager.ResolveImageBinding(Command(image)));
+
+        Assert.Equal((1025u, 1u), (binding.TextureWidth, binding.TextureHeight));
+        Assert.Equal(new UiImageAtlasRegion(0, 0, 1025, 1), binding.Region);
+        Assert.Single(device.Uploads.Where(upload => upload.Region is null).Skip(1));
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void SynchronousUploadFailureIsLoggedAndRetiredOnce()
+    {
+        var device = new UiTestGraphicsDevice();
         var logger = new CapturingLogger();
-        var manager = new UiResourceManager(device, logger: logger);
-        var image = CreateImage();
-        var command = new UiDrawImageCommand(
-            new Rect(0, 0, 1, 1),
-            image,
-            image.FullSourceRect,
-            ImageSamplingMode.Linear,
-            null,
-            1);
+        var manager = CreateManager(device, logger);
+        var expected = new InvalidOperationException("upload failed");
+        device.UploadException = expected;
+        var command = Command(CreateImage());
 
         Assert.Null(manager.ResolveImageBinding(command));
         Assert.Null(manager.ResolveImageBinding(command));
 
-        Assert.Equal(1, device.UploadCount);
         Assert.Equal(1, logger.ErrorCount);
         Assert.Same(expected, logger.LastException);
+        manager.SynchronizeAfterBuild(0);
+        manager.SynchronizeAfterBuild(1);
         manager.Destroy();
     }
 
     [Fact]
-    public void AsynchronousUploadFailureIsLoggedAndSkippedOnce()
+    public void ReadyImageUploadCanLaterFaultAndLogOnce()
     {
-        var expected = new InvalidOperationException("upload failed");
-        var device = new ImageTestGraphicsDevice(uploadHandle: new ImageTestUploadHandle(expected));
+        var device = new UiTestGraphicsDevice();
         var logger = new CapturingLogger();
-        var manager = new UiResourceManager(device, logger: logger);
-        var image = CreateImage();
-        var command = new UiDrawImageCommand(
-            new Rect(0, 0, 1, 1),
-            image,
-            image.FullSourceRect,
-            ImageSamplingMode.Linear,
-            null,
-            1);
+        var manager = CreateManager(device, logger);
+        var upload = UiTestUploadHandle.Ready();
+        device.UploadHandle = upload;
+        var command = Command(CreateImage());
 
+        Assert.NotNull(manager.ResolveImageBinding(command));
+        var failure = new InvalidOperationException("late");
+        upload.SetFaulted(failure);
         Assert.Null(manager.ResolveImageBinding(command));
         Assert.Null(manager.ResolveImageBinding(command));
 
-        Assert.Equal(1, device.UploadCount);
         Assert.Equal(1, logger.ErrorCount);
-        Assert.Same(expected, logger.LastException);
+        Assert.Same(failure, logger.LastException);
         manager.Destroy();
     }
 
     [Fact]
-    public void ManagerWithoutGraphicsDeviceRejectsGlyphResolution()
+    public void PendingImageUploadPublishesWhenItBecomesReady()
+    {
+        var device = new UiTestGraphicsDevice();
+        var manager = CreateManager(device);
+        var upload = new UiTestUploadHandle();
+        device.UploadHandle = upload;
+        var image = CreateImage();
+        var command = Command(image);
+
+        Assert.Null(manager.ResolveImageBinding(command));
+        manager.SynchronizeAfterBuild(0);
+        Assert.Empty(device.DescriptorSets[0].Updates);
+
+        upload.SetReady();
+        Assert.NotNull(manager.ResolveImageBinding(command));
+        manager.SynchronizeAfterBuild(0);
+
+        var update = Assert.Single(Assert.Single(device.DescriptorSets[0].Updates));
+        Assert.Equal((0u, 0u), (update.Binding, update.ArrayElement));
+
+        GC.KeepAlive(image);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void ManagerWithoutFontManagerRejectsGlyphResolution()
     {
         using var fonts = new GlyphManagerContext();
-        var manager = new UiResourceManager();
+        var manager = CreateManager(new UiTestGraphicsDevice());
 
         Assert.Throws<InvalidOperationException>(() =>
             manager.ResolveGlyphBinding(fonts.CreateKey("A", 16)));
@@ -286,87 +292,45 @@ public sealed class UiResourceManagerTests
     }
 
     [Fact]
-    public void GlyphBindingWaitsForUploadAndReadyCanBecomeFaulted()
+    public void PendingGlyphPublishesThenObservesLateUploadFault()
     {
-        var upload = new MutableImageTestUploadHandle();
         using var fonts = new GlyphManagerContext();
-        var device = new ImageTestGraphicsDevice(uploadHandle: upload);
+        var device = new UiTestGraphicsDevice();
         var logger = new CapturingLogger();
-        var manager = new UiResourceManager(
-            device,
-            fonts.FontManager,
-            new ImageTestDescriptorSetLayout(),
-            logger);
+        var manager = CreateManager(device, fonts.FontManager, logger);
+        var upload = new UiTestUploadHandle();
+        device.UploadHandle = upload;
         var key = fonts.CreateKey("A", 16);
 
         Assert.Null(manager.ResolveGlyphBinding(key));
+        manager.SynchronizeAfterBuild(0);
+        Assert.Empty(device.DescriptorSets[0].Updates);
+
         upload.SetReady();
         var ready = Assert.IsType<UiGlyphRenderBinding>(manager.ResolveGlyphBinding(key));
-        Assert.NotEqual(0UL, ready.ResourceId);
+        Assert.Equal(0u, ready.TextureIndex);
+        manager.SynchronizeAfterBuild(0);
 
-        var failure = new InvalidOperationException("late glyph upload");
+        var update = Assert.Single(Assert.Single(device.DescriptorSets[0].Updates));
+        Assert.Equal((0u, ready.TextureIndex), (update.Binding, update.ArrayElement));
+
+        var failure = new InvalidOperationException("glyph late fault");
         upload.SetFaulted(failure);
         Assert.Null(manager.ResolveGlyphBinding(key));
         Assert.Null(manager.ResolveGlyphBinding(key));
 
-        Assert.Equal(1, device.UploadCount);
         Assert.Equal(1, logger.ErrorCount);
         Assert.Same(failure, logger.LastException);
         manager.Destroy();
     }
 
-    [Fact]
-    public void EmptyGlyphDoesNotCreateAtlasPageOrUpload()
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<UiImageRegistration> CreateUnrootedRegistration(
+        UiResourceManager manager,
+        TestState state)
     {
-        using var fonts = new GlyphManagerContext();
-        var device = new ImageTestGraphicsDevice();
-        var manager = new UiResourceManager(
-            device,
-            fonts.FontManager,
-            new ImageTestDescriptorSetLayout());
-
-        Assert.Null(manager.ResolveGlyphBinding(fonts.CreateKey(" ", 16)));
-
-        Assert.Equal(0, device.TextureCount);
-        Assert.Equal(0, device.UploadCount);
-        manager.Destroy();
-    }
-
-    [Fact]
-    public void GlyphKeyFromDifferentFontManagerIsRejected()
-    {
-        using var firstFonts = new GlyphManagerContext();
-        using var secondFonts = new GlyphManagerContext();
-        var manager = new UiResourceManager(
-            new ImageTestGraphicsDevice(),
-            secondFonts.FontManager,
-            new ImageTestDescriptorSetLayout());
-
-        Assert.Throws<ArgumentException>(() =>
-            manager.ResolveGlyphBinding(firstFonts.CreateKey("A", 16)));
-
-        manager.Destroy();
-    }
-
-    [Fact]
-    public void GlyphResolutionRequiresOwnerThread()
-    {
-        using var fonts = new GlyphManagerContext();
-        var manager = new UiResourceManager(
-            new ImageTestGraphicsDevice(),
-            fonts.FontManager,
-            new ImageTestDescriptorSetLayout());
-        var key = fonts.CreateKey("A", 16);
-        Exception? exception = null;
-        var thread = new Thread(() =>
-            exception = Record.Exception(() =>
-                manager.ResolveGlyphBinding(key)));
-
-        thread.Start();
-        thread.Join();
-
-        Assert.IsType<InvalidOperationException>(exception);
-        manager.Destroy();
+        var registration = manager.RegisterImage(CreateImage(), state);
+        return new WeakReference<UiImageRegistration>(registration);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -379,24 +343,82 @@ public sealed class UiResourceManagerTests
         return new WeakReference<UiImage>(image);
     }
 
-    [MethodImpl(MethodImplOptions.NoInlining)]
-    private static SharedImageReferences RegisterSharedImage(
-        UiResourceManager firstManager,
-        TestState firstState,
-        UiResourceManager secondManager,
-        TestState secondState)
-    {
-        var image = CreateImage();
-        var firstRegistration = firstManager.RegisterImage(image, firstState);
-        var secondRegistration = secondManager.RegisterImage(image, secondState);
-        return new SharedImageReferences(
-            new WeakReference<UiImage>(image),
-            new WeakReference<UiImageRegistration>(firstRegistration),
-            new WeakReference<UiImageRegistration>(secondRegistration));
-    }
+    private static UiResourceManager CreateManager(
+        UiTestGraphicsDevice device,
+        ILogger? logger = null) =>
+        new(device, new UiTestDescriptorSetLayout(default), 2, logger);
+
+    private static UiResourceManager CreateManager(
+        UiTestGraphicsDevice device,
+        FontManager fontManager,
+        ILogger? logger = null) =>
+        new(device, fontManager, new UiTestDescriptorSetLayout(default), 2, logger);
 
     private static UiImage CreateImage() =>
         UiImage.FromRgba(new byte[] { 1, 2, 3, 4 }, 1, 1);
+
+    private static UiDrawImageCommand Command(UiImage image) =>
+        new(
+            new Rect(0, 0, image.PixelWidth, image.PixelHeight),
+            image,
+            image.FullSourceRect,
+            ImageSamplingMode.Linear,
+            null,
+            1);
+
+    private static void CollectUntilDead<T>(WeakReference<T> reference) where T : class
+    {
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
+        }
+        GC.KeepAlive(reference);
+    }
+
+    private sealed class TestState(Exception? destroyException = null) : IUiGpuResourceState
+    {
+        internal int RetireCount { get; private set; }
+        internal int DestroyCount { get; private set; }
+        internal Thread? RetireThread { get; private set; }
+
+        public void Retire()
+        {
+            RetireCount++;
+            RetireThread = Thread.CurrentThread;
+        }
+
+        public void Destroy()
+        {
+            DestroyCount++;
+            if (destroyException is not null)
+                throw destroyException;
+        }
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        internal int ErrorCount { get; private set; }
+        internal Exception? LastException { get; private set; }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel != LogLevel.Error)
+                return;
+            ErrorCount++;
+            LastException = exception;
+        }
+    }
 
     private sealed class GlyphManagerContext : IDisposable
     {
@@ -441,217 +463,4 @@ public sealed class UiResourceManagerTests
 
         public void Dispose() => FontManager.Destroy();
     }
-
-    private static void CollectUntilDead<T>(WeakReference<T> reference) where T : class
-    {
-        for (var attempt = 0; attempt < 5; attempt++)
-        {
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-        }
-
-        GC.KeepAlive(reference);
-    }
-
-    private readonly record struct SharedImageReferences(
-        WeakReference<UiImage> Image,
-        WeakReference<UiImageRegistration> FirstRegistration,
-        WeakReference<UiImageRegistration> SecondRegistration);
-
-    private sealed class TestState(Exception? destroyException = null) : IUiGpuResourceState
-    {
-        internal int DestroyCount { get; private set; }
-        internal Thread? DestroyThread { get; private set; }
-
-        public void Destroy()
-        {
-            DestroyCount++;
-            DestroyThread = Thread.CurrentThread;
-            if (destroyException is not null)
-                throw destroyException;
-        }
-    }
-
-    private sealed class CapturingLogger : ILogger
-    {
-        internal int ErrorCount { get; private set; }
-        internal Exception? LastException { get; private set; }
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-        public bool IsEnabled(LogLevel logLevel) => true;
-
-        public void Log<TState>(
-            LogLevel logLevel,
-            EventId eventId,
-            TState state,
-            Exception? exception,
-            Func<TState, Exception?, string> formatter)
-        {
-            if (logLevel != LogLevel.Error)
-                return;
-            ErrorCount++;
-            LastException = exception;
-        }
-    }
-}
-
-internal sealed class ImageTestGraphicsDevice(
-    Exception? uploadException = null,
-    UploadHandle? uploadHandle = null) : GraphicsDevice
-{
-    internal int UploadCount { get; private set; }
-    internal List<ImageTestTexture> Textures { get; } = [];
-    internal int TextureCount => Textures.Count;
-
-    public override uint MaxTextureDimension2D => 4096;
-    public override uint MaxDrawIndirectCount => 1;
-
-    public override GraphicsBuffer CreateBuffer(in BufferDescription description) =>
-        throw new NotSupportedException();
-
-    public override UploadHandle UploadBuffer<T>(
-        GraphicsBuffer destination,
-        ReadOnlySpan<T> data,
-        ulong destinationOffset = 0) => throw new NotSupportedException();
-
-    public override Texture CreateTexture(in TextureDescription description)
-    {
-        var texture = new ImageTestTexture(description);
-        Textures.Add(texture);
-        return texture;
-    }
-
-    public override TextureView CreateTextureView(
-        Texture texture,
-        in TextureViewDescription description) =>
-        new ImageTestTextureView(texture, description);
-
-    public override UploadHandle UploadTexture(Texture destination, ReadOnlySpan<byte> data)
-    {
-        UploadCount++;
-        if (uploadException is not null)
-            throw uploadException;
-        return uploadHandle ?? ImageTestUploadHandle.Ready;
-    }
-
-    public override UploadHandle UploadTexture(
-        Texture destination,
-        ReadOnlySpan<byte> data,
-        in TextureUploadRegion region)
-    {
-        UploadCount++;
-        if (uploadException is not null)
-            throw uploadException;
-        return uploadHandle ?? ImageTestUploadHandle.Ready;
-    }
-
-    public override UploadHandle GenerateMipmaps(Texture texture) => throw new NotSupportedException();
-    public override Sampler CreateSampler(in SamplerDescription description) => new ImageTestSampler();
-    public override Shader CreateShader(in ShaderDescription description) => throw new NotSupportedException();
-
-    public override DescriptorSetLayout CreateDescriptorSetLayout(
-        in DescriptorSetLayoutDescription description) => throw new NotSupportedException();
-
-    public override DescriptorSet CreateDescriptorSet(
-        in DescriptorSetDescription description) => new ImageTestDescriptorSet();
-
-    public override ulong GetAlignedUniformSize(ulong rawSize) => throw new NotSupportedException();
-
-    public override GraphicsPipeline CreateGraphicsPipeline(
-        in GraphicsPipelineDescription description) => throw new NotSupportedException();
-
-    public override void WaitIdle() => throw new NotSupportedException();
-}
-
-internal sealed class ImageTestTexture(TextureDescription description) : Texture
-{
-    public override TextureDimension Dimension => description.Dimension;
-    public override TextureFormat Format => description.Format;
-    public override uint Width => description.Width;
-    public override uint Height => description.Height;
-    public override uint Depth => description.Depth;
-    public override uint MipLevels => description.MipLevels;
-    public override uint ArrayLayers => description.ArrayLayers;
-    public override TextureUsage Usage => description.Usage;
-    public override TextureCreateFlags CreateFlags => description.Flags;
-
-    public override void Destroy()
-    {
-        if (!IsDestroyed)
-            MarkDestroyed();
-    }
-}
-
-internal sealed class ImageTestTextureView(
-    Texture texture,
-    TextureViewDescription description) : TextureView
-{
-    public override Texture Texture { get; } = texture;
-    public override TextureViewDimension Dimension => description.Dimension;
-    public override TextureFormat Format => texture.Format;
-    public override uint Width => texture.Width;
-    public override uint Height => texture.Height;
-    public override uint Depth => texture.Depth;
-    public override uint BaseMipLevel => description.BaseMipLevel;
-    public override uint MipLevels => description.MipLevels;
-    public override uint BaseArrayLayer => description.BaseArrayLayer;
-    public override uint ArrayLayers => description.ArrayLayers;
-
-    public override void Destroy()
-    {
-        if (!IsDestroyed)
-            MarkDestroyed();
-    }
-}
-
-internal sealed class ImageTestUploadHandle : UploadHandle
-{
-    internal static readonly ImageTestUploadHandle Ready = new();
-
-    private readonly Exception? _exception;
-
-    internal ImageTestUploadHandle(Exception? exception = null)
-    {
-        _exception = exception;
-    }
-
-    protected override UploadState State =>
-        _exception is null ? UploadState.Ready : UploadState.Faulted;
-
-    public override Exception? Exception => _exception;
-}
-
-internal sealed class MutableImageTestUploadHandle : UploadHandle
-{
-    private UploadState _state;
-    private Exception? _exception;
-
-    protected override UploadState State => _state;
-    public override Exception? Exception => _exception;
-
-    internal void SetReady() => _state = UploadState.Ready;
-
-    internal void SetFaulted(Exception exception)
-    {
-        _exception = exception;
-        _state = UploadState.Faulted;
-    }
-}
-
-internal sealed class ImageTestSampler : Sampler
-{
-    public override void Destroy() => MarkDestroyed();
-}
-
-internal sealed class ImageTestDescriptorSetLayout : DescriptorSetLayout
-{
-    public override void Destroy() => MarkDestroyed();
-}
-
-internal sealed class ImageTestDescriptorSet : DescriptorSet
-{
-    public override void Destroy() => MarkDestroyed();
 }

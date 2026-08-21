@@ -16,9 +16,7 @@ internal sealed class UiRenderer
     private readonly FrameResources[] _frameResources;
     private readonly UiResourceManager _resourceManager;
     private readonly GraphicsPipeline _pipeline;
-    private readonly DescriptorSetLayout _imageDescriptorLayout;
-    private readonly GraphicsPipeline _imagePipeline;
-    private readonly GraphicsPipeline _textPipeline;
+    private readonly DescriptorSetLayout _descriptorSetLayout;
     private bool _destroyed;
 
     internal UiRenderer(
@@ -39,71 +37,57 @@ internal sealed class UiRenderer
         for (var index = 0; index < _frameResources.Length; index++)
             _frameResources[index] = new FrameResources();
 
-        var imageDescriptorLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
-            [new DescriptorSetLayoutBinding(
-                0,
-                DescriptorType.CombinedImageSampler,
-                ShaderStageFlags.Fragment)]));
+        var descriptorSetLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
+            [
+                new DescriptorSetLayoutBinding(
+                    0,
+                    DescriptorType.SampledImage,
+                    ShaderStageFlags.Fragment,
+                    UiTextureTable.SlotCount),
+                new DescriptorSetLayoutBinding(1, DescriptorType.Sampler, ShaderStageFlags.Fragment),
+                new DescriptorSetLayoutBinding(2, DescriptorType.Sampler, ShaderStageFlags.Fragment)
+            ]));
         UiResourceManager? resourceManager = null;
-        GraphicsPipeline? solidPipeline = null;
-        GraphicsPipeline? imagePipeline = null;
-        GraphicsPipeline? textPipeline = null;
+        GraphicsPipeline? pipeline = null;
         try
         {
             resourceManager = new UiResourceManager(
                 device,
                 fontManager,
-                imageDescriptorLayout,
+                descriptorSetLayout,
+                frameSlotCount,
                 Log.CreateLogger("UI"));
-            solidPipeline = CreatePipeline(
+            pipeline = CreatePipeline(
                 device,
                 colorFormat,
                 depthStencilFormat,
-                "pangu/shaders/ui_solid.vert",
-                "pangu/shaders/ui_solid.frag",
-                "ui_solid.vert",
-                "ui_solid.frag",
-                UiVertex.SolidVertexInput,
-                []);
-            imagePipeline = CreatePipeline(
-                device,
-                colorFormat,
-                depthStencilFormat,
-                "pangu/shaders/ui_image.vert",
-                "pangu/shaders/ui_image.frag",
-                "ui_image.vert",
-                "ui_image.frag",
-                UiVertex.TexturedVertexInput,
-                [imageDescriptorLayout]);
-            textPipeline = CreatePipeline(
-                device,
-                colorFormat,
-                depthStencilFormat,
-                "pangu/shaders/ui_text.vert",
-                "pangu/shaders/ui_text.frag",
-                "ui_text.vert",
-                "ui_text.frag",
-                UiVertex.TexturedVertexInput,
-                [imageDescriptorLayout]);
+                "pangu/shaders/ui.vert",
+                "pangu/shaders/ui.frag",
+                "ui.vert",
+                "ui.frag",
+                descriptorSetLayout);
         }
         catch (Exception exception)
         {
             var cleanupFailures = new List<Exception>();
-            Destroy(textPipeline, cleanupFailures);
-            Destroy(imagePipeline, cleanupFailures);
-            Destroy(solidPipeline, cleanupFailures);
+            Destroy(pipeline, cleanupFailures);
             Destroy(resourceManager, cleanupFailures);
-            Destroy(imageDescriptorLayout, cleanupFailures);
+            Destroy(descriptorSetLayout, cleanupFailures);
             if (cleanupFailures.Count > 0)
                 exception.Data[CleanupFailuresDataKey] = cleanupFailures.ToArray();
             throw;
         }
 
-        _pipeline = solidPipeline;
-        _imagePipeline = imagePipeline;
-        _textPipeline = textPipeline;
+        _pipeline = pipeline;
         _resourceManager = resourceManager;
-        _imageDescriptorLayout = imageDescriptorLayout;
+        _descriptorSetLayout = descriptorSetLayout;
+    }
+
+    internal void PrepareFrame(Frame frame)
+    {
+        ObjectDisposedException.ThrowIf(_destroyed, this);
+        ArgumentNullException.ThrowIfNull(frame);
+        _resourceManager.PrepareFrame(frame.FrameSlot);
     }
 
     internal void Draw(Frame frame, UiDrawCommandList commands)
@@ -121,6 +105,7 @@ internal sealed class UiRenderer
             _convertSrgbToLinear,
             _resourceManager.ResolveImageBinding,
             _resourceManager.ResolveGlyphBinding);
+        _resourceManager.SynchronizeAfterBuild(frame.FrameSlot);
         if (_builder.RectangleCount == 0)
             return;
 
@@ -132,30 +117,15 @@ internal sealed class UiRenderer
         indexBuffer.Write(_builder.Indices);
 
         var commandList = frame.CommandList;
+        commandList.SetGraphicsPipeline(_pipeline);
+        commandList.SetDescriptorSet(0, _resourceManager.GetTextureDescriptorSet(frame.FrameSlot));
         commandList.SetViewport(0, 0, frame.Width, frame.Height);
         commandList.SetVertexBuffer(0, vertexBuffer);
         commandList.SetIndexBuffer(indexBuffer, IndexFormat.UInt32);
         var projection = new UiProjection(2f / frame.Width, 2f / frame.Height);
+        commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, projection);
         foreach (var batch in _builder.Batches)
         {
-            switch (batch.Material.Kind)
-            {
-                case UiMaterialKind.Solid:
-                    commandList.SetGraphicsPipeline(_pipeline);
-                    break;
-                case UiMaterialKind.Image:
-                    commandList.SetGraphicsPipeline(_imagePipeline);
-                    commandList.SetDescriptorSet(0, batch.Material.DescriptorSet!);
-                    break;
-                case UiMaterialKind.Text:
-                    commandList.SetGraphicsPipeline(_textPipeline);
-                    commandList.SetDescriptorSet(0, batch.Material.DescriptorSet!);
-                    break;
-                default:
-                    throw new InvalidOperationException("UI material kind has an undefined value.");
-            }
-
-            commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, projection);
             commandList.SetScissor(
                 batch.Scissor.X,
                 batch.Scissor.Y,
@@ -163,12 +133,6 @@ internal sealed class UiRenderer
                 batch.Scissor.Height);
             commandList.DrawIndexed(batch.IndexCount, firstIndex: batch.FirstIndex);
         }
-    }
-
-    internal void ProcessFinalizedResources()
-    {
-        ObjectDisposedException.ThrowIf(_destroyed, this);
-        _resourceManager.DrainFinalizedResources();
     }
 
     internal void Destroy()
@@ -179,15 +143,13 @@ internal sealed class UiRenderer
 
         var errors = new List<Exception>();
         Destroy(_resourceManager, errors);
-        Destroy(_textPipeline, errors);
-        Destroy(_imagePipeline, errors);
-        Destroy(_imageDescriptorLayout, errors);
         foreach (var frame in _frameResources)
         {
             Destroy(frame.IndexBuffer, errors);
             Destroy(frame.VertexBuffer, errors);
         }
         Destroy(_pipeline, errors);
+        Destroy(_descriptorSetLayout, errors);
 
         if (errors.Count > 0)
             ExceptionDispatchInfo.Capture(errors[0]).Throw();
@@ -201,8 +163,7 @@ internal sealed class UiRenderer
         string fragmentPath,
         string vertexName,
         string fragmentName,
-        VertexInputDescription vertexInput,
-        DescriptorSetLayout[] descriptorSetLayouts)
+        DescriptorSetLayout descriptorSetLayout)
     {
         var vertexSource = Engine.ResourceManager.ReadAllText(vertexPath);
         var fragmentSource = Engine.ResourceManager.ReadAllText(fragmentPath);
@@ -219,9 +180,9 @@ internal sealed class UiRenderer
             pipeline = device.CreateGraphicsPipeline(new GraphicsPipelineDescription
             {
                 Shaders = [vertexShader, fragmentShader],
-                VertexInput = vertexInput,
+                VertexInput = UiVertex.VertexInput,
                 ColorAttachmentFormats = [colorFormat],
-                DescriptorSetLayouts = descriptorSetLayouts,
+                DescriptorSetLayouts = [descriptorSetLayout],
                 PushConstantRanges = [new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, UiProjection.SizeInBytes)],
                 Rasterizer = new RasterizerDescription { CullMode = CullMode.None },
                 ColorBlend = new ColorBlendDescription { AlphaBlend = true },

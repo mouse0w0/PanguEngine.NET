@@ -7,6 +7,20 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiDrawBuilderTests
 {
     [Fact]
+    public void UnifiedVertexInputMatchesFiftyTwoByteLayout()
+    {
+        Assert.Equal(52u, UiVertex.SizeInBytes);
+        Assert.Equal(52, System.Runtime.InteropServices.Marshal.SizeOf<UiVertex>());
+        Assert.Equal(52u, Assert.Single(UiVertex.VertexInput.Buffers).Stride);
+        Assert.Equal(
+            [
+                (4u, VertexAttributeFormat.UInt32, 48u)
+            ],
+            UiVertex.VertexInput.Attributes.Skip(4)
+                .Select(attribute => (attribute.Location, attribute.Format, attribute.Offset)));
+    }
+
+    [Fact]
     public void InvalidScaleFailsBeforePreviousResultChanges()
     {
         var builder = new UiDrawBuilder();
@@ -278,7 +292,6 @@ public sealed class UiDrawBuilderTests
     public void ImageVerticesContainNormalizedUvAndTexelCenterBounds()
     {
         var image = UiImage.FromRgba(new byte[64], 4, 4);
-        var descriptorSet = new TestDescriptorSet();
         var builder = new UiDrawBuilder();
 
         builder.Build(
@@ -292,20 +305,54 @@ public sealed class UiDrawBuilderTests
             16,
             16,
             false,
-            _ => new UiImageRenderBinding(17, descriptorSet));
+            _ => new UiImageRenderBinding(
+                17,
+                16,
+                16,
+                new UiImageAtlasRegion(4, 8, 4, 4)));
 
         var first = builder.Vertices[0];
-        Assert.Equal(0.25f, first.U);
-        Assert.Equal(0.25f, first.V);
-        Assert.Equal(0.375f, first.ClampMinU);
-        Assert.Equal(0.375f, first.ClampMinV);
-        Assert.Equal(0.625f, first.ClampMaxU);
-        Assert.Equal(0.625f, first.ClampMaxV);
+        Assert.Equal(5 / 16f, first.U);
+        Assert.Equal(9 / 16f, first.V);
+        Assert.Equal(5.5f / 16, first.ClampMinU);
+        Assert.Equal(9.5f / 16, first.ClampMinV);
+        Assert.Equal(6.5f / 16, first.ClampMaxU);
+        Assert.Equal(10.5f / 16, first.ClampMaxV);
         Assert.Equal(0.5f, first.A);
-        var batch = Assert.Single(builder.Batches.ToArray());
-        Assert.Equal(UiMaterialKind.Image, batch.Material.Kind);
-        Assert.Equal(17ul, batch.Material.ResourceId);
-        Assert.Same(descriptorSet, batch.Material.DescriptorSet);
+        Assert.Equal(
+            PackMaterialData(UiMaterialKind.ImageLinear, 17),
+            first.MaterialData);
+        Assert.Single(builder.Batches.ToArray());
+    }
+
+    [Fact]
+    public void SubTexelImageSourceClampsToItsCenter()
+    {
+        var image = UiImage.FromRgba(new byte[4], 1, 1);
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            Commands(new UiDrawImageCommand(
+                new Rect(0, 0, 1, 1),
+                image,
+                new Rect(0.25, 0.125, 0.5, 0.25),
+                ImageSamplingMode.Linear,
+                null,
+                1)),
+            10,
+            10,
+            false,
+            _ => new UiImageRenderBinding(
+                1,
+                16,
+                8,
+                new UiImageAtlasRegion(4, 2, 1, 1)));
+
+        var first = builder.Vertices[0];
+        Assert.Equal(4.5f / 16, first.ClampMinU);
+        Assert.Equal(first.ClampMinU, first.ClampMaxU);
+        Assert.Equal(2.25f / 8, first.ClampMinV);
+        Assert.Equal(first.ClampMinV, first.ClampMaxV);
     }
 
     [Fact]
@@ -330,12 +377,10 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
-    public void DifferentImageMaterialsCreateStableBatchBoundaries()
+    public void DifferentImageSlotsAndSamplingModesShareScissorBatch()
     {
         var firstImage = UiImage.FromRgba(new byte[4], 1, 1);
         var secondImage = UiImage.FromRgba(new byte[4], 1, 1);
-        var firstDescriptor = new TestDescriptorSet();
-        var secondDescriptor = new TestDescriptorSet();
         var builder = new UiDrawBuilder();
 
         builder.Build(
@@ -353,21 +398,25 @@ public sealed class UiDrawBuilderTests
             false,
             command => command.Image == firstImage
                 ? new UiImageRenderBinding(
-                    command.SamplingMode == ImageSamplingMode.Linear ? 1ul : 2ul,
-                    command.SamplingMode == ImageSamplingMode.Linear ? firstDescriptor : secondDescriptor)
-                : new UiImageRenderBinding(3, secondDescriptor));
+                    command.SamplingMode == ImageSamplingMode.Linear ? 1u : 2u,
+                    1,
+                    1,
+                    new UiImageAtlasRegion(0, 0, 1, 1))
+                : new UiImageRenderBinding(3, 1, 1, new UiImageAtlasRegion(0, 0, 1, 1)));
 
+        Assert.Equal(24u, Assert.Single(builder.Batches.ToArray()).IndexCount);
         Assert.Equal(
             [
-                new UiBatch(new UiScissor(0, 0, 10, 10),
-                    new UiBatchMaterial(UiMaterialKind.Image, 1, firstDescriptor, ImageSamplingMode.Linear), 0, 12),
-                new UiBatch(new UiScissor(0, 0, 10, 10),
-                    new UiBatchMaterial(UiMaterialKind.Image, 2, secondDescriptor, ImageSamplingMode.Nearest), 12, 6),
-                new UiBatch(new UiScissor(0, 0, 10, 10),
-                    new UiBatchMaterial(UiMaterialKind.Image, 3, secondDescriptor, ImageSamplingMode.Linear), 18, 6)
+                PackMaterialData(UiMaterialKind.ImageLinear, 1),
+                PackMaterialData(UiMaterialKind.ImageLinear, 1),
+                PackMaterialData(UiMaterialKind.ImageNearest, 2),
+                PackMaterialData(UiMaterialKind.ImageLinear, 3)
             ],
-            builder.Batches.ToArray());
+            builder.Vertices.ToArray().Chunk(4).Select(vertices => vertices[0].MaterialData));
     }
+
+    private static uint PackMaterialData(UiMaterialKind materialKind, uint textureIndex) =>
+        (textureIndex << 8) | (uint)materialKind;
 
     private static UiDrawCommandList Commands(params UiDrawCommand[] commands) =>
         new(commands.ToList(), 1);
@@ -382,9 +431,4 @@ public sealed class UiDrawBuilderTests
         double opacity = 1) =>
         new(bounds, color, clip, opacity);
 
-    private sealed class TestDescriptorSet : DescriptorSet
-    {
-        public override void Destroy() =>
-            MarkDestroyed();
-    }
 }
