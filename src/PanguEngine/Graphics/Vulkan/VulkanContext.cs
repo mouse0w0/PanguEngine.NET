@@ -467,7 +467,18 @@ public static unsafe class VulkanContext
     {
         var indices = FindQueueFamilies(device, surface);
         var extensionsSupported = CheckDeviceExtensionsSupport(device);
-        Vk.GetPhysicalDeviceFeatures(device, out var features);
+        Vk.GetPhysicalDeviceProperties(device, out var properties);
+
+        PhysicalDeviceFeatures2 features2 = new()
+        {
+            SType = StructureType.PhysicalDeviceFeatures2
+        };
+        PhysicalDeviceVulkan12Features vulkan12Features = new()
+        {
+            SType = StructureType.PhysicalDeviceVulkan12Features
+        };
+        features2.PNext = &vulkan12Features;
+        Vk.GetPhysicalDeviceFeatures2(device, &features2);
 
         var swapChainAdequate = false;
         if (extensionsSupported)
@@ -479,8 +490,13 @@ public static unsafe class VulkanContext
         return indices.IsComplete &&
                extensionsSupported &&
                swapChainAdequate &&
-               features.MultiDrawIndirect &&
-               features.DrawIndirectFirstInstance;
+               features2.Features.MultiDrawIndirect &&
+               features2.Features.DrawIndirectFirstInstance &&
+               vulkan12Features.ShaderSampledImageArrayNonUniformIndexing &&
+               properties.Limits.MaxPerStageDescriptorSampledImages >= 256 &&
+               properties.Limits.MaxDescriptorSetSampledImages >= 256 &&
+               properties.Limits.MaxPerStageDescriptorSamplers >= 2 &&
+               properties.Limits.MaxDescriptorSetSamplers >= 2;
     }
 
     private static bool CheckDeviceExtensionsSupport(PhysicalDevice device)
@@ -617,7 +633,8 @@ public static unsafe class VulkanContext
         PhysicalDeviceVulkan12Features vulkan12Features = new()
         {
             SType = StructureType.PhysicalDeviceVulkan12Features,
-            TimelineSemaphore = true
+            TimelineSemaphore = true,
+            ShaderSampledImageArrayNonUniformIndexing = true
         };
 
         PhysicalDeviceVulkan13Features vulkan13Features = new()

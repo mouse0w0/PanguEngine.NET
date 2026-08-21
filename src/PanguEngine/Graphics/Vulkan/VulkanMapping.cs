@@ -3,6 +3,7 @@ using VKShaderStageFlags = Silk.NET.Vulkan.ShaderStageFlags;
 using VkFrontFace = Silk.NET.Vulkan.FrontFace;
 using VkPrimitiveTopology = Silk.NET.Vulkan.PrimitiveTopology;
 using VkVertexInputRate = Silk.NET.Vulkan.VertexInputRate;
+using VkDescriptorType = Silk.NET.Vulkan.DescriptorType;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -165,9 +166,20 @@ internal static class VulkanMapping
             VertexAttributeFormat.Float32x2 => Format.R32G32Sfloat,
             VertexAttributeFormat.Float32x3 => Format.R32G32B32Sfloat,
             VertexAttributeFormat.Float32x4 => Format.R32G32B32A32Sfloat,
+            VertexAttributeFormat.UInt32 => Format.R32Uint,
             _ => throw new ArgumentOutOfRangeException(nameof(format), "Unsupported vertex attribute format.")
         };
     }
+
+    internal static VkDescriptorType ToVulkanDescriptorType(DescriptorType type) => type switch
+    {
+        DescriptorType.UniformBuffer => VkDescriptorType.UniformBuffer,
+        DescriptorType.StorageBuffer => VkDescriptorType.StorageBuffer,
+        DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
+        DescriptorType.SampledImage => VkDescriptorType.SampledImage,
+        DescriptorType.Sampler => VkDescriptorType.Sampler,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
+    };
 
     internal static VkPrimitiveTopology ToVulkanPrimitiveTopology(PrimitiveTopology topology)
     {

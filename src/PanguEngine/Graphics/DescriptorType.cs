@@ -18,5 +18,15 @@ public enum DescriptorType
     /// <summary>
     /// A sampled texture and sampler binding.
     /// </summary>
-    CombinedImageSampler
+    CombinedImageSampler,
+
+    /// <summary>
+    /// A sampled texture binding without an attached sampler.
+    /// </summary>
+    SampledImage,
+
+    /// <summary>
+    /// A sampler binding used with a separate sampled image.
+    /// </summary>
+    Sampler
 }

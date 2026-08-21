@@ -1,7 +1,6 @@
 using Silk.NET.Vulkan;
 using VKDescriptorSetLayoutBinding = Silk.NET.Vulkan.DescriptorSetLayoutBinding;
 using VKDescriptorSetLayout = Silk.NET.Vulkan.DescriptorSetLayout;
-using VkDescriptorType = Silk.NET.Vulkan.DescriptorType;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -21,6 +20,10 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
         var vulkanBindings = new VKDescriptorSetLayoutBinding[bindings.Length];
         for (var i = 0; i < bindings.Length; i++)
         {
+            if (bindings[i].DescriptorCount == 0)
+                throw new ArgumentOutOfRangeException(
+                    nameof(description),
+                    "Descriptor set layout binding count must be greater than zero.");
             for (var previous = 0; previous < i; previous++)
             {
                 if (bindings[previous].Binding == bindings[i].Binding)
@@ -32,8 +35,8 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             vulkanBindings[i] = new VKDescriptorSetLayoutBinding
             {
                 Binding = bindings[i].Binding,
-                DescriptorType = ToVulkanDescriptorType(bindings[i].Type),
-                DescriptorCount = 1,
+                DescriptorType = VulkanMapping.ToVulkanDescriptorType(bindings[i].Type),
+                DescriptorCount = bindings[i].DescriptorCount,
                 StageFlags = VulkanMapping.ToVulkanShaderStageFlags(bindings[i].StageFlags)
             };
         }
@@ -80,27 +83,5 @@ internal sealed unsafe class VulkanDescriptorSetLayout : DescriptorSetLayout
             VulkanContext.Vk.DestroyDescriptorSetLayout(VulkanContext.Device, DescriptorSetLayout, null);
             DescriptorSetLayout = default;
         }
-    }
-
-    internal DescriptorSetLayoutBinding GetBinding(uint binding)
-    {
-        foreach (var layoutBinding in Bindings)
-        {
-            if (layoutBinding.Binding == binding)
-                return layoutBinding;
-        }
-
-        throw new ArgumentException("Descriptor set binding does not exist in the layout.", nameof(binding));
-    }
-
-    private static VkDescriptorType ToVulkanDescriptorType(DescriptorType type)
-    {
-        return type switch
-        {
-            DescriptorType.UniformBuffer => VkDescriptorType.UniformBuffer,
-            DescriptorType.StorageBuffer => VkDescriptorType.StorageBuffer,
-            DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
-            _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
-        };
     }
 }

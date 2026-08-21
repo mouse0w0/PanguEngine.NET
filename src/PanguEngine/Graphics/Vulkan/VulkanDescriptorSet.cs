@@ -1,6 +1,5 @@
 using Silk.NET.Vulkan;
 using VkDescriptorSet = Silk.NET.Vulkan.DescriptorSet;
-using VkDescriptorType = Silk.NET.Vulkan.DescriptorType;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -20,11 +19,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         Layout = layout;
 
         var bindings = description.Bindings;
-        if (bindings.Length == 0)
-            throw new ArgumentException("Descriptor set must contain at least one binding.", nameof(description));
-        if (bindings.Length != layout.Bindings.Count)
-            throw new ArgumentException("Descriptor set bindings must match the descriptor set layout bindings.",
-                nameof(description));
+        _bindingState = new VulkanDescriptorSetBindingState(layout.Bindings, bindings);
 
         var poolSizes = CreateDescriptorPoolSizes(layout.Bindings);
 
@@ -61,7 +56,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 throw new InvalidOperationException("Failed to allocate Vulkan descriptor set.");
 
             Handle = descriptorSet;
-            UpdateDescriptorSet(layout, bindings);
+            UpdateDescriptorSet(bindings);
             ReferencedResources = GetReferencedResources(bindings);
             var descriptorPool = DescriptorPool;
             Lifetime = new VulkanResourceLifetime(
@@ -88,7 +83,9 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
 
     internal VulkanResourceLifetime Lifetime { get; }
 
-    internal IReadOnlyList<VulkanResourceLifetime> ReferencedResources { get; }
+    internal IReadOnlyList<VulkanResourceLifetime> ReferencedResources { get; private set; }
+
+    private readonly VulkanDescriptorSetBindingState _bindingState;
 
     private DescriptorPool DescriptorPool { get; }
 
@@ -100,6 +97,18 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
             return;
         MarkDestroyed();
         Lifetime.RequestDestroy();
+    }
+
+    /// <inheritdoc/>
+    public override void Update(DescriptorSetBinding[] bindings)
+    {
+        VulkanContext.EnsureRenderThread();
+        ThrowIfDestroyed();
+        ArgumentNullException.ThrowIfNull(bindings);
+        var candidate = _bindingState.CreateUpdatedBindings(bindings);
+        UpdateDescriptorSet(bindings);
+        _bindingState.Commit(candidate);
+        ReferencedResources = GetReferencedResources(candidate);
     }
 
     private static VulkanResourceLifetime[] GetReferencedResources(ReadOnlySpan<DescriptorSetBinding> bindings)
@@ -121,6 +130,16 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                     resources.Add(((VulkanSampler)binding.Sampler!).Lifetime);
                     break;
                 }
+                case DescriptorType.SampledImage:
+                {
+                    var view = (VulkanTextureView)binding.TextureView!;
+                    resources.Add(view.Lifetime);
+                    resources.Add(view.VulkanTexture.Lifetime);
+                    break;
+                }
+                case DescriptorType.Sampler:
+                    resources.Add(((VulkanSampler)binding.Sampler!).Lifetime);
+                    break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(bindings), "Unsupported descriptor type.");
             }
@@ -129,7 +148,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         return [.. resources];
     }
 
-    private void UpdateDescriptorSet(VulkanDescriptorSetLayout layout, ReadOnlySpan<DescriptorSetBinding> bindings)
+    private void UpdateDescriptorSet(ReadOnlySpan<DescriptorSetBinding> bindings)
     {
         var bufferInfos = new DescriptorBufferInfo[bindings.Length];
         var imageInfos = new DescriptorImageInfo[bindings.Length];
@@ -137,26 +156,14 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
 
         for (var i = 0; i < bindings.Length; i++)
         {
-            for (var previous = 0; previous < i; previous++)
-            {
-                if (bindings[previous].Binding == bindings[i].Binding)
-                    throw new ArgumentException("Descriptor set bindings must not contain duplicate binding indices.",
-                        nameof(bindings));
-            }
-
-            var layoutBinding = layout.GetBinding(bindings[i].Binding);
-            if (layoutBinding.Type != bindings[i].Type)
-                throw new ArgumentOutOfRangeException(nameof(bindings),
-                    "Descriptor set binding type must match the descriptor set layout binding type.");
-
             writes[i] = new WriteDescriptorSet
             {
                 SType = StructureType.WriteDescriptorSet,
                 DstSet = Handle,
                 DstBinding = bindings[i].Binding,
-                DstArrayElement = 0,
+                DstArrayElement = bindings[i].ArrayElement,
                 DescriptorCount = 1,
-                DescriptorType = ToVulkanDescriptorType(bindings[i].Type)
+                DescriptorType = VulkanMapping.ToVulkanDescriptorType(bindings[i].Type)
             };
 
             switch (bindings[i].Type)
@@ -169,6 +176,12 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                     break;
                 case DescriptorType.CombinedImageSampler:
                     WriteCombinedImageSamplerDescriptor(bindings[i], imageInfos, i);
+                    break;
+                case DescriptorType.SampledImage:
+                    WriteSampledImageDescriptor(bindings[i], imageInfos, i);
+                    break;
+                case DescriptorType.Sampler:
+                    WriteSamplerDescriptor(bindings[i], imageInfos, i);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(bindings), "Unsupported descriptor type.");
@@ -188,6 +201,8 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                         pWrites[i].PBufferInfo = pBufferInfos + i;
                         break;
                     case DescriptorType.CombinedImageSampler:
+                    case DescriptorType.SampledImage:
+                    case DescriptorType.Sampler:
                         pWrites[i].PImageInfo = pImageInfos + i;
                         break;
                     default:
@@ -199,12 +214,12 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         }
     }
 
-    private static DescriptorPoolSize[] CreateDescriptorPoolSizes(IReadOnlyList<DescriptorSetLayoutBinding> bindings)
+    internal static DescriptorPoolSize[] CreateDescriptorPoolSizes(IReadOnlyList<DescriptorSetLayoutBinding> bindings)
     {
         var poolSizes = new List<DescriptorPoolSize>();
         foreach (var binding in bindings)
         {
-            var descriptorType = ToVulkanDescriptorType(binding.Type);
+            var descriptorType = VulkanMapping.ToVulkanDescriptorType(binding.Type);
             var found = false;
             for (var i = 0; i < poolSizes.Count; i++)
             {
@@ -212,7 +227,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                     continue;
 
                 var poolSize = poolSizes[i];
-                poolSize.DescriptorCount++;
+                poolSize.DescriptorCount += binding.DescriptorCount;
                 poolSizes[i] = poolSize;
                 found = true;
                 break;
@@ -223,7 +238,7 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
                 poolSizes.Add(new DescriptorPoolSize
                 {
                     Type = descriptorType,
-                    DescriptorCount = 1
+                    DescriptorCount = binding.DescriptorCount
                 });
             }
         }
@@ -322,14 +337,40 @@ internal sealed unsafe class VulkanDescriptorSet : DescriptorSet
         };
     }
 
-    private static VkDescriptorType ToVulkanDescriptorType(DescriptorType type)
+    private static void WriteSampledImageDescriptor(
+        DescriptorSetBinding binding,
+        DescriptorImageInfo[] imageInfos,
+        int index)
     {
-        return type switch
+        var textureView = binding.TextureView as VulkanTextureView
+                          ?? throw new InvalidOperationException(
+                              "Descriptor set texture view was not created by the Vulkan backend.");
+        textureView.ThrowIfDestroyed();
+        var texture = textureView.VulkanTexture;
+        texture.ThrowIfDestroyed();
+        if (!texture.Usage.HasFlag(TextureUsage.Sampled))
+            throw new InvalidOperationException("Descriptor set texture was not created with Sampled usage.");
+
+        imageInfos[index] = new DescriptorImageInfo
         {
-            DescriptorType.UniformBuffer => VkDescriptorType.UniformBuffer,
-            DescriptorType.StorageBuffer => VkDescriptorType.StorageBuffer,
-            DescriptorType.CombinedImageSampler => VkDescriptorType.CombinedImageSampler,
-            _ => throw new ArgumentOutOfRangeException(nameof(type), "Unsupported descriptor type.")
+            ImageView = textureView.ImageView,
+            ImageLayout = ImageLayout.ShaderReadOnlyOptimal
+        };
+    }
+
+    private static void WriteSamplerDescriptor(
+        DescriptorSetBinding binding,
+        DescriptorImageInfo[] imageInfos,
+        int index)
+    {
+        var sampler = binding.Sampler as VulkanSampler
+                      ?? throw new InvalidOperationException(
+                          "Descriptor set sampler was not created by the Vulkan backend.");
+        sampler.ThrowIfDestroyed();
+
+        imageInfos[index] = new DescriptorImageInfo
+        {
+            Sampler = sampler.Handle
         };
     }
 }

@@ -18,5 +18,10 @@ public enum VertexAttributeFormat
     /// <summary>
     /// Four 32-bit floating point components.
     /// </summary>
-    Float32x4
+    Float32x4,
+
+    /// <summary>
+    /// A single 32-bit unsigned integer component.
+    /// </summary>
+    UInt32
 }
