@@ -10,6 +10,7 @@ namespace PanguEngine.Windowing;
 /// <param name="Bounds">The monitor bounds in screen coordinates.</param>
 /// <param name="VideoMode">The monitor's current video mode.</param>
 /// <param name="Gamma">The monitor gamma value.</param>
+/// <param name="ContentScale">The operating system content scale for text and UI elements.</param>
 /// <param name="VideoModes">The video modes reported by the monitor.</param>
 public readonly record struct DisplayMonitor(
     string Name,
@@ -17,4 +18,5 @@ public readonly record struct DisplayMonitor(
     Rectangle<int> Bounds,
     VideoMode VideoMode,
     double Gamma,
+    double ContentScale,
     VideoMode[] VideoModes);

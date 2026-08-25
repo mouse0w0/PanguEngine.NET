@@ -2,7 +2,8 @@ namespace PanguEngine.Client.UI;
 
 public partial class UiScreen
 {
-    private double _scale = 1;
+    private double _scale;
+    private bool _hasExplicitScale;
     private bool _useLayoutRounding = true;
 
     /// <summary>
@@ -44,18 +45,16 @@ public partial class UiScreen
 
     private void SetScale(double value)
     {
-        if (!double.IsFinite(value) || value <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(value),
-                "UI scale must be finite and greater than zero.");
-        }
+        UiSettings.ValidateScale(value, nameof(value));
 
         lock (_stateSync)
         {
             // ReSharper disable once CompareOfFloatsByEqualityOperator
             if (_scale == value)
+            {
+                _hasExplicitScale = true;
                 return;
+            }
             if (_ownerThreadId is not null)
                 VerifyOwnerThreadCore();
             if (IsUpdatingLayout)
@@ -67,6 +66,25 @@ public partial class UiScreen
             }
 
             _scale = value;
+            _hasExplicitScale = true;
+        }
+
+        Root?.InvalidateMeasureSubtree();
+    }
+
+    private void SynchronizeDefaultScale()
+    {
+        lock (_stateSync)
+        {
+            if (_hasExplicitScale)
+                return;
+
+            var scale = UiSettings.DefaultScale;
+            // ReSharper disable once CompareOfFloatsByEqualityOperator
+            if (_scale == scale)
+                return;
+
+            _scale = scale;
         }
 
         Root?.InvalidateMeasureSubtree();

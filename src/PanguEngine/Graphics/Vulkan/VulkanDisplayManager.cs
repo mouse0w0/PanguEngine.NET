@@ -1,4 +1,5 @@
 using PanguEngine.Windowing;
+using Silk.NET.GLFW;
 using SilkMonitor = Silk.NET.Windowing.Monitor;
 using ISilkMonitor = Silk.NET.Windowing.IMonitor;
 using SilkVideoMode = Silk.NET.Windowing.VideoMode;
@@ -10,7 +11,7 @@ namespace PanguEngine.Graphics.Vulkan;
 /// <summary>
 /// Vulkan implementation of <see cref="DisplayManager"/>.
 /// </summary>
-internal sealed class VulkanDisplayManager : DisplayManager
+internal sealed unsafe class VulkanDisplayManager : DisplayManager
 {
     private readonly SilkWindow _window;
 
@@ -70,6 +71,10 @@ internal sealed class VulkanDisplayManager : DisplayManager
     /// <returns>The engine display monitor snapshot.</returns>
     internal static DisplayMonitor CreateDisplayMonitor(ISilkMonitor monitor)
     {
+        var glfw = GlfwProvider.GLFW.Value;
+        var monitors = glfw.GetMonitors(out _);
+        glfw.GetMonitorContentScale(monitors[monitor.Index], out var xScale, out _);
+
         var modes = new List<EngineVideoMode>();
         foreach (var mode in monitor.GetAllVideoModes())
             modes.Add(FromSilkVideoMode(mode));
@@ -80,6 +85,7 @@ internal sealed class VulkanDisplayManager : DisplayManager
             monitor.Bounds,
             FromSilkVideoMode(monitor.VideoMode),
             monitor.Gamma,
+            xScale,
             modes.ToArray());
     }
 }

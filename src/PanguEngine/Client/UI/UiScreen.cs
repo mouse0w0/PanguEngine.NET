@@ -26,6 +26,7 @@ public partial class UiScreen
     /// <param name="root">The initial root node, or null to create an empty screen.</param>
     public UiScreen(UiNode? root = null)
     {
+        _scale = UiSettings.DefaultScale;
         Root = root;
     }
 
@@ -102,6 +103,7 @@ public partial class UiScreen
         {
             try
             {
+                SynchronizeDefaultScale();
                 OnOpening();
                 ActivateInteraction();
             }
@@ -160,6 +162,7 @@ public partial class UiScreen
             if (!IsScreenActive())
                 return;
 
+            SynchronizeDefaultScale();
             var scale = Scale;
             var logicalViewportSize = new Size(
                 viewportSize.Width / scale,

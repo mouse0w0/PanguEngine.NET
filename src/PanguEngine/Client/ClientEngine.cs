@@ -104,6 +104,9 @@ public sealed class ClientEngine
             EnableValidation = _launchOptions.GpuValidation,
             PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
         });
+        var monitor = PrimaryWindow.Monitor ?? throw new InvalidOperationException(
+            "UI scale initialization requires a current monitor.");
+        UiSettings.DefaultScale = monitor.ContentScale;
         Ui = new UiManager();
 
         Audio = new AudioSystem(
