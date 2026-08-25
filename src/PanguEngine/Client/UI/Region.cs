@@ -184,34 +184,9 @@ public abstract class Region : Parent
         if (BorderBrush is not { } borderBrush)
             return;
 
-        context.FillRectangle(
-            new Rect(
-                decorationBounds.X,
-                decorationBounds.Y,
-                decorationBounds.Width,
-                borderInnerBounds.Y - decorationBounds.Y),
-            borderBrush);
-        context.FillRectangle(
-            new Rect(
-                borderInnerBounds.X + borderInnerBounds.Width,
-                borderInnerBounds.Y,
-                decorationBounds.X + decorationBounds.Width - (borderInnerBounds.X + borderInnerBounds.Width),
-                borderInnerBounds.Height),
-            borderBrush);
-        context.FillRectangle(
-            new Rect(
-                decorationBounds.X,
-                borderInnerBounds.Y + borderInnerBounds.Height,
-                decorationBounds.Width,
-                decorationBounds.Y + decorationBounds.Height -
-                (borderInnerBounds.Y + borderInnerBounds.Height)),
-            borderBrush);
-        context.FillRectangle(
-            new Rect(
-                decorationBounds.X,
-                borderInnerBounds.Y,
-                borderInnerBounds.X - decorationBounds.X,
-                borderInnerBounds.Height),
+        context.FillBorder(
+            decorationBounds,
+            borderInnerBounds,
             borderBrush);
     }
 

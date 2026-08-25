@@ -28,7 +28,12 @@ public partial class UiScreen
             var commands = new List<UiDrawCommand>();
             root.AppendDrawCommands(
                 commands,
-                new UiDrawingState(0, 0, null, false, 1));
+                new UiDrawingState(
+                    0,
+                    0,
+                    null,
+                    false,
+                    1));
             return new UiDrawCommandList(commands, snapshotScale);
         }
         finally

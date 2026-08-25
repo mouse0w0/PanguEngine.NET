@@ -106,7 +106,11 @@ public sealed class ImageView : UiNode
                     : availableSize.Height);
         }
 
-        var scale = GetScale(availableSize, sourceRect.Width, sourceRect.Height, Stretch);
+        var scale = UiImageLayout.GetScale(
+            availableSize,
+            sourceRect.Width,
+            sourceRect.Height,
+            Stretch);
         return new Size(sourceRect.Width * scale, sourceRect.Height * scale);
     }
 
@@ -125,13 +129,13 @@ public sealed class ImageView : UiNode
         var screen = Screen;
         var useLayoutRounding = screen?.UseLayoutRounding ?? true;
         var scale = screen?.Scale ?? 1;
-        var destinationBounds = GetDestinationBounds(
+        var destinationBounds = UiImageLayout.GetDestinationBounds(
             viewBounds,
             sourceRect.Width,
             sourceRect.Height,
-            Stretch,
-            useLayoutRounding,
-            scale);
+            Stretch);
+        if (useLayoutRounding && Stretch != ImageStretch.Fill)
+            destinationBounds = UiLayoutHelper.RoundLayoutRect(destinationBounds, scale);
         using (context.PushClip(viewBounds))
         {
             context.DrawImage(destinationBounds, image, sourceRect, SamplingMode);
@@ -150,69 +154,4 @@ public sealed class ImageView : UiNode
         return sourceRect;
     }
 
-    private static double GetScale(
-        Size availableSize,
-        double sourceWidth,
-        double sourceHeight,
-        ImageStretch stretch) =>
-        stretch switch
-        {
-            ImageStretch.None => 1,
-            ImageStretch.Uniform =>
-                GetUniformScale(availableSize, sourceWidth, sourceHeight, useMaximum: false),
-            ImageStretch.UniformToFill =>
-                GetUniformScale(availableSize, sourceWidth, sourceHeight, useMaximum: true),
-            ImageStretch.Fill => 1,
-            _ => throw new InvalidOperationException("ImageView.Stretch has an undefined value.")
-        };
-
-    private static double GetUniformScale(
-        Size availableSize,
-        double sourceWidth,
-        double sourceHeight,
-        bool useMaximum)
-    {
-        var widthIsInfinite = double.IsPositiveInfinity(availableSize.Width);
-        var heightIsInfinite = double.IsPositiveInfinity(availableSize.Height);
-        if (widthIsInfinite && heightIsInfinite)
-            return 1;
-        if (widthIsInfinite)
-            return availableSize.Height / sourceHeight;
-        if (heightIsInfinite)
-            return availableSize.Width / sourceWidth;
-
-        var widthScale = availableSize.Width / sourceWidth;
-        var heightScale = availableSize.Height / sourceHeight;
-        return useMaximum
-            ? Math.Max(widthScale, heightScale)
-            : Math.Min(widthScale, heightScale);
-    }
-
-    private static Rect GetDestinationBounds(
-        Rect viewBounds,
-        double sourceWidth,
-        double sourceHeight,
-        ImageStretch stretch,
-        bool useLayoutRounding,
-        double layoutScale)
-    {
-        if (stretch == ImageStretch.Fill)
-            return viewBounds;
-
-        var scale = GetScale(
-            new Size(viewBounds.Width, viewBounds.Height),
-            sourceWidth,
-            sourceHeight,
-            stretch);
-        var width = sourceWidth * scale;
-        var height = sourceHeight * scale;
-        var bounds = new Rect(
-            (viewBounds.Width - width) / 2,
-            (viewBounds.Height - height) / 2,
-            width,
-            height);
-        return useLayoutRounding
-            ? UiLayoutHelper.RoundLayoutRect(bounds, layoutScale)
-            : bounds;
-    }
 }

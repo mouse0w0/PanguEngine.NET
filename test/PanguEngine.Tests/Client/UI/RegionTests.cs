@@ -488,6 +488,20 @@ public sealed class RegionTests
     }
 
     [Fact]
+    public void ImageBrushChangesDoNotInvalidateLayout()
+    {
+        var image = UiImage.FromRgba(new byte[64], 4, 4);
+        var region = new TestRegion();
+        ValidateLayout(region);
+
+        region.Background = new ImageBrush(image);
+        region.BorderBrush = new NineSliceImageBrush(image, new ImageSlice(1));
+
+        Assert.True(region.IsMeasureValid);
+        Assert.True(region.IsArrangeValid);
+    }
+
+    [Fact]
     public void ContentHookExceptionsPropagateWithoutCommittingPasses()
     {
         var measureException = new InvalidOperationException("measure");

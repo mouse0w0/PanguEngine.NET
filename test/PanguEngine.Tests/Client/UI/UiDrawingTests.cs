@@ -387,6 +387,310 @@ public sealed class UiDrawingTests
         Assert.Equal(0.25, command.Opacity);
     }
 
+    [Theory]
+    [InlineData(ImageStretch.Fill, 0, 0, 100, 100)]
+    [InlineData(ImageStretch.None, -50, 0, 200, 100)]
+    [InlineData(ImageStretch.Uniform, 0, 25, 100, 50)]
+    [InlineData(ImageStretch.UniformToFill, -50, 0, 200, 100)]
+    public void ImageBrushBackgroundUsesExpectedStretch(
+        ImageStretch stretch,
+        double x,
+        double y,
+        double width,
+        double height)
+    {
+        var image = CreateImage(200, 100);
+        var region = new DrawingRegion
+        {
+            Background = new ImageBrush(image, stretch)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 100, 100));
+
+        var command = Assert.IsType<UiDrawImageCommand>(
+            Assert.Single(screen.CreateDrawCommandList()));
+
+        Assert.Equal(new Rect(x, y, width, height), command.Bounds);
+        Assert.Equal(new Rect(0, 0, 200, 100), command.SourceRect);
+        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ImageBrushBackgroundUsesExactLogicalStretchGeometry(
+        bool useLayoutRounding)
+    {
+        var region = new DrawingRegion
+        {
+            Background = new ImageBrush(
+                CreateImage(101, 99),
+                ImageStretch.None)
+        };
+        var screen = new UiScreen(region)
+        {
+            Scale = 1.5,
+            UseLayoutRounding = useLayoutRounding
+        };
+        Arrange(region, new Rect(0, 0, 100, 100));
+
+        var command = Assert.IsType<UiDrawImageCommand>(
+            Assert.Single(screen.CreateDrawCommandList()));
+
+        Assert.Equal(new Rect(-0.5, 0.5, 101, 99), command.Bounds);
+        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+    }
+
+    [Theory]
+    [InlineData(ImageStretch.Fill, 5, 7, 100, 80, true)]
+    [InlineData(ImageStretch.None, -45, -3, 200, 100, true)]
+    [InlineData(ImageStretch.Uniform, 5, 22, 100, 50, false)]
+    [InlineData(ImageStretch.UniformToFill, -25, 7, 160, 80, true)]
+    public void ImageBrushBorderUsesOneContinuousOuterMapping(
+        ImageStretch stretch,
+        double x,
+        double y,
+        double width,
+        double height,
+        bool includesBottom)
+    {
+        var image = CreateImage(200, 100);
+        var region = new DrawingRegion
+        {
+            BorderBrush = new ImageBrush(image, stretch),
+            BorderThickness = new Thickness(10, 20, 30, 15)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(5, 7, 100, 80));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiDrawImageCommand>()
+            .ToArray();
+
+        var expectedClips = new List<Rect>
+        {
+            new(5, 7, 100, 20),
+            new(75, 27, 30, 45)
+        };
+        if (includesBottom)
+            expectedClips.Add(new Rect(5, 72, 100, 15));
+        expectedClips.Add(new Rect(5, 27, 10, 45));
+
+        Assert.Equal(expectedClips.Count, commands.Length);
+        Assert.All(commands, command =>
+        {
+            Assert.Same(image, command.Image);
+            Assert.Equal(new Rect(x, y, width, height), command.Bounds);
+            Assert.Equal(new Rect(0, 0, 200, 100), command.SourceRect);
+        });
+        Assert.Equal(
+            expectedClips,
+            commands.Select(command => command.Clip!.Value));
+    }
+
+    [Fact]
+    public void NineSliceBackgroundMapsSubregionInRowMajorOrder()
+    {
+        var image = CreateImage(30, 30);
+        var region = new DrawingRegion
+        {
+            Background = new NineSliceImageBrush(
+                image,
+                new Rect(5, 4, 20, 18),
+                new ImageSlice(3, 2, 5, 4))
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 40, 30));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiDrawImageCommand>()
+            .ToArray();
+        var sourceX = new[] { 5d, 8, 20, 25 };
+        var sourceY = new[] { 4d, 6, 18, 22 };
+        var destinationX = new[] { 0d, 3, 35, 40 };
+        var destinationY = new[] { 0d, 2, 26, 30 };
+
+        Assert.Equal(9, commands.Length);
+        for (var row = 0; row < 3; row++)
+        {
+            for (var column = 0; column < 3; column++)
+            {
+                var command = commands[row * 3 + column];
+                Assert.Same(image, command.Image);
+                Assert.Equal(ImageSamplingMode.Linear, command.SamplingMode);
+                Assert.Null(command.Clip);
+                AssertBounds(
+                    RectFromCuts(destinationX, destinationY, column, row),
+                    command.Bounds);
+                AssertBounds(
+                    RectFromCuts(sourceX, sourceY, column, row),
+                    command.SourceRect);
+            }
+        }
+    }
+
+    [Fact]
+    public void NineSliceBackgroundShrinksFixedEdgesForSmallTarget()
+    {
+        var image = CreateImage(20, 12);
+        var region = new DrawingRegion
+        {
+            Background = new NineSliceImageBrush(
+                image,
+                new ImageSlice(7, 4, 5, 4))
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 10, 6));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiDrawImageCommand>()
+            .ToArray();
+        var split = 70d / 12;
+
+        Assert.Equal(4, commands.Length);
+        AssertBounds(new Rect(0, 0, split, 3), commands[0].Bounds);
+        AssertBounds(new Rect(split, 0, 10 - split, 3), commands[1].Bounds);
+        AssertBounds(new Rect(0, 3, split, 3), commands[2].Bounds);
+        AssertBounds(new Rect(split, 3, 10 - split, 3), commands[3].Bounds);
+        Assert.Equal(
+            [
+                new Rect(0, 0, 7, 4),
+                new Rect(15, 0, 5, 4),
+                new Rect(0, 8, 7, 4),
+                new Rect(15, 8, 5, 4)
+            ],
+            commands.Select(command => command.SourceRect));
+    }
+
+    [Fact]
+    public void NineSliceBorderMapsSourceEdgesToCommittedBorderBounds()
+    {
+        var image = CreateImage(30, 24);
+        var region = new DrawingRegion
+        {
+            BorderBrush = new NineSliceImageBrush(
+                image,
+                new ImageSlice(4, 3, 6, 5)),
+            BorderThickness = new Thickness(10, 20, 30, 15)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(5, 7, 100, 80));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiDrawImageCommand>()
+            .ToArray();
+        var expectedBounds = new[]
+        {
+            new Rect(5, 7, 10, 20),
+            new Rect(15, 7, 60, 20),
+            new Rect(75, 7, 30, 20),
+            new Rect(5, 27, 10, 45),
+            new Rect(75, 27, 30, 45),
+            new Rect(5, 72, 10, 15),
+            new Rect(15, 72, 60, 15),
+            new Rect(75, 72, 30, 15)
+        };
+        var expectedSources = new[]
+        {
+            new Rect(0, 0, 4, 3),
+            new Rect(4, 0, 20, 3),
+            new Rect(24, 0, 6, 3),
+            new Rect(0, 3, 4, 16),
+            new Rect(24, 3, 6, 16),
+            new Rect(0, 19, 4, 5),
+            new Rect(4, 19, 20, 5),
+            new Rect(24, 19, 6, 5)
+        };
+
+        Assert.Equal(8, commands.Length);
+        for (var index = 0; index < commands.Length; index++)
+        {
+            AssertBounds(expectedBounds[index], commands[index].Bounds);
+            AssertBounds(expectedSources[index], commands[index].SourceRect);
+            Assert.Null(commands[index].Clip);
+        }
+        Assert.DoesNotContain(commands, command =>
+            command.Bounds == new Rect(15, 27, 60, 45));
+    }
+
+    [Fact]
+    public void NineSliceBorderLeavesTargetEdgeTransparentForZeroSourceSlice()
+    {
+        var region = new DrawingRegion
+        {
+            BorderBrush = new NineSliceImageBrush(
+                CreateImage(20, 20),
+                new ImageSlice(0, 4, 4, 4)),
+            BorderThickness = new Thickness(5)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 20, 20));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiDrawImageCommand>()
+            .ToArray();
+
+        Assert.Equal(5, commands.Length);
+        Assert.All(commands, command => Assert.True(command.SourceRect.Width > 0));
+        Assert.DoesNotContain(commands, command => command.Bounds.X == 0);
+    }
+
+    [Fact]
+    public void NineSliceBorderUsesCollapsedCommittedInnerBounds()
+    {
+        var region = new DrawingRegion
+        {
+            BorderBrush = new NineSliceImageBrush(
+                CreateImage(30, 24),
+                new ImageSlice(4, 3, 6, 5)),
+            BorderThickness = new Thickness(25, 20, 30, 15)
+        };
+        var screen = new UiScreen(region);
+        Arrange(region, new Rect(0, 0, 40, 30));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiDrawImageCommand>()
+            .ToArray();
+
+        Assert.Equal(4, commands.Length);
+        Assert.Equal(
+            [
+                new Rect(0, 0, 25, 20),
+                new Rect(25, 0, 15, 20),
+                new Rect(0, 20, 25, 10),
+                new Rect(25, 20, 15, 10)
+            ],
+            commands.Select(command => command.Bounds));
+    }
+
+    [Fact]
+    public void NineSliceBackgroundUsesInheritedClipAndOpacity()
+    {
+        var parent = new DrawingParent { ClipToBounds = true, Opacity = 0.5 };
+        var region = new DrawingRegion
+        {
+            Opacity = 0.5,
+            Background = new NineSliceImageBrush(
+                CreateImage(12, 12),
+                new ImageSlice(2))
+        };
+        parent.Add(region);
+        var screen = new UiScreen(parent);
+        Arrange(parent, new Rect(10, 20, 30, 30));
+        Arrange(region, new Rect(20, 20, 40, 40));
+
+        var commands = screen.CreateDrawCommandList()
+            .Cast<UiDrawImageCommand>()
+            .ToArray();
+
+        Assert.Equal(4, commands.Length);
+        Assert.All(commands, command =>
+        {
+            Assert.Equal(new Rect(10, 20, 30, 30), command.Clip);
+            Assert.Equal(0.25, command.Opacity);
+        });
+    }
+
     [Fact]
     public void RegionDecorationPropertiesCannotChangeWhileDrawing()
     {
@@ -1043,6 +1347,20 @@ public sealed class UiDrawingTests
         Assert.Equal(expected.Width, actual.Width, 12);
         Assert.Equal(expected.Height, actual.Height, 12);
     }
+
+    private static Rect RectFromCuts(
+        IReadOnlyList<double> x,
+        IReadOnlyList<double> y,
+        int column,
+        int row) =>
+        new(
+            x[column],
+            y[row],
+            x[column + 1] - x[column],
+            y[row + 1] - y[row]);
+
+    private static UiImage CreateImage(int width, int height) =>
+        UiImage.FromRgba(new byte[checked(width * height * 4)], width, height);
 
     private static void Arrange(UiNode node, Rect bounds)
     {

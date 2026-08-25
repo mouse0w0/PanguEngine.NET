@@ -60,16 +60,47 @@ public sealed class UiDrawingContext
                 _state.Opacity));
     }
 
-    internal void FillRectangle(Rect bounds, Brush brush)
+    internal void FillRectangle(
+        Rect bounds,
+        Brush brush)
     {
-        if (brush is SolidColorBrush solidColorBrush)
+        switch (brush)
         {
-            FillRectangle(bounds, solidColorBrush.Color);
-            return;
+            case SolidColorBrush solidColorBrush:
+                FillRectangle(bounds, solidColorBrush.Color);
+                return;
+            case ImageBrush imageBrush:
+                FillImageRectangle(bounds, imageBrush);
+                return;
+            case NineSliceImageBrush nineSliceImageBrush:
+                FillNineSliceRectangle(bounds, nineSliceImageBrush);
+                return;
+            default:
+                throw new NotSupportedException(
+                    $"Brush type '{brush.GetType().FullName}' is not supported for rectangle fills.");
         }
+    }
 
-        throw new NotSupportedException(
-            $"Brush type '{brush.GetType().FullName}' is not supported for rectangle fills.");
+    internal void FillBorder(
+        Rect outerBounds,
+        Rect innerBounds,
+        Brush brush)
+    {
+        switch (brush)
+        {
+            case SolidColorBrush solidColorBrush:
+                FillSolidBorder(outerBounds, innerBounds, solidColorBrush.Color);
+                return;
+            case ImageBrush imageBrush:
+                FillImageBorder(outerBounds, innerBounds, imageBrush);
+                return;
+            case NineSliceImageBrush nineSliceImageBrush:
+                FillNineSliceBorder(outerBounds, innerBounds, nineSliceImageBrush);
+                return;
+            default:
+                throw new NotSupportedException(
+                    $"Brush type '{brush.GetType().FullName}' is not supported for border fills.");
+        }
     }
 
     /// <summary>
@@ -273,6 +304,225 @@ public sealed class UiDrawingContext
 
         _state = _states[lastIndex].State;
         _states.RemoveAt(lastIndex);
+    }
+
+    private void FillImageRectangle(
+        Rect bounds,
+        ImageBrush brush)
+    {
+        var sourceRect = brush.SourceRect;
+        if (sourceRect.Width == 0 || sourceRect.Height == 0)
+        {
+            DrawImage(bounds, brush.Source, sourceRect, brush.SamplingMode);
+            return;
+        }
+
+        var destinationBounds = UiImageLayout.GetDestinationBounds(
+            bounds,
+            sourceRect.Width,
+            sourceRect.Height,
+            brush.Stretch);
+        using (PushClip(bounds))
+        {
+            DrawImage(
+                destinationBounds,
+                brush.Source,
+                sourceRect,
+                brush.SamplingMode);
+        }
+    }
+
+    private void FillSolidBorder(Rect outerBounds, Rect innerBounds, Color color)
+    {
+        Span<Rect> bounds = stackalloc Rect[4];
+        GetBorderBounds(outerBounds, innerBounds, bounds);
+        foreach (var edgeBounds in bounds)
+            FillRectangle(edgeBounds, color);
+    }
+
+    private void FillImageBorder(
+        Rect outerBounds,
+        Rect innerBounds,
+        ImageBrush brush)
+    {
+        var sourceRect = brush.SourceRect;
+        if (sourceRect.Width == 0 || sourceRect.Height == 0)
+        {
+            DrawImage(outerBounds, brush.Source, sourceRect, brush.SamplingMode);
+            return;
+        }
+
+        var destinationBounds = UiImageLayout.GetDestinationBounds(
+            outerBounds,
+            sourceRect.Width,
+            sourceRect.Height,
+            brush.Stretch);
+        Span<Rect> edgeBounds = stackalloc Rect[4];
+        GetBorderBounds(outerBounds, innerBounds, edgeBounds);
+        foreach (var edge in edgeBounds)
+        {
+            using (PushClip(edge))
+            {
+                DrawImage(
+                    destinationBounds,
+                    brush.Source,
+                    sourceRect,
+                    brush.SamplingMode);
+            }
+        }
+    }
+
+    private void FillNineSliceRectangle(Rect bounds, NineSliceImageBrush brush)
+    {
+        Span<double> destinationX = stackalloc double[4];
+        Span<double> destinationY = stackalloc double[4];
+        GetBackgroundDestinationCuts(
+            bounds,
+            brush.Slice,
+            destinationX,
+            destinationY);
+        AppendNineSlice(
+            brush.Source,
+            brush.SourceRect,
+            brush.Slice,
+            destinationX,
+            destinationY,
+            brush.SamplingMode,
+            drawCenter: true);
+    }
+
+    private void FillNineSliceBorder(
+        Rect outerBounds,
+        Rect innerBounds,
+        NineSliceImageBrush brush)
+    {
+        Span<double> destinationX = stackalloc double[4];
+        Span<double> destinationY = stackalloc double[4];
+        destinationX[0] = outerBounds.X;
+        destinationX[1] = innerBounds.X;
+        destinationX[2] = innerBounds.X + innerBounds.Width;
+        destinationX[3] = outerBounds.X + outerBounds.Width;
+        destinationY[0] = outerBounds.Y;
+        destinationY[1] = innerBounds.Y;
+        destinationY[2] = innerBounds.Y + innerBounds.Height;
+        destinationY[3] = outerBounds.Y + outerBounds.Height;
+        AppendNineSlice(
+            brush.Source,
+            brush.SourceRect,
+            brush.Slice,
+            destinationX,
+            destinationY,
+            brush.SamplingMode,
+            drawCenter: false);
+    }
+
+    private void AppendNineSlice(
+        UiImage image,
+        Rect sourceRect,
+        ImageSlice slice,
+        ReadOnlySpan<double> destinationX,
+        ReadOnlySpan<double> destinationY,
+        ImageSamplingMode samplingMode,
+        bool drawCenter)
+    {
+        Span<double> sourceX = stackalloc double[4];
+        Span<double> sourceY = stackalloc double[4];
+        GetSourceCuts(sourceRect, slice, sourceX, sourceY);
+
+        for (var row = 0; row < 3; row++)
+        {
+            for (var column = 0; column < 3; column++)
+            {
+                if (!drawCenter && row == 1 && column == 1)
+                    continue;
+
+                DrawImage(
+                    new Rect(
+                        destinationX[column],
+                        destinationY[row],
+                        destinationX[column + 1] - destinationX[column],
+                        destinationY[row + 1] - destinationY[row]),
+                    image,
+                    new Rect(
+                        sourceX[column],
+                        sourceY[row],
+                        sourceX[column + 1] - sourceX[column],
+                        sourceY[row + 1] - sourceY[row]),
+                    samplingMode);
+            }
+        }
+    }
+
+    private static void GetBorderBounds(
+        Rect outerBounds,
+        Rect innerBounds,
+        Span<Rect> bounds)
+    {
+        bounds[0] = new Rect(
+            outerBounds.X,
+            outerBounds.Y,
+            outerBounds.Width,
+            innerBounds.Y - outerBounds.Y);
+        bounds[1] = new Rect(
+            innerBounds.X + innerBounds.Width,
+            innerBounds.Y,
+            outerBounds.X + outerBounds.Width -
+            (innerBounds.X + innerBounds.Width),
+            innerBounds.Height);
+        bounds[2] = new Rect(
+            outerBounds.X,
+            innerBounds.Y + innerBounds.Height,
+            outerBounds.Width,
+            outerBounds.Y + outerBounds.Height -
+            (innerBounds.Y + innerBounds.Height));
+        bounds[3] = new Rect(
+            outerBounds.X,
+            innerBounds.Y,
+            innerBounds.X - outerBounds.X,
+            innerBounds.Height);
+    }
+
+    private static void GetSourceCuts(
+        Rect source,
+        ImageSlice slice,
+        Span<double> x,
+        Span<double> y)
+    {
+        x[0] = source.X;
+        x[1] = source.X + slice.Left;
+        x[2] = source.X + source.Width - slice.Right;
+        x[3] = source.X + source.Width;
+        y[0] = source.Y;
+        y[1] = source.Y + slice.Top;
+        y[2] = source.Y + source.Height - slice.Bottom;
+        y[3] = source.Y + source.Height;
+    }
+
+    private static void GetBackgroundDestinationCuts(
+        Rect bounds,
+        ImageSlice slice,
+        Span<double> x,
+        Span<double> y)
+    {
+        var fixedWidth = (double)slice.Left + slice.Right;
+        var shrinkWidth = fixedWidth > bounds.Width;
+        var factorX = shrinkWidth ? bounds.Width / fixedWidth : 1;
+        var fixedHeight = (double)slice.Top + slice.Bottom;
+        var shrinkHeight = fixedHeight > bounds.Height;
+        var factorY = shrinkHeight ? bounds.Height / fixedHeight : 1;
+
+        x[0] = bounds.X;
+        x[1] = bounds.X + slice.Left * factorX;
+        x[2] = shrinkWidth
+            ? x[1]
+            : bounds.X + bounds.Width - slice.Right;
+        x[3] = bounds.X + bounds.Width;
+        y[0] = bounds.Y;
+        y[1] = bounds.Y + slice.Top * factorY;
+        y[2] = shrinkHeight
+            ? y[1]
+            : bounds.Y + bounds.Height - slice.Bottom;
+        y[3] = bounds.Y + bounds.Height;
     }
 
     private UiDrawingScope PushState(UiDrawingState state)
