@@ -31,6 +31,16 @@ public partial class UiScreen
     }
 
     /// <summary>
+    /// Gets whether the game host pauses the game while this screen is current.
+    /// </summary>
+    public bool PausesGame { get; init; }
+
+    /// <summary>
+    /// Gets whether the game host closes this screen when Escape is pressed.
+    /// </summary>
+    public bool CloseOnEscape { get; init; }
+
+    /// <summary>
     /// Gets or sets the root node of this screen.
     /// </summary>
     /// <remarks>

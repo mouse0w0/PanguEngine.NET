@@ -5,6 +5,8 @@ internal sealed class PauseScreen : UiScreen
     internal PauseScreen()
         : base(CreateRoot())
     {
+        PausesGame = true;
+        CloseOnEscape = true;
     }
 
     private static UiNode CreateRoot()
@@ -24,7 +26,7 @@ internal sealed class PauseScreen : UiScreen
             Background = new SolidColorBrush(104, 43, 45),
             BorderBrush = new SolidColorBrush(157, 73, 77)
         };
-        resumeButton.Click += (_, _) => ClientEngine.Current.ResumeGame();
+        resumeButton.Click += (_, _) => ClientEngine.Current.Ui.Close();
         exitButton.Click += (_, _) => ClientEngine.Current.PrimaryWindow.CloseWindow();
 
         var panel = new StackPanel

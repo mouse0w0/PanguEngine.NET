@@ -6,6 +6,31 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiScreenTests
 {
     [Fact]
+    public void GameBehaviorDefaultsToDisabledAndCanBeConfigured()
+    {
+        var defaultScreen = new UiScreen();
+        var configuredScreen = new UiScreen
+        {
+            PausesGame = true,
+            CloseOnEscape = true
+        };
+
+        Assert.False(defaultScreen.PausesGame);
+        Assert.False(defaultScreen.CloseOnEscape);
+        Assert.True(configuredScreen.PausesGame);
+        Assert.True(configuredScreen.CloseOnEscape);
+    }
+
+    [Fact]
+    public void PauseScreenEnablesGamePauseAndEscapeClose()
+    {
+        var screen = new PauseScreen();
+
+        Assert.True(screen.PausesGame);
+        Assert.True(screen.CloseOnEscape);
+    }
+
+    [Fact]
     public void ScaleDefaultsToOneAndRejectsInvalidValuesWithoutChangingState()
     {
         var screen = new UiScreen();

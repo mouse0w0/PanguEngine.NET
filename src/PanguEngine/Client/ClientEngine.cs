@@ -132,6 +132,8 @@ public sealed class ClientEngine
         Engine.ModManager.RunReady();
 
         Game = new ClientGame(this);
+        Ui.CurrentScreenChanged += OnCurrentScreenChanged;
+        OnCurrentScreenChanged(null, Ui.CurrentScreen);
         Renderer = new ClientRenderer(
             Device,
             PrimaryWindow.Presenter,
@@ -139,7 +141,7 @@ public sealed class ClientEngine
             Ui,
             Game.World,
             BlockModelManager);
-        InputBridge = new ClientInputBridge(PrimaryWindow, Ui, Game.Input, TryTogglePause);
+        InputBridge = new ClientInputBridge(PrimaryWindow, Ui, Game.Input, TryHandleEscape);
     }
 
     private void OnRunning()
@@ -155,30 +157,33 @@ public sealed class ClientEngine
         Audio.Update();
     }
 
-    private bool TryTogglePause()
+    private void OnCurrentScreenChanged(UiScreen? oldScreen, UiScreen? newScreen)
     {
-        if (Game.IsPaused)
+        if (newScreen?.PausesGame == true)
+            Game.Pause();
+        else
+            Game.Resume();
+    }
+
+    private bool TryHandleEscape()
+    {
+        var screen = Ui.CurrentScreen;
+        if (screen is null)
         {
-            ResumeGame();
+            Ui.Open(new PauseScreen());
             return true;
         }
 
-        if (Ui.CurrentScreen is not null)
+        if (!screen.CloseOnEscape)
             return false;
 
-        Ui.Open(new PauseScreen());
-        Game.Pause();
-        return true;
-    }
-
-    internal void ResumeGame()
-    {
         Ui.Close();
-        Game.Resume();
+        return true;
     }
 
     private void OnShutdown()
     {
+        Ui.CurrentScreenChanged -= OnCurrentScreenChanged;
         Ui.Destroy();
         InputBridge.Destroy();
         Game.Destroy();

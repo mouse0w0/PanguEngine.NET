@@ -9,7 +9,7 @@ internal sealed class ClientInputBridge
     private readonly Window _window;
     private readonly UiManager _uiManager;
     private readonly ClientInputState _input;
-    private readonly Func<bool> _tryTogglePause;
+    private readonly Func<bool> _tryHandleEscape;
     private bool _restoreMouseCapture;
     private bool _destroyed;
 
@@ -17,12 +17,12 @@ internal sealed class ClientInputBridge
         Window window,
         UiManager uiManager,
         ClientInputState input,
-        Func<bool> tryTogglePause)
+        Func<bool> tryHandleEscape)
     {
         _window = window;
         _uiManager = uiManager;
         _input = input;
-        _tryTogglePause = tryTogglePause;
+        _tryHandleEscape = tryHandleEscape;
         window.KeyDown += OnKeyDown;
         window.KeyUp += OnKeyUp;
         window.MouseMove += OnMouseMove;
@@ -53,7 +53,7 @@ internal sealed class ClientInputBridge
 
     private void OnKeyDown(Window window, KeyEventArgs args)
     {
-        if (args.Key == Key.Escape && _tryTogglePause())
+        if (args.Key == Key.Escape && _tryHandleEscape())
             return;
 
         var screen = _uiManager.CurrentScreen;
