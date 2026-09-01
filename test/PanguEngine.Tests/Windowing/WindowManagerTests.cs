@@ -223,6 +223,53 @@ public sealed class WindowManagerTests
         Assert.Equal(1, renderCount);
     }
 
+    [Fact]
+    public void PlatformEventPumpRunsOncePerDoEvents()
+    {
+        var primary = new TestWindow(true);
+        var pumpCount = 0;
+        var manager = new WindowManager(primary, _ => new TestWindow(), () => 0, () =>
+        {
+            pumpCount++;
+            return false;
+        });
+
+        manager.DoEvents();
+
+        Assert.Equal(1, pumpCount);
+    }
+
+    [Fact]
+    public void PlatformQuitRequestsAllWindowsToClose()
+    {
+        var primary = new TestWindow(true);
+        var secondary = new TestWindow();
+        var manager = new WindowManager(primary, _ => secondary, () => 0, () => true);
+        manager.CreateWindow(default);
+
+        manager.DoEvents();
+
+        Assert.Empty(manager.Windows);
+        Assert.Null(manager.PrimaryWindow);
+        Assert.True(primary.IsDestroyed);
+        Assert.True(secondary.IsDestroyed);
+    }
+
+    [Fact]
+    public void WithoutPlatformEventPumpEachWindowProcessesEvents()
+    {
+        var primary = new TestWindow(true);
+        var secondary = new TestWindow();
+        var manager = CreateManager(primary, secondary);
+        primary.EventCallCount = 0;
+        secondary.EventCallCount = 0;
+
+        manager.DoEvents();
+
+        Assert.Equal(1, primary.EventCallCount);
+        Assert.Equal(1, secondary.EventCallCount);
+    }
+
     private static WindowManager CreateManager(
         TestWindow primary,
         TestWindow secondary,

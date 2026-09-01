@@ -32,6 +32,8 @@ public sealed unsafe partial class VulkanWindow
         VulkanContext.EnsureRenderThread();
 
         imageIndex = 0;
+        if (IsDestroyed)
+            return Result.ErrorOutOfDateKhr;
         var result = VulkanContext.KhrSwapchain.AcquireNextImage(
             VulkanContext.Device, _swapchain, ulong.MaxValue,
             imageAvailableSemaphore, default, ref imageIndex);
@@ -54,6 +56,8 @@ public sealed unsafe partial class VulkanWindow
     public void PresentImage(uint imageIndex, Semaphore renderFinishedSemaphore)
     {
         VulkanContext.EnsureRenderThread();
+        if (IsDestroyed)
+            return;
 
         var swapChains = stackalloc[] { _swapchain };
         var signalSemaphores = stackalloc[] { renderFinishedSemaphore };
@@ -84,8 +88,12 @@ public sealed unsafe partial class VulkanWindow
     /// <summary>Gets the render-finished semaphore assigned to a swapchain image.</summary>
     /// <param name="imageIndex">The swapchain image index.</param>
     /// <returns>The render-finished semaphore.</returns>
-    public Semaphore GetRenderFinishedSemaphore(uint imageIndex) =>
-        _renderFinishedSemaphores![checked((int)imageIndex)];
+    public Semaphore GetRenderFinishedSemaphore(uint imageIndex)
+    {
+        if (IsDestroyed)
+            return default;
+        return _renderFinishedSemaphores![checked((int)imageIndex)];
+    }
 
     /// <summary>Initializes swapchain resources for the window.</summary>
     private void InitializeSwapchain()
@@ -98,12 +106,19 @@ public sealed unsafe partial class VulkanWindow
     /// <summary>Recreates swapchain resources for the current framebuffer size.</summary>
     private void RecreateSwapchain()
     {
-        var framebufferSize = _silkWindow.FramebufferSize;
+        var framebufferSize = FramebufferSize;
 
         while (framebufferSize.X == 0 || framebufferSize.Y == 0)
         {
-            framebufferSize = _silkWindow.FramebufferSize;
-            _silkWindow.DoEvents();
+            if (IsClosing)
+                return;
+            if (_platform.PumpEvents())
+            {
+                RequestClose();
+                return;
+            }
+            framebufferSize = FramebufferSize;
+            Thread.Sleep(1);
         }
 
         if (VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device) != Result.Success)
@@ -375,7 +390,7 @@ public sealed unsafe partial class VulkanWindow
         if (capabilities.CurrentExtent.Width != uint.MaxValue)
             return capabilities.CurrentExtent;
 
-        var framebufferSize = _silkWindow.FramebufferSize;
+        var framebufferSize = FramebufferSize;
 
         Extent2D actualExtent = new()
         {

@@ -1,5 +1,6 @@
 using Silk.NET.Vulkan;
-using SilkWindow = Silk.NET.Windowing.IWindow;
+using PanguEngine.Windowing;
+using SDL;
 using Window = PanguEngine.Windowing.Window;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -9,12 +10,18 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 public sealed unsafe partial class VulkanWindow : Window
 {
-    private bool _isDestroyed;
-    private readonly VulkanPresenter _presenter;
-    private readonly SilkWindow _silkWindow;
+    private readonly SdlPlatform _platform;
+    private readonly SdlWindowEventState _eventState = new();
+    private bool _textInputActive;
 
     /// <summary>The Vulkan surface created from the window.</summary>
-    public SurfaceKHR Surface { get; }
+    public SurfaceKHR Surface { get; private set; }
+
+    internal SDL_Window* NativeWindow { get; }
+
+    internal SDL_WindowID WindowId { get; }
+
+    private bool _isDestroyed;
 
     /// <inheritdoc/>
     // ReSharper disable once ConvertToAutoPropertyWithPrivateSetter
@@ -24,24 +31,33 @@ public sealed unsafe partial class VulkanWindow : Window
     public override bool IsPrimary { get; }
 
     /// <inheritdoc/>
-    public override Presenter Presenter => _presenter;
+    public override Presenter Presenter { get; }
 
     /// <summary>Creates a <see cref="VulkanWindow"/> from an existing window and surface.</summary>
-    internal VulkanWindow(SilkWindow window, SurfaceKHR surface, bool isPrimary, double framesPerSecond = 60)
+    internal VulkanWindow(
+        SdlPlatform platform,
+        SDL_Window* window,
+        SurfaceKHR surface,
+        bool isPrimary,
+        WindowOptions options)
     {
+        _platform = platform;
         VulkanContext.EnsureRenderThread();
-
-        _silkWindow = window;
+        NativeWindow = window;
+        WindowId = SDL3.SDL_GetWindowID(window);
         Surface = surface;
         IsPrimary = isPrimary;
-        FramesPerSecond = framesPerSecond;
+        FramesPerSecond = options.FramesPerSecond;
+        _vsync = options.VSync;
+        _requestedVideoMode = options.VideoMode;
 
         try
         {
-            SubscribeEvents();
+            _isFocused = (SDL3.SDL_GetWindowFlags(window) & SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS) != 0;
             InitializeSwapchain();
             InitializeInput();
-            _presenter = new VulkanPresenter(this);
+            Presenter = new VulkanPresenter(this);
+            _platform.RegisterWindow(this);
         }
         catch
         {
@@ -51,13 +67,23 @@ public sealed unsafe partial class VulkanWindow : Window
     }
 
     /// <inheritdoc/>
-    internal override void DoEvents() => _silkWindow.DoEvents();
+    internal override void DoEvents()
+    {
+    }
 
     /// <inheritdoc/>
-    internal override void DoPreRender(double alpha) => PreRender?.Invoke(this, alpha);
+    internal override void DoPreRender(double alpha)
+    {
+        if (!IsDestroyed)
+            PreRender?.Invoke(this, alpha);
+    }
 
     /// <inheritdoc/>
-    internal override void DoRender(double alpha) => Render?.Invoke(this, alpha);
+    internal override void DoRender(double alpha)
+    {
+        if (!IsDestroyed)
+            Render?.Invoke(this, alpha);
+    }
 
     /// <inheritdoc/>
     internal override void Destroy()
@@ -66,15 +92,18 @@ public sealed unsafe partial class VulkanWindow : Window
         if (_isDestroyed) return;
         _isDestroyed = true;
 
-        if (_presenter is { IsDestroyed: false })
-            _presenter.Destroy();
+        if (Presenter is { IsDestroyed: false })
+            Presenter.Destroy();
 
         DestroyRenderFinishedSemaphores();
         DestroyImageViews();
         DestroySwapchain();
 
-        _inputContext?.Dispose();
-        VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, Surface, null);
-        _silkWindow.Dispose();
+        if (_textInputActive)
+            SDL3.SDL_StopTextInput(NativeWindow);
+        if (Surface.Handle != 0)
+            VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, Surface, null);
+        Surface = default;
+        _platform.UnregisterAndDestroyWindow(this);
     }
 }

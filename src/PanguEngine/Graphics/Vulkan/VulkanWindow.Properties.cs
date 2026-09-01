@@ -1,49 +1,134 @@
+using System.Runtime.InteropServices;
+using System.Text;
 using PanguEngine.Windowing;
-using Silk.NET.Core;
+using SDL;
 using Silk.NET.Maths;
-using Silk.NET.Windowing;
-using SilkWindowBorder = Silk.NET.Windowing.WindowBorder;
-using SilkWindowState = Silk.NET.Windowing.WindowState;
 using WindowBorder = PanguEngine.Windowing.WindowBorder;
 using WindowState = PanguEngine.Windowing.WindowState;
-using EngineVideoMode = PanguEngine.Windowing.VideoMode;
 
 namespace PanguEngine.Graphics.Vulkan;
 
 /// <inheritdoc/>
-public sealed partial class VulkanWindow
+public sealed unsafe partial class VulkanWindow
 {
-    private bool _isFocused = true;
+    private bool _isFocused;
+    private bool _vsync;
+    private readonly VideoMode _requestedVideoMode;
 
     /// <inheritdoc/>
     public override string Title
     {
-        get => _silkWindow.Title;
-        set => _silkWindow.Title = value;
+        get
+        {
+            if (IsDestroyed)
+                return "";
+            VulkanContext.EnsureRenderThread();
+            return Marshal.PtrToStringUTF8((nint)SDL3.Unsafe_SDL_GetWindowTitle(NativeWindow)) ?? "";
+        }
+        set
+        {
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            var bytes = Encoding.UTF8.GetBytes(value + "\0");
+            fixed (byte* title = bytes)
+            {
+                if (!SDL3.SDL_SetWindowTitle(NativeWindow, title))
+                    throw CreateSdlException("SDL window title update");
+            }
+            SdlPlatform.SyncWindow(NativeWindow);
+        }
     }
 
     /// <inheritdoc/>
     public override Vector2D<int> Position
     {
-        get => _silkWindow.Position;
-        set => _silkWindow.Position = value;
+        get
+        {
+            if (IsDestroyed)
+                return default;
+            VulkanContext.EnsureRenderThread();
+            var x = 0;
+            var y = 0;
+            SDL3.SDL_GetWindowPosition(NativeWindow, &x, &y);
+            return new Vector2D<int>(x, y);
+        }
+        set
+        {
+            if (IsDestroyed)
+                return;
+            SdlPlatform.SetWindowPosition(NativeWindow, value);
+            SdlPlatform.SyncWindow(NativeWindow);
+        }
     }
 
     /// <inheritdoc/>
     public override Vector2D<int> Size
     {
-        get => _silkWindow.Size;
-        set => _silkWindow.Size = value;
+        get
+        {
+            if (IsDestroyed)
+                return default;
+            VulkanContext.EnsureRenderThread();
+            var width = 0;
+            var height = 0;
+            SDL3.SDL_GetWindowSize(NativeWindow, &width, &height);
+            return new Vector2D<int>(width, height);
+        }
+        set
+        {
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            if (!SDL3.SDL_SetWindowSize(NativeWindow, value.X, value.Y))
+                throw CreateSdlException("SDL window size update");
+            SdlPlatform.SyncWindow(NativeWindow);
+        }
     }
 
     /// <inheritdoc/>
-    public override Vector2D<int> FramebufferSize => _silkWindow.FramebufferSize;
+    public override Vector2D<int> FramebufferSize
+    {
+        get
+        {
+            if (IsDestroyed)
+                return default;
+            VulkanContext.EnsureRenderThread();
+            var width = 0;
+            var height = 0;
+            SDL3.SDL_GetWindowSizeInPixels(NativeWindow, &width, &height);
+            return new Vector2D<int>(width, height);
+        }
+    }
 
     /// <inheritdoc/>
-    public override Vector2D<int> FullSize => _silkWindow.GetFullSize();
+    public override Vector2D<int> FullSize
+    {
+        get
+        {
+            var size = Size;
+            var border = BorderSize;
+            return new Vector2D<int>(size.X + border.Size.X, size.Y + border.Size.Y);
+        }
+    }
 
     /// <inheritdoc/>
-    public override Rectangle<int> BorderSize => _silkWindow.BorderSize;
+    public override Rectangle<int> BorderSize
+    {
+        get
+        {
+            if (IsDestroyed)
+                return default;
+            VulkanContext.EnsureRenderThread();
+            var top = 0;
+            var left = 0;
+            var bottom = 0;
+            var right = 0;
+            if (!SDL3.SDL_GetWindowBordersSize(NativeWindow, &top, &left, &bottom, &right))
+                return default;
+            return new Rectangle<int>(left, top, left + right, top + bottom);
+        }
+    }
 
     /// <inheritdoc/>
     // ReSharper disable once ConvertToAutoPropertyWithPrivateSetter
@@ -52,45 +137,138 @@ public sealed partial class VulkanWindow
     /// <inheritdoc/>
     public override WindowState WindowState
     {
-        get => FromSilkWindowState(_silkWindow.WindowState);
-        set => _silkWindow.WindowState = ToSilkWindowState(value);
+        get
+        {
+            if (IsDestroyed)
+                return WindowState.Normal;
+            VulkanContext.EnsureRenderThread();
+            var flags = SDL3.SDL_GetWindowFlags(NativeWindow);
+            if (flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_FULLSCREEN))
+                return WindowState.Fullscreen;
+            if (flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_MINIMIZED))
+                return WindowState.Minimized;
+            if (flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_MAXIMIZED))
+                return WindowState.Maximized;
+            return WindowState.Normal;
+        }
+        set
+        {
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            switch (value)
+            {
+                case WindowState.Minimized:
+                    if (!SDL3.SDL_MinimizeWindow(NativeWindow))
+                        throw CreateSdlException("SDL window minimize");
+                    break;
+                case WindowState.Maximized:
+                    if (!SDL3.SDL_MaximizeWindow(NativeWindow))
+                        throw CreateSdlException("SDL window maximize");
+                    break;
+                case WindowState.Fullscreen:
+                    if (_requestedVideoMode != VideoMode.Default)
+                        SdlPlatform.SetFullscreenVideoMode(NativeWindow, _requestedVideoMode);
+                    if (!SDL3.SDL_SetWindowFullscreen(NativeWindow, true))
+                        throw CreateSdlException("SDL fullscreen update");
+                    break;
+                case WindowState.Normal:
+                    if (!SDL3.SDL_RestoreWindow(NativeWindow))
+                        throw CreateSdlException("SDL window restore");
+                    if (!SDL3.SDL_SetWindowFullscreen(NativeWindow, false))
+                        throw CreateSdlException("SDL fullscreen update");
+                    break;
+                default:
+                    return;
+            }
+            SdlPlatform.SyncWindow(NativeWindow);
+        }
     }
 
     /// <inheritdoc/>
-    public override EngineVideoMode VideoMode => VulkanDisplayManager.FromSilkVideoMode(_silkWindow.VideoMode);
+    public override VideoMode VideoMode
+    {
+        get
+        {
+            if (IsDestroyed)
+                return VideoMode.Default;
+            VulkanContext.EnsureRenderThread();
+            var fullscreenMode = SDL3.SDL_GetWindowFullscreenMode(NativeWindow);
+            if (fullscreenMode is not null)
+                return VulkanDisplayManager.FromSdlVideoMode(fullscreenMode);
+            var displayId = SDL3.SDL_GetDisplayForWindow(NativeWindow);
+            var currentMode = SDL3.SDL_GetCurrentDisplayMode(displayId);
+            return currentMode is null
+                ? VideoMode.Default
+                : VulkanDisplayManager.FromSdlVideoMode(currentMode);
+        }
+    }
 
     /// <inheritdoc/>
-    public override DisplayMonitor? Monitor => VulkanDisplayManager.FromSilkMonitor(_silkWindow.Monitor);
+    public override DisplayMonitor? Monitor
+    {
+        get
+        {
+            if (IsDestroyed)
+                return null;
+            VulkanContext.EnsureRenderThread();
+            var displayId = SDL3.SDL_GetDisplayForWindow(NativeWindow);
+            return VulkanDisplayManager.FromSdlDisplay(displayId);
+        }
+    }
 
     /// <inheritdoc/>
     public override bool IsVisible
     {
-        get => _silkWindow.IsVisible;
-        set => _silkWindow.IsVisible = value;
+        get
+        {
+            if (IsDestroyed)
+                return false;
+            VulkanContext.EnsureRenderThread();
+            return !SDL3.SDL_GetWindowFlags(NativeWindow).HasFlag(SDL_WindowFlags.SDL_WINDOW_HIDDEN);
+        }
+        set
+        {
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            var result = value ? SDL3.SDL_ShowWindow(NativeWindow) : SDL3.SDL_HideWindow(NativeWindow);
+            if (!result)
+                throw CreateSdlException(value ? "SDL window show" : "SDL window hide");
+            SdlPlatform.SyncWindow(NativeWindow);
+        }
     }
 
     /// <inheritdoc/>
-    public override bool IsClosing
-    {
-        get => _silkWindow.IsClosing;
-        set => _silkWindow.IsClosing = value;
-    }
+    public override bool IsClosing { get; set; }
 
     /// <inheritdoc/>
     public override WindowBorder WindowBorder
     {
-        get => _silkWindow.WindowBorder switch
+        get
         {
-            SilkWindowBorder.Fixed => WindowBorder.Fixed,
-            SilkWindowBorder.Hidden => WindowBorder.Hidden,
-            _ => WindowBorder.Resizable
-        };
-        set => _silkWindow.WindowBorder = value switch
+            if (IsDestroyed)
+                return WindowBorder.Fixed;
+            VulkanContext.EnsureRenderThread();
+            var flags = SDL3.SDL_GetWindowFlags(NativeWindow);
+            if (flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_BORDERLESS))
+                return WindowBorder.Hidden;
+            return flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_RESIZABLE)
+                ? WindowBorder.Resizable
+                : WindowBorder.Fixed;
+        }
+        set
         {
-            WindowBorder.Fixed => SilkWindowBorder.Fixed,
-            WindowBorder.Hidden => SilkWindowBorder.Hidden,
-            _ => SilkWindowBorder.Resizable
-        };
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            var bordered = value != WindowBorder.Hidden;
+            if (!SDL3.SDL_SetWindowBordered(NativeWindow, bordered))
+                throw CreateSdlException("SDL window border update");
+            if (!SDL3.SDL_SetWindowResizable(NativeWindow, value == WindowBorder.Resizable))
+                throw CreateSdlException("SDL window resize policy update");
+            SdlPlatform.SyncWindow(NativeWindow);
+        }
     }
 
     /// <inheritdoc/>
@@ -99,14 +277,17 @@ public sealed partial class VulkanWindow
     /// <inheritdoc/>
     public override bool VSync
     {
-        get => _silkWindow.VSync;
+        get => _vsync;
         set
         {
-            VulkanContext.EnsureRenderThread();
-            if (_silkWindow.VSync == value) return;
+            if (_vsync == value)
+                return;
 
-            _silkWindow.VSync = value;
-            if (!IsDestroyed && _swapchain.Handle != 0)
+            _vsync = value;
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            if (_swapchain.Handle != 0)
                 RecreateSwapchain();
         }
     }
@@ -114,103 +295,159 @@ public sealed partial class VulkanWindow
     /// <inheritdoc/>
     public override bool TopMost
     {
-        get => _silkWindow.TopMost;
-        set => _silkWindow.TopMost = value;
+        get
+        {
+            if (IsDestroyed)
+                return false;
+            VulkanContext.EnsureRenderThread();
+            return SDL3.SDL_GetWindowFlags(NativeWindow).HasFlag(SDL_WindowFlags.SDL_WINDOW_ALWAYS_ON_TOP);
+        }
+        set
+        {
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            if (!SDL3.SDL_SetWindowAlwaysOnTop(NativeWindow, value))
+                throw CreateSdlException("SDL window top-most update");
+            SdlPlatform.SyncWindow(NativeWindow);
+        }
     }
 
     /// <inheritdoc/>
-    public override void Show() => _silkWindow.IsVisible = true;
+    public override void Show() => IsVisible = true;
 
     /// <inheritdoc/>
-    public override void Hide() => _silkWindow.IsVisible = false;
+    public override void Hide() => IsVisible = false;
 
     /// <inheritdoc/>
-    public override void CenterOnScreen() => _silkWindow.Center();
-
-    /// <inheritdoc/>
-    public override void Focus() => _silkWindow.Focus();
-
-    /// <inheritdoc/>
-    public override Vector2D<int> PointToClient(Vector2D<int> point) => _silkWindow.PointToClient(point);
-
-    /// <inheritdoc/>
-    public override Vector2D<int> PointToScreen(Vector2D<int> point) => _silkWindow.PointToScreen(point);
-
-    /// <inheritdoc/>
-    public override Vector2D<int> PointToFramebuffer(Vector2D<int> point) => _silkWindow.PointToFramebuffer(point);
-
-    /// <inheritdoc/>
-    public override void SetWindowIcon(WindowIcon icon)
+    public override void CenterOnScreen()
     {
-        RawImage[] rawIcons = [ToRawImage(icon)];
-        _silkWindow.SetWindowIcon(rawIcons);
+        if (IsDestroyed)
+            return;
+        var bounds = VulkanDisplayManager.MainUsableBounds();
+        if (bounds is null)
+            return;
+
+        var fullSize = FullSize;
+        Position = new Vector2D<int>(
+            bounds.Value.Origin.X + (bounds.Value.Size.X - fullSize.X) / 2,
+            bounds.Value.Origin.Y + (bounds.Value.Size.Y - fullSize.Y) / 2);
     }
+
+    /// <inheritdoc/>
+    public override void Focus()
+    {
+        if (IsDestroyed)
+            return;
+        VulkanContext.EnsureRenderThread();
+        if (!SDL3.SDL_RaiseWindow(NativeWindow))
+            throw CreateSdlException("SDL window focus request");
+    }
+
+    /// <inheritdoc/>
+    public override Vector2D<int> PointToClient(Vector2D<int> point)
+    {
+        var position = Position;
+        var border = BorderSize;
+        return new Vector2D<int>(point.X - position.X - border.Origin.X, point.Y - position.Y - border.Origin.Y);
+    }
+
+    /// <inheritdoc/>
+    public override Vector2D<int> PointToScreen(Vector2D<int> point)
+    {
+        var position = Position;
+        var border = BorderSize;
+        return new Vector2D<int>(point.X + position.X + border.Origin.X, point.Y + position.Y + border.Origin.Y);
+    }
+
+    /// <inheritdoc/>
+    public override Vector2D<int> PointToFramebuffer(Vector2D<int> point)
+    {
+        var size = Size;
+        var framebufferSize = FramebufferSize;
+        return new Vector2D<int>(
+            size.X == 0 ? point.X : point.X * framebufferSize.X / size.X,
+            size.Y == 0 ? point.Y : point.Y * framebufferSize.Y / size.Y);
+    }
+
+    /// <inheritdoc/>
+    public override void SetWindowIcon(WindowIcon icon) => SetWindowIcons([icon]);
 
     /// <inheritdoc/>
     public override void SetWindowIcons(WindowIcon[] icons)
     {
+        if (IsDestroyed)
+            return;
+        VulkanContext.EnsureRenderThread();
         if (icons.Length == 0)
         {
             SetDefaultIcon();
             return;
         }
 
-        var rawIcons = new RawImage[icons.Length];
-        for (var i = 0; i < icons.Length; i++)
-            rawIcons[i] = ToRawImage(icons[i]);
+        SDL_Surface* mainSurface = null;
+        try
+        {
+            fixed (byte* mainPixels = icons[0].RgbaPixels)
+            {
+                mainSurface = CreateIconSurface(icons[0], mainPixels);
+                for (var i = 1; i < icons.Length; i++)
+                {
+                    fixed (byte* alternatePixels = icons[i].RgbaPixels)
+                    {
+                        var alternateSurface = CreateIconSurface(icons[i], alternatePixels);
+                        try
+                        {
+                            if (!SDL3.SDL_AddSurfaceAlternateImage(mainSurface, alternateSurface))
+                                throw CreateSdlException("SDL window alternate icon update");
+                        }
+                        finally
+                        {
+                            SDL3.SDL_DestroySurface(alternateSurface);
+                        }
+                    }
+                }
 
-        _silkWindow.SetWindowIcon(rawIcons);
+                if (!SDL3.SDL_SetWindowIcon(NativeWindow, mainSurface))
+                    throw CreateSdlException("SDL window icon update");
+            }
+        }
+        finally
+        {
+            if (mainSurface is not null)
+                SDL3.SDL_DestroySurface(mainSurface);
+        }
+    }
+
+    /// <summary>Leaves the platform default icon unchanged because SDL3 has no portable reset operation.</summary>
+    public override void SetDefaultIcon()
+    {
     }
 
     /// <inheritdoc/>
-    public override void SetDefaultIcon() => _silkWindow.SetDefaultIcon();
-
-    /// <inheritdoc/>
-    public override void CloseWindow() => _silkWindow.Close();
-
-    /// <summary>Converts an engine window state to a Silk.NET window state.</summary>
-    /// <param name="state">The engine window state.</param>
-    /// <returns>The Silk.NET window state.</returns>
-    private static SilkWindowState ToSilkWindowState(WindowState state)
+    public override void CloseWindow()
     {
-        return state switch
-        {
-            WindowState.Minimized => SilkWindowState.Minimized,
-            WindowState.Maximized => SilkWindowState.Maximized,
-            WindowState.Fullscreen => SilkWindowState.Fullscreen,
-            _ => SilkWindowState.Normal
-        };
+        if (IsDestroyed)
+            return;
+        RequestClose();
     }
 
-    /// <summary>Converts a Silk.NET window state to an engine window state.</summary>
-    /// <param name="state">The Silk.NET window state.</param>
-    /// <returns>The engine window state.</returns>
-    private static WindowState FromSilkWindowState(SilkWindowState state)
-    {
-        return state switch
-        {
-            SilkWindowState.Minimized => WindowState.Minimized,
-            SilkWindowState.Maximized => WindowState.Maximized,
-            SilkWindowState.Fullscreen => WindowState.Fullscreen,
-            _ => WindowState.Normal
-        };
-    }
-
-    /// <summary>Converts an engine window state for use in window creation options.</summary>
-    /// <param name="state">The engine window state.</param>
-    /// <returns>The Silk.NET window state.</returns>
-    internal static SilkWindowState ToSilkWindowStateForOptions(WindowState state) => ToSilkWindowState(state);
-
-    /// <summary>Creates a Silk.NET raw image from an engine window icon.</summary>
-    /// <param name="icon">The engine window icon.</param>
-    /// <returns>The Silk.NET raw image.</returns>
-    private static RawImage ToRawImage(WindowIcon icon)
+    private static SDL_Surface* CreateIconSurface(WindowIcon icon, byte* pixels)
     {
         var expectedLength = checked(icon.Width * icon.Height * 4);
         if (icon.RgbaPixels.Length != expectedLength)
             throw new ArgumentException("Window icon pixel data must contain width * height * 4 RGBA bytes.",
                 nameof(icon));
 
-        return new RawImage(icon.Width, icon.Height, icon.RgbaPixels);
+        var surface = SDL3.SDL_CreateSurfaceFrom(
+            icon.Width,
+            icon.Height,
+            SDL3.SDL_PIXELFORMAT_RGBA32,
+            (nint)pixels,
+            checked(icon.Width * 4));
+        if (surface is null)
+            throw CreateSdlException("SDL window icon surface creation");
+        return surface;
     }
+
 }

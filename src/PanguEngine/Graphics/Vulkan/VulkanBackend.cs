@@ -1,8 +1,7 @@
+using System.Diagnostics;
 using PanguEngine.Windowing;
-using Silk.NET.Core.Native;
 using Silk.NET.Vulkan;
-using SilkWindow = Silk.NET.Windowing.IWindow;
-using SilkWindowCreator = Silk.NET.Windowing.Window;
+using SDL;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -11,6 +10,7 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanBackend : GraphicsBackend
 {
+    private readonly SdlPlatform _platform;
     private bool _isDestroyed;
 
     /// <inheritdoc/>
@@ -40,30 +40,26 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     {
         VulkanContext.BindRenderThread();
 
-        SilkWindow? silkWindow = null;
+        var platform = new SdlPlatform();
+        _platform = platform;
+        SDL_Window* nativeWindow = null;
         SurfaceKHR surface = default;
         VulkanWindow? primaryWindow = null;
         var instanceInitialized = false;
         var allocatorInitialized = false;
         var uploaderInitialized = false;
-        var silkOptions = VulkanWindowFactory.CreateSilkWindowOptions(options.PrimaryWindow);
+        var windowConstructionStarted = false;
 
         try
         {
-            silkWindow = SilkWindowCreator.Create(silkOptions);
-            silkWindow.Initialize();
+            platform.Initialize();
+            nativeWindow = platform.CreateWindow(options.PrimaryWindow);
 
-            if (silkWindow.VkSurface is null)
-                throw new InvalidOperationException("Windowing platform doesn't support Vulkan.");
-
-            var glfwExtensions = silkWindow.VkSurface.GetRequiredExtensions(out var count);
-            var requiredExtensions = SilkMarshal.PtrToStringArray((nint)glfwExtensions, (int)count);
-
+            var requiredExtensions = SdlPlatform.GetVulkanInstanceExtensions();
             VulkanContext.InitializeInstance(requiredExtensions, options.EnableValidation);
             instanceInitialized = true;
 
-            surface = silkWindow.VkSurface.Create<AllocationCallbacks>(VulkanContext.VkInstance.ToHandle(), null)
-                .ToSurface();
+            surface = SdlPlatform.CreateVulkanSurface(nativeWindow);
             VulkanContext.InitializeDevice(surface);
 
             VulkanAllocator.Initialize();
@@ -72,24 +68,19 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             VulkanUploader.Initialize();
             uploaderInitialized = true;
 
-            var device = new VulkanGraphicsDevice();
-            var displayManager = new VulkanDisplayManager(silkWindow);
-
-            try
-            {
-                primaryWindow = new VulkanWindow(silkWindow, surface, true, options.PrimaryWindow.FramesPerSecond);
-            }
-            catch
-            {
-                surface = default;
-                silkWindow = null;
-                throw;
-            }
-
+            windowConstructionStarted = true;
+            primaryWindow = new VulkanWindow(platform, nativeWindow, surface, true, options.PrimaryWindow);
             if (options.PrimaryWindow.Icons.Length > 0)
                 primaryWindow.SetWindowIcons(options.PrimaryWindow.Icons);
 
-            var windowManager = new WindowManager(primaryWindow, VulkanWindowFactory.CreateWindow);
+            var device = new VulkanGraphicsDevice();
+            var displayManager = new VulkanDisplayManager();
+            var factory = new VulkanWindowFactory(platform);
+            var windowManager = new WindowManager(
+                primaryWindow,
+                factory.CreateWindow,
+                static () => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency,
+                platform.PumpEvents);
 
             Device = device;
             DisplayManager = displayManager;
@@ -98,7 +89,17 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         }
         catch
         {
-            primaryWindow?.Destroy();
+            if (primaryWindow is not null)
+            {
+                primaryWindow.Destroy();
+            }
+            else if (!windowConstructionStarted)
+            {
+                if (surface.Handle != 0 && instanceInitialized)
+                    VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, surface, null);
+                if (nativeWindow is not null)
+                    platform.DestroyWindow(nativeWindow);
+            }
 
             if (uploaderInitialized)
                 VulkanUploader.Destroy();
@@ -108,13 +109,9 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
                 VulkanAllocator.Destroy();
             }
 
-            if (surface.Handle != 0 && primaryWindow is null && instanceInitialized)
-                VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, surface, null);
             if (instanceInitialized)
                 VulkanContext.Destroy();
-            if (primaryWindow is null)
-                silkWindow?.Dispose();
-
+            platform.Destroy();
             throw;
         }
     }
@@ -131,6 +128,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         VulkanDeletionQueue.Drain();
         VulkanAllocator.Destroy();
         VulkanContext.Destroy();
+        _platform.Destroy();
     }
 
     /// <inheritdoc/>

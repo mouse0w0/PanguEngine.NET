@@ -15,6 +15,8 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     private Vector2D<float> _mousePosition;
     private KeyModifiers _keyModifiers;
 
+    internal int EventCallCount { get; set; }
+
     public override bool IsDestroyed => _isDestroyed;
     public override string Title { get; set; } = "";
     public override Vector2D<int> Position { get; set; }
@@ -81,7 +83,7 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     }
 
     internal override void Destroy() => _isDestroyed = true;
-    internal override void DoEvents() { }
+    internal override void DoEvents() => EventCallCount++;
     internal override void DoPreRender(double alpha) => PreRender?.Invoke(this, alpha);
     internal override void DoRender(double alpha) => Render?.Invoke(this, alpha);
 

@@ -9,6 +9,7 @@ public sealed class WindowManager
 {
     private readonly Func<WindowOptions, Window> _createWindow;
     private readonly Func<double> _getTime;
+    private readonly Func<bool>? _pumpEvents;
     private readonly List<Window> _windows = [];
     private readonly List<Window> _dueWindows = [];
     private readonly List<Window> _pendingDestroy = [];
@@ -30,6 +31,15 @@ public sealed class WindowManager
         Window primaryWindow,
         Func<WindowOptions, Window> createWindow,
         Func<double> getTime)
+        : this(primaryWindow, createWindow, getTime, null)
+    {
+    }
+
+    internal WindowManager(
+        Window primaryWindow,
+        Func<WindowOptions, Window> createWindow,
+        Func<double> getTime,
+        Func<bool>? pumpEvents)
     {
         ArgumentNullException.ThrowIfNull(primaryWindow);
         if (!primaryWindow.IsPrimary)
@@ -37,6 +47,7 @@ public sealed class WindowManager
 
         _createWindow = createWindow ?? throw new ArgumentNullException(nameof(createWindow));
         _getTime = getTime ?? throw new ArgumentNullException(nameof(getTime));
+        _pumpEvents = pumpEvents;
         PrimaryWindow = primaryWindow;
         AddWindow(primaryWindow);
     }
@@ -62,10 +73,18 @@ public sealed class WindowManager
     /// <summary>Processes platform events for all windows.</summary>
     public void DoEvents()
     {
-        foreach (var window in _windows)
+        if (_pumpEvents is not null)
         {
-            if (!window.IsDestroyed)
-                window.DoEvents();
+            if (_pumpEvents())
+                CloseAll();
+        }
+        else
+        {
+            foreach (var window in _windows)
+            {
+                if (!window.IsDestroyed)
+                    window.DoEvents();
+            }
         }
 
         DestroyClosedWindows();

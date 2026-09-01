@@ -1,300 +1,280 @@
-using System.Numerics;
+using System.Runtime.InteropServices;
+using System.Text;
+using PanguEngine.Input;
 using PanguEngine.Windowing;
-using Silk.NET.Input;
+using SDL;
 using Silk.NET.Maths;
 using InputKey = PanguEngine.Input.Key;
-using InputKeyAction = PanguEngine.Input.KeyAction;
-using InputKeyModifiers = PanguEngine.Input.KeyModifiers;
 using InputMouseButton = PanguEngine.Input.MouseButton;
-using SilkKey = Silk.NET.Input.Key;
-using SilkMouseButton = Silk.NET.Input.MouseButton;
 
 namespace PanguEngine.Graphics.Vulkan;
 
 /// <inheritdoc/>
-public sealed partial class VulkanWindow
+public sealed unsafe partial class VulkanWindow
 {
-    private IInputContext? _inputContext;
-    private ICursor? _cursor;
+    private CursorState _cursorState;
+    private CursorShape _cursorShape = CursorShape.Arrow;
 
     /// <inheritdoc/>
     public override CursorState CursorState
     {
-        get => _cursor?.CursorMode switch
-        {
-            CursorMode.Hidden => CursorState.Hidden,
-            CursorMode.Disabled => CursorState.Disabled,
-            CursorMode.Raw => CursorState.Raw,
-            _ => CursorState.Normal
-        };
+        get => _cursorState;
         set
         {
-            _cursor?.CursorMode = value switch
+            VulkanContext.EnsureRenderThread();
+            if (_cursorState == value)
+                return;
+            var wasRelative = _cursorState is CursorState.Disabled or CursorState.Raw;
+            var shouldBeRelative = value is CursorState.Disabled or CursorState.Raw;
+            if (wasRelative && shouldBeRelative)
             {
-                CursorState.Hidden => CursorMode.Hidden,
-                CursorState.Disabled => CursorMode.Disabled,
-                CursorState.Raw => CursorMode.Raw,
-                _ => CursorMode.Normal
-            };
+                _cursorState = value;
+                return;
+            }
+
+            if (shouldBeRelative)
+            {
+                var position = GetAbsoluteMousePosition();
+                if (!SDL3.SDL_SetWindowRelativeMouseMode(NativeWindow, true))
+                    throw CreateSdlException("SDL relative mouse mode update");
+                _eventState.EnterRelativeMode(position);
+                _cursorState = value;
+                return;
+            }
+
+            var absolutePosition = _eventState.MousePosition;
+            if (wasRelative)
+            {
+                if (!SDL3.SDL_SetWindowRelativeMouseMode(NativeWindow, false))
+                    throw CreateSdlException("SDL relative mouse mode update");
+                absolutePosition = GetAbsoluteMousePosition();
+            }
+
+            if (HasMouseFocus() && value == CursorState.Hidden)
+            {
+                if (!SDL3.SDL_HideCursor())
+                {
+                    if (wasRelative)
+                        SDL3.SDL_SetWindowRelativeMouseMode(NativeWindow, true);
+                    throw CreateSdlException("SDL cursor hiding");
+                }
+            }
+            else if (HasMouseFocus() && !SDL3.SDL_ShowCursor())
+            {
+                if (wasRelative)
+                    SDL3.SDL_SetWindowRelativeMouseMode(NativeWindow, true);
+                throw CreateSdlException("SDL cursor showing");
+            }
+
+            if (wasRelative)
+                _eventState.ExitRelativeMode(absolutePosition);
+            _cursorState = value;
         }
     }
 
     /// <inheritdoc/>
     public override CursorShape CursorShape
     {
-        get => _cursor?.StandardCursor switch
-        {
-            StandardCursor.Arrow => CursorShape.Arrow,
-            StandardCursor.IBeam => CursorShape.IBeam,
-            StandardCursor.Crosshair => CursorShape.Crosshair,
-            StandardCursor.Hand => CursorShape.Hand,
-            StandardCursor.HResize => CursorShape.HResize,
-            StandardCursor.VResize => CursorShape.VResize,
-            StandardCursor.NwseResize => CursorShape.NwseResize,
-            StandardCursor.NeswResize => CursorShape.NeswResize,
-            StandardCursor.ResizeAll => CursorShape.ResizeAll,
-            StandardCursor.NotAllowed => CursorShape.NotAllowed,
-            StandardCursor.Wait => CursorShape.Wait,
-            StandardCursor.WaitArrow => CursorShape.WaitArrow,
-            _ => CursorShape.Arrow
-        };
+        get => _cursorShape;
         set
         {
-            _cursor?.Type = CursorType.Standard;
-            _cursor?.StandardCursor = value switch
+            VulkanContext.EnsureRenderThread();
+            if (_cursorShape == value)
+                return;
+
+            if (HasMouseFocus())
             {
-                CursorShape.Arrow => StandardCursor.Arrow,
-                CursorShape.IBeam => StandardCursor.IBeam,
-                CursorShape.Crosshair => StandardCursor.Crosshair,
-                CursorShape.Hand => StandardCursor.Hand,
-                CursorShape.HResize => StandardCursor.HResize,
-                CursorShape.VResize => StandardCursor.VResize,
-                CursorShape.NwseResize => StandardCursor.NwseResize,
-                CursorShape.NeswResize => StandardCursor.NeswResize,
-                CursorShape.ResizeAll => StandardCursor.ResizeAll,
-                CursorShape.NotAllowed => StandardCursor.NotAllowed,
-                CursorShape.Wait => StandardCursor.Wait,
-                CursorShape.WaitArrow => StandardCursor.WaitArrow,
-                _ => StandardCursor.Arrow
-            };
+                var cursor = _platform.GetCursor(value);
+                if (!SDL3.SDL_SetCursor(cursor))
+                    throw CreateSdlException("SDL cursor update");
+            }
+            _cursorShape = value;
         }
     }
 
+    internal void ApplyCursorState()
+    {
+        VulkanContext.EnsureRenderThread();
+        if (_cursorState is CursorState.Disabled or CursorState.Raw)
+        {
+            if (!SDL3.SDL_SetWindowRelativeMouseMode(NativeWindow, true))
+                throw CreateSdlException("SDL relative mouse mode update");
+        }
+        else if (_cursorState == CursorState.Hidden)
+        {
+            if (!SDL3.SDL_HideCursor())
+                throw CreateSdlException("SDL cursor hiding");
+        }
+        else if (!SDL3.SDL_ShowCursor())
+        {
+            throw CreateSdlException("SDL cursor showing");
+        }
+    }
+
+    internal void ApplyCursorShape()
+    {
+        VulkanContext.EnsureRenderThread();
+        if (!HasMouseFocus())
+            return;
+        var cursor = _platform.GetCursor(_cursorShape);
+        if (!SDL3.SDL_SetCursor(cursor))
+            throw CreateSdlException("SDL cursor update");
+    }
+
     /// <inheritdoc/>
-    public override Vector2D<float> MousePosition
+    public override Vector2D<float> MousePosition => _eventState.MousePosition;
+
+    /// <inheritdoc/>
+    public override KeyModifiers KeyModifiers
     {
         get
         {
-            var mice = _inputContext?.Mice;
-            var position = mice is not null && mice.Count > 0 ? mice[0].Position : Vector2.Zero;
-            return new Vector2D<float>(position.X, position.Y);
+            if (IsDestroyed)
+                return KeyModifiers.None;
+            VulkanContext.EnsureRenderThread();
+            return ToKeyModifiers(SDL3.SDL_GetModState());
         }
     }
-
-    /// <inheritdoc/>
-    public override InputKeyModifiers KeyModifiers => GetCurrentKeyModifiers();
 
     /// <inheritdoc/>
     public override string ClipboardText
     {
         get
         {
-            var keyboards = _inputContext?.Keyboards;
-            return keyboards is not null && keyboards.Count > 0 ? keyboards[0].ClipboardText : "";
+            if (IsDestroyed)
+                return "";
+            VulkanContext.EnsureRenderThread();
+            var text = SDL3.Unsafe_SDL_GetClipboardText();
+            if (text is null)
+                return "";
+
+            try
+            {
+                return Marshal.PtrToStringUTF8((nint)text) ?? "";
+            }
+            finally
+            {
+                SDL3.SDL_free((nint)text);
+            }
         }
         set
         {
-            if (_inputContext is null) return;
-            foreach (var keyboard in _inputContext.Keyboards)
-                keyboard.ClipboardText = value;
+            if (IsDestroyed)
+                return;
+            VulkanContext.EnsureRenderThread();
+            var bytes = Encoding.UTF8.GetBytes(value + "\0");
+            fixed (byte* text = bytes)
+            {
+                if (!SDL3.SDL_SetClipboardText(text))
+                    throw CreateSdlException("SDL clipboard update");
+            }
         }
     }
 
     /// <inheritdoc/>
-    public override IReadOnlyList<InputKey> SupportedKeys
-    {
-        get
-        {
-            var keyboards = _inputContext?.Keyboards;
-            if (keyboards is null || keyboards.Count == 0)
-                return [];
-
-            var keys = keyboards[0].SupportedKeys;
-            var result = new InputKey[keys.Count];
-            for (var i = 0; i < keys.Count; i++)
-                result[i] = (InputKey)(int)keys[i];
-
-            return result;
-        }
-    }
+    public override IReadOnlyList<InputKey> SupportedKeys => SdlKeyMapping.SupportedKeys;
 
     /// <inheritdoc/>
-    public override IReadOnlyList<InputMouseButton> SupportedMouseButtons
-    {
-        get
-        {
-            var mice = _inputContext?.Mice;
-            if (mice is null || mice.Count == 0)
-                return [];
-
-            var buttons = mice[0].SupportedButtons;
-            var result = new InputMouseButton[buttons.Count];
-            for (var i = 0; i < buttons.Count; i++)
-                result[i] = (InputMouseButton)(int)buttons[i];
-
-            return result;
-        }
-    }
+    public override IReadOnlyList<InputMouseButton> SupportedMouseButtons => SdlMouseMapping.SupportedButtons;
 
     /// <inheritdoc/>
     public override bool IsKeyPressed(InputKey key)
     {
-        var keyboards = _inputContext?.Keyboards;
-        if (keyboards is null)
+        if (IsDestroyed)
+            return false;
+        VulkanContext.EnsureRenderThread();
+        if (!SdlKeyMapping.TryGetScancode(key, out var scancode))
+            return false;
+        if (SDL3.SDL_GetKeyboardFocus() != NativeWindow)
             return false;
 
-        foreach (var keyboard in keyboards)
-        {
-            if (keyboard.IsKeyPressed((SilkKey)(int)key))
-                return true;
-        }
-
-        return false;
+        var keyCount = 0;
+        var keyState = SDL3.SDL_GetKeyboardState(&keyCount);
+        return keyState is not null && (int)scancode < keyCount && keyState[(int)scancode];
     }
 
     /// <inheritdoc/>
     public override bool IsMouseButtonPressed(InputMouseButton button)
     {
-        var mice = _inputContext?.Mice;
-        if (mice is null)
+        if (IsDestroyed)
+            return false;
+        VulkanContext.EnsureRenderThread();
+        var buttonNumber = button switch
+        {
+            InputMouseButton.Left => 1,
+            InputMouseButton.Middle => 2,
+            InputMouseButton.Right => 3,
+            InputMouseButton.Button4 => 4,
+            InputMouseButton.Button5 => 5,
+            InputMouseButton.Button6 => 6,
+            InputMouseButton.Button7 => 7,
+            InputMouseButton.Button8 => 8,
+            InputMouseButton.Button9 => 9,
+            InputMouseButton.Button10 => 10,
+            InputMouseButton.Button11 => 11,
+            InputMouseButton.Button12 => 12,
+            _ => 0
+        };
+        if (buttonNumber == 0)
+            return false;
+        if (!HasMouseFocus())
             return false;
 
-        foreach (var mouse in mice)
-        {
-            if (mouse.IsButtonPressed((SilkMouseButton)(int)button))
-                return true;
-        }
-
-        return false;
+        float x = 0;
+        float y = 0;
+        var state = SDL3.SDL_GetMouseState(&x, &y);
+        return ((uint)state & (1u << (buttonNumber - 1))) != 0;
     }
 
     /// <inheritdoc/>
     public override void BeginTextInput()
     {
-        if (_inputContext is null) return;
-        foreach (var keyboard in _inputContext.Keyboards)
-            keyboard.BeginInput();
+        if (IsDestroyed)
+            return;
+        VulkanContext.EnsureRenderThread();
+        if (_textInputActive)
+            return;
+        if (!SDL3.SDL_StartTextInput(NativeWindow))
+            throw CreateSdlException("SDL text input start");
+        _textInputActive = true;
     }
 
     /// <inheritdoc/>
     public override void EndTextInput()
     {
-        if (_inputContext is null) return;
-        foreach (var keyboard in _inputContext.Keyboards)
-            keyboard.EndInput();
+        if (IsDestroyed)
+            return;
+        VulkanContext.EnsureRenderThread();
+        if (!_textInputActive)
+            return;
+        if (!SDL3.SDL_StopTextInput(NativeWindow))
+            throw CreateSdlException("SDL text input stop");
+        _textInputActive = false;
     }
 
-    /// <summary>Gets the keyboard modifiers currently pressed by any keyboard device.</summary>
-    /// <returns>The active engine key modifiers.</returns>
-    private InputKeyModifiers GetCurrentKeyModifiers()
-    {
-        var mods = InputKeyModifiers.None;
-        if (_inputContext is null)
-            return mods;
-
-        foreach (var keyboard in _inputContext.Keyboards)
-        {
-            if (keyboard.IsKeyPressed(SilkKey.ShiftLeft) || keyboard.IsKeyPressed(SilkKey.ShiftRight))
-                mods |= InputKeyModifiers.Shift;
-            if (keyboard.IsKeyPressed(SilkKey.ControlLeft) || keyboard.IsKeyPressed(SilkKey.ControlRight))
-                mods |= InputKeyModifiers.Control;
-            if (keyboard.IsKeyPressed(SilkKey.AltLeft) || keyboard.IsKeyPressed(SilkKey.AltRight))
-                mods |= InputKeyModifiers.Alt;
-            if (keyboard.IsKeyPressed(SilkKey.SuperLeft) || keyboard.IsKeyPressed(SilkKey.SuperRight))
-                mods |= InputKeyModifiers.Super;
-        }
-
-        return mods;
-    }
-
-    /// <summary>Creates the input context and subscribes to input events.</summary>
     private void InitializeInput()
     {
-        _inputContext = _silkWindow.CreateInput();
-        foreach (var keyboard in _inputContext.Keyboards)
-        {
-            keyboard.KeyDown += OnKeyDown;
-            keyboard.KeyUp += OnKeyUp;
-            keyboard.KeyChar += OnKeyChar;
-        }
-
-        foreach (var mouse in _inputContext.Mice)
-        {
-            _cursor = mouse.Cursor;
-            mouse.MouseMove += OnMouseMove;
-            mouse.MouseDown += OnMouseDown;
-            mouse.MouseUp += OnMouseUp;
-            mouse.Scroll += OnMouseScroll;
-        }
+        _eventState.ExitRelativeMode(GetAbsoluteMousePosition());
+        _cursorState = CursorState.Normal;
+        var cursor = _platform.GetCursor(_cursorShape);
+        if (HasMouseFocus() && !SDL3.SDL_SetCursor(cursor))
+            throw CreateSdlException("SDL cursor initialization");
+        BeginTextInput();
     }
 
-    /// <summary>Handles a platform key press event.</summary>
-    /// <param name="keyboard">The keyboard that raised the event.</param>
-    /// <param name="key">The pressed key.</param>
-    /// <param name="scancode">The platform scan code.</param>
-    private void OnKeyDown(IKeyboard keyboard, SilkKey key, int scancode)
+    private Vector2D<float> GetAbsoluteMousePosition()
     {
-        KeyDown?.Invoke(this, new KeyEventArgs((InputKey)(int)key, InputKeyAction.Press, GetCurrentKeyModifiers()));
+        if (SDL3.SDL_GetMouseFocus() != NativeWindow)
+            return _eventState.MousePosition;
+
+        float x = 0;
+        float y = 0;
+        SDL3.SDL_GetMouseState(&x, &y);
+        return new Vector2D<float>(x, y);
     }
 
-    /// <summary>Handles a platform key release event.</summary>
-    /// <param name="keyboard">The keyboard that raised the event.</param>
-    /// <param name="key">The released key.</param>
-    /// <param name="scancode">The platform scan code.</param>
-    private void OnKeyUp(IKeyboard keyboard, SilkKey key, int scancode)
-    {
-        KeyUp?.Invoke(this, new KeyEventArgs((InputKey)(int)key, InputKeyAction.Release, GetCurrentKeyModifiers()));
-    }
+    private bool HasMouseFocus() => SDL3.SDL_GetMouseFocus() == NativeWindow;
 
-    /// <summary>Handles a platform text input event.</summary>
-    /// <param name="keyboard">The keyboard that raised the event.</param>
-    /// <param name="c">The input character.</param>
-    private void OnKeyChar(IKeyboard keyboard, char c)
-    {
-        CharInput?.Invoke(this, c);
-    }
-
-    /// <summary>Handles a platform mouse move event.</summary>
-    /// <param name="mouse">The mouse that raised the event.</param>
-    /// <param name="position">The new mouse position.</param>
-    private void OnMouseMove(IMouse mouse, Vector2 position)
-    {
-        MouseMove?.Invoke(this, new MouseMoveEventArgs(position.X, position.Y));
-    }
-
-    /// <summary>Handles a platform mouse button press event.</summary>
-    /// <param name="mouse">The mouse that raised the event.</param>
-    /// <param name="button">The pressed mouse button.</param>
-    private void OnMouseDown(IMouse mouse, SilkMouseButton button)
-    {
-        MouseDown?.Invoke(this,
-            new MouseClickEventArgs((InputMouseButton)(int)button, mouse.Position.X, mouse.Position.Y));
-    }
-
-    /// <summary>Handles a platform mouse button release event.</summary>
-    /// <param name="mouse">The mouse that raised the event.</param>
-    /// <param name="button">The released mouse button.</param>
-    private void OnMouseUp(IMouse mouse, SilkMouseButton button)
-    {
-        MouseUp?.Invoke(this,
-            new MouseClickEventArgs((InputMouseButton)(int)button, mouse.Position.X, mouse.Position.Y));
-    }
-
-    /// <summary>Handles a platform mouse scroll event.</summary>
-    /// <param name="mouse">The mouse that raised the event.</param>
-    /// <param name="scrollWheel">The scroll wheel delta.</param>
-    private void OnMouseScroll(IMouse mouse, ScrollWheel scrollWheel)
-    {
-        Scroll?.Invoke(this, new ScrollEventArgs(scrollWheel.X, scrollWheel.Y));
-    }
+    private static InvalidOperationException CreateSdlException(string operation) =>
+        new($"{operation} failed: {SDL3.SDL_GetError()}");
 }

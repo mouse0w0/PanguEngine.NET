@@ -1,10 +1,8 @@
+using System.Runtime.InteropServices;
 using PanguEngine.Windowing;
-using Silk.NET.GLFW;
-using SilkMonitor = Silk.NET.Windowing.Monitor;
-using ISilkMonitor = Silk.NET.Windowing.IMonitor;
-using SilkVideoMode = Silk.NET.Windowing.VideoMode;
-using SilkWindow = Silk.NET.Windowing.IWindow;
-using EngineVideoMode = PanguEngine.Windowing.VideoMode;
+using SDL;
+using Silk.NET.Maths;
+using SdlDisplayMode = SDL.SDL_DisplayMode;
 
 namespace PanguEngine.Graphics.Vulkan;
 
@@ -13,13 +11,10 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanDisplayManager : DisplayManager
 {
-    private readonly SilkWindow _window;
-
-    /// <summary>Creates a new Vulkan display manager.</summary>
-    /// <param name="window">The window used to query platform display state.</param>
-    internal VulkanDisplayManager(SilkWindow window)
+    /// <summary>Creates a new SDL-backed Vulkan display manager.</summary>
+    internal VulkanDisplayManager()
     {
-        _window = window;
+        VulkanContext.EnsureRenderThread();
     }
 
     /// <inheritdoc/>
@@ -27,65 +22,119 @@ internal sealed unsafe class VulkanDisplayManager : DisplayManager
     {
         get
         {
-            var result = new List<DisplayMonitor>();
-            foreach (var monitor in SilkMonitor.GetMonitors(_window))
-                result.Add(CreateDisplayMonitor(monitor));
-
+            VulkanContext.EnsureRenderThread();
+            var displays = GetDisplays();
+            var result = new DisplayMonitor[displays.Length];
+            for (var i = 0; i < displays.Length; i++)
+                result[i] = CreateDisplayMonitor(displays[i], i);
             return result;
         }
     }
 
     /// <inheritdoc/>
-    public override DisplayMonitor? MainMonitor =>
-        FromSilkMonitor(SilkMonitor.GetMainMonitor(_window));
-
-    /// <summary>Converts an engine video mode to a Silk.NET video mode.</summary>
-    /// <param name="mode">The engine video mode.</param>
-    /// <returns>The Silk.NET video mode.</returns>
-    internal static SilkVideoMode ToSilkVideoMode(EngineVideoMode mode)
+    public override DisplayMonitor? MainMonitor
     {
-        return new SilkVideoMode(mode.Resolution, mode.RefreshRate);
+        get
+        {
+            VulkanContext.EnsureRenderThread();
+            return FromSdlDisplay(SDL3.SDL_GetPrimaryDisplay());
+        }
     }
 
-    /// <summary>Converts a Silk.NET video mode to an engine video mode.</summary>
-    /// <param name="mode">The Silk.NET video mode.</param>
-    /// <returns>The engine video mode.</returns>
-    internal static EngineVideoMode FromSilkVideoMode(SilkVideoMode mode)
+    internal static DisplayMonitor? FromSdlDisplay(SDL_DisplayID displayId)
     {
-        return new EngineVideoMode(mode.Resolution, mode.RefreshRate);
-    }
-
-    /// <summary>Creates an engine display monitor from a Silk.NET monitor.</summary>
-    /// <param name="monitor">The Silk.NET monitor, or <see langword="null" /> when unavailable.</param>
-    /// <returns>The engine display monitor, or <see langword="null" /> when unavailable.</returns>
-    internal static DisplayMonitor? FromSilkMonitor(ISilkMonitor? monitor)
-    {
-        if (monitor is null)
+        VulkanContext.EnsureRenderThread();
+        if (displayId == default)
             return null;
 
-        return CreateDisplayMonitor(monitor);
+        var displays = GetDisplays();
+        for (var i = 0; i < displays.Length; i++)
+        {
+            if (displays[i] == displayId)
+                return CreateDisplayMonitor(displayId, i);
+        }
+
+        return null;
     }
 
-    /// <summary>Creates an engine display monitor snapshot.</summary>
-    /// <param name="monitor">The Silk.NET monitor to describe.</param>
-    /// <returns>The engine display monitor snapshot.</returns>
-    internal static DisplayMonitor CreateDisplayMonitor(ISilkMonitor monitor)
+    internal static Rectangle<int>? MainUsableBounds()
     {
-        var glfw = GlfwProvider.GLFW.Value;
-        var monitors = glfw.GetMonitors(out _);
-        glfw.GetMonitorContentScale(monitors[monitor.Index], out var xScale, out _);
+        VulkanContext.EnsureRenderThread();
+        var displayId = SDL3.SDL_GetPrimaryDisplay();
+        if (displayId == default)
+            return null;
 
-        var modes = new List<EngineVideoMode>();
-        foreach (var mode in monitor.GetAllVideoModes())
-            modes.Add(FromSilkVideoMode(mode));
+        SDL_Rect rect = default;
+        if (!SDL3.SDL_GetDisplayUsableBounds(displayId, &rect))
+            return null;
+        return new Rectangle<int>(rect.x, rect.y, rect.w, rect.h);
+    }
+
+    private static DisplayMonitor CreateDisplayMonitor(SDL_DisplayID displayId, int index)
+    {
+        var name = Marshal.PtrToStringUTF8((nint)SDL3.Unsafe_SDL_GetDisplayName(displayId)) ?? "";
+        SDL_Rect bounds = default;
+        if (!SDL3.SDL_GetDisplayBounds(displayId, &bounds))
+            bounds = default;
+
+        var currentMode = SDL3.SDL_GetCurrentDisplayMode(displayId);
+        var videoMode = currentMode is null ? VideoMode.Default : FromSdlVideoMode(currentMode);
+        var contentScale = SDL3.SDL_GetDisplayContentScale(displayId);
+        if (contentScale <= 0)
+            contentScale = 1;
 
         return new DisplayMonitor(
-            monitor.Name,
-            monitor.Index,
-            monitor.Bounds,
-            FromSilkVideoMode(monitor.VideoMode),
-            monitor.Gamma,
-            xScale,
-            modes.ToArray());
+            name,
+            index,
+            new Rectangle<int>(bounds.x, bounds.y, bounds.w, bounds.h),
+            videoMode,
+            contentScale,
+            GetFullscreenVideoModes(displayId));
+    }
+
+    private static VideoMode[] GetFullscreenVideoModes(SDL_DisplayID displayId)
+    {
+        var count = 0;
+        var modes = SDL3.SDL_GetFullscreenDisplayModes(displayId, &count);
+        if (modes is null)
+            return [];
+
+        try
+        {
+            var result = new VideoMode[count];
+            for (var i = 0; i < count; i++)
+                result[i] = FromSdlVideoMode(modes[i]);
+            return result;
+        }
+        finally
+        {
+            SDL3.SDL_free((nint)modes);
+        }
+    }
+
+    private static SDL_DisplayID[] GetDisplays()
+    {
+        var count = 0;
+        var displays = SDL3.SDL_GetDisplays(&count);
+        if (displays is null)
+            return [];
+
+        try
+        {
+            var result = new SDL_DisplayID[count];
+            for (var i = 0; i < count; i++)
+                result[i] = displays[i];
+            return result;
+        }
+        finally
+        {
+            SDL3.SDL_free((nint)displays);
+        }
+    }
+
+    internal static VideoMode FromSdlVideoMode(SdlDisplayMode* mode)
+    {
+        var refreshRate = mode->refresh_rate <= 0 ? null : (int?)Math.Round(mode->refresh_rate);
+        return new VideoMode(new Vector2D<int>(mode->w, mode->h), refreshRate);
     }
 }
