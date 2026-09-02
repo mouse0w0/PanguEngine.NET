@@ -144,6 +144,12 @@ public sealed class ClientEngine
         InputBridge = new ClientInputBridge(PrimaryWindow, Ui, Game.Input, TryHandleEscape);
     }
 
+    /// <summary>Requests the client engine to shut down after the current loop iteration.</summary>
+    internal void RequestShutdown()
+    {
+        Loop.RequestStop();
+    }
+
     private void OnRunning()
     {
         PrimaryWindow.PreRender += (_, alpha) => Game.PrepareFrame(alpha);

@@ -71,8 +71,8 @@ public sealed class ClientLoop(Func<bool> shouldContinue, Action pumpEvents, Act
         }
     }
 
-    /// <summary>Requests the client loop to stop.</summary>
-    public void Stop()
+    /// <summary>Requests the client loop to stop after the current iteration.</summary>
+    internal void RequestStop()
     {
         _stopRequested = true;
     }

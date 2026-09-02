@@ -27,7 +27,7 @@ internal sealed class PauseScreen : UiScreen
             BorderBrush = new SolidColorBrush(157, 73, 77)
         };
         resumeButton.Click += (_, _) => ClientEngine.Current.Ui.Close();
-        exitButton.Click += (_, _) => ClientEngine.Current.PrimaryWindow.CloseWindow();
+        exitButton.Click += (_, _) => ClientEngine.Current.RequestShutdown();
 
         var panel = new StackPanel
         {
