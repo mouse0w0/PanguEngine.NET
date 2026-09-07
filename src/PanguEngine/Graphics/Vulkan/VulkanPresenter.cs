@@ -83,7 +83,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
             var result = _window.AcquireNextImage(context.ImageAvailableSemaphore, out var imageIndex);
             if (result == Result.ErrorOutOfDateKhr)
             {
-                if (_window.IsClosing)
+                if (!_window.IsVisible)
                     return false;
                 result = _window.AcquireNextImage(context.ImageAvailableSemaphore, out imageIndex);
             }

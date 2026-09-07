@@ -8,7 +8,7 @@ namespace PanguEngine.Graphics.Vulkan;
 
 internal sealed unsafe class SdlPlatform
 {
-    private readonly Dictionary<SDL_WindowID, VulkanWindow> _windows = [];
+    private readonly Dictionary<SDL_WindowID, WeakReference<VulkanWindow>> _windows = [];
     private readonly Dictionary<SDL_WindowID, nint> _nativeWindows = [];
     private readonly Dictionary<CursorShape, nint> _cursors = [];
     private bool _initialized;
@@ -83,7 +83,7 @@ internal sealed unsafe class SdlPlatform
     {
         VulkanContext.EnsureRenderThread();
         var id = SDL3.SDL_GetWindowID(window.NativeWindow);
-        _windows.Add(id, window);
+        _windows.Add(id, new WeakReference<VulkanWindow>(window));
     }
 
     internal void UnregisterAndDestroyWindow(VulkanWindow window)
@@ -150,13 +150,15 @@ internal sealed unsafe class SdlPlatform
                     ? null
                     : Marshal.PtrToStringUTF8((nint)@event.drop.data);
 
-                if (_windows.TryGetValue(@event.drop.windowID, out var dropWindow))
+                if (_windows.TryGetValue(@event.drop.windowID, out var dropWindowReference) &&
+                    dropWindowReference.TryGetTarget(out var dropWindow))
                     dropWindow.HandleDropEvent(@event.Type, path);
                 continue;
             }
 
             if (TryGetWindowId(@event, out var windowId) &&
-                _windows.TryGetValue(windowId, out var window))
+                _windows.TryGetValue(windowId, out var windowReference) &&
+                windowReference.TryGetTarget(out var window))
             {
                 window.HandleEvent(in @event);
             }

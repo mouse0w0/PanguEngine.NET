@@ -26,9 +26,6 @@ public sealed partial class VulkanWindow
     public override event Action<Window, FileDropEventArgs>? FileDrop;
 
     /// <inheritdoc/>
-    public override event Action<Window>? Close;
-
-    /// <inheritdoc/>
     public override event Action<Window, bool>? FocusChanged;
 
     /// <inheritdoc/>
@@ -64,6 +61,14 @@ public sealed partial class VulkanWindow
             return;
         switch (@event.Type)
         {
+            case SDL_EventType.SDL_EVENT_WINDOW_SHOWN:
+                if (!_isVisible)
+                    CommitVisibility(true);
+                break;
+            case SDL_EventType.SDL_EVENT_WINDOW_HIDDEN:
+                if (_isVisible)
+                    CommitVisibility(false);
+                break;
             case SDL_EventType.SDL_EVENT_WINDOW_RESIZED:
                 _framebufferResized = true;
                 var framebufferSize = FramebufferSize;
@@ -96,7 +101,7 @@ public sealed partial class VulkanWindow
                 StateChanged?.Invoke(this, WindowState.Fullscreen);
                 break;
             case SDL_EventType.SDL_EVENT_WINDOW_CLOSE_REQUESTED:
-                RequestClose();
+                Hide();
                 break;
             case SDL_EventType.SDL_EVENT_WINDOW_FOCUS_GAINED:
                 SetFocus(true);
@@ -159,17 +164,6 @@ public sealed partial class VulkanWindow
             default:
                 return;
         }
-    }
-
-    internal void RequestClose()
-    {
-        if (IsDestroyed)
-            return;
-        if (IsClosing)
-            return;
-
-        IsClosing = true;
-        Close?.Invoke(this);
     }
 
     private void SetFocus(bool focused)

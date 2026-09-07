@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using PanguEngine.Windowing;
 
 namespace PanguEngine.Tests.Windowing;
@@ -38,7 +39,6 @@ public sealed class WindowManagerTests
 
     [Theory]
     [InlineData(RenderBlockingState.Destroyed)]
-    [InlineData(RenderBlockingState.Closing)]
     [InlineData(RenderBlockingState.Hidden)]
     [InlineData(RenderBlockingState.Minimized)]
     public void PreRenderStateChangeSkipsOnlyRenderForTheAffectedWindow(RenderBlockingState state)
@@ -181,7 +181,7 @@ public sealed class WindowManagerTests
         var now = 1d;
         var timeReadCount = 0;
         var primary = new TestWindow(true) { FramesPerSecond = 2 };
-        var manager = new WindowManager(primary, _ => new TestWindow(), () =>
+        var manager = new TestWindowManager(primary, _ => new TestWindow(), () =>
         {
             timeReadCount++;
             return now;
@@ -207,7 +207,7 @@ public sealed class WindowManagerTests
     {
         var now = 1d;
         var primary = new TestWindow(true) { FramesPerSecond = 2 };
-        var manager = new WindowManager(primary, _ => new TestWindow(), () => now);
+        var manager = new TestWindowManager(primary, _ => new TestWindow(), () => now);
         var renderCount = 0;
         Action<PanguEngine.Windowing.Window, double> hide = (window, _) => window.IsVisible = false;
         primary.PreRender += hide;
@@ -224,14 +224,13 @@ public sealed class WindowManagerTests
     }
 
     [Fact]
-    public void PlatformEventPumpRunsOncePerDoEvents()
+    public void DoEventsCallsEventPumpOnce()
     {
         var primary = new TestWindow(true);
         var pumpCount = 0;
-        var manager = new WindowManager(primary, _ => new TestWindow(), () => 0, () =>
+        var manager = new TestWindowManager(primary, _ => new TestWindow(), () => 0, () =>
         {
             pumpCount++;
-            return false;
         });
 
         manager.DoEvents();
@@ -240,34 +239,89 @@ public sealed class WindowManagerTests
     }
 
     [Fact]
-    public void PlatformQuitRequestsAllWindowsToClose()
+    public void HideAllHidesWindowsWithoutDestroyingThem()
     {
         var primary = new TestWindow(true);
         var secondary = new TestWindow();
-        var manager = new WindowManager(primary, _ => secondary, () => 0, () => true);
+        var manager = new TestWindowManager(primary, _ => secondary);
         manager.CreateWindow(default);
 
-        manager.DoEvents();
+        manager.HideAll();
 
-        Assert.Empty(manager.Windows);
-        Assert.Null(manager.PrimaryWindow);
-        Assert.True(primary.IsDestroyed);
-        Assert.True(secondary.IsDestroyed);
+        Assert.Empty(manager.VisibleWindows);
+        Assert.Equal(2, manager.Windows.Count);
+        Assert.False(primary.IsDestroyed);
+        Assert.False(secondary.IsDestroyed);
     }
 
     [Fact]
-    public void WithoutPlatformEventPumpEachWindowProcessesEvents()
+    public void HiddenWindowCanBeShownAgain()
     {
         var primary = new TestWindow(true);
         var secondary = new TestWindow();
         var manager = CreateManager(primary, secondary);
-        primary.EventCallCount = 0;
-        secondary.EventCallCount = 0;
 
+        secondary.Hide();
+
+        Assert.Contains(secondary, manager.Windows);
+        Assert.DoesNotContain(secondary, manager.VisibleWindows);
+        Assert.False(secondary.IsDestroyed);
+
+        secondary.Show();
+
+        Assert.Contains(secondary, manager.VisibleWindows);
+        Assert.False(secondary.IsDestroyed);
+    }
+
+    [Fact]
+    public void VisibilityChangedIsRaisedOncePerStateTransition()
+    {
+        var window = new TestWindow();
+        var changes = new List<(bool IsVisible, bool ObservedIsVisible)>();
+        window.VisibilityChanged += (sender, isVisible) => changes.Add((isVisible, sender.IsVisible));
+
+        window.Hide();
+        window.Hide();
+        window.Show();
+        window.Show();
+
+        Assert.Equal([(false, false), (true, true)], changes);
+    }
+
+    [Fact]
+    public void VisibleWindowsKeepsVisibleWindowAlive()
+    {
+        var primary = new TestWindow(true);
+        var manager = new TestWindowManager(primary, _ => new TestWindow());
+        var weakWindow = CreateVisibleWindow(manager);
+
+        ForceCollection();
+
+        AssertWindowIsAliveAndHide(weakWindow);
+        ForceCollection();
+
+        Assert.False(weakWindow.TryGetTarget(out _));
+        GC.KeepAlive(manager);
+    }
+
+    [Fact]
+    public void HiddenWindowIsRemovedAfterExternalReferencesAreReleased()
+    {
+        var primary = new TestWindow(true);
+        var manager = new TestWindowManager(primary, _ => new TestWindow());
+        var weakWindow = CreateHiddenWindow(manager);
+        var renderCount = 0;
+        primary.Render += (_, _) => renderCount++;
+
+        ForceCollection();
         manager.DoEvents();
+        manager.PreRenderWindows(0);
+        manager.RenderWindows(0);
+        ForceCollection();
 
-        Assert.Equal(1, primary.EventCallCount);
-        Assert.Equal(1, secondary.EventCallCount);
+        Assert.False(weakWindow.TryGetTarget(out _));
+        Assert.Single(manager.Windows);
+        Assert.Equal(1, renderCount);
     }
 
     private static WindowManager CreateManager(
@@ -275,7 +329,7 @@ public sealed class WindowManagerTests
         TestWindow secondary,
         bool addSecondary = true)
     {
-        var manager = new WindowManager(primary, _ => secondary);
+        var manager = new TestWindowManager(primary, _ => secondary);
         if (addSecondary)
             manager.CreateWindow(default);
         return manager;
@@ -288,9 +342,6 @@ public sealed class WindowManagerTests
             case RenderBlockingState.Destroyed:
                 window.Destroy();
                 break;
-            case RenderBlockingState.Closing:
-                window.IsClosing = true;
-                break;
             case RenderBlockingState.Hidden:
                 window.IsVisible = false;
                 break;
@@ -300,10 +351,38 @@ public sealed class WindowManagerTests
         }
     }
 
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<Window> CreateVisibleWindow(WindowManager manager)
+    {
+        var window = manager.CreateWindow(default);
+        return new WeakReference<Window>(window);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<Window> CreateHiddenWindow(WindowManager manager)
+    {
+        var window = manager.CreateWindow(default);
+        window.Hide();
+        return new WeakReference<Window>(window);
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static void AssertWindowIsAliveAndHide(WeakReference<Window> weakWindow)
+    {
+        Assert.True(weakWindow.TryGetTarget(out var window));
+        window!.Hide();
+    }
+
+    private static void ForceCollection()
+    {
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+    }
+
     public enum RenderBlockingState
     {
         Destroyed,
-        Closing,
         Hidden,
         Minimized
     }

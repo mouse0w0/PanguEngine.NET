@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using PanguEngine.Windowing;
 using Silk.NET.Vulkan;
 using SDL;
@@ -11,6 +10,7 @@ namespace PanguEngine.Graphics.Vulkan;
 internal sealed unsafe class VulkanBackend : GraphicsBackend
 {
     private readonly SdlPlatform _platform;
+    private readonly VulkanWindowManager _windowManager;
     private bool _isDestroyed;
 
     /// <inheritdoc/>
@@ -23,7 +23,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     public override DisplayManager DisplayManager { get; }
 
     /// <inheritdoc/>
-    public override WindowManager WindowManager { get; }
+    public override WindowManager WindowManager => _windowManager;
 
     /// <inheritdoc/>
     public override Window PrimaryWindow { get; }
@@ -42,6 +42,8 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
 
         var platform = new SdlPlatform();
         _platform = platform;
+        var windowManager = new VulkanWindowManager(platform);
+        _windowManager = windowManager;
         SDL_Window* nativeWindow = null;
         SurfaceKHR surface = default;
         VulkanWindow? primaryWindow = null;
@@ -69,31 +71,18 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
             uploaderInitialized = true;
 
             windowConstructionStarted = true;
-            primaryWindow = new VulkanWindow(platform, nativeWindow, surface, true, options.PrimaryWindow);
-            if (options.PrimaryWindow.Icons.Length > 0)
-                primaryWindow.SetWindowIcons(options.PrimaryWindow.Icons);
+            primaryWindow = windowManager.CreatePrimaryWindow(nativeWindow, surface, options.PrimaryWindow);
 
             var device = new VulkanGraphicsDevice();
             var displayManager = new VulkanDisplayManager();
-            var factory = new VulkanWindowFactory(platform);
-            var windowManager = new WindowManager(
-                primaryWindow,
-                factory.CreateWindow,
-                static () => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency,
-                platform.PumpEvents);
 
             Device = device;
             DisplayManager = displayManager;
             PrimaryWindow = primaryWindow;
-            WindowManager = windowManager;
         }
         catch
         {
-            if (primaryWindow is not null)
-            {
-                primaryWindow.Destroy();
-            }
-            else if (!windowConstructionStarted)
+            if (!windowConstructionStarted)
             {
                 if (surface.Handle != 0 && instanceInitialized)
                     VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, surface, null);
@@ -101,6 +90,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
                     platform.DestroyWindow(nativeWindow);
             }
 
+            windowManager.Destroy();
             if (uploaderInitialized)
                 VulkanUploader.Destroy();
             if (allocatorInitialized)
@@ -134,6 +124,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     /// <inheritdoc/>
     internal override void Render(double alpha)
     {
+        _windowManager.DrainFinalized();
         WindowManager.PreRenderWindows(alpha);
         VulkanUploader.Pump();
         WindowManager.RenderWindows(alpha);

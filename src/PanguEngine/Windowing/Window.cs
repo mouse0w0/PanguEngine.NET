@@ -45,9 +45,6 @@ public abstract class Window
     /// <summary>Whether the window is visible.</summary>
     public abstract bool IsVisible { get; set; }
 
-    /// <summary>Whether the window is closing.</summary>
-    public abstract bool IsClosing { get; set; }
-
     /// <summary>The window border style.</summary>
     public abstract WindowBorder WindowBorder { get; set; }
 
@@ -99,11 +96,11 @@ public abstract class Window
     /// <summary>Raised when the window state changes.</summary>
     public abstract event Action<Window, WindowState>? StateChanged;
 
+    /// <summary>Raised after the window visibility changes.</summary>
+    public event Action<Window, bool>? VisibilityChanged;
+
     /// <summary>Raised when files are dropped onto the window.</summary>
     public abstract event Action<Window, FileDropEventArgs>? FileDrop;
-
-    /// <summary>Raised when the window is closing.</summary>
-    public abstract event Action<Window>? Close;
 
     /// <summary>Raised when the window gains or loses focus.</summary>
     public abstract event Action<Window, bool>? FocusChanged;
@@ -189,14 +186,9 @@ public abstract class Window
     /// <summary>Restores the platform default window icon.</summary>
     public abstract void SetDefaultIcon();
 
-    /// <summary>Requests the window to close.</summary>
-    public abstract void CloseWindow();
-
-    /// <summary>Destroys the window.</summary>
-    internal abstract void Destroy();
-
-    /// <summary>Processes pending platform events for the window.</summary>
-    internal abstract void DoEvents();
+    /// <summary>Raises <see cref="VisibilityChanged"/> after the visibility state is committed.</summary>
+    protected void RaiseVisibilityChanged(bool isVisible) =>
+        VisibilityChanged?.Invoke(this, isVisible);
 
     /// <summary>Performs a pre-render event for this window.</summary>
     /// <param name="alpha">The interpolation factor since the last fixed update.</param>

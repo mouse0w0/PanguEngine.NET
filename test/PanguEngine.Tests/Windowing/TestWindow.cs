@@ -11,11 +11,10 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
 {
     private bool _isDestroyed;
     private bool _isFocused = true;
+    private bool _isVisible = true;
     private Vector2D<int>? _framebufferSize;
     private Vector2D<float> _mousePosition;
     private KeyModifiers _keyModifiers;
-
-    internal int EventCallCount { get; set; }
 
     public override bool IsDestroyed => _isDestroyed;
     public override string Title { get; set; } = "";
@@ -28,8 +27,17 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     public override WindowState WindowState { get; set; } = WindowState.Normal;
     public override DisplayMonitor? Monitor => null;
     public override VideoMode VideoMode => VideoMode.Default;
-    public override bool IsVisible { get; set; } = true;
-    public override bool IsClosing { get; set; }
+    public override bool IsVisible
+    {
+        get => _isVisible;
+        set
+        {
+            if (_isVisible == value)
+                return;
+            _isVisible = value;
+            RaiseVisibilityChanged(value);
+        }
+    }
     public override WindowBorder WindowBorder { get; set; } = WindowBorder.Resizable;
     public override double FramesPerSecond { get; set; }
     public override bool VSync { get; set; }
@@ -49,7 +57,6 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     public override event Action<EngineWindow, Vector2D<int>>? Move;
     public override event Action<EngineWindow, WindowState>? StateChanged;
     public override event Action<EngineWindow, FileDropEventArgs>? FileDrop;
-    public override event Action<EngineWindow>? Close;
     public override event Action<EngineWindow, bool>? FocusChanged;
     public override event Action<EngineWindow, KeyEventArgs>? KeyDown;
     public override event Action<EngineWindow, KeyEventArgs>? KeyUp;
@@ -76,14 +83,10 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     public override void SetWindowIcons(WindowIcon[] icons) { }
     public override void SetDefaultIcon() { }
 
-    public override void CloseWindow()
+    internal void Destroy()
     {
-        IsClosing = true;
-        Close?.Invoke(this);
+        _isDestroyed = true;
     }
-
-    internal override void Destroy() => _isDestroyed = true;
-    internal override void DoEvents() => EventCallCount++;
     internal override void DoPreRender(double alpha) => PreRender?.Invoke(this, alpha);
     internal override void DoRender(double alpha) => Render?.Invoke(this, alpha);
 

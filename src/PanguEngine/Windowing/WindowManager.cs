@@ -5,64 +5,43 @@ namespace PanguEngine.Windowing;
 /// <summary>
 /// Creates and manages engine windows.
 /// </summary>
-public sealed class WindowManager
+public abstract class WindowManager
 {
-    private readonly Func<WindowOptions, Window> _createWindow;
+    private sealed class WindowEntry(Window window)
+    {
+        internal WeakReference<Window> Reference { get; } = new(window);
+        internal double LastRenderTime { get; set; }
+    }
+
     private readonly Func<double> _getTime;
-    private readonly Func<bool>? _pumpEvents;
-    private readonly List<Window> _windows = [];
+    private readonly List<WindowEntry> _windows = [];
+    private readonly List<Window> _visibleWindows = [];
     private readonly List<Window> _dueWindows = [];
-    private readonly List<Window> _pendingDestroy = [];
-    private readonly Dictionary<Window, double> _lastRenderTimes = [];
     private double _renderTime;
     private bool _destroyed;
 
-    /// <summary>
-    /// Creates a window manager for a primary window.
-    /// </summary>
-    /// <param name="primaryWindow">The primary window created by the client startup path.</param>
-    /// <param name="createWindow">The non-primary window factory.</param>
-    public WindowManager(Window primaryWindow, Func<WindowOptions, Window> createWindow)
-        : this(primaryWindow, createWindow, GetCurrentTime)
+    protected WindowManager()
+        : this(GetCurrentTime)
     {
     }
 
-    internal WindowManager(
-        Window primaryWindow,
-        Func<WindowOptions, Window> createWindow,
-        Func<double> getTime)
-        : this(primaryWindow, createWindow, getTime, null)
+    protected WindowManager(Func<double> getTime)
     {
-    }
-
-    internal WindowManager(
-        Window primaryWindow,
-        Func<WindowOptions, Window> createWindow,
-        Func<double> getTime,
-        Func<bool>? pumpEvents)
-    {
-        ArgumentNullException.ThrowIfNull(primaryWindow);
-        if (!primaryWindow.IsPrimary)
-            throw new InvalidOperationException("Window is not a primary window.");
-
-        _createWindow = createWindow ?? throw new ArgumentNullException(nameof(createWindow));
         _getTime = getTime ?? throw new ArgumentNullException(nameof(getTime));
-        _pumpEvents = pumpEvents;
-        PrimaryWindow = primaryWindow;
-        AddWindow(primaryWindow);
+        VisibleWindows = _visibleWindows.AsReadOnly();
     }
 
-    /// <summary>The active windows.</summary>
-    public IReadOnlyList<Window> Windows => _windows;
+    /// <summary>Gets a new snapshot of the currently registered windows that are alive and not destroyed.</summary>
+    public IReadOnlyList<Window> Windows => GetWindowsSnapshot();
 
-    /// <summary>The current primary window.</summary>
-    public Window? PrimaryWindow { get; private set; }
+    /// <summary>The currently visible windows held by the manager.</summary>
+    public IReadOnlyList<Window> VisibleWindows { get; }
 
     /// <summary>Creates a non-primary window.</summary>
     public Window CreateWindow(WindowOptions options)
     {
         ThrowIfDestroyed();
-        var window = _createWindow(options);
+        var window = CreateWindowCore(options);
         if (window.IsPrimary)
             throw new InvalidOperationException("Window factory created a primary window.");
 
@@ -70,41 +49,33 @@ public sealed class WindowManager
         return window;
     }
 
+    protected abstract Window CreateWindowCore(WindowOptions options);
+
     /// <summary>Processes platform events for all windows.</summary>
     public void DoEvents()
     {
-        if (_pumpEvents is not null)
-        {
-            if (_pumpEvents())
-                CloseAll();
-        }
-        else
-        {
-            foreach (var window in _windows)
-            {
-                if (!window.IsDestroyed)
-                    window.DoEvents();
-            }
-        }
-
-        DestroyClosedWindows();
+        PumpEventsCore();
+        PruneDeadWindows();
     }
+
+    protected abstract void PumpEventsCore();
 
     /// <summary>Captures the windows due for a frame and performs their pre-render events.</summary>
     /// <param name="alpha">The interpolation factor since the last fixed update.</param>
     internal void PreRenderWindows(double alpha)
     {
+        PruneDeadWindows();
         _dueWindows.Clear();
         _renderTime = _getTime();
-        foreach (var window in _windows)
+        foreach (var entry in _windows)
         {
-            if (window.IsDestroyed || window.IsClosing || !window.IsVisible ||
+            if (!entry.Reference.TryGetTarget(out var window) ||
+                window.IsDestroyed || !window.IsVisible ||
                 window.WindowState == WindowState.Minimized)
                 continue;
 
-            _lastRenderTimes.TryGetValue(window, out var lastRenderTime);
             var interval = window.FramesPerSecond <= 0 ? 0 : 1d / window.FramesPerSecond;
-            if (interval > 0 && _renderTime - lastRenderTime < interval)
+            if (interval > 0 && _renderTime - entry.LastRenderTime < interval)
                 continue;
 
             _dueWindows.Add(window);
@@ -120,76 +91,115 @@ public sealed class WindowManager
     {
         foreach (var window in _dueWindows)
         {
-            if (window.IsDestroyed || window.IsClosing || !window.IsVisible ||
+            if (window.IsDestroyed || !window.IsVisible ||
                 window.WindowState == WindowState.Minimized)
                 continue;
 
             window.DoRender(alpha);
-            _lastRenderTimes[window] = _renderTime;
+            FindEntry(window)!.LastRenderTime = _renderTime;
         }
     }
 
-    /// <summary>Requests all windows to close.</summary>
-    public void CloseAll()
+    /// <summary>Hides all windows.</summary>
+    public void HideAll()
     {
-        foreach (var window in _windows)
+        foreach (var window in Windows)
         {
             if (!window.IsDestroyed)
-                window.CloseWindow();
+                window.Hide();
         }
     }
 
-    /// <summary>Destroys all managed window resources.</summary>
+    /// <summary>Stops managing all windows.</summary>
     internal void Destroy()
     {
         if (_destroyed) return;
         _destroyed = true;
 
-        foreach (var window in _windows)
-        {
-            DestroyWindow(window);
-        }
+        foreach (var window in Windows)
+            window.VisibilityChanged -= OnWindowVisibilityChanged;
 
         _windows.Clear();
+        _visibleWindows.Clear();
         _dueWindows.Clear();
-        _pendingDestroy.Clear();
-        _lastRenderTimes.Clear();
-        PrimaryWindow = null;
+        DestroyCore();
     }
 
-    private void AddWindow(Window window)
+    protected abstract void DestroyCore();
+
+    protected void AddWindow(Window window)
     {
-        _windows.Add(window);
-        window.Close += OnWindowClosed;
+        _windows.Add(new WindowEntry(window));
+        window.VisibilityChanged += OnWindowVisibilityChanged;
+        if (window.IsVisible)
+            AddVisibleWindow(window);
     }
 
-    private void OnWindowClosed(Window window)
+    private void OnWindowVisibilityChanged(Window window, bool isVisible)
     {
-        var managedWindow = _windows.FirstOrDefault(candidate => ReferenceEquals(candidate, window));
-        if (managedWindow is null) return;
-
-        if (!_pendingDestroy.Contains(managedWindow))
-            _pendingDestroy.Add(managedWindow);
+        if (isVisible)
+            AddVisibleWindow(window);
+        else
+            RemoveVisibleWindow(window);
     }
 
-    private void DestroyClosedWindows()
+    private void PruneDeadWindows()
     {
-        foreach (var window in _pendingDestroy)
+        foreach (var entry in _windows.ToArray())
         {
-            DestroyWindow(window);
-            _windows.Remove(window);
-            _lastRenderTimes.Remove(window);
-            if (ReferenceEquals(PrimaryWindow, window))
-                PrimaryWindow = null;
+            if (!entry.Reference.TryGetTarget(out var window))
+            {
+                _windows.Remove(entry);
+                continue;
+            }
+
+            if (!window.IsDestroyed)
+                continue;
+
+            RemoveWindow(window);
+        }
+    }
+
+    private void RemoveWindow(Window window)
+    {
+        RemoveVisibleWindow(window);
+        window.VisibilityChanged -= OnWindowVisibilityChanged;
+        for (var i = _windows.Count - 1; i >= 0; i--)
+        {
+            if (_windows[i].Reference.TryGetTarget(out var candidate) && ReferenceEquals(candidate, window))
+                _windows.RemoveAt(i);
+        }
+    }
+
+    private void AddVisibleWindow(Window window)
+    {
+        if (!_visibleWindows.Contains(window))
+            _visibleWindows.Add(window);
+    }
+
+    private void RemoveVisibleWindow(Window window) => _visibleWindows.Remove(window);
+
+    private List<Window> GetWindowsSnapshot()
+    {
+        var windows = new List<Window>(_windows.Count);
+        foreach (var entry in _windows)
+        {
+            if (entry.Reference.TryGetTarget(out var window) && !window.IsDestroyed)
+                windows.Add(window);
         }
 
-        _pendingDestroy.Clear();
+        return windows;
     }
 
-    private static void DestroyWindow(Window window)
+    private WindowEntry? FindEntry(Window window)
     {
-        if (!window.IsDestroyed)
-            window.Destroy();
+        foreach (var entry in _windows)
+        {
+            if (entry.Reference.TryGetTarget(out var candidate) && ReferenceEquals(candidate, window))
+                return entry;
+        }
+
+        return null;
     }
 
     private void ThrowIfDestroyed()

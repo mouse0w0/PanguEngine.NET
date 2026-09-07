@@ -107,18 +107,10 @@ public sealed unsafe partial class VulkanWindow
     private void RecreateSwapchain()
     {
         var framebufferSize = FramebufferSize;
-
-        while (framebufferSize.X == 0 || framebufferSize.Y == 0)
+        if (framebufferSize.X == 0 || framebufferSize.Y == 0)
         {
-            if (IsClosing)
-                return;
-            if (_platform.PumpEvents())
-            {
-                RequestClose();
-                return;
-            }
-            framebufferSize = FramebufferSize;
-            Thread.Sleep(1);
+            _framebufferResized = true;
+            return;
         }
 
         if (VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device) != Result.Success)

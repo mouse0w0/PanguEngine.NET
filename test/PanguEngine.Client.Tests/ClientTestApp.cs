@@ -107,7 +107,7 @@ public sealed class ClientTestApp
             _audio.MarkReady();
         }
         _loop = new ClientLoop(
-            () => WindowManager.Windows.Count > 0,
+            () => WindowManager.VisibleWindows.Count > 0,
             WindowManager.DoEvents,
             Update,
             _graphicsBackend.Render);

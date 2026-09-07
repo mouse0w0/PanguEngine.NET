@@ -12,6 +12,7 @@ namespace PanguEngine.Graphics.Vulkan;
 public sealed unsafe partial class VulkanWindow
 {
     private bool _isFocused;
+    private bool _isVisible;
     private bool _vsync;
     private readonly VideoMode _requestedVideoMode;
 
@@ -225,22 +226,22 @@ public sealed unsafe partial class VulkanWindow
             if (IsDestroyed)
                 return false;
             VulkanContext.EnsureRenderThread();
-            return !SDL3.SDL_GetWindowFlags(NativeWindow).HasFlag(SDL_WindowFlags.SDL_WINDOW_HIDDEN);
+            return _isVisible;
         }
         set
         {
             if (IsDestroyed)
                 return;
             VulkanContext.EnsureRenderThread();
+            if (_isVisible == value)
+                return;
             var result = value ? SDL3.SDL_ShowWindow(NativeWindow) : SDL3.SDL_HideWindow(NativeWindow);
             if (!result)
                 throw CreateSdlException(value ? "SDL window show" : "SDL window hide");
             SdlPlatform.SyncWindow(NativeWindow);
+            CommitVisibility(value);
         }
     }
-
-    /// <inheritdoc/>
-    public override bool IsClosing { get; set; }
 
     /// <inheritdoc/>
     public override WindowBorder WindowBorder
@@ -424,12 +425,10 @@ public sealed unsafe partial class VulkanWindow
     {
     }
 
-    /// <inheritdoc/>
-    public override void CloseWindow()
+    private void CommitVisibility(bool isVisible)
     {
-        if (IsDestroyed)
-            return;
-        RequestClose();
+        _isVisible = isVisible;
+        RaiseVisibilityChanged(isVisible);
     }
 
     private static SDL_Surface* CreateIconSurface(WindowIcon icon, byte* pixels)

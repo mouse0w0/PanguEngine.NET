@@ -10,6 +10,7 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 public sealed unsafe partial class VulkanWindow : Window
 {
+    private readonly VulkanWindowManager _windowManager;
     private readonly SdlPlatform _platform;
     private readonly SdlWindowEventState _eventState = new();
     private bool _textInputActive;
@@ -35,12 +36,14 @@ public sealed unsafe partial class VulkanWindow : Window
 
     /// <summary>Creates a <see cref="VulkanWindow"/> from an existing window and surface.</summary>
     internal VulkanWindow(
+        VulkanWindowManager windowManager,
         SdlPlatform platform,
         SDL_Window* window,
         SurfaceKHR surface,
         bool isPrimary,
         WindowOptions options)
     {
+        _windowManager = windowManager;
         _platform = platform;
         VulkanContext.EnsureRenderThread();
         NativeWindow = window;
@@ -53,7 +56,9 @@ public sealed unsafe partial class VulkanWindow : Window
 
         try
         {
-            _isFocused = (SDL3.SDL_GetWindowFlags(window) & SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS) != 0;
+            var windowFlags = SDL3.SDL_GetWindowFlags(window);
+            _isFocused = (windowFlags & SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS) != 0;
+            _isVisible = (windowFlags & SDL_WindowFlags.SDL_WINDOW_HIDDEN) == 0;
             InitializeSwapchain();
             InitializeInput();
             Presenter = new VulkanPresenter(this);
@@ -66,9 +71,9 @@ public sealed unsafe partial class VulkanWindow : Window
         }
     }
 
-    /// <inheritdoc/>
-    internal override void DoEvents()
+    ~VulkanWindow()
     {
+        _windowManager.EnqueueFinalized(this);
     }
 
     /// <inheritdoc/>
@@ -85,8 +90,7 @@ public sealed unsafe partial class VulkanWindow : Window
             Render?.Invoke(this, alpha);
     }
 
-    /// <inheritdoc/>
-    internal override void Destroy()
+    internal void Destroy()
     {
         VulkanContext.EnsureRenderThread();
         if (_isDestroyed) return;
@@ -94,16 +98,29 @@ public sealed unsafe partial class VulkanWindow : Window
 
         if (Presenter is { IsDestroyed: false })
             Presenter.Destroy();
-
         DestroyRenderFinishedSemaphores();
         DestroyImageViews();
         DestroySwapchain();
-
-        if (_textInputActive)
-            SDL3.SDL_StopTextInput(NativeWindow);
-        if (Surface.Handle != 0)
-            VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, Surface, null);
-        Surface = default;
+        StopTextInput();
+        DestroySurface();
         _platform.UnregisterAndDestroyWindow(this);
+        GC.SuppressFinalize(this);
     }
+
+    private void StopTextInput()
+    {
+        if (!_textInputActive)
+            return;
+        SDL3.SDL_StopTextInput(NativeWindow);
+        _textInputActive = false;
+    }
+
+    private void DestroySurface()
+    {
+        if (Surface.Handle == 0)
+            return;
+        VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, Surface, null);
+        Surface = default;
+    }
+
 }

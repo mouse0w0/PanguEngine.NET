@@ -116,7 +116,7 @@ public sealed class ClientEngine
             Log.CreateLogger("Audio"));
 
         Loop = new ClientLoop(
-            () => WindowManager.Windows.Count > 0,
+            () => WindowManager.VisibleWindows.Count > 0,
             WindowManager.DoEvents,
             OnUpdate,
             GraphicsBackend.Render);
