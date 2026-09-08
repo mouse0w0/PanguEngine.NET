@@ -31,9 +31,6 @@ public abstract class WindowManager
         VisibleWindows = _visibleWindows.AsReadOnly();
     }
 
-    /// <summary>Gets a new snapshot of the currently registered windows that are alive and not destroyed.</summary>
-    public IReadOnlyList<Window> Windows => GetWindowsSnapshot();
-
     /// <summary>The currently visible windows held by the manager.</summary>
     public IReadOnlyList<Window> VisibleWindows { get; }
 
@@ -103,7 +100,7 @@ public abstract class WindowManager
     /// <summary>Hides all windows.</summary>
     public void HideAll()
     {
-        foreach (var window in Windows)
+        foreach (var window in GetWindowsSnapshot())
         {
             if (!window.IsDestroyed)
                 window.Hide();
@@ -116,7 +113,7 @@ public abstract class WindowManager
         if (_destroyed) return;
         _destroyed = true;
 
-        foreach (var window in Windows)
+        foreach (var window in GetWindowsSnapshot())
             window.VisibilityChanged -= OnWindowVisibilityChanged;
 
         _windows.Clear();

@@ -144,8 +144,7 @@ public sealed class WindowManagerTests
         secondary.PreRender += (_, _) => calls.Add("secondary-pre");
         primary.Render += (_, _) => calls.Add("primary-render");
 
-        var actual = Assert.Throws<InvalidOperationException>(
-            () => manager.PreRenderWindows(0));
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.PreRenderWindows(0));
 
         Assert.Same(expected, actual);
         Assert.Equal(["primary-pre"], calls);
@@ -209,7 +208,7 @@ public sealed class WindowManagerTests
         var primary = new TestWindow(true) { FramesPerSecond = 2 };
         var manager = new TestWindowManager(primary, _ => new TestWindow(), () => now);
         var renderCount = 0;
-        Action<PanguEngine.Windowing.Window, double> hide = (window, _) => window.IsVisible = false;
+        Action<Window, double> hide = (window, _) => window.IsVisible = false;
         primary.PreRender += hide;
         primary.Render += (_, _) => renderCount++;
 
@@ -228,10 +227,7 @@ public sealed class WindowManagerTests
     {
         var primary = new TestWindow(true);
         var pumpCount = 0;
-        var manager = new TestWindowManager(primary, _ => new TestWindow(), () => 0, () =>
-        {
-            pumpCount++;
-        });
+        var manager = new TestWindowManager(primary, _ => new TestWindow(), () => 0, () => { pumpCount++; });
 
         manager.DoEvents();
 
@@ -249,7 +245,6 @@ public sealed class WindowManagerTests
         manager.HideAll();
 
         Assert.Empty(manager.VisibleWindows);
-        Assert.Equal(2, manager.Windows.Count);
         Assert.False(primary.IsDestroyed);
         Assert.False(secondary.IsDestroyed);
     }
@@ -263,7 +258,6 @@ public sealed class WindowManagerTests
 
         secondary.Hide();
 
-        Assert.Contains(secondary, manager.Windows);
         Assert.DoesNotContain(secondary, manager.VisibleWindows);
         Assert.False(secondary.IsDestroyed);
 
@@ -305,7 +299,7 @@ public sealed class WindowManagerTests
     }
 
     [Fact]
-    public void HiddenWindowIsRemovedAfterExternalReferencesAreReleased()
+    public void HiddenWindowDoesNotRemainAliveAfterExternalReferencesAreReleased()
     {
         var primary = new TestWindow(true);
         var manager = new TestWindowManager(primary, _ => new TestWindow());
@@ -320,7 +314,6 @@ public sealed class WindowManagerTests
         ForceCollection();
 
         Assert.False(weakWindow.TryGetTarget(out _));
-        Assert.Single(manager.Windows);
         Assert.Equal(1, renderCount);
     }
 
