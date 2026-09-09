@@ -123,8 +123,8 @@ public abstract class Window
     /// <summary>Raised when the mouse wheel is scrolled.</summary>
     public abstract event Action<Window, ScrollEventArgs>? Scroll;
 
-    /// <summary>Raised when a character is typed.</summary>
-    public abstract event Action<Window, char>? CharInput;
+    /// <summary>Raised when committed text is entered.</summary>
+    public abstract event Action<Window, string>? TextInput;
 
     /// <summary>Raised during frame preparation before any due window is rendered.</summary>
     public abstract event Action<Window, double>? PreRender;

@@ -10,6 +10,30 @@ namespace PanguEngine.Tests.Client.Game;
 public sealed class ClientInputBridgeTests
 {
     [Fact]
+    public void WindowTextInputAndKeyRepeatPreserveTheirContracts()
+    {
+        var window = CreateWindow();
+        var texts = new List<string>();
+        window.TextInput += (_, text) => texts.Add(text);
+        var initial = new KeyEventArgs(Key.Left, KeyAction.Press, KeyModifiers.Control);
+        var repeat = new KeyEventArgs(Key.Left, KeyAction.Press, KeyModifiers.Control)
+        {
+            IsRepeat = true
+        };
+
+        window.RaiseTextInput("A\U0001F600中");
+        var (key, action, modifiers) = repeat;
+
+        Assert.Equal(["A\U0001F600中"], texts);
+        Assert.False(initial.IsRepeat);
+        Assert.True(repeat.IsRepeat);
+        Assert.Equal(Key.Left, key);
+        Assert.Equal(KeyAction.Press, action);
+        Assert.Equal(KeyModifiers.Control, modifiers);
+        Assert.NotEqual(initial, repeat);
+    }
+
+    [Fact]
     public void WithoutScreenRoutesGameEventsOnly()
     {
         var window = CreateWindow();
@@ -55,23 +79,36 @@ public sealed class ClientInputBridgeTests
         UiPointerButtonEventArgs? released = null;
         UiPointerWheelEventArgs? wheel = null;
         UiKeyEventArgs? keyDown = null;
+        UiKeyEventArgs? keyUp = null;
+        UiTextInputEventArgs? textInput = null;
         leaf.PointerMoved += (_, args) => movedPosition = args.ScreenPosition;
         leaf.PointerPressed += (_, args) => pressed = args;
         leaf.PointerReleased += (_, args) => released = args;
         leaf.PointerWheel += (_, args) => wheel = args;
         leaf.KeyDown += (_, args) => keyDown = args;
+        leaf.KeyUp += (_, args) => keyUp = args;
+        leaf.TextInput += (_, args) => textInput = args;
 
         window.RaiseMouseMove(new MouseMoveEventArgs(25, 10));
         window.SetKeyModifiers(KeyModifiers.Control | KeyModifiers.Shift);
         window.RaiseMouseDown(new MouseClickEventArgs(MouseButton.Left, 25, 10));
         window.RaiseMouseUp(new MouseClickEventArgs(MouseButton.Left, 25, 10));
-        window.RaiseKeyDown(new KeyEventArgs(Key.A, KeyAction.Press, KeyModifiers.Alt));
+        window.RaiseKeyDown(new KeyEventArgs(Key.A, KeyAction.Press, KeyModifiers.Alt)
+        {
+            IsRepeat = true
+        });
+        window.RaiseKeyUp(new KeyEventArgs(Key.A, KeyAction.Release, KeyModifiers.Alt)
+        {
+            IsRepeat = true
+        });
+        window.RaiseTextInput("A\U0001F600中");
         window.SetMousePosition(new Vector2D<float>(25, 10));
         window.RaiseScroll(new ScrollEventArgs(1.5f, -2.5f));
 
         var pressedArgs = Assert.IsType<UiPointerButtonEventArgs>(pressed);
         var releasedArgs = Assert.IsType<UiPointerButtonEventArgs>(released);
         var keyDownArgs = Assert.IsType<UiKeyEventArgs>(keyDown);
+        var keyUpArgs = Assert.IsType<UiKeyEventArgs>(keyUp);
         var wheelArgs = Assert.IsType<UiPointerWheelEventArgs>(wheel);
         Assert.Equal(new Point(50, 30), movedPosition!.Value);
         Assert.Equal(new Point(50, 30), pressedArgs.ScreenPosition);
@@ -81,6 +118,11 @@ public sealed class ClientInputBridgeTests
         Assert.Equal(KeyModifiers.Control | KeyModifiers.Shift, releasedArgs.Modifiers);
         Assert.Equal(Key.A, keyDownArgs.Key);
         Assert.Equal(KeyModifiers.Alt, keyDownArgs.Modifiers);
+        Assert.True(keyDownArgs.IsRepeat);
+        Assert.Equal(Key.A, keyUpArgs.Key);
+        Assert.Equal(KeyModifiers.Alt, keyUpArgs.Modifiers);
+        Assert.True(keyUpArgs.IsRepeat);
+        Assert.Equal("A\U0001F600中", Assert.IsType<UiTextInputEventArgs>(textInput).Text);
         Assert.Equal(new Point(50, 30), wheelArgs.ScreenPosition);
         Assert.Equal(1.5, wheelArgs.DeltaX);
         Assert.Equal(-2.5, wheelArgs.DeltaY);
@@ -287,11 +329,13 @@ public sealed class ClientInputBridgeTests
         leaf.PointerWheel += (_, _) => routed++;
         leaf.KeyDown += (_, _) => routed++;
         leaf.KeyUp += (_, _) => routed++;
+        leaf.TextInput += (_, _) => routed++;
 
         bridge.Destroy();
         bridge.Destroy();
         window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
         window.RaiseKeyUp(new KeyEventArgs(Key.W, KeyAction.Release, KeyModifiers.None));
+        window.RaiseTextInput("text");
         window.RaiseMouseMove(new MouseMoveEventArgs(5, 5));
         window.RaiseMouseDown(new MouseClickEventArgs(MouseButton.Left, 5, 5));
         window.RaiseMouseUp(new MouseClickEventArgs(MouseButton.Left, 5, 5));
@@ -324,6 +368,67 @@ public sealed class ClientInputBridgeTests
         Assert.Equal(1, toggles);
         Assert.False(input.IsKeyDown(Key.Escape));
         bridge.Destroy();
+        input.Destroy();
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void RepeatedEscapeSkipsHostToggleAndRoutesNormally()
+    {
+        var window = CreateWindow();
+        var input = new ClientInputState(state => window.CursorState = state);
+        var manager = new UiManager();
+        var leaf = new TestNode { Focusable = true };
+        OpenScreen(manager, leaf, new Size(100, 100));
+        Assert.True(leaf.Focus());
+        var toggles = 0;
+        var routed = 0;
+        leaf.KeyDown += (_, args) =>
+        {
+            Assert.True(args.IsRepeat);
+            routed++;
+        };
+        var bridge = new ClientInputBridge(window, manager, input, () =>
+        {
+            toggles++;
+            return true;
+        });
+
+        window.RaiseKeyDown(new KeyEventArgs(Key.Escape, KeyAction.Press, KeyModifiers.None)
+        {
+            IsRepeat = true
+        });
+
+        Assert.Equal(0, toggles);
+        Assert.Equal(1, routed);
+        bridge.Destroy();
+        input.Destroy();
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void ClipboardHostFollowsCurrentScreenAndDetachesOnDestroy()
+    {
+        var window = CreateWindow();
+        var input = new ClientInputState(state => window.CursorState = state);
+        var manager = new UiManager();
+        var first = new UiScreen(new TestNode());
+        var second = new UiScreen(new TestNode());
+        manager.Open(first);
+
+        var bridge = new ClientInputBridge(window, manager, input, static () => false);
+
+        Assert.Same(bridge, first.Clipboard);
+        manager.Open(second);
+        Assert.Null(first.Clipboard);
+        Assert.Same(bridge, second.Clipboard);
+        manager.Close();
+        Assert.Null(second.Clipboard);
+
+        manager.Open(first);
+        Assert.Same(bridge, first.Clipboard);
+        bridge.Destroy();
+        Assert.Null(first.Clipboard);
         input.Destroy();
         manager.Destroy();
     }

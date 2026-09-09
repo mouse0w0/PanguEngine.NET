@@ -15,6 +15,8 @@ public partial class UiScreen
     private bool _isChangingFocus;
     private bool _isRoutingInput;
 
+    internal IUiClipboard? Clipboard { get; private set; }
+
     internal sealed class InputStateCleanupSnapshot
     {
         internal InputStateCleanupSnapshot(
@@ -42,6 +44,15 @@ public partial class UiScreen
     /// Gets the node that currently owns keyboard focus.
     /// </summary>
     public UiNode? FocusedNode { get; private set; }
+
+    internal void AttachClipboard(IUiClipboard clipboard) =>
+        Clipboard = clipboard;
+
+    internal void DetachClipboard(IUiClipboard clipboard)
+    {
+        if (ReferenceEquals(Clipboard, clipboard))
+            Clipboard = null;
+    }
 
     /// <summary>
     /// Finds the frontmost deepest node at a point in screen logical coordinates.
@@ -103,10 +114,18 @@ public partial class UiScreen
         {
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
-            if (!IsScreenActive() || _hoverPath.Count == 0)
+            if (!IsScreenActive())
                 return;
 
-            var path = _hoverPath.ToArray();
+            UiHitPathEntry[] path;
+            var pressedTarget = _pressedTargets[GetButtonIndex(MouseButton.Left)];
+            if (pressedTarget is not null && IsActive(pressedTarget))
+                path = BuildPathForNode(pressedTarget, logicalPosition).ToArray();
+            else
+                path = _hoverPath.ToArray();
+            if (path.Length == 0)
+                return;
+
             var args = new UiPointerEventArgs(path[^1].Node, logicalPosition, path);
             Bubble(
                 path,
@@ -135,14 +154,12 @@ public partial class UiScreen
             var path = _hoverPath.ToArray();
             var index = GetButtonIndex(button);
             var target = path.Length == 0 ? null : path[^1].Node;
-            Control[]? oldPressedControls = null;
-            Control[]? newPressedControls = null;
             _pressedTargets[index] = target;
             if (button == MouseButton.Left)
             {
-                oldPressedControls = _leftPressedControls;
+                var oldPressedControls = _leftPressedControls;
                 var controls = GetControls(path);
-                newPressedControls = controls.Length == 0 ? null : controls;
+                var newPressedControls = controls.Length == 0 ? null : controls;
                 _leftPressedControls = newPressedControls;
 
                 var errors = new List<Exception>();
@@ -276,14 +293,21 @@ public partial class UiScreen
         }
     }
 
-    internal void ProcessKeyDown(Key key, KeyModifiers modifiers)
+    internal void ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
-        ProcessKey(key, modifiers, static (node, eventArgs) => node.RaiseKeyDown(eventArgs));
+        ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyDown(eventArgs));
     }
 
-    internal void ProcessKeyUp(Key key, KeyModifiers modifiers)
+    internal void ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
-        ProcessKey(key, modifiers, static (node, eventArgs) => node.RaiseKeyUp(eventArgs));
+        ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyUp(eventArgs));
+    }
+
+    internal void ProcessTextInput(string text)
+    {
+        ProcessFocusedInput(
+            source => new UiTextInputEventArgs(source, text),
+            static (node, eventArgs) => node.RaiseTextInput(eventArgs));
     }
 
     internal void ProcessFocusChanged(bool focused)
@@ -528,12 +552,23 @@ public partial class UiScreen
     private void ProcessKey(
         Key key,
         KeyModifiers modifiers,
+        bool isRepeat,
         Action<UiNode, UiKeyEventArgs> raise)
+    {
+        ProcessFocusedInput(
+            source => new UiKeyEventArgs(source, key, modifiers, isRepeat),
+            raise);
+    }
+
+    private void ProcessFocusedInput<TEventArgs>(
+        Func<UiNode, TEventArgs> createEventArgs,
+        Action<UiNode, TEventArgs> raise)
+        where TEventArgs : UiInputEventArgs
     {
         BeginInputRouting();
         try
         {
-            if (FocusedNode is not null && !CanFocus(FocusedNode))
+            if (FocusedNode is not null && !CanRetainFocus(FocusedNode))
                 _ = ChangeFocus(null);
             if (!IsScreenActive() || FocusedNode is null)
                 return;
@@ -543,7 +578,7 @@ public partial class UiScreen
                 return;
 
             var nodes = path.Select(static entry => entry.Node).ToArray();
-            var args = new UiKeyEventArgs(FocusedNode, key, modifiers);
+            var args = createEventArgs(FocusedNode);
             for (var index = nodes.Length - 1; index >= 0; index--)
             {
                 if (!IsScreenActive())
@@ -754,12 +789,21 @@ public partial class UiScreen
 
     private bool CanFocus(UiNode node)
     {
+        if (!node.IsArrangeValid || !CanRetainFocus(node))
+            return false;
+
+        return true;
+    }
+
+    private bool CanRetainFocus(UiNode node)
+    {
         if (!IsActive(node) ||
             !node.IsEnabled ||
             !node.Focusable ||
-            !node.IsArrangeValid ||
             node.Visibility != Visibility.Visible)
+        {
             return false;
+        }
 
         for (var ancestor = node.Parent; ancestor is not null; ancestor = ancestor.Parent)
         {
@@ -794,13 +838,13 @@ public partial class UiScreen
     }
 
     private void ProjectPressedDifference(
-        IReadOnlyList<Control>? oldControls,
-        IReadOnlyList<Control>? newControls,
+        Control[]? oldControls,
+        Control[]? newControls,
         List<Exception> errors)
     {
         if (oldControls is not null)
         {
-            for (var index = oldControls.Count - 1; index >= 0; index--)
+            for (var index = oldControls.Length - 1; index >= 0; index--)
             {
                 var control = oldControls[index];
                 if (newControls is not null && ContainsControlReference(newControls, control))
@@ -820,9 +864,8 @@ public partial class UiScreen
         if (newControls is null)
             return;
 
-        for (var index = 0; index < newControls.Count; index++)
+        foreach (var control in newControls)
         {
-            var control = newControls[index];
             if ((oldControls is not null && ContainsControlReference(oldControls, control)) ||
                 !CanSetPressed(control))
             {
@@ -841,13 +884,13 @@ public partial class UiScreen
     }
 
     private static void ClearPressedControls(
-        IReadOnlyList<Control>? controls,
+        Control[]? controls,
         List<Exception> errors)
     {
         if (controls is null)
             return;
 
-        for (var index = controls.Count - 1; index >= 0; index--)
+        for (var index = controls.Length - 1; index >= 0; index--)
         {
             try
             {
@@ -873,7 +916,7 @@ public partial class UiScreen
     }
 
     private static bool ContainsControlReference(
-        IReadOnlyList<Control> controls,
+        Control[] controls,
         Control candidate)
     {
         foreach (var control in controls)

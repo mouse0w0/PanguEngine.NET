@@ -64,7 +64,7 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     public override event Action<EngineWindow, MouseClickEventArgs>? MouseDown;
     public override event Action<EngineWindow, MouseClickEventArgs>? MouseUp;
     public override event Action<EngineWindow, ScrollEventArgs>? Scroll;
-    public override event Action<EngineWindow, char>? CharInput;
+    public override event Action<EngineWindow, string>? TextInput;
     public override event Action<EngineWindow, double>? PreRender;
     public override event Action<EngineWindow, double>? Render;
 
@@ -99,6 +99,8 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     internal void RaiseKeyDown(KeyEventArgs args) => KeyDown?.Invoke(this, args);
 
     internal void RaiseKeyUp(KeyEventArgs args) => KeyUp?.Invoke(this, args);
+
+    internal void RaiseTextInput(string text) => TextInput?.Invoke(this, text);
 
     internal void RaiseMouseMove(MouseMoveEventArgs args)
     {

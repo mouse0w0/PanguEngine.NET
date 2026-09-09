@@ -131,6 +131,11 @@ public abstract partial class UiNode
     public event EventHandler<UiKeyEventArgs>? KeyUp;
 
     /// <summary>
+    /// Occurs when committed text is entered while this node has focus.
+    /// </summary>
+    public event EventHandler<UiTextInputEventArgs>? TextInput;
+
+    /// <summary>
     /// Occurs when this node receives focus.
     /// </summary>
     public event EventHandler<UiFocusChangedEventArgs>? GotFocus;
@@ -272,6 +277,13 @@ public abstract partial class UiNode
         KeyUp?.Invoke(this, eventArgs);
 
     /// <summary>
+    /// Raises the text input event.
+    /// </summary>
+    /// <param name="eventArgs">The event data.</param>
+    protected virtual void OnTextInput(UiTextInputEventArgs eventArgs) =>
+        TextInput?.Invoke(this, eventArgs);
+
+    /// <summary>
     /// Raises the got focus event.
     /// </summary>
     /// <param name="eventArgs">The event data.</param>
@@ -294,6 +306,7 @@ public abstract partial class UiNode
     internal void RaisePointerWheel(UiPointerWheelEventArgs eventArgs) => OnPointerWheel(eventArgs);
     internal void RaiseKeyDown(UiKeyEventArgs eventArgs) => OnKeyDown(eventArgs);
     internal void RaiseKeyUp(UiKeyEventArgs eventArgs) => OnKeyUp(eventArgs);
+    internal void RaiseTextInput(UiTextInputEventArgs eventArgs) => OnTextInput(eventArgs);
     internal void RaiseGotFocus(UiFocusChangedEventArgs eventArgs) => OnGotFocus(eventArgs);
     internal void RaiseLostFocus(UiFocusChangedEventArgs eventArgs) => OnLostFocus(eventArgs);
 

@@ -84,6 +84,7 @@ public sealed class UiInputRoutingTests
         manager.ProcessPointerWheel(Point.Zero, double.NaN, double.PositiveInfinity);
         manager.ProcessKeyDown(Key.A, KeyModifiers.Shift);
         manager.ProcessKeyUp(Key.A, KeyModifiers.Shift);
+        manager.ProcessTextInput("text");
 
         var threadError = RunOnBackgroundThread(() =>
             Record.Exception(() =>
@@ -94,6 +95,7 @@ public sealed class UiInputRoutingTests
                 manager.ProcessPointerWheel(Point.Zero, double.NaN, double.PositiveInfinity);
                 manager.ProcessKeyDown(Key.A, KeyModifiers.None);
                 manager.ProcessKeyUp(Key.A, KeyModifiers.None);
+                manager.ProcessTextInput("text");
             }));
         Assert.IsType<InvalidOperationException>(threadError);
     }
@@ -125,6 +127,59 @@ public sealed class UiInputRoutingTests
         Assert.Equal(
             ["first-exit", "second-enter", "second-move", "root-move"],
             events);
+    }
+
+    [Fact]
+    public void LeftPressedTargetReceivesMovedWhileHoverTracksActualLeaf()
+    {
+        var (manager, _, root) = OpenScene();
+        var first = Place(root, new TestNode(), 0, 0, 20, 20);
+        var second = Place(root, new TestNode(), 30, 0, 20, 20);
+        var events = new List<string>();
+        UiPointerEventArgs? moved = null;
+        first.PointerMoved += (_, args) =>
+        {
+            moved = args;
+            events.Add("first-move");
+        };
+        first.PointerExited += (_, _) => events.Add("first-exit");
+        second.PointerEntered += (_, _) => events.Add("second-enter");
+        second.PointerMoved += (_, _) => events.Add("second-move");
+
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        events.Clear();
+        manager.ProcessPointerMoved(new Point(35, 5));
+
+        Assert.Equal(["first-exit", "second-enter", "first-move"], events);
+        var movedArgs = Assert.IsType<UiPointerEventArgs>(moved);
+        Assert.Same(first, movedArgs.Source);
+        Assert.Equal(new Point(35, 5), movedArgs.ScreenPosition);
+
+        manager.ProcessPointerReleased(new Point(35, 5), MouseButton.Left, KeyModifiers.None);
+        events.Clear();
+        manager.ProcessPointerMoved(new Point(36, 5));
+
+        Assert.Equal(["second-move"], events);
+    }
+
+    [Fact]
+    public void RemovingPressedTargetReturnsMovedRoutingToHover()
+    {
+        var (manager, _, root) = OpenScene();
+        var first = Place(root, new TestNode(), 0, 0, 20, 20);
+        var second = Place(root, new TestNode(), 30, 0, 20, 20);
+        var firstMoves = 0;
+        var secondMoves = 0;
+        first.PointerMoved += (_, _) => firstMoves++;
+        second.PointerMoved += (_, _) => secondMoves++;
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+
+        Assert.True(root.Children.Remove(first));
+        manager.Update(new Size(100, 100));
+        manager.ProcessPointerMoved(new Point(35, 5));
+
+        Assert.Equal(0, firstMoves);
+        Assert.Equal(1, secondMoves);
     }
 
     [Fact]
@@ -523,6 +578,104 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
+    public void TextInputAndKeyRepeatBubbleFromFocusedNode()
+    {
+        var (manager, _, root) = OpenScene();
+        var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var events = new List<string>();
+        UiTextInputEventArgs? leafTextArgs = null;
+        UiTextInputEventArgs? rootTextArgs = null;
+        UiKeyEventArgs? keyArgs = null;
+        leaf.TextInput += (_, args) =>
+        {
+            leafTextArgs = args;
+            events.Add($"leaf:{args.Text}");
+        };
+        root.TextInput += (_, args) =>
+        {
+            rootTextArgs = args;
+            events.Add("root");
+        };
+        leaf.KeyDown += (_, args) => keyArgs = args;
+        Assert.True(leaf.Focus());
+
+        manager.ProcessTextInput("A\U0001F600中");
+        manager.ProcessKeyDown(Key.Left, KeyModifiers.Shift, isRepeat: true);
+
+        Assert.Equal(["leaf:A\U0001F600中", "root"], events);
+        var textArgs = Assert.IsType<UiTextInputEventArgs>(leafTextArgs);
+        Assert.Same(textArgs, rootTextArgs);
+        Assert.Same(leaf, textArgs.Source);
+        Assert.False(textArgs.Handled);
+        Assert.Equal("A\U0001F600中", textArgs.Text);
+        Assert.True(Assert.IsType<UiKeyEventArgs>(keyArgs).IsRepeat);
+    }
+
+    [Fact]
+    public void HandledTextInputStopsAncestorAndNoFocusIsNoOp()
+    {
+        var (manager, screen, root) = OpenScene();
+        var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var events = new List<string>();
+        leaf.TextInput += (_, args) =>
+        {
+            events.Add("leaf");
+            args.Handled = true;
+        };
+        root.TextInput += (_, _) => events.Add("root");
+
+        manager.ProcessTextInput("ignored");
+        Assert.Empty(events);
+
+        Assert.True(leaf.Focus());
+        manager.ProcessTextInput("handled");
+        screen.ClearFocus();
+        manager.ProcessTextInput("ignored");
+
+        Assert.Equal(["leaf"], events);
+    }
+
+    [Fact]
+    public void TextInputRouteStopsWhenHandlerReplacesScreen()
+    {
+        var (manager, _, root) = OpenScene();
+        var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var replacementRoot = new TestNode();
+        var replacement = new UiScreen(replacementRoot);
+        var events = new List<string>();
+        leaf.TextInput += (_, _) =>
+        {
+            events.Add("old-leaf");
+            manager.Open(replacement);
+        };
+        root.TextInput += (_, _) => events.Add("old-root");
+        replacementRoot.TextInput += (_, _) => events.Add("new-root");
+        Assert.True(leaf.Focus());
+
+        manager.ProcessTextInput("replace");
+
+        Assert.Equal(["old-leaf"], events);
+        Assert.Same(replacement, manager.CurrentScreen);
+    }
+
+    [Fact]
+    public void TextInputHandlerExceptionStopsRouteAndPreservesInstance()
+    {
+        var (manager, _, root) = OpenScene();
+        var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var expected = new InvalidOperationException("text input");
+        var rootCalls = 0;
+        leaf.TextInput += (_, _) => throw expected;
+        root.TextInput += (_, _) => rootCalls++;
+        Assert.True(leaf.Focus());
+
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.ProcessTextInput("text"));
+
+        Assert.Same(expected, actual);
+        Assert.Equal(0, rootCalls);
+    }
+
+    [Fact]
     public void InvalidFocusIsClearedBeforeKeyboardRouting()
     {
         var (manager, screen, root) = OpenScene();
@@ -537,6 +690,24 @@ public sealed class UiInputRoutingTests
 
         Assert.Null(screen.FocusedNode);
         Assert.Equal(["lost"], events);
+    }
+
+    [Fact]
+    public void FocusedNodeRetainsKeyboardFocusWhileLayoutIsInvalid()
+    {
+        var (manager, screen, root) = OpenScene();
+        var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
+        var events = new List<string>();
+        leaf.KeyDown += (_, _) => events.Add("key");
+        leaf.TextInput += (_, _) => events.Add("text");
+        Assert.True(leaf.Focus());
+        leaf.InvalidateMeasure();
+
+        manager.ProcessKeyDown(Key.A, KeyModifiers.None);
+        manager.ProcessTextInput("a");
+
+        Assert.Same(leaf, screen.FocusedNode);
+        Assert.Equal(["key", "text"], events);
     }
 
     [Fact]

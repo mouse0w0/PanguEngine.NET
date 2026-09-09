@@ -47,7 +47,7 @@ public sealed partial class VulkanWindow
     public override event Action<Window, ScrollEventArgs>? Scroll;
 
     /// <inheritdoc/>
-    public override event Action<Window, char>? CharInput;
+    public override event Action<Window, string>? TextInput;
 
     /// <inheritdoc/>
     public override event Action<Window, double>? PreRender;
@@ -177,15 +177,16 @@ public sealed partial class VulkanWindow
 
     private void HandleKeyEvent(SDL_KeyboardEvent keyEvent)
     {
-        if (keyEvent.repeat && keyEvent.down)
-            return;
         if (!SdlKeyMapping.TryGetKey(keyEvent.scancode, out var key))
             return;
 
         var args = new KeyEventArgs(
             key,
             keyEvent.down ? KeyAction.Press : KeyAction.Release,
-            ToKeyModifiers(keyEvent.mod));
+            ToKeyModifiers(keyEvent.mod))
+        {
+            IsRepeat = keyEvent.repeat
+        };
         if (keyEvent.down)
             KeyDown?.Invoke(this, args);
         else
@@ -194,10 +195,9 @@ public sealed partial class VulkanWindow
 
     private void HandleTextInput(string? text)
     {
-        if (text is null)
+        if (string.IsNullOrEmpty(text))
             return;
-        foreach (var character in text)
-            CharInput?.Invoke(this, character);
+        TextInput?.Invoke(this, text);
     }
 
     private void HandleMouseMotion(SDL_MouseMotionEvent motion)

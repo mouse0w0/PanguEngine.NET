@@ -4,7 +4,7 @@ using PanguEngine.Windowing;
 
 namespace PanguEngine.Client.Game;
 
-internal sealed class ClientInputBridge
+internal sealed class ClientInputBridge : IUiClipboard
 {
     private readonly Window _window;
     private readonly UiManager _uiManager;
@@ -25,6 +25,7 @@ internal sealed class ClientInputBridge
         _tryHandleEscape = tryHandleEscape;
         window.KeyDown += OnKeyDown;
         window.KeyUp += OnKeyUp;
+        window.TextInput += OnTextInput;
         window.MouseMove += OnMouseMove;
         window.MouseDown += OnMouseDown;
         window.MouseUp += OnMouseUp;
@@ -42,24 +43,32 @@ internal sealed class ClientInputBridge
 
         _window.KeyDown -= OnKeyDown;
         _window.KeyUp -= OnKeyUp;
+        _window.TextInput -= OnTextInput;
         _window.MouseMove -= OnMouseMove;
         _window.MouseDown -= OnMouseDown;
         _window.MouseUp -= OnMouseUp;
         _window.Scroll -= OnScroll;
         _window.FocusChanged -= OnFocusChanged;
         _uiManager.CurrentScreenChanged -= OnCurrentScreenChanged;
+        _uiManager.CurrentScreen?.DetachClipboard(this);
         _restoreMouseCapture = false;
+    }
+
+    string IUiClipboard.Text
+    {
+        get => _window.ClipboardText;
+        set => _window.ClipboardText = value;
     }
 
     private void OnKeyDown(Window window, KeyEventArgs args)
     {
-        if (args.Key == Key.Escape && _tryHandleEscape())
+        if (args.Key == Key.Escape && !args.IsRepeat && _tryHandleEscape())
             return;
 
         var screen = _uiManager.CurrentScreen;
         if (screen is not null)
         {
-            _uiManager.ProcessKeyDown(args.Key, args.Modifiers);
+            _uiManager.ProcessKeyDown(args.Key, args.Modifiers, args.IsRepeat);
             return;
         }
 
@@ -71,11 +80,17 @@ internal sealed class ClientInputBridge
         var screen = _uiManager.CurrentScreen;
         if (screen is not null)
         {
-            _uiManager.ProcessKeyUp(args.Key, args.Modifiers);
+            _uiManager.ProcessKeyUp(args.Key, args.Modifiers, args.IsRepeat);
             return;
         }
 
         _input.HandleKeyUp(args);
+    }
+
+    private void OnTextInput(Window window, string text)
+    {
+        if (_uiManager.CurrentScreen is not null)
+            _uiManager.ProcessTextInput(text);
     }
 
     private void OnMouseMove(Window window, MouseMoveEventArgs args)
@@ -137,6 +152,9 @@ internal sealed class ClientInputBridge
 
     private void OnCurrentScreenChanged(UiScreen? oldScreen, UiScreen? newScreen)
     {
+        oldScreen?.DetachClipboard(this);
+        newScreen?.AttachClipboard(this);
+
         if (oldScreen is null && newScreen is not null)
         {
             _restoreMouseCapture = _input.SuspendForUi();

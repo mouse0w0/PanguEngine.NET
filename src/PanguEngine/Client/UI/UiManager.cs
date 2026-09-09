@@ -182,16 +182,22 @@ public sealed class UiManager
         CurrentScreen?.ProcessPointerWheel(position, deltaX, deltaY);
     }
 
-    internal void ProcessKeyDown(Key key, KeyModifiers modifiers)
+    internal void ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessKeyDown(key, modifiers);
+        CurrentScreen?.ProcessKeyDown(key, modifiers, isRepeat);
     }
 
-    internal void ProcessKeyUp(Key key, KeyModifiers modifiers)
+    internal void ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessKeyUp(key, modifiers);
+        CurrentScreen?.ProcessKeyUp(key, modifiers, isRepeat);
+    }
+
+    internal void ProcessTextInput(string text)
+    {
+        VerifyAccess();
+        CurrentScreen?.ProcessTextInput(text);
     }
 
     internal void ProcessFocusChanged(bool focused)
