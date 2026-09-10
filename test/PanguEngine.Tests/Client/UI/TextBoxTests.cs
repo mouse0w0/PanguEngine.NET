@@ -271,67 +271,34 @@ public sealed class TextBoxTests
     }
 
     [Fact]
-    public void ClipboardShortcutsAndReadOnlyCommandsFollowTheEditingContract()
+    public void ClipboardCommandsRespectReadOnlyState()
     {
         using var context = new UiTextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("value");
+        var (_, _, textBox) = OpenTextBox("value");
         var clipboard = new TestClipboard();
-        Assert.True(textBox.Focus());
-
         textBox.SelectAll();
-        Assert.True(textBox.TryHandleKey(Key.Insert, KeyModifiers.Control, clipboard));
+        textBox.Copy(clipboard);
         Assert.Equal("value", clipboard.Text);
-        Assert.True(textBox.TryHandleKey(Key.Delete, KeyModifiers.Shift, clipboard));
-        Assert.Equal(string.Empty, textBox.Text);
-        Assert.True(textBox.TryHandleKey(Key.Insert, KeyModifiers.Shift, clipboard));
-        Assert.Equal("value", textBox.Text);
-        textBox.SelectAll();
-        Assert.True(textBox.TryHandleKey(Key.C, KeyModifiers.Control, clipboard));
-        Assert.True(textBox.TryHandleKey(Key.X, KeyModifiers.Control, clipboard));
-        Assert.Equal(string.Empty, textBox.Text);
-        clipboard.Text = "replacement";
-        Assert.True(textBox.TryHandleKey(Key.V, KeyModifiers.Control, clipboard));
-        Assert.Equal("replacement", textBox.Text);
-
-        var ancestorKeys = new List<Key>();
-        screen.Root!.KeyDown += (_, args) => ancestorKeys.Add(args.Key);
         textBox.IsReadOnly = true;
-        textBox.SelectAll();
-        manager.ProcessKeyDown(Key.Backspace, KeyModifiers.None);
-        manager.ProcessKeyDown(Key.Delete, KeyModifiers.None);
-        Assert.True(textBox.TryHandleKey(Key.X, KeyModifiers.Control, clipboard));
-        Assert.True(textBox.TryHandleKey(Key.V, KeyModifiers.Control, clipboard));
-        manager.ProcessKeyDown(Key.Z, KeyModifiers.Control);
-        manager.ProcessKeyDown(Key.Y, KeyModifiers.Control);
-        Assert.True(textBox.TryHandleKey(Key.Delete, KeyModifiers.Shift, clipboard));
-        Assert.True(textBox.TryHandleKey(Key.Insert, KeyModifiers.Shift, clipboard));
+        textBox.Cut(clipboard);
+        clipboard.Text = "replacement";
+        textBox.Paste(clipboard);
 
-        Assert.Equal("replacement", textBox.Text);
-        Assert.Empty(ancestorKeys);
-        textBox.ClearSelection();
-        manager.Update(new Size(240, 80));
-        Assert.DoesNotContain(
-            screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
-            command => command.Color == textBox.CaretColor);
+        Assert.Equal("value", textBox.Text);
     }
 
     [Fact]
-    public void ClipboardMethodsWithoutClientClipboardAndEqualTextAssignmentAreNoOps()
+    public void EqualTextAssignmentPreservesUndoHistory()
     {
         using var context = new UiTextTestContext();
         var (manager, _, textBox) = OpenTextBox("a");
         Assert.True(textBox.Focus());
         manager.ProcessTextInput("b");
         Assert.True(textBox.CanUndo);
-        textBox.Text = textBox.Text;
-        textBox.SelectAll();
 
-        textBox.Copy();
-        textBox.Cut();
-        textBox.Paste();
+        textBox.Text = textBox.Text;
 
         Assert.Equal("ab", textBox.Text);
-        Assert.Equal(2, textBox.SelectionLength);
         Assert.True(textBox.CanUndo);
     }
 

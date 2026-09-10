@@ -138,11 +138,11 @@ public sealed class TextBox : Control
             .AddBinding(
                 Key.Delete,
                 KeyModifiers.Shift,
-                static (textBox, _) => textBox.Cut(textBox.KeyBindingClipboard))
+                static (textBox, _) => textBox.Cut())
             .AddBinding(
                 Key.Insert,
                 KeyModifiers.Shift,
-                static (textBox, _) => textBox.Paste(textBox.KeyBindingClipboard))
+                static (textBox, _) => textBox.Paste())
             .AddBinding(
                 Key.Left,
                 KeyModifiers.Control,
@@ -180,19 +180,19 @@ public sealed class TextBox : Control
             .AddBinding(
                 Key.C,
                 KeyModifiers.Control,
-                static (textBox, _) => textBox.Copy(textBox.KeyBindingClipboard))
+                static (textBox, _) => textBox.Copy())
             .AddBinding(
                 Key.Insert,
                 KeyModifiers.Control,
-                static (textBox, _) => textBox.Copy(textBox.KeyBindingClipboard))
+                static (textBox, _) => textBox.Copy())
             .AddBinding(
                 Key.X,
                 KeyModifiers.Control,
-                static (textBox, _) => textBox.Cut(textBox.KeyBindingClipboard))
+                static (textBox, _) => textBox.Cut())
             .AddBinding(
                 Key.V,
                 KeyModifiers.Control,
-                static (textBox, _) => textBox.Paste(textBox.KeyBindingClipboard))
+                static (textBox, _) => textBox.Paste())
             .AddBinding(
                 Key.Z,
                 KeyModifiers.Control,
@@ -209,7 +209,6 @@ public sealed class TextBox : Control
     private readonly TextEditingState _editingState = new();
     private CaretStop[] _caretStops = [new(0, 0)];
     private TextEditingState.Change? _pendingChange;
-    private Clipboard? _keyBindingClipboardOverride;
     private TextLayout? _layout;
     private double _caretWidth = 1;
     private double _horizontalOffset;
@@ -218,7 +217,6 @@ public sealed class TextBox : Control
     private bool _isDraggingSelection;
     private bool _drawLayout;
     private bool _layoutIsPlaceholder;
-    private bool _hasKeyBindingClipboardOverride;
 
     /// <summary>
     /// Initializes a text box with its default focus and decoration values.
@@ -651,33 +649,6 @@ public sealed class TextBox : Control
         _editingState.EndEditGroup();
         base.OnLostFocus(eventArgs);
     }
-
-    internal bool TryHandleKey(Key key, KeyModifiers modifiers, Clipboard? clipboard)
-    {
-        var previousClipboard = _keyBindingClipboardOverride;
-        var hadPreviousOverride = _hasKeyBindingClipboardOverride;
-        _keyBindingClipboardOverride = clipboard;
-        _hasKeyBindingClipboardOverride = true;
-        try
-        {
-            var eventArgs = new UiKeyEventArgs(
-                this,
-                key,
-                modifiers,
-                isRepeat: false);
-            return KeyBindings.TryHandle(this, eventArgs, KeyAction.Press);
-        }
-        finally
-        {
-            _keyBindingClipboardOverride = previousClipboard;
-            _hasKeyBindingClipboardOverride = hadPreviousOverride;
-        }
-    }
-
-    private Clipboard? KeyBindingClipboard =>
-        _hasKeyBindingClipboardOverride
-            ? _keyBindingClipboardOverride
-            : ClientEngine.Current.Clipboard;
 
     private void MoveByTextElement(int direction, bool extend)
     {
