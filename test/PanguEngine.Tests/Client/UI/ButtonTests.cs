@@ -1,5 +1,8 @@
 using System.Reflection;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Input;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 

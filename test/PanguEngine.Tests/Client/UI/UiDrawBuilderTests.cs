@@ -1,4 +1,6 @@
+using System.Runtime.InteropServices;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics;
 
@@ -10,7 +12,7 @@ public sealed class UiDrawBuilderTests
     public void UnifiedVertexInputMatchesFiftyTwoByteLayout()
     {
         Assert.Equal(52u, UiVertex.SizeInBytes);
-        Assert.Equal(52, System.Runtime.InteropServices.Marshal.SizeOf<UiVertex>());
+        Assert.Equal(52, Marshal.SizeOf<UiVertex>());
         Assert.Equal(52u, Assert.Single(UiVertex.VertexInput.Buffers).Stride);
         Assert.Equal(
             [
@@ -430,5 +432,4 @@ public sealed class UiDrawBuilderTests
         Rect? clip = null,
         double opacity = 1) =>
         new(bounds, color, clip, opacity);
-
 }

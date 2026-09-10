@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics;
 
 namespace PanguEngine.Client.UI.Rendering;
@@ -95,6 +96,7 @@ internal sealed class UiImageAtlas
                 errors.Add(exception);
             }
         }
+
         _pages.Clear();
         _retiringRegions.Clear();
         if (errors.Count != 0)
@@ -159,6 +161,7 @@ internal sealed class UiImageAtlas
         {
             uploadFailure = exception;
         }
+
         return new UiImageAtlasEntry(page, region, upload, uploadFailure);
     }
 
@@ -219,6 +222,7 @@ internal sealed class UiImageAtlasPage(
         {
             firstFailure = exception;
         }
+
         try
         {
             Texture.Destroy();
@@ -227,6 +231,7 @@ internal sealed class UiImageAtlasPage(
         {
             firstFailure ??= exception;
         }
+
         if (firstFailure is not null)
             ExceptionDispatchInfo.Capture(firstFailure).Throw();
     }

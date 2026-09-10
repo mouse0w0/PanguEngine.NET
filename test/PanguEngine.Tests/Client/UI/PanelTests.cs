@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -389,10 +390,7 @@ public sealed class PanelTests
         Assert.False(enumerator.MoveNext());
 
         var result = RunOnBackgroundThread(() =>
-            (Remove: Record.Exception(() =>
-                {
-                    panel.Children.Remove(new TestNode());
-                }),
+            (Remove: Record.Exception(() => { panel.Children.Remove(new TestNode()); }),
                 Clear: Record.Exception(panel.Children.Clear)));
 
         Assert.Null(result.Remove);

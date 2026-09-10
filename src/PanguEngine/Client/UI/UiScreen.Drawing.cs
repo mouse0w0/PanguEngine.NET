@@ -1,3 +1,5 @@
+using PanguEngine.Client.UI.Drawing;
+
 namespace PanguEngine.Client.UI;
 
 public partial class UiScreen

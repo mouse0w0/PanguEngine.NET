@@ -1,5 +1,7 @@
 using PanguEngine.Client.Game;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Input;
 using PanguEngine.Input;
 using PanguEngine.Tests.Windowing;
 using PanguEngine.Windowing;

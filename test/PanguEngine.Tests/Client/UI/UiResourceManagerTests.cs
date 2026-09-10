@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics.Text;
 
@@ -375,6 +376,7 @@ public sealed class UiResourceManagerTests
             GC.Collect();
             GC.WaitForPendingFinalizers();
         }
+
         GC.KeepAlive(reference);
     }
 

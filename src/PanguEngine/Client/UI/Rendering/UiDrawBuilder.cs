@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 
@@ -171,6 +172,7 @@ internal sealed class UiDrawBuilder
                             framebufferHeight,
                             uiScale);
                     }
+
                     break;
                 case UiDrawTextCommand text:
                     if (glyphResolver is null)
@@ -203,6 +205,7 @@ internal sealed class UiDrawBuilder
                 return requiredCapacity;
             capacity = checked(capacity * 2);
         }
+
         return capacity;
     }
 

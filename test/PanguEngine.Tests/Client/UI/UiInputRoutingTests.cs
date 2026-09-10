@@ -1,5 +1,7 @@
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Input;
 using PanguEngine.Input;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -526,9 +528,11 @@ public sealed class UiInputRoutingTests
         first.GotFocus += (_, eventArgs) =>
             events.Add($"first-got:{ReferenceEquals(screen.FocusedNode, first)}:{eventArgs.OldFocus is null}");
         first.LostFocus += (_, eventArgs) =>
-            events.Add($"first-lost:{ReferenceEquals(screen.FocusedNode, second)}:{ReferenceEquals(eventArgs.NewFocus, second)}");
+            events.Add(
+                $"first-lost:{ReferenceEquals(screen.FocusedNode, second)}:{ReferenceEquals(eventArgs.NewFocus, second)}");
         second.GotFocus += (_, eventArgs) =>
-            events.Add($"second-got:{ReferenceEquals(screen.FocusedNode, second)}:{ReferenceEquals(eventArgs.OldFocus, first)}");
+            events.Add(
+                $"second-got:{ReferenceEquals(screen.FocusedNode, second)}:{ReferenceEquals(eventArgs.OldFocus, first)}");
         second.LostFocus += (_, eventArgs) =>
             events.Add($"second-lost:{screen.FocusedNode is null}:{eventArgs.NewFocus is null}");
 
@@ -753,10 +757,7 @@ public sealed class UiInputRoutingTests
         Exception? reentryError = null;
         first.GotFocus += (_, _) =>
         {
-            reentryError = Record.Exception(() =>
-            {
-                first.Focus();
-            });
+            reentryError = Record.Exception(() => { first.Focus(); });
             screen.Post(() => second.Focus());
         };
 
@@ -907,10 +908,7 @@ public sealed class UiInputRoutingTests
         Assert.True(leaf.Focus());
         notifications.Clear();
 
-        var aggregate = Assert.Throws<AggregateException>(() =>
-        {
-            root.Children.Remove(branch);
-        });
+        var aggregate = Assert.Throws<AggregateException>(() => { root.Children.Remove(branch); });
 
         Assert.Equal([lostError, exitError], aggregate.InnerExceptions);
         Assert.Equal(["lost", "exit", "branch-exit"], notifications);

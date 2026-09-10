@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -609,6 +611,7 @@ public sealed class UiDrawingTests
             AssertBounds(expectedSources[index], commands[index].SourceRect);
             Assert.Null(commands[index].Clip);
         }
+
         Assert.DoesNotContain(commands, command =>
             command.Bounds == new Rect(15, 27, 60, 45));
     }

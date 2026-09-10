@@ -1,4 +1,6 @@
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;

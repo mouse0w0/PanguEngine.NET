@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Drawing;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -19,8 +20,7 @@ public sealed class BrushTests
     [InlineData(0, 0, -1, 0)]
     [InlineData(0, 0, 0, -1)]
     public void ImageSliceRejectsNegativeEdges(int left, int top, int right, int bottom) =>
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ImageSlice(left, top, right, bottom));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ImageSlice(left, top, right, bottom));
 
     [Fact]
     public void ImageBrushUsesExpectedDefaultsAndNormalizesFullSource()
@@ -65,8 +65,7 @@ public sealed class BrushTests
     public void ImageBrushRejectsNullAndOutOfRangeSource()
     {
         Assert.Throws<ArgumentNullException>(() => new ImageBrush(null!));
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new ImageBrush(Image(4, 4), new Rect(3, 0, 2, 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ImageBrush(Image(4, 4), new Rect(3, 0, 2, 1)));
     }
 
     [Fact]
@@ -120,22 +119,19 @@ public sealed class BrushTests
         int right,
         int bottom)
     {
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new NineSliceImageBrush(
-                Image(20, 12),
-                new ImageSlice(left, top, right, bottom)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new NineSliceImageBrush(
+            Image(20, 12),
+            new ImageSlice(left, top, right, bottom)));
     }
 
     [Fact]
     public void NineSliceBrushRejectsNullAndOutOfRangeSource()
     {
-        Assert.Throws<ArgumentNullException>(
-            () => new NineSliceImageBrush(null!, new ImageSlice(1)));
-        Assert.Throws<ArgumentOutOfRangeException>(
-            () => new NineSliceImageBrush(
-                Image(4, 4),
-                new Rect(3, 0, 2, 1),
-                ImageSlice.Zero));
+        Assert.Throws<ArgumentNullException>(() => new NineSliceImageBrush(null!, new ImageSlice(1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new NineSliceImageBrush(
+            Image(4, 4),
+            new Rect(3, 0, 2, 1),
+            ImageSlice.Zero));
     }
 
     private static UiImage Image(int width, int height) =>

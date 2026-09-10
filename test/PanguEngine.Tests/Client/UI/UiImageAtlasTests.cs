@@ -1,4 +1,4 @@
-using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics;
 
@@ -82,6 +82,7 @@ public sealed class UiImageAtlasTests
         {
             Assert.True(context.Table.TryRegister(context.Device.CreateSampledView(), out lastSlot));
         }
+
         var textureCount = context.Device.Textures.Count;
 
         Assert.Null(context.Atlas.TryCreate(Image(4, 4)));

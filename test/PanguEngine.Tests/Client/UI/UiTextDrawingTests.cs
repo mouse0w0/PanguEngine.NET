@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics.Text;
 
@@ -247,5 +248,4 @@ public sealed class UiTextDrawingTests
 
         public void Dispose() => _fontManager.Destroy();
     }
-
 }

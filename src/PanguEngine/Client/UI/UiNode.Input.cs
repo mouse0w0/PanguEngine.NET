@@ -1,3 +1,5 @@
+using PanguEngine.Client.UI.Input;
+
 namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode

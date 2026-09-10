@@ -1,4 +1,4 @@
-using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Drawing;
 
 namespace PanguEngine.Tests.Client.UI;
 

@@ -1,4 +1,4 @@
-using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -73,12 +73,11 @@ public sealed class TextEditingStateTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => state.Select(text, 2, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => state.Select(text, 1, 1));
-        Assert.Equal("start", Assert.Throws<ArgumentOutOfRangeException>(
-            () => state.Select(text, -1, 1)).ParamName);
-        Assert.Equal("start", Assert.Throws<ArgumentOutOfRangeException>(
-            () => state.Select(text, text.Length + 1, 0)).ParamName);
-        Assert.Equal("length", Assert.Throws<ArgumentOutOfRangeException>(
-            () => state.Select(text, 0, text.Length + 1)).ParamName);
+        Assert.Equal("start", Assert.Throws<ArgumentOutOfRangeException>(() => state.Select(text, -1, 1)).ParamName);
+        Assert.Equal("start",
+            Assert.Throws<ArgumentOutOfRangeException>(() => state.Select(text, text.Length + 1, 0)).ParamName);
+        Assert.Equal("length",
+            Assert.Throws<ArgumentOutOfRangeException>(() => state.Select(text, 0, text.Length + 1)).ParamName);
     }
 
     [Fact]
@@ -122,6 +121,7 @@ public sealed class TextEditingStateTests
             state.MoveByWord(text, 1, extend: false);
             right.Add(state.Caret);
         }
+
         while (state.Caret != 0)
         {
             state.MoveByWord(text, -1, extend: false);

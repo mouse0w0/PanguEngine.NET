@@ -1,8 +1,10 @@
-using System.Reflection;
 using System.ComponentModel;
+using System.Reflection;
 using System.Text;
 using PanguEngine.Client;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 
@@ -18,9 +20,12 @@ public sealed class TextBoxTests
 
         Assert.True(typeof(TextBox).IsSealed);
         Assert.Equal(typeof(Control), typeof(TextBox).BaseType);
-        AssertProperty(TextBox.TextProperty, string.Empty, UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.PlaceholderProperty, string.Empty, UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.FontProperty, new Font(string.Empty), UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+        AssertProperty(TextBox.TextProperty, string.Empty,
+            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+        AssertProperty(TextBox.PlaceholderProperty, string.Empty,
+            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+        AssertProperty(TextBox.FontProperty, new Font(string.Empty),
+            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
         AssertProperty(TextBox.FontSizeProperty, 16d, UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
         AssertProperty(TextBox.ForegroundProperty, new Color(242, 244, 247), UiPropertyInvalidation.Render);
         AssertProperty(TextBox.PlaceholderForegroundProperty, new Color(139, 148, 160), UiPropertyInvalidation.Render);
@@ -413,7 +418,8 @@ public sealed class TextBoxTests
 
         manager.ProcessPointerPressed(text.Origin, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(new Point(text.Origin.X + text.Layout.Width + 20, text.Origin.Y));
-        manager.ProcessPointerReleased(new Point(text.Origin.X + text.Layout.Width + 20, text.Origin.Y), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerReleased(new Point(text.Origin.X + text.Layout.Width + 20, text.Origin.Y),
+            MouseButton.Left, KeyModifiers.None);
 
         Assert.Equal(0, textBox.SelectionStart);
         Assert.Equal(textBox.Text.Length, textBox.SelectionLength);
@@ -423,7 +429,8 @@ public sealed class TextBoxTests
         textBox.ClearSelection();
         manager.ProcessPointerPressed(text.Origin, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(new Point(text.Origin.X + text.Layout.Width, text.Origin.Y));
-        manager.ProcessPointerReleased(new Point(text.Origin.X + text.Layout.Width, text.Origin.Y), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerReleased(new Point(text.Origin.X + text.Layout.Width, text.Origin.Y), MouseButton.Left,
+            KeyModifiers.None);
         Assert.Equal(0, textBox.SelectionLength);
     }
 

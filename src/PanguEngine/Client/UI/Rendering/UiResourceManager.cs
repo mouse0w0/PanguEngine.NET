@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 
@@ -38,6 +39,7 @@ internal sealed class UiResourceManager
         LogLevel.Error,
         new EventId(1, nameof(LogImageUploadFailure)),
         "UI image resource {ResourceId} upload failed; subsequent draws will be skipped");
+
     private static readonly Action<ILogger, uint, Exception?> LogGlyphUploadFailure = LoggerMessage.Define<uint>(
         LogLevel.Error,
         new EventId(2, nameof(LogGlyphUploadFailure)),
@@ -159,6 +161,7 @@ internal sealed class UiResourceManager
             state.Retire();
             return null;
         }
+
         if (!state.IsUploadReady)
             return null;
         state.Publish();
@@ -178,6 +181,7 @@ internal sealed class UiResourceManager
                 LogGlyphUploadFailure(_logger, key.GlyphId, uploadFailure);
             return null;
         }
+
         if (!entry.IsUploadReady)
             return null;
 
@@ -265,6 +269,7 @@ internal sealed class UiResourceManager
             {
                 throw new InvalidOperationException("The UI image registration has no live GPU state.");
             }
+
             return imageState;
         }
 
@@ -278,6 +283,7 @@ internal sealed class UiResourceManager
         {
             state = TryCreateStandaloneImage(device, textureTable, image);
         }
+
         if (state is null)
             return null;
 
@@ -337,6 +343,7 @@ internal sealed class UiResourceManager
             {
                 uploadFailure = exception;
             }
+
             return new StandaloneImageState(
                 textureTable,
                 texture,
@@ -421,6 +428,7 @@ internal sealed class AtlasImageState(
 
     public ulong ResourceId { get; set; }
     public bool IsUploadReady => entry.IsUploadReady;
+
     public UiImageRenderBinding Binding => new(
         entry.Page.TextureSlot.Index,
         entry.Page.Texture.Width,
@@ -475,6 +483,7 @@ internal sealed class StandaloneImageState : IUiImageGpuResourceState
 
     public ulong ResourceId { get; set; }
     public bool IsUploadReady => _uploadFailure is null && _upload?.IsReady == true;
+
     public UiImageRenderBinding Binding => new(
         _slot.Index,
         _texture.Width,
@@ -488,6 +497,7 @@ internal sealed class StandaloneImageState : IUiImageGpuResourceState
             _uploadFailure = _upload.Exception ?? new InvalidOperationException(
                 "The UI image upload faulted without reporting an exception.");
         }
+
         failure = _uploadFailure;
         firstObservation = failure is not null && !_failureObserved;
         if (firstObservation)
@@ -522,6 +532,7 @@ internal sealed class StandaloneImageState : IUiImageGpuResourceState
         {
             firstFailure = exception;
         }
+
         try
         {
             _texture.Destroy();
@@ -530,6 +541,7 @@ internal sealed class StandaloneImageState : IUiImageGpuResourceState
         {
             firstFailure ??= exception;
         }
+
         if (firstFailure is not null)
             ExceptionDispatchInfo.Capture(firstFailure).Throw();
     }

@@ -1,5 +1,6 @@
-using System.Runtime.ExceptionServices;
+using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -222,6 +223,7 @@ public sealed class UiScreenTests
         Assert.True(root.IsArrangeValid);
         screen.Close();
     }
+
     [Fact]
     public void UiScreenSupportsOptionalRootAndAssociatesItWhileClosed()
     {
@@ -512,10 +514,14 @@ public sealed class UiScreenTests
         RecordingUiScreen screen = null!;
         screen = new RecordingUiScreen(root)
         {
-            Opening = () => states.Add(ReferenceEquals(root.Screen, screen) ? "opening-associated" : "opening-unassociated"),
-            Opened = () => states.Add(ReferenceEquals(root.Screen, screen) ? "opened-associated" : "opened-unassociated"),
-            Closing = () => states.Add(ReferenceEquals(root.Screen, screen) ? "closing-associated" : "closing-unassociated"),
-            Closed = () => states.Add(ReferenceEquals(root.Screen, screen) ? "closed-associated" : "closed-unassociated")
+            Opening = () =>
+                states.Add(ReferenceEquals(root.Screen, screen) ? "opening-associated" : "opening-unassociated"),
+            Opened = () =>
+                states.Add(ReferenceEquals(root.Screen, screen) ? "opened-associated" : "opened-unassociated"),
+            Closing = () =>
+                states.Add(ReferenceEquals(root.Screen, screen) ? "closing-associated" : "closing-unassociated"),
+            Closed = () =>
+                states.Add(ReferenceEquals(root.Screen, screen) ? "closed-associated" : "closed-unassociated")
         };
 
         screen.Open();

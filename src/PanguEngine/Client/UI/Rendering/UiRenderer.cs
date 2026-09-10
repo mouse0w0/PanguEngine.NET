@@ -1,5 +1,6 @@
-using System.Runtime.InteropServices;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
@@ -38,15 +39,15 @@ internal sealed class UiRenderer
             _frameResources[index] = new FrameResources();
 
         var descriptorSetLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
-            [
-                new DescriptorSetLayoutBinding(
-                    0,
-                    DescriptorType.SampledImage,
-                    ShaderStageFlags.Fragment,
-                    UiTextureTable.SlotCount),
-                new DescriptorSetLayoutBinding(1, DescriptorType.Sampler, ShaderStageFlags.Fragment),
-                new DescriptorSetLayoutBinding(2, DescriptorType.Sampler, ShaderStageFlags.Fragment)
-            ]));
+        [
+            new DescriptorSetLayoutBinding(
+                0,
+                DescriptorType.SampledImage,
+                ShaderStageFlags.Fragment,
+                UiTextureTable.SlotCount),
+            new DescriptorSetLayoutBinding(1, DescriptorType.Sampler, ShaderStageFlags.Fragment),
+            new DescriptorSetLayoutBinding(2, DescriptorType.Sampler, ShaderStageFlags.Fragment)
+        ]));
         UiResourceManager? resourceManager = null;
         GraphicsPipeline? pipeline = null;
         try
@@ -96,7 +97,8 @@ internal sealed class UiRenderer
         ArgumentNullException.ThrowIfNull(frame);
         ArgumentNullException.ThrowIfNull(commands);
         if (frame.FrameSlot >= (uint)_frameResources.Length)
-            throw new ArgumentOutOfRangeException(nameof(frame), "Frame slot exceeds the renderer frame resource count.");
+            throw new ArgumentOutOfRangeException(nameof(frame),
+                "Frame slot exceeds the renderer frame resource count.");
 
         _builder.Build(
             commands,
@@ -148,6 +150,7 @@ internal sealed class UiRenderer
             Destroy(frame.IndexBuffer, errors);
             Destroy(frame.VertexBuffer, errors);
         }
+
         Destroy(_pipeline, errors);
         Destroy(_descriptorSetLayout, errors);
 
@@ -176,17 +179,20 @@ internal sealed class UiRenderer
         try
         {
             vertexShader = device.CreateShader(new ShaderDescription(ShaderStage.Vertex, vertexBytecode, vertexName));
-            fragmentShader = device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragmentBytecode, fragmentName));
+            fragmentShader =
+                device.CreateShader(new ShaderDescription(ShaderStage.Fragment, fragmentBytecode, fragmentName));
             pipeline = device.CreateGraphicsPipeline(new GraphicsPipelineDescription
             {
                 Shaders = [vertexShader, fragmentShader],
                 VertexInput = UiVertex.VertexInput,
                 ColorAttachmentFormats = [colorFormat],
                 DescriptorSetLayouts = [descriptorSetLayout],
-                PushConstantRanges = [new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, UiProjection.SizeInBytes)],
+                PushConstantRanges =
+                    [new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, UiProjection.SizeInBytes)],
                 Rasterizer = new RasterizerDescription { CullMode = CullMode.None },
                 ColorBlend = new ColorBlendDescription { AlphaBlend = true },
-                DepthStencil = new DepthStencilDescription(false, false, CompareOperation.Always, false, default, default),
+                DepthStencil =
+                    new DepthStencilDescription(false, false, CompareOperation.Always, false, default, default),
                 DepthStencilAttachmentFormat = depthStencilFormat
             });
             return pipeline;

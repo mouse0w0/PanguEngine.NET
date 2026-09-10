@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
 
 namespace PanguEngine.Tests.Client.UI;
 
