@@ -75,9 +75,6 @@ public abstract class Window
     /// <summary>The key modifiers currently pressed.</summary>
     public abstract KeyModifiers KeyModifiers { get; }
 
-    /// <summary>The text currently stored in the platform clipboard.</summary>
-    public abstract string ClipboardText { get; set; }
-
     /// <summary>The keyboard keys supported by the current input backend.</summary>
     public abstract IReadOnlyList<Key> SupportedKeys { get; }
 

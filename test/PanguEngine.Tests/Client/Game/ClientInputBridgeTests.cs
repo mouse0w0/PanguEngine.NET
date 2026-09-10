@@ -407,33 +407,6 @@ public sealed class ClientInputBridgeTests
     }
 
     [Fact]
-    public void ClipboardHostFollowsCurrentScreenAndDetachesOnDestroy()
-    {
-        var window = CreateWindow();
-        var input = new ClientInputState(state => window.CursorState = state);
-        var manager = new UiManager();
-        var first = new UiScreen(new TestNode());
-        var second = new UiScreen(new TestNode());
-        manager.Open(first);
-
-        var bridge = new ClientInputBridge(window, manager, input, static () => false);
-
-        Assert.Same(bridge, first.Clipboard);
-        manager.Open(second);
-        Assert.Null(first.Clipboard);
-        Assert.Same(bridge, second.Clipboard);
-        manager.Close();
-        Assert.Null(second.Clipboard);
-
-        manager.Open(first);
-        Assert.Same(bridge, first.Clipboard);
-        bridge.Destroy();
-        Assert.Null(first.Clipboard);
-        input.Destroy();
-        manager.Destroy();
-    }
-
-    [Fact]
     public void UnhandledEscapeContinuesToCurrentScreen()
     {
         var window = CreateWindow();

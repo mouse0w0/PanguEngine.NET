@@ -4,7 +4,7 @@ using PanguEngine.Windowing;
 
 namespace PanguEngine.Client.Game;
 
-internal sealed class ClientInputBridge : IUiClipboard
+internal sealed class ClientInputBridge
 {
     private readonly Window _window;
     private readonly UiManager _uiManager;
@@ -50,14 +50,7 @@ internal sealed class ClientInputBridge : IUiClipboard
         _window.Scroll -= OnScroll;
         _window.FocusChanged -= OnFocusChanged;
         _uiManager.CurrentScreenChanged -= OnCurrentScreenChanged;
-        _uiManager.CurrentScreen?.DetachClipboard(this);
         _restoreMouseCapture = false;
-    }
-
-    string IUiClipboard.Text
-    {
-        get => _window.ClipboardText;
-        set => _window.ClipboardText = value;
     }
 
     private void OnKeyDown(Window window, KeyEventArgs args)
@@ -152,9 +145,6 @@ internal sealed class ClientInputBridge : IUiClipboard
 
     private void OnCurrentScreenChanged(UiScreen? oldScreen, UiScreen? newScreen)
     {
-        oldScreen?.DetachClipboard(this);
-        newScreen?.AttachClipboard(this);
-
         if (oldScreen is null && newScreen is not null)
         {
             _restoreMouseCapture = _input.SuspendForUi();

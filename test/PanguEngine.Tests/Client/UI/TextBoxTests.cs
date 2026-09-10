@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.ComponentModel;
+using System.Text;
+using PanguEngine.Client;
 using PanguEngine.Client.UI;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
@@ -133,21 +135,20 @@ public sealed class TextBoxTests
     public void ClipboardCommandsPreserveOriginalProgrammaticLineBreaks()
     {
         using var context = new UiTextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("a\r\nb\tc");
+        var (manager, _, textBox) = OpenTextBox("a\r\nb\tc");
         var clipboard = new TestClipboard();
-        screen.AttachClipboard(clipboard);
         textBox.Select(1, 3);
         Assert.Throws<ArgumentOutOfRangeException>(() => textBox.Select(2, 0));
 
-        textBox.Copy();
+        textBox.Copy(clipboard);
         Assert.Equal("\r\nb", clipboard.Text);
-        textBox.Cut();
+        textBox.Cut(clipboard);
         Assert.Equal("a\tc", textBox.Text);
         textBox.Undo();
         Assert.Equal("a\r\nb\tc", textBox.Text);
         clipboard.Text = "X\tY\nignored";
         textBox.SelectAll();
-        textBox.Paste();
+        textBox.Paste(clipboard);
 
         Assert.Equal("X Y", textBox.Text);
         manager.Close();
@@ -157,12 +158,12 @@ public sealed class TextBoxTests
     public void ClipboardFailureDoesNotCommitCut()
     {
         using var context = new UiTextTestContext();
-        var (_, screen, textBox) = OpenTextBox("value");
+        var (_, _, textBox) = OpenTextBox("value");
         var expected = new InvalidOperationException("clipboard");
-        screen.AttachClipboard(new TestClipboard { SetException = expected });
+        var clipboard = new TestClipboard { SetException = expected };
         textBox.SelectAll();
 
-        var actual = Assert.Throws<InvalidOperationException>(textBox.Cut);
+        var actual = Assert.Throws<InvalidOperationException>(() => textBox.Cut(clipboard));
 
         Assert.Same(expected, actual);
         Assert.Equal("value", textBox.Text);
@@ -170,8 +171,8 @@ public sealed class TextBoxTests
         Assert.False(textBox.CanUndo);
 
         expected = new InvalidOperationException("clipboard read");
-        screen.AttachClipboard(new TestClipboard { GetException = expected });
-        actual = Assert.Throws<InvalidOperationException>(textBox.Paste);
+        clipboard = new TestClipboard { GetException = expected };
+        actual = Assert.Throws<InvalidOperationException>(() => textBox.Paste(clipboard));
 
         Assert.Same(expected, actual);
         Assert.Equal("value", textBox.Text);
@@ -185,22 +186,21 @@ public sealed class TextBoxTests
         using var context = new UiTextTestContext();
         var (manager, screen, textBox) = OpenTextBox("value");
         var clipboard = new TestClipboard();
-        screen.AttachClipboard(clipboard);
         Assert.True(textBox.Focus());
 
         textBox.SelectAll();
-        manager.ProcessKeyDown(Key.Insert, KeyModifiers.Control);
+        Assert.True(textBox.TryHandleKey(Key.Insert, KeyModifiers.Control, clipboard));
         Assert.Equal("value", clipboard.Text);
-        manager.ProcessKeyDown(Key.Delete, KeyModifiers.Shift);
+        Assert.True(textBox.TryHandleKey(Key.Delete, KeyModifiers.Shift, clipboard));
         Assert.Equal(string.Empty, textBox.Text);
-        manager.ProcessKeyDown(Key.Insert, KeyModifiers.Shift);
+        Assert.True(textBox.TryHandleKey(Key.Insert, KeyModifiers.Shift, clipboard));
         Assert.Equal("value", textBox.Text);
         textBox.SelectAll();
-        manager.ProcessKeyDown(Key.C, KeyModifiers.Control);
-        manager.ProcessKeyDown(Key.X, KeyModifiers.Control);
+        Assert.True(textBox.TryHandleKey(Key.C, KeyModifiers.Control, clipboard));
+        Assert.True(textBox.TryHandleKey(Key.X, KeyModifiers.Control, clipboard));
         Assert.Equal(string.Empty, textBox.Text);
         clipboard.Text = "replacement";
-        manager.ProcessKeyDown(Key.V, KeyModifiers.Control);
+        Assert.True(textBox.TryHandleKey(Key.V, KeyModifiers.Control, clipboard));
         Assert.Equal("replacement", textBox.Text);
 
         var ancestorKeys = new List<Key>();
@@ -209,12 +209,12 @@ public sealed class TextBoxTests
         textBox.SelectAll();
         manager.ProcessKeyDown(Key.Backspace, KeyModifiers.None);
         manager.ProcessKeyDown(Key.Delete, KeyModifiers.None);
-        manager.ProcessKeyDown(Key.X, KeyModifiers.Control);
-        manager.ProcessKeyDown(Key.V, KeyModifiers.Control);
+        Assert.True(textBox.TryHandleKey(Key.X, KeyModifiers.Control, clipboard));
+        Assert.True(textBox.TryHandleKey(Key.V, KeyModifiers.Control, clipboard));
         manager.ProcessKeyDown(Key.Z, KeyModifiers.Control);
         manager.ProcessKeyDown(Key.Y, KeyModifiers.Control);
-        manager.ProcessKeyDown(Key.Delete, KeyModifiers.Shift);
-        manager.ProcessKeyDown(Key.Insert, KeyModifiers.Shift);
+        Assert.True(textBox.TryHandleKey(Key.Delete, KeyModifiers.Shift, clipboard));
+        Assert.True(textBox.TryHandleKey(Key.Insert, KeyModifiers.Shift, clipboard));
 
         Assert.Equal("replacement", textBox.Text);
         Assert.Empty(ancestorKeys);
@@ -226,7 +226,7 @@ public sealed class TextBoxTests
     }
 
     [Fact]
-    public void ClipboardMethodsWithoutHostAndEqualTextAssignmentAreNoOps()
+    public void ClipboardMethodsWithoutClientClipboardAndEqualTextAssignmentAreNoOps()
     {
         using var context = new UiTextTestContext();
         var (manager, _, textBox) = OpenTextBox("a");
@@ -521,27 +521,65 @@ public sealed class TextBoxTests
         Assert.Equal(invalidation, property.Invalidation);
     }
 
-    private sealed class TestClipboard : IUiClipboard
+    private sealed class TestClipboard : Clipboard
     {
         private string _text = string.Empty;
 
         internal Exception? GetException { get; init; }
         internal Exception? SetException { get; init; }
 
-        public string Text
+        internal string Text
         {
-            get
+            get => _text;
+            set => _text = value;
+        }
+
+        protected override IReadOnlyList<ClipboardFormat> GetFormatsCore() =>
+            _text.Length == 0 ? [] : [ClipboardFormat.Text];
+
+        protected override bool TryGetTextCore(out string text)
+        {
+            if (GetException is not null)
+                throw GetException;
+            text = _text;
+            return text.Length != 0;
+        }
+
+        protected override bool TryGetDataCore(ClipboardFormat format, out byte[] data)
+        {
+            if (format == ClipboardFormat.Text && TryGetTextCore(out var text))
             {
-                if (GetException is not null)
-                    throw GetException;
-                return _text;
+                data = Encoding.UTF8.GetBytes(text);
+                return true;
             }
-            set
+
+            data = [];
+            return false;
+        }
+
+        protected override void SetTextCore(string text)
+        {
+            if (SetException is not null)
+                throw SetException;
+            _text = text;
+        }
+
+        protected override void SetContentCore(ClipboardContent content)
+        {
+            _text = string.Empty;
+            foreach (var entry in content.CopyEntries())
             {
-                if (SetException is not null)
-                    throw SetException;
-                _text = value;
+                if (entry.Format != ClipboardFormat.Text)
+                    continue;
+                _text = Encoding.UTF8.GetString(entry.Data);
+                return;
             }
+        }
+
+        protected override void ClearCore() => _text = string.Empty;
+
+        protected override void DestroyCore()
+        {
         }
     }
 

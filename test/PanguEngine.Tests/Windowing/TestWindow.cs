@@ -48,7 +48,6 @@ internal sealed class TestWindow(bool isPrimary = false) : EngineWindow
     public override CursorShape CursorShape { get; set; }
     public override Vector2D<float> MousePosition => _mousePosition;
     public override KeyModifiers KeyModifiers => _keyModifiers;
-    public override string ClipboardText { get; set; } = "";
     public override IReadOnlyList<Key> SupportedKeys => [];
     public override IReadOnlyList<MouseButton> SupportedMouseButtons => [];
 

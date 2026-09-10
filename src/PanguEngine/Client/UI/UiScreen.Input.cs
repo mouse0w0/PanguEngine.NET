@@ -15,8 +15,6 @@ public partial class UiScreen
     private bool _isChangingFocus;
     private bool _isRoutingInput;
 
-    internal IUiClipboard? Clipboard { get; private set; }
-
     internal sealed class InputStateCleanupSnapshot
     {
         internal InputStateCleanupSnapshot(
@@ -44,15 +42,6 @@ public partial class UiScreen
     /// Gets the node that currently owns keyboard focus.
     /// </summary>
     public UiNode? FocusedNode { get; private set; }
-
-    internal void AttachClipboard(IUiClipboard clipboard) =>
-        Clipboard = clipboard;
-
-    internal void DetachClipboard(IUiClipboard clipboard)
-    {
-        if (ReferenceEquals(Clipboard, clipboard))
-            Clipboard = null;
-    }
 
     /// <summary>
     /// Finds the frontmost deepest node at a point in screen logical coordinates.

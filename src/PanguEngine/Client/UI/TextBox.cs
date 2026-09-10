@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using PanguEngine.Client;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 
@@ -260,28 +261,30 @@ public sealed class TextBox : Control
     }
 
     /// <summary>
-    /// Copies the selected text to the current host clipboard.
+    /// Copies the selected text to the client clipboard.
     /// </summary>
-    public void Copy()
+    public void Copy() => Copy(ClientEngine.Current?.Clipboard);
+
+    internal void Copy(Clipboard? clipboard)
     {
         VerifyEditingAccess();
-        var clipboard = Screen?.Clipboard;
         if (clipboard is null || SelectionLength == 0)
             return;
-        clipboard.Text = SelectedText;
+        clipboard.SetText(SelectedText);
     }
 
     /// <summary>
     /// Copies and removes the selected text when editing is enabled.
     /// </summary>
-    public void Cut()
+    public void Cut() => Cut(ClientEngine.Current?.Clipboard);
+
+    internal void Cut(Clipboard? clipboard)
     {
         VerifyEditingAccess();
-        var clipboard = Screen?.Clipboard;
         if (IsReadOnly || clipboard is null || SelectionLength == 0)
             return;
 
-        clipboard.Text = SelectedText;
+        clipboard.SetText(SelectedText);
         CommitChange(_editingState.CreateDelete(
             Text,
             -1,
@@ -290,16 +293,19 @@ public sealed class TextBox : Control
     }
 
     /// <summary>
-    /// Replaces the selection with text from the current host clipboard.
+    /// Replaces the selection with text from the client clipboard.
     /// </summary>
-    public void Paste()
+    public void Paste() => Paste(ClientEngine.Current?.Clipboard);
+
+    internal void Paste(Clipboard? clipboard)
     {
         VerifyEditingAccess();
-        var clipboard = Screen?.Clipboard;
         if (IsReadOnly || clipboard is null)
             return;
 
-        var text = FilterInput(clipboard.Text);
+        if (!clipboard.TryGetText(out var clipboardText))
+            return;
+        var text = FilterInput(clipboardText);
         if (text.Length == 0)
             return;
         CommitChange(_editingState.CreateInsert(Text, text, TextEditingState.InsertKind.Paste));
@@ -534,7 +540,10 @@ public sealed class TextBox : Control
         base.OnLostFocus(eventArgs);
     }
 
-    private bool TryHandleKey(Key key, KeyModifiers modifiers)
+    private bool TryHandleKey(Key key, KeyModifiers modifiers) =>
+        TryHandleKey(key, modifiers, ClientEngine.Current?.Clipboard);
+
+    internal bool TryHandleKey(Key key, KeyModifiers modifiers, Clipboard? clipboard)
     {
         if ((modifiers & (KeyModifiers.Alt | KeyModifiers.Super)) != 0)
             return false;
@@ -564,13 +573,13 @@ public sealed class TextBox : Control
                     return true;
                 case Key.C when !shift:
                 case Key.Insert when !shift:
-                    Copy();
+                    Copy(clipboard);
                     return true;
                 case Key.X when !shift:
-                    Cut();
+                    Cut(clipboard);
                     return true;
                 case Key.V when !shift:
-                    Paste();
+                    Paste(clipboard);
                     return true;
                 case Key.Z when !shift:
                     Undo();
@@ -609,10 +618,10 @@ public sealed class TextBox : Control
                 Delete(1, byWord: false, TextEditingState.DeleteKind.Delete);
                 return true;
             case Key.Delete when shift:
-                Cut();
+                Cut(clipboard);
                 return true;
             case Key.Insert when shift:
-                Paste();
+                Paste(clipboard);
                 return true;
             default:
                 return false;

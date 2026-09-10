@@ -3,6 +3,7 @@ using PanguEngine.Client.Game;
 using PanguEngine.Client.Rendering;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.UI;
+using PanguEngine.Desktop.Sdl;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Registries;
@@ -55,6 +56,11 @@ public sealed class ClientEngine
     public AudioSystem Audio { get; private set; } = null!;
 
     /// <summary>
+    /// Gets the system clipboard for this client.
+    /// </summary>
+    public Clipboard Clipboard { get; private set; } = null!;
+
+    /// <summary>
     /// Gets the client UI manager.
     /// </summary>
     public UiManager Ui { get; private set; } = null!;
@@ -104,6 +110,7 @@ public sealed class ClientEngine
             EnableValidation = _launchOptions.GpuValidation,
             PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
         });
+        Clipboard = new SdlClipboard();
         var monitor = PrimaryWindow.Monitor ?? throw new InvalidOperationException(
             "UI scale initialization requires a current monitor.");
         UiSettings.DefaultScale = monitor.ContentScale;
@@ -196,6 +203,7 @@ public sealed class ClientEngine
         Renderer.Destroy();
         Audio.Destroy();
         TextServices.Shutdown();
+        Clipboard.Destroy();
         GraphicsBackend.Destroy();
 
         Engine.Shutdown();

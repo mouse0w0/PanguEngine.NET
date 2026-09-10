@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-using System.Text;
 using PanguEngine.Input;
 using PanguEngine.Windowing;
 using SDL;
@@ -133,41 +131,6 @@ public sealed unsafe partial class VulkanWindow
                 return KeyModifiers.None;
             VulkanContext.EnsureRenderThread();
             return ToKeyModifiers(SDL3.SDL_GetModState());
-        }
-    }
-
-    /// <inheritdoc/>
-    public override string ClipboardText
-    {
-        get
-        {
-            if (IsDestroyed)
-                return "";
-            VulkanContext.EnsureRenderThread();
-            var text = SDL3.Unsafe_SDL_GetClipboardText();
-            if (text is null)
-                return "";
-
-            try
-            {
-                return Marshal.PtrToStringUTF8((nint)text) ?? "";
-            }
-            finally
-            {
-                SDL3.SDL_free((nint)text);
-            }
-        }
-        set
-        {
-            if (IsDestroyed)
-                return;
-            VulkanContext.EnsureRenderThread();
-            var bytes = Encoding.UTF8.GetBytes(value + "\0");
-            fixed (byte* text = bytes)
-            {
-                if (!SDL3.SDL_SetClipboardText(text))
-                    throw CreateSdlException("SDL clipboard update");
-            }
         }
     }
 
