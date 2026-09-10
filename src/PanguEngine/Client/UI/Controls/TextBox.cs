@@ -379,7 +379,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Copies the selected text to the client clipboard.
     /// </summary>
-    public void Copy() => Copy(ClientEngine.Current?.Clipboard);
+    public void Copy() => Copy(ClientEngine.Current.Clipboard);
 
     internal void Copy(Clipboard? clipboard)
     {
@@ -392,7 +392,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Copies and removes the selected text when editing is enabled.
     /// </summary>
-    public void Cut() => Cut(ClientEngine.Current?.Clipboard);
+    public void Cut() => Cut(ClientEngine.Current.Clipboard);
 
     internal void Cut(Clipboard? clipboard)
     {
@@ -411,7 +411,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Replaces the selection with text from the client clipboard.
     /// </summary>
-    public void Paste() => Paste(ClientEngine.Current?.Clipboard);
+    public void Paste() => Paste(ClientEngine.Current.Clipboard);
 
     internal void Paste(Clipboard? clipboard)
     {
@@ -677,7 +677,7 @@ public sealed class TextBox : Control
     private Clipboard? KeyBindingClipboard =>
         _hasKeyBindingClipboardOverride
             ? _keyBindingClipboardOverride
-            : ClientEngine.Current?.Clipboard;
+            : ClientEngine.Current.Clipboard;
 
     private void MoveByTextElement(int direction, bool extend)
     {
