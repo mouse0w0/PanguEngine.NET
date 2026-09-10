@@ -92,9 +92,123 @@ public sealed class TextBox : Control
             false,
             UiPropertyInvalidation.Render);
 
+    private static readonly UiKeyBindings<TextBox> KeyBindings =
+        new UiKeyBindings<TextBox>()
+            .AddBinding(
+                Key.Left,
+                static (textBox, _) => textBox.MoveByTextElement(-1, extend: false))
+            .AddBinding(
+                Key.Left,
+                KeyModifiers.Shift,
+                static (textBox, _) => textBox.MoveByTextElement(-1, extend: true))
+            .AddBinding(
+                Key.Right,
+                static (textBox, _) => textBox.MoveByTextElement(1, extend: false))
+            .AddBinding(
+                Key.Right,
+                KeyModifiers.Shift,
+                static (textBox, _) => textBox.MoveByTextElement(1, extend: true))
+            .AddBinding(
+                Key.Home,
+                static (textBox, _) => textBox.MoveTo(0, extend: false))
+            .AddBinding(
+                Key.Home,
+                KeyModifiers.Shift,
+                static (textBox, _) => textBox.MoveTo(0, extend: true))
+            .AddBinding(
+                Key.End,
+                static (textBox, _) => textBox.MoveTo(textBox.Text.Length, extend: false))
+            .AddBinding(
+                Key.End,
+                KeyModifiers.Shift,
+                static (textBox, _) => textBox.MoveTo(textBox.Text.Length, extend: true))
+            .AddBinding(
+                Key.Backspace,
+                static (textBox, _) => textBox.Delete(
+                    -1,
+                    byWord: false,
+                    TextEditingState.DeleteKind.Backspace))
+            .AddBinding(
+                Key.Delete,
+                static (textBox, _) => textBox.Delete(
+                    1,
+                    byWord: false,
+                    TextEditingState.DeleteKind.Delete))
+            .AddBinding(
+                Key.Delete,
+                KeyModifiers.Shift,
+                static (textBox, _) => textBox.Cut(textBox.KeyBindingClipboard))
+            .AddBinding(
+                Key.Insert,
+                KeyModifiers.Shift,
+                static (textBox, _) => textBox.Paste(textBox.KeyBindingClipboard))
+            .AddBinding(
+                Key.Left,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.MoveByWord(-1, extend: false))
+            .AddBinding(
+                Key.Left,
+                KeyModifiers.Control | KeyModifiers.Shift,
+                static (textBox, _) => textBox.MoveByWord(-1, extend: true))
+            .AddBinding(
+                Key.Right,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.MoveByWord(1, extend: false))
+            .AddBinding(
+                Key.Right,
+                KeyModifiers.Control | KeyModifiers.Shift,
+                static (textBox, _) => textBox.MoveByWord(1, extend: true))
+            .AddBinding(
+                Key.Backspace,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Delete(
+                    -1,
+                    byWord: true,
+                    TextEditingState.DeleteKind.Backspace))
+            .AddBinding(
+                Key.Delete,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Delete(
+                    1,
+                    byWord: true,
+                    TextEditingState.DeleteKind.Delete))
+            .AddBinding(
+                Key.A,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.SelectAll())
+            .AddBinding(
+                Key.C,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Copy(textBox.KeyBindingClipboard))
+            .AddBinding(
+                Key.Insert,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Copy(textBox.KeyBindingClipboard))
+            .AddBinding(
+                Key.X,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Cut(textBox.KeyBindingClipboard))
+            .AddBinding(
+                Key.V,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Paste(textBox.KeyBindingClipboard))
+            .AddBinding(
+                Key.Z,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Undo())
+            .AddBinding(
+                Key.Z,
+                KeyModifiers.Control | KeyModifiers.Shift,
+                static (textBox, _) => textBox.Redo())
+            .AddBinding(
+                Key.Y,
+                KeyModifiers.Control,
+                static (textBox, _) => textBox.Redo());
+
     private readonly TextEditingState _editingState = new();
     private CaretStop[] _caretStops = [new(0, 0)];
     private TextEditingState.Change? _pendingChange;
+    private Clipboard? _keyBindingClipboardOverride;
     private TextLayout? _layout;
     private double _caretWidth = 1;
     private double _horizontalOffset;
@@ -103,6 +217,7 @@ public sealed class TextBox : Control
     private bool _isDraggingSelection;
     private bool _drawLayout;
     private bool _layoutIsPlaceholder;
+    private bool _hasKeyBindingClipboardOverride;
 
     /// <summary>
     /// Initializes a text box with its default focus and decoration values.
@@ -472,7 +587,7 @@ public sealed class TextBox : Control
     protected override void OnKeyDown(UiKeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
-        if (IsFocused && TryHandleKey(eventArgs.Key, eventArgs.Modifiers))
+        if (IsFocused && KeyBindings.TryHandle(this, eventArgs, KeyAction.Press))
             eventArgs.Handled = true;
     }
 
@@ -540,92 +655,49 @@ public sealed class TextBox : Control
         base.OnLostFocus(eventArgs);
     }
 
-    private bool TryHandleKey(Key key, KeyModifiers modifiers) =>
-        TryHandleKey(key, modifiers, ClientEngine.Current?.Clipboard);
-
     internal bool TryHandleKey(Key key, KeyModifiers modifiers, Clipboard? clipboard)
     {
-        if ((modifiers & (KeyModifiers.Alt | KeyModifiers.Super)) != 0)
-            return false;
-
-        var control = (modifiers & KeyModifiers.Control) != 0;
-        var shift = (modifiers & KeyModifiers.Shift) != 0;
-        if (control)
+        var previousClipboard = _keyBindingClipboardOverride;
+        var hadPreviousOverride = _hasKeyBindingClipboardOverride;
+        _keyBindingClipboardOverride = clipboard;
+        _hasKeyBindingClipboardOverride = true;
+        try
         {
-            switch (key)
-            {
-                case Key.Left:
-                    _editingState.MoveByWord(Text, -1, shift);
-                    SelectionChanged();
-                    return true;
-                case Key.Right:
-                    _editingState.MoveByWord(Text, 1, shift);
-                    SelectionChanged();
-                    return true;
-                case Key.Backspace when !shift:
-                    Delete(-1, byWord: true, TextEditingState.DeleteKind.Backspace);
-                    return true;
-                case Key.Delete when !shift:
-                    Delete(1, byWord: true, TextEditingState.DeleteKind.Delete);
-                    return true;
-                case Key.A when !shift:
-                    SelectAll();
-                    return true;
-                case Key.C when !shift:
-                case Key.Insert when !shift:
-                    Copy(clipboard);
-                    return true;
-                case Key.X when !shift:
-                    Cut(clipboard);
-                    return true;
-                case Key.V when !shift:
-                    Paste(clipboard);
-                    return true;
-                case Key.Z when !shift:
-                    Undo();
-                    return true;
-                case Key.Z when shift:
-                case Key.Y when !shift:
-                    Redo();
-                    return true;
-                default:
-                    return false;
-            }
+            var eventArgs = new UiKeyEventArgs(
+                this,
+                key,
+                modifiers,
+                isRepeat: false);
+            return KeyBindings.TryHandle(this, eventArgs, KeyAction.Press);
         }
-
-        switch (key)
+        finally
         {
-            case Key.Left:
-                _editingState.MoveByTextElement(Text, -1, shift);
-                SelectionChanged();
-                return true;
-            case Key.Right:
-                _editingState.MoveByTextElement(Text, 1, shift);
-                SelectionChanged();
-                return true;
-            case Key.Home:
-                _editingState.MoveTo(Text, 0, shift);
-                SelectionChanged();
-                return true;
-            case Key.End:
-                _editingState.MoveTo(Text, Text.Length, shift);
-                SelectionChanged();
-                return true;
-            case Key.Backspace when !shift:
-                Delete(-1, byWord: false, TextEditingState.DeleteKind.Backspace);
-                return true;
-            case Key.Delete when !shift:
-                Delete(1, byWord: false, TextEditingState.DeleteKind.Delete);
-                return true;
-            case Key.Delete when shift:
-                Cut(clipboard);
-                return true;
-            case Key.Insert when shift:
-                Paste(clipboard);
-                return true;
-            default:
-                return false;
+            _keyBindingClipboardOverride = previousClipboard;
+            _hasKeyBindingClipboardOverride = hadPreviousOverride;
         }
+    }
+
+    private Clipboard? KeyBindingClipboard =>
+        _hasKeyBindingClipboardOverride
+            ? _keyBindingClipboardOverride
+            : ClientEngine.Current?.Clipboard;
+
+    private void MoveByTextElement(int direction, bool extend)
+    {
+        _editingState.MoveByTextElement(Text, direction, extend);
+        SelectionChanged();
+    }
+
+    private void MoveByWord(int direction, bool extend)
+    {
+        _editingState.MoveByWord(Text, direction, extend);
+        SelectionChanged();
+    }
+
+    private void MoveTo(int index, bool extend)
+    {
+        _editingState.MoveTo(Text, index, extend);
+        SelectionChanged();
     }
 
     private void Delete(int direction, bool byWord, TextEditingState.DeleteKind kind)

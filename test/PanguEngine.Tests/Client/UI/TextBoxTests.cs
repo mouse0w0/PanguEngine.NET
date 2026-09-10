@@ -117,11 +117,74 @@ public sealed class TextBoxTests
     }
 
     [Fact]
+    public void TextBoxBuiltInBindingRunsAfterItsKeyDownHandlerMarksHandled()
+    {
+        using var context = new UiTextTestContext();
+        var (manager, screen, textBox) = OpenTextBox("value");
+        Assert.True(textBox.Focus());
+        var rootKeys = new List<Key>();
+        textBox.KeyDown += (_, args) => args.Handled = true;
+        screen.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
+
+        manager.ProcessKeyDown(Key.Home, KeyModifiers.None);
+
+        Assert.Equal(0, textBox.CaretIndex);
+        Assert.Empty(rootKeys);
+    }
+
+    [Fact]
+    public void ExtendedKeyboardBindingsNavigateDeleteAndRedo()
+    {
+        using var context = new UiTextTestContext();
+        var (manager, screen, textBox) = OpenTextBox("one two");
+        Assert.True(textBox.Focus());
+        var rootKeys = new List<Key>();
+        screen.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
+
+        manager.ProcessKeyDown(Key.Backspace, KeyModifiers.Shift);
+        Assert.Equal("one two", textBox.Text);
+        Assert.Equal([Key.Backspace], rootKeys);
+
+        manager.ProcessKeyDown(Key.Left, KeyModifiers.Shift);
+        Assert.Equal("o", textBox.SelectedText);
+        manager.ProcessKeyDown(Key.Right, KeyModifiers.Shift);
+        Assert.Equal(0, textBox.SelectionLength);
+        manager.ProcessKeyDown(Key.Left, KeyModifiers.Control);
+        Assert.Equal(4, textBox.CaretIndex);
+        manager.ProcessKeyDown(Key.Left, KeyModifiers.Control | KeyModifiers.Shift);
+        Assert.Equal("one ", textBox.SelectedText);
+        manager.ProcessKeyDown(Key.Right, KeyModifiers.Control | KeyModifiers.Shift);
+        Assert.Equal(0, textBox.SelectionLength);
+        manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
+        Assert.Equal(5, textBox.CaretIndex);
+
+        textBox.Select(0, 0);
+        manager.ProcessKeyDown(Key.Delete, KeyModifiers.None);
+        Assert.Equal("ne two", textBox.Text);
+        textBox.Undo();
+        Assert.Equal("one two", textBox.Text);
+
+        textBox.Select(textBox.Text.Length, 0);
+        manager.ProcessKeyDown(Key.Backspace, KeyModifiers.Control);
+        Assert.Equal("one ", textBox.Text);
+        textBox.Undo();
+        textBox.Select(0, 0);
+        manager.ProcessKeyDown(Key.Delete, KeyModifiers.Control);
+        Assert.Equal("two", textBox.Text);
+        manager.ProcessKeyDown(Key.Z, KeyModifiers.Control);
+        Assert.Equal("one two", textBox.Text);
+        manager.ProcessKeyDown(Key.Z, KeyModifiers.Control | KeyModifiers.Shift);
+        Assert.Equal("two", textBox.Text);
+    }
+
+    [Fact]
     public void AltAndSuperDoNotInvokeEditingShortcuts()
     {
         using var context = new UiTextTestContext();
-        var (manager, _, textBox) = OpenTextBox("value");
+        var (manager, screen, textBox) = OpenTextBox("value");
         Assert.True(textBox.Focus());
+        var rootKeys = new List<Key>();
+        screen.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
 
         manager.ProcessKeyDown(Key.A, KeyModifiers.Control | KeyModifiers.Alt);
         manager.ProcessKeyDown(Key.A, KeyModifiers.Control | KeyModifiers.Super);
@@ -129,6 +192,7 @@ public sealed class TextBoxTests
 
         Assert.Equal("value", textBox.Text);
         Assert.Equal(0, textBox.SelectionLength);
+        Assert.Equal([Key.A, Key.A, Key.Backspace], rootKeys);
     }
 
     [Fact]
