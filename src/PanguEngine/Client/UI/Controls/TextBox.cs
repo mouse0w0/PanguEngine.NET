@@ -498,13 +498,7 @@ public sealed class TextBox : Control
             ? [new CaretStop(0, 0)]
             : CreateCaretStops(text, _layout);
 
-        var naturalWidth = text.Length != 0
-            ? _layout.Width + _caretWidth
-            : Math.Max(_drawLayout ? _layout.Width : 0, _caretWidth);
-        var width = double.IsPositiveInfinity(availableSize.Width)
-            ? naturalWidth
-            : Math.Min(naturalWidth, availableSize.Width);
-        return new Size(width, _layout.Height);
+        return new Size(Math.Min(_caretWidth, availableSize.Width), _layout.Height);
     }
 
     /// <inheritdoc />

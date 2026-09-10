@@ -50,6 +50,27 @@ public sealed class TextBoxTests
     }
 
     [Fact]
+    public void DesiredWidthDoesNotDependOnTextOrPlaceholderLength()
+    {
+        using var context = new UiTextTestContext();
+        var textBox = new TextBox();
+
+        textBox.Measure(Size.Infinite);
+        var expectedWidth = textBox.DesiredSize.Width;
+        textBox.Text = "A long value that exceeds the default text box width";
+        textBox.Measure(Size.Infinite);
+
+        Assert.Equal(160d, expectedWidth);
+        Assert.Equal(expectedWidth, textBox.DesiredSize.Width);
+
+        textBox.Text = string.Empty;
+        textBox.Placeholder = "A long placeholder that exceeds the default text box width";
+        textBox.Measure(Size.Infinite);
+
+        Assert.Equal(expectedWidth, textBox.DesiredSize.Width);
+    }
+
+    [Fact]
     public void SelectionApiUsesTextElementBoundaries()
     {
         var textBox = new TextBox { Text = "A\U0001F600e\u0301Z" };
