@@ -1,4 +1,4 @@
-using PanguEngine.Client;
+using PanguEngine.Desktop;
 
 namespace PanguEngine.Tests.Client;
 

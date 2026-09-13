@@ -1,4 +1,4 @@
-namespace PanguEngine.Client;
+namespace PanguEngine.Desktop;
 
 /// <summary>
 /// Provides synchronous access to the system clipboard while client services are active.

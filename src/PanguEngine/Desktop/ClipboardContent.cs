@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace PanguEngine.Client;
+namespace PanguEngine.Desktop;
 
 /// <summary>
 /// Represents a set of clipboard values indexed by data format.

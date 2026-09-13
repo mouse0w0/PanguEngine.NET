@@ -4,6 +4,7 @@ using PanguEngine.Client.Rendering;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
+using PanguEngine.Desktop;
 using PanguEngine.Desktop.Sdl;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;

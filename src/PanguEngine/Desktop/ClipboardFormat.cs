@@ -1,4 +1,4 @@
-namespace PanguEngine.Client;
+namespace PanguEngine.Desktop;
 
 /// <summary>
 /// Identifies a clipboard data format by its MIME type.

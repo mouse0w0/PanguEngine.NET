@@ -1,4 +1,4 @@
-using PanguEngine.Client;
+using PanguEngine.Desktop;
 using PanguEngine.Desktop.Sdl;
 
 namespace PanguEngine.Tests.Client;
@@ -132,13 +132,7 @@ public sealed class ClipboardTests
     {
         var clipboard = new SdlClipboard();
         Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            failure = Record.Exception(() =>
-            {
-                _ = clipboard.HasText;
-            });
-        });
+        var thread = new Thread(() => { failure = Record.Exception(() => { _ = clipboard.HasText; }); });
 
         thread.Start();
         thread.Join();
