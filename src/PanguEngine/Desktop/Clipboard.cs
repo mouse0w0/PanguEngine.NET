@@ -19,7 +19,7 @@ public abstract class Clipboard
     {
         get
         {
-            EnsureNotDestroyed();
+            ThrowIfDestroyed();
             return GetFormatsCore();
         }
     }
@@ -31,7 +31,7 @@ public abstract class Clipboard
     {
         get
         {
-            EnsureNotDestroyed();
+            ThrowIfDestroyed();
             return TryGetTextCore(out var text) && text.Length != 0;
         }
     }
@@ -43,7 +43,7 @@ public abstract class Clipboard
     /// <returns><see langword="true"/> when the format is present.</returns>
     public bool Contains(ClipboardFormat format)
     {
-        EnsureNotDestroyed();
+        ThrowIfDestroyed();
         ArgumentNullException.ThrowIfNull(format);
         return GetFormatsCore().Contains(format);
     }
@@ -55,7 +55,7 @@ public abstract class Clipboard
     /// <returns><see langword="true"/> when text was read.</returns>
     public bool TryGetText(out string text)
     {
-        EnsureNotDestroyed();
+        ThrowIfDestroyed();
         if (TryGetTextCore(out text) && text.Length != 0)
             return true;
 
@@ -71,7 +71,7 @@ public abstract class Clipboard
     /// <returns><see langword="true"/> when data was read.</returns>
     public bool TryGetData(ClipboardFormat format, out byte[] data)
     {
-        EnsureNotDestroyed();
+        ThrowIfDestroyed();
         ArgumentNullException.ThrowIfNull(format);
         if (TryGetDataCore(format, out data))
             return true;
@@ -86,7 +86,7 @@ public abstract class Clipboard
     /// <param name="text">The plain text value.</param>
     public void SetText(string text)
     {
-        EnsureNotDestroyed();
+        ThrowIfDestroyed();
         ArgumentNullException.ThrowIfNull(text);
         if (text.Length == 0)
         {
@@ -103,7 +103,7 @@ public abstract class Clipboard
     /// <param name="content">The content to publish.</param>
     public void SetContent(ClipboardContent content)
     {
-        EnsureNotDestroyed();
+        ThrowIfDestroyed();
         ArgumentNullException.ThrowIfNull(content);
         if (content.Formats.Count == 0)
         {
@@ -119,7 +119,7 @@ public abstract class Clipboard
     /// </summary>
     public void Clear()
     {
-        EnsureNotDestroyed();
+        ThrowIfDestroyed();
         ClearCore();
     }
 
@@ -128,14 +128,7 @@ public abstract class Clipboard
         if (_destroyed)
             return;
 
-        try
-        {
-            DestroyCore();
-        }
-        finally
-        {
-            _destroyed = true;
-        }
+        _destroyed = true;
     }
 
     protected abstract IReadOnlyList<ClipboardFormat> GetFormatsCore();
@@ -150,9 +143,7 @@ public abstract class Clipboard
 
     protected abstract void ClearCore();
 
-    protected abstract void DestroyCore();
-
-    private void EnsureNotDestroyed()
+    private void ThrowIfDestroyed()
     {
         ObjectDisposedException.ThrowIf(_destroyed, this);
     }

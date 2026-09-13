@@ -636,10 +636,6 @@ public sealed class TextBoxTests
         }
 
         protected override void ClearCore() => _text = string.Empty;
-
-        protected override void DestroyCore()
-        {
-        }
     }
 
     private sealed class ThrowingTextSource(string value, Exception setException) : INotifyPropertyChanged

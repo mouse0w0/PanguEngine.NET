@@ -104,27 +104,25 @@ public sealed class ClipboardTests
         clipboard.Destroy();
         clipboard.Destroy();
 
-        Assert.Equal(1, clipboard.DestroyCount);
+        Assert.Equal(0, clipboard.ClearCount);
+        Assert.Throws<ObjectDisposedException>(() => clipboard.Formats);
         Assert.Throws<ObjectDisposedException>(() => clipboard.HasText);
+        Assert.Throws<ObjectDisposedException>(() => clipboard.TryGetText(out _));
         Assert.Throws<ObjectDisposedException>(() => clipboard.SetText("value"));
         Assert.Throws<ObjectDisposedException>(() => clipboard.Contains(null!));
         Assert.Throws<ObjectDisposedException>(() => clipboard.TryGetData(null!, out _));
         Assert.Throws<ObjectDisposedException>(() => clipboard.SetText(null!));
         Assert.Throws<ObjectDisposedException>(() => clipboard.SetContent(null!));
+        Assert.Throws<ObjectDisposedException>(() => clipboard.Clear());
     }
 
     [Fact]
-    public void DestroyFailureStillTransitionsToTerminalState()
+    public void SdlClipboardDestroyDoesNotAccessNativeClipboard()
     {
-        var expected = new InvalidOperationException("cleanup");
-        var clipboard = new TestClipboard { DestroyException = expected };
+        var clipboard = new SdlClipboard();
 
-        var actual = Assert.Throws<InvalidOperationException>(clipboard.Destroy);
         clipboard.Destroy();
-
-        Assert.Same(expected, actual);
-        Assert.Equal(1, clipboard.DestroyCount);
-        Assert.Throws<ObjectDisposedException>(() => clipboard.Clear());
+        clipboard.Destroy();
     }
 
     [Fact]
@@ -161,13 +159,9 @@ public sealed class ClipboardTests
 
         internal Exception? Exception { get; init; }
 
-        internal Exception? DestroyException { get; init; }
-
         internal int CallCount { get; private set; }
 
         internal int ClearCount { get; private set; }
-
-        internal int DestroyCount { get; private set; }
 
         internal int SetTextCount { get; private set; }
 
@@ -211,13 +205,6 @@ public sealed class ClipboardTests
         {
             RecordCall();
             ClearCount++;
-        }
-
-        protected override void DestroyCore()
-        {
-            DestroyCount++;
-            if (DestroyException is not null)
-                throw DestroyException;
         }
 
         private void RecordCall()

@@ -179,16 +179,6 @@ internal sealed unsafe class SdlClipboard : Clipboard
         }
     }
 
-    protected override void DestroyCore()
-    {
-        EnsureMainThread();
-        SDL3.SDL_ClearError();
-        if (!SDL3.SDL_ClearClipboardData())
-        {
-            throw CreateSdlException("SDL clipboard cleanup", SDL3.SDL_GetError());
-        }
-    }
-
     private static NativeClipboardSnapshot* CreateSnapshot(IReadOnlyList<ClipboardContentEntry> entries)
     {
         var snapshot = (NativeClipboardSnapshot*)NativeMemory.AllocZeroed((nuint)sizeof(NativeClipboardSnapshot));
