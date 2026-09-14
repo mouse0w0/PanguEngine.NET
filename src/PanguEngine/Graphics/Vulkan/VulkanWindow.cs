@@ -11,7 +11,6 @@ namespace PanguEngine.Graphics.Vulkan;
 public sealed unsafe partial class VulkanWindow : Window
 {
     private readonly VulkanWindowManager _windowManager;
-    private readonly SdlPlatform _platform;
     private readonly SdlWindowEventState _eventState = new();
     private bool _textInputActive;
 
@@ -37,14 +36,12 @@ public sealed unsafe partial class VulkanWindow : Window
     /// <summary>Creates a <see cref="VulkanWindow"/> from an existing window and surface.</summary>
     internal VulkanWindow(
         VulkanWindowManager windowManager,
-        SdlPlatform platform,
         SDL_Window* window,
         SurfaceKHR surface,
         bool isPrimary,
         WindowOptions options)
     {
         _windowManager = windowManager;
-        _platform = platform;
         VulkanContext.EnsureRenderThread();
         NativeWindow = window;
         WindowId = SDL3.SDL_GetWindowID(window);
@@ -54,21 +51,13 @@ public sealed unsafe partial class VulkanWindow : Window
         _vsync = options.VSync;
         _requestedVideoMode = options.VideoMode;
 
-        try
-        {
-            var windowFlags = SDL3.SDL_GetWindowFlags(window);
-            _isFocused = (windowFlags & SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS) != 0;
-            _isVisible = (windowFlags & SDL_WindowFlags.SDL_WINDOW_HIDDEN) == 0;
-            InitializeSwapchain();
-            InitializeInput();
-            Presenter = new VulkanPresenter(this);
-            _platform.RegisterWindow(this);
-        }
-        catch
-        {
-            Destroy();
-            throw;
-        }
+        var windowFlags = SDL3.SDL_GetWindowFlags(window);
+        _isFocused = (windowFlags & SDL_WindowFlags.SDL_WINDOW_INPUT_FOCUS) != 0;
+        _isVisible = (windowFlags & SDL_WindowFlags.SDL_WINDOW_HIDDEN) == 0;
+        InitializeSwapchain();
+        InitializeInput();
+        Presenter = new VulkanPresenter(this);
+        _windowManager.RegisterWindow(this);
     }
 
     ~VulkanWindow()
@@ -103,7 +92,7 @@ public sealed unsafe partial class VulkanWindow : Window
         DestroySwapchain();
         StopTextInput();
         DestroySurface();
-        _platform.UnregisterAndDestroyWindow(this);
+        _windowManager.UnregisterAndDestroyWindow(this);
         GC.SuppressFinalize(this);
     }
 

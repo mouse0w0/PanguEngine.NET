@@ -37,7 +37,7 @@ public sealed unsafe partial class VulkanWindow
                 if (!SDL3.SDL_SetWindowTitle(NativeWindow, title))
                     throw CreateSdlException("SDL window title update");
             }
-            SdlPlatform.SyncWindow(NativeWindow);
+            VulkanWindowManager.SyncWindow(NativeWindow);
         }
     }
 
@@ -58,8 +58,8 @@ public sealed unsafe partial class VulkanWindow
         {
             if (IsDestroyed)
                 return;
-            SdlPlatform.SetWindowPosition(NativeWindow, value);
-            SdlPlatform.SyncWindow(NativeWindow);
+            VulkanWindowManager.SetWindowPosition(NativeWindow, value);
+            VulkanWindowManager.SyncWindow(NativeWindow);
         }
     }
 
@@ -83,7 +83,7 @@ public sealed unsafe partial class VulkanWindow
             VulkanContext.EnsureRenderThread();
             if (!SDL3.SDL_SetWindowSize(NativeWindow, value.X, value.Y))
                 throw CreateSdlException("SDL window size update");
-            SdlPlatform.SyncWindow(NativeWindow);
+            VulkanWindowManager.SyncWindow(NativeWindow);
         }
     }
 
@@ -169,7 +169,7 @@ public sealed unsafe partial class VulkanWindow
                     break;
                 case WindowState.Fullscreen:
                     if (_requestedVideoMode != VideoMode.Default)
-                        SdlPlatform.SetFullscreenVideoMode(NativeWindow, _requestedVideoMode);
+                        VulkanWindowManager.SetFullscreenVideoMode(NativeWindow, _requestedVideoMode);
                     if (!SDL3.SDL_SetWindowFullscreen(NativeWindow, true))
                         throw CreateSdlException("SDL fullscreen update");
                     break;
@@ -182,7 +182,7 @@ public sealed unsafe partial class VulkanWindow
                 default:
                     return;
             }
-            SdlPlatform.SyncWindow(NativeWindow);
+            VulkanWindowManager.SyncWindow(NativeWindow);
         }
     }
 
@@ -238,7 +238,7 @@ public sealed unsafe partial class VulkanWindow
             var result = value ? SDL3.SDL_ShowWindow(NativeWindow) : SDL3.SDL_HideWindow(NativeWindow);
             if (!result)
                 throw CreateSdlException(value ? "SDL window show" : "SDL window hide");
-            SdlPlatform.SyncWindow(NativeWindow);
+            VulkanWindowManager.SyncWindow(NativeWindow);
             CommitVisibility(value);
         }
     }
@@ -268,7 +268,7 @@ public sealed unsafe partial class VulkanWindow
                 throw CreateSdlException("SDL window border update");
             if (!SDL3.SDL_SetWindowResizable(NativeWindow, value == WindowBorder.Resizable))
                 throw CreateSdlException("SDL window resize policy update");
-            SdlPlatform.SyncWindow(NativeWindow);
+            VulkanWindowManager.SyncWindow(NativeWindow);
         }
     }
 
@@ -310,7 +310,7 @@ public sealed unsafe partial class VulkanWindow
             VulkanContext.EnsureRenderThread();
             if (!SDL3.SDL_SetWindowAlwaysOnTop(NativeWindow, value))
                 throw CreateSdlException("SDL window top-most update");
-            SdlPlatform.SyncWindow(NativeWindow);
+            VulkanWindowManager.SyncWindow(NativeWindow);
         }
     }
 

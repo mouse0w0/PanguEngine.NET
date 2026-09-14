@@ -2,6 +2,7 @@ using PanguEngine.Audio;
 using PanguEngine.Graphics;
 using PanguEngine.Registries;
 using PanguEngine.Windowing;
+using SDL;
 using Silk.NET.Maths;
 using Window = PanguEngine.Windowing.Window;
 
@@ -42,10 +43,6 @@ public sealed class ClientTestApp
 
     private GraphicsBackend _graphicsBackend = null!;
     private ClientLoop _loop = null!;
-    private bool _sceneInitialized;
-    private bool _graphicsBackendInitialized;
-    private bool _engineInitialized;
-    private bool _audioInitialized;
     private AudioSystem? _audio;
 
     private ClientTestApp(IClientTestScene scene)
@@ -64,10 +61,9 @@ public sealed class ClientTestApp
 
     private void RunInternal()
     {
+        Initialize();
         try
         {
-            Initialize();
-
             _loop.Run();
         }
         finally
@@ -80,7 +76,9 @@ public sealed class ClientTestApp
     {
         _scene.ConfigureBeforeEngineInitialize();
         Engine.Initialize();
-        _engineInitialized = true;
+
+        if (!SDL3.SDL_InitSubSystem(SDL_InitFlags.SDL_INIT_VIDEO))
+            throw new InvalidOperationException($"SDL video initialization failed: {SDL3.SDL_GetError()}");
 
         _graphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
@@ -91,7 +89,6 @@ public sealed class ClientTestApp
                 Title = _scene.Name
             }
         });
-        _graphicsBackendInitialized = true;
 
         Window = _graphicsBackend.PrimaryWindow;
         WindowManager = _graphicsBackend.WindowManager;
@@ -102,7 +99,6 @@ public sealed class ClientTestApp
                 BuiltinRegistries.SoundCategory,
                 BuiltinRegistries.SoundEvent,
                 Log.CreateLogger("AudioTests"));
-            _audioInitialized = true;
             _audio.Load();
             _audio.MarkReady();
         }
@@ -112,25 +108,17 @@ public sealed class ClientTestApp
             Update,
             _graphicsBackend.Render);
         _scene.Initialize(Window);
-        _sceneInitialized = true;
     }
 
     private void Shutdown()
     {
-        if (_graphicsBackendInitialized)
-            Device.WaitIdle();
-
-        if (_sceneInitialized)
-            _scene.Destroy();
-
-        if (_audioInitialized)
-            _audio!.Destroy();
-
-        if (_graphicsBackendInitialized)
-            _graphicsBackend.Destroy();
-
-        if (_engineInitialized)
-            Engine.Shutdown();
+        Device.WaitIdle();
+        _scene.Destroy();
+        _audio?.Destroy();
+        _graphicsBackend.Destroy();
+        SDL3.SDL_QuitSubSystem(SDL_InitFlags.SDL_INIT_VIDEO);
+        SDL3.SDL_Quit();
+        Engine.Shutdown();
     }
 
     private void Update()

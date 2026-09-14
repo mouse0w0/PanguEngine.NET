@@ -1,5 +1,5 @@
+using System.Runtime.InteropServices;
 using PanguEngine.Windowing;
-using Silk.NET.Vulkan;
 using SDL;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -9,7 +9,6 @@ namespace PanguEngine.Graphics.Vulkan;
 /// </summary>
 internal sealed unsafe class VulkanBackend : GraphicsBackend
 {
-    private readonly SdlPlatform _platform;
     private readonly VulkanWindowManager _windowManager;
     private bool _isDestroyed;
 
@@ -40,70 +39,25 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     {
         VulkanContext.BindRenderThread();
 
-        var platform = new SdlPlatform();
-        _platform = platform;
-        var windowManager = new VulkanWindowManager(platform);
+        if (!SDL3.SDL_Vulkan_LoadLibrary((byte*)null))
+            throw CreateSdlException("SDL Vulkan loader initialization");
+
+        var windowManager = new VulkanWindowManager();
         _windowManager = windowManager;
-        SDL_Window* nativeWindow = null;
-        SurfaceKHR surface = default;
-        VulkanWindow? primaryWindow = null;
-        var instanceInitialized = false;
-        var allocatorInitialized = false;
-        var uploaderInitialized = false;
-        var windowConstructionStarted = false;
+        var nativeWindow = windowManager.CreateNativeWindow(options.PrimaryWindow);
 
-        try
-        {
-            platform.Initialize();
-            nativeWindow = platform.CreateWindow(options.PrimaryWindow);
+        var requiredExtensions = GetVulkanInstanceExtensions();
+        VulkanContext.InitializeInstance(requiredExtensions, options.EnableValidation);
 
-            var requiredExtensions = SdlPlatform.GetVulkanInstanceExtensions();
-            VulkanContext.InitializeInstance(requiredExtensions, options.EnableValidation);
-            instanceInitialized = true;
+        var surface = VulkanWindowManager.CreateVulkanSurface(nativeWindow);
+        VulkanContext.InitializeDevice(surface);
 
-            surface = SdlPlatform.CreateVulkanSurface(nativeWindow);
-            VulkanContext.InitializeDevice(surface);
+        VulkanAllocator.Initialize();
+        VulkanUploader.Initialize();
 
-            VulkanAllocator.Initialize();
-            allocatorInitialized = true;
-
-            VulkanUploader.Initialize();
-            uploaderInitialized = true;
-
-            windowConstructionStarted = true;
-            primaryWindow = windowManager.CreatePrimaryWindow(nativeWindow, surface, options.PrimaryWindow);
-
-            var device = new VulkanGraphicsDevice();
-            var displayManager = new VulkanDisplayManager();
-
-            Device = device;
-            DisplayManager = displayManager;
-            PrimaryWindow = primaryWindow;
-        }
-        catch
-        {
-            if (!windowConstructionStarted)
-            {
-                if (surface.Handle != 0 && instanceInitialized)
-                    VulkanContext.KhrSurface.DestroySurface(VulkanContext.VkInstance, surface, null);
-                if (nativeWindow is not null)
-                    platform.DestroyWindow(nativeWindow);
-            }
-
-            windowManager.Destroy();
-            if (uploaderInitialized)
-                VulkanUploader.Destroy();
-            if (allocatorInitialized)
-            {
-                VulkanDeletionQueue.Drain();
-                VulkanAllocator.Destroy();
-            }
-
-            if (instanceInitialized)
-                VulkanContext.Destroy();
-            platform.Destroy();
-            throw;
-        }
+        PrimaryWindow = windowManager.CreatePrimaryWindow(nativeWindow, surface, options.PrimaryWindow);
+        Device = new VulkanGraphicsDevice();
+        DisplayManager = new VulkanDisplayManager();
     }
 
     /// <inheritdoc/>
@@ -118,7 +72,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         VulkanDeletionQueue.Drain();
         VulkanAllocator.Destroy();
         VulkanContext.Destroy();
-        _platform.Destroy();
+        SDL3.SDL_Vulkan_UnloadLibrary();
     }
 
     /// <inheritdoc/>
@@ -130,4 +84,21 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         WindowManager.RenderWindows(alpha);
         VulkanDeletionQueue.Collect();
     }
+
+    private static string[] GetVulkanInstanceExtensions()
+    {
+        VulkanContext.EnsureRenderThread();
+        uint count = 0;
+        var extensions = SDL3.SDL_Vulkan_GetInstanceExtensions(&count);
+        if (extensions is null)
+            throw CreateSdlException("SDL Vulkan instance extension query");
+
+        var names = new string[count];
+        for (var i = 0; i < count; i++)
+            names[i] = Marshal.PtrToStringUTF8((nint)extensions[i])!;
+        return names;
+    }
+
+    private static InvalidOperationException CreateSdlException(string operation) =>
+        new($"{operation} failed: {SDL3.SDL_GetError()}");
 }

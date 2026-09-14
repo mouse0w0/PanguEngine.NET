@@ -82,7 +82,7 @@ public sealed unsafe partial class VulkanWindow
 
             if (HasMouseFocus())
             {
-                var cursor = _platform.GetCursor(value);
+                var cursor = _windowManager.GetCursor(value);
                 if (!SDL3.SDL_SetCursor(cursor))
                     throw CreateSdlException("SDL cursor update");
             }
@@ -114,7 +114,7 @@ public sealed unsafe partial class VulkanWindow
         VulkanContext.EnsureRenderThread();
         if (!HasMouseFocus())
             return;
-        var cursor = _platform.GetCursor(_cursorShape);
+        var cursor = _windowManager.GetCursor(_cursorShape);
         if (!SDL3.SDL_SetCursor(cursor))
             throw CreateSdlException("SDL cursor update");
     }
@@ -219,7 +219,7 @@ public sealed unsafe partial class VulkanWindow
     {
         _eventState.ExitRelativeMode(GetAbsoluteMousePosition());
         _cursorState = CursorState.Normal;
-        var cursor = _platform.GetCursor(_cursorShape);
+        var cursor = _windowManager.GetCursor(_cursorShape);
         if (HasMouseFocus() && !SDL3.SDL_SetCursor(cursor))
             throw CreateSdlException("SDL cursor initialization");
         BeginTextInput();

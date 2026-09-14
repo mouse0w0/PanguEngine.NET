@@ -5,18 +5,12 @@ using Silk.NET.Vulkan;
 
 namespace PanguEngine.Graphics.Vulkan;
 
-internal sealed unsafe class VulkanWindowManager : WindowManager
+internal sealed unsafe partial class VulkanWindowManager : WindowManager
 {
-    private readonly SdlPlatform _platform;
     private readonly List<WeakReference<VulkanWindow>> _lifetimeWindows = [];
     private readonly ConcurrentQueue<VulkanWindow> _finalizedWindows = new();
     private int _acceptingFinalizers = 1;
     private int _inFlightFinalizerEnqueues;
-
-    internal VulkanWindowManager(SdlPlatform platform)
-    {
-        _platform = platform;
-    }
 
     internal VulkanWindow CreatePrimaryWindow(
         SDL_Window* nativeWindow,
@@ -24,41 +18,20 @@ internal sealed unsafe class VulkanWindowManager : WindowManager
         WindowOptions options)
     {
         var window = CreateVulkanWindow(nativeWindow, surface, true, options);
-        try
-        {
-            AddWindow(window);
-            return window;
-        }
-        catch
-        {
-            DestroyWindow(window);
-            throw;
-        }
+        AddWindow(window);
+        return window;
     }
 
     protected override Window CreateWindowCore(WindowOptions options)
     {
-        var nativeWindow = _platform.CreateWindow(options);
-        var constructionStarted = false;
-
-        try
-        {
-            var surface = SdlPlatform.CreateVulkanSurface(nativeWindow);
-            constructionStarted = true;
-            return CreateVulkanWindow(nativeWindow, surface, false, options);
-        }
-        catch
-        {
-            if (!constructionStarted)
-                _platform.DestroyWindow(nativeWindow);
-
-            throw;
-        }
+        var nativeWindow = CreateNativeWindow(options);
+        var surface = CreateVulkanSurface(nativeWindow);
+        return CreateVulkanWindow(nativeWindow, surface, false, options);
     }
 
     protected override void PumpEventsCore()
     {
-        if (_platform.PumpEvents())
+        if (PumpEvents())
             HideAll();
     }
 
@@ -75,6 +48,7 @@ internal sealed unsafe class VulkanWindowManager : WindowManager
 
         _lifetimeWindows.Clear();
         _finalizedWindows.Clear();
+        DestroySdlResources();
     }
 
     internal void EnqueueFinalized(VulkanWindow window)
@@ -104,20 +78,11 @@ internal sealed unsafe class VulkanWindowManager : WindowManager
         bool isPrimary,
         WindowOptions options)
     {
-        VulkanWindow? window = null;
-        try
-        {
-            window = new VulkanWindow(this, _platform, nativeWindow, surface, isPrimary, options);
-            if (options.Icons.Length > 0)
-                window.SetWindowIcons(options.Icons);
-            _lifetimeWindows.Add(new WeakReference<VulkanWindow>(window, trackResurrection: true));
-            return window;
-        }
-        catch
-        {
-            window?.Destroy();
-            throw;
-        }
+        var window = new VulkanWindow(this, nativeWindow, surface, isPrimary, options);
+        if (options.Icons.Length > 0)
+            window.SetWindowIcons(options.Icons);
+        _lifetimeWindows.Add(new WeakReference<VulkanWindow>(window, trackResurrection: true));
+        return window;
     }
 
     private void DestroyWindow(VulkanWindow window)

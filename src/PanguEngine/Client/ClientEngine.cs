@@ -10,6 +10,7 @@ using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Registries;
 using PanguEngine.Windowing;
+using SDL;
 using Silk.NET.Maths;
 using Window = PanguEngine.Windowing.Window;
 
@@ -106,6 +107,9 @@ public sealed class ClientEngine
     {
         Engine.Initialize(_launchOptions);
         InitializeTextServices();
+
+        if (!SDL3.SDL_InitSubSystem(SDL_InitFlags.SDL_INIT_VIDEO))
+            throw new InvalidOperationException($"SDL video initialization failed: {SDL3.SDL_GetError()}");
 
         GraphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
         {
@@ -207,6 +211,8 @@ public sealed class ClientEngine
         TextServices.Shutdown();
         Clipboard.Destroy();
         GraphicsBackend.Destroy();
+        SDL3.SDL_QuitSubSystem(SDL_InitFlags.SDL_INIT_VIDEO);
+        SDL3.SDL_Quit();
 
         Engine.Shutdown();
     }
