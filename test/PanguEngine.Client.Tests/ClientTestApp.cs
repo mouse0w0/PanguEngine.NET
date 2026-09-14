@@ -1,5 +1,6 @@
 using PanguEngine.Audio;
 using PanguEngine.Graphics;
+using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Registries;
 using PanguEngine.Windowing;
 using SDL;
@@ -80,15 +81,13 @@ public sealed class ClientTestApp
         if (!SDL3.SDL_InitSubSystem(SDL_InitFlags.SDL_INIT_VIDEO))
             throw new InvalidOperationException($"SDL video initialization failed: {SDL3.SDL_GetError()}");
 
-        _graphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
-        {
-            EnableValidation = true,
-            PrimaryWindow = new WindowOptions
+        _graphicsBackend = new VulkanBackend(
+            new WindowOptions
             {
                 Size = new Vector2D<int>(800, 600),
                 Title = _scene.Name
-            }
-        });
+            },
+            enableValidation: true);
 
         Window = _graphicsBackend.PrimaryWindow;
         WindowManager = _graphicsBackend.WindowManager;
@@ -102,6 +101,7 @@ public sealed class ClientTestApp
             _audio.Load();
             _audio.MarkReady();
         }
+
         _loop = new ClientLoop(
             () => WindowManager.VisibleWindows.Count > 0,
             WindowManager.DoEvents,

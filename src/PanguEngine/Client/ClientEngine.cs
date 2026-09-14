@@ -8,6 +8,7 @@ using PanguEngine.Desktop;
 using PanguEngine.Desktop.Sdl;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
+using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Registries;
 using PanguEngine.Windowing;
 using SDL;
@@ -111,11 +112,9 @@ public sealed class ClientEngine
         if (!SDL3.SDL_InitSubSystem(SDL_InitFlags.SDL_INIT_VIDEO))
             throw new InvalidOperationException($"SDL video initialization failed: {SDL3.SDL_GetError()}");
 
-        GraphicsBackend = GraphicsBackendFactory.Create(GraphicsBackendType.Vulkan, new GraphicsBackendOptions
-        {
-            EnableValidation = _launchOptions.GpuValidation,
-            PrimaryWindow = new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" }
-        });
+        GraphicsBackend = new VulkanBackend(
+            new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" },
+            enableValidation: _launchOptions.GpuValidation);
         Clipboard = new SdlClipboard();
         var monitor = PrimaryWindow.Monitor ?? throw new InvalidOperationException(
             "UI scale initialization requires a current monitor.");

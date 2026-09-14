@@ -8,11 +8,6 @@ namespace PanguEngine.Graphics;
 public abstract class GraphicsBackend
 {
     /// <summary>
-    /// Gets the graphics backend type.
-    /// </summary>
-    public abstract GraphicsBackendType Type { get; }
-
-    /// <summary>
     /// Gets the graphics device created by the backend.
     /// </summary>
     public abstract GraphicsDevice Device { get; }

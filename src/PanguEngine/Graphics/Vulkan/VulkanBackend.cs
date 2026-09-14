@@ -13,9 +13,6 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     private bool _isDestroyed;
 
     /// <inheritdoc/>
-    public override GraphicsBackendType Type => GraphicsBackendType.Vulkan;
-
-    /// <inheritdoc/>
     public override GraphicsDevice Device { get; }
 
     /// <inheritdoc/>
@@ -34,8 +31,9 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     /// <summary>
     /// Creates and initializes a Vulkan graphics backend.
     /// </summary>
-    /// <param name="options">The backend initialization options.</param>
-    internal VulkanBackend(GraphicsBackendOptions options)
+    /// <param name="primaryWindowOptions">The options used to create the primary window.</param>
+    /// <param name="enableValidation">Whether Vulkan validation is enabled.</param>
+    internal VulkanBackend(WindowOptions primaryWindowOptions, bool enableValidation)
     {
         VulkanContext.BindRenderThread();
 
@@ -44,10 +42,10 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
 
         var windowManager = new VulkanWindowManager();
         _windowManager = windowManager;
-        var nativeWindow = windowManager.CreateNativeWindow(options.PrimaryWindow);
+        var nativeWindow = windowManager.CreateNativeWindow(primaryWindowOptions);
 
         var requiredExtensions = GetVulkanInstanceExtensions();
-        VulkanContext.InitializeInstance(requiredExtensions, options.EnableValidation);
+        VulkanContext.InitializeInstance(requiredExtensions, enableValidation);
 
         var surface = VulkanWindowManager.CreateVulkanSurface(nativeWindow);
         VulkanContext.InitializeDevice(surface);
@@ -55,7 +53,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         VulkanAllocator.Initialize();
         VulkanUploader.Initialize();
 
-        PrimaryWindow = windowManager.CreatePrimaryWindow(nativeWindow, surface, options.PrimaryWindow);
+        PrimaryWindow = windowManager.CreatePrimaryWindow(nativeWindow, surface, primaryWindowOptions);
         Device = new VulkanGraphicsDevice();
         DisplayManager = new VulkanDisplayManager();
     }
