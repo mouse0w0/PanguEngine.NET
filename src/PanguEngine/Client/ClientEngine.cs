@@ -10,6 +10,7 @@ using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Registries;
+using PanguEngine.Threading;
 using PanguEngine.Windowing;
 using SDL;
 using Silk.NET.Maths;
@@ -28,6 +29,7 @@ public sealed class ClientEngine
     public static ClientEngine Current { get; private set; } = null!;
 
     private readonly LaunchOptions _launchOptions;
+    private EngineWorkQueue _workQueue = null!;
 
     private ClientEngine(LaunchOptions launchOptions)
     {
@@ -65,6 +67,11 @@ public sealed class ClientEngine
     public Clipboard Clipboard { get; private set; } = null!;
 
     /// <summary>
+    /// Gets the client main-thread dispatcher.
+    /// </summary>
+    public EngineDispatcher Dispatcher { get; private set; } = null!;
+
+    /// <summary>
     /// Gets the client UI manager.
     /// </summary>
     public UiManager Ui { get; private set; } = null!;
@@ -93,14 +100,32 @@ public sealed class ClientEngine
 
     private void Run()
     {
-        OnInit();
+        var previousContext = SynchronizationContext.Current;
+        _workQueue = new EngineWorkQueue();
+        Dispatcher = new EngineDispatcher(_workQueue);
+        SynchronizationContext.SetSynchronizationContext(new EngineSynchronizationContext(_workQueue));
         try
         {
-            OnRunning();
+            OnInit();
+            try
+            {
+                OnRunning();
+            }
+            finally
+            {
+                OnShutdown();
+            }
         }
         finally
         {
-            OnShutdown();
+            try
+            {
+                _workQueue.Destroy();
+            }
+            finally
+            {
+                SynchronizationContext.SetSynchronizationContext(previousContext);
+            }
         }
     }
 
@@ -129,7 +154,7 @@ public sealed class ClientEngine
 
         Loop = new ClientLoop(
             () => WindowManager.VisibleWindows.Count > 0,
-            WindowManager.DoEvents,
+            PumpClientEvents,
             OnUpdate,
             GraphicsBackend.Render);
         Engine.ModManager.RunClientSetup();
@@ -160,6 +185,12 @@ public sealed class ClientEngine
     internal void RequestShutdown()
     {
         Loop.RequestStop();
+    }
+
+    private void PumpClientEvents()
+    {
+        WindowManager.DoEvents();
+        _workQueue.RunPending();
     }
 
     private void OnRunning()
@@ -201,6 +232,8 @@ public sealed class ClientEngine
 
     private void OnShutdown()
     {
+        _workQueue.Destroy();
+
         Ui.CurrentScreenChanged -= OnCurrentScreenChanged;
         Ui.Destroy();
         InputBridge.Destroy();
