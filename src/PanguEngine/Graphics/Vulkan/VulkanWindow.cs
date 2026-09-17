@@ -1,4 +1,5 @@
 using Silk.NET.Vulkan;
+using PanguEngine.Desktop.Sdl;
 using PanguEngine.Windowing;
 using SDL;
 using Window = PanguEngine.Windowing.Window;
@@ -8,7 +9,7 @@ namespace PanguEngine.Graphics.Vulkan;
 /// <summary>
 /// Manages a Vulkan swapchain surface and its associated rendering resources bound to a window.
 /// </summary>
-public sealed unsafe partial class VulkanWindow : Window
+public sealed unsafe partial class VulkanWindow : Window, ISdlWindow
 {
     private readonly VulkanWindowManager _windowManager;
     private readonly SdlWindowEventState _eventState = new();
@@ -18,6 +19,8 @@ public sealed unsafe partial class VulkanWindow : Window
     public SurfaceKHR Surface { get; private set; }
 
     internal SDL_Window* NativeWindow { get; }
+
+    nint ISdlWindow.Handle => (nint)NativeWindow;
 
     internal SDL_WindowID WindowId { get; }
 

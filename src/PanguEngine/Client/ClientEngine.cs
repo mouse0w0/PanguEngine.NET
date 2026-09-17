@@ -12,6 +12,7 @@ using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Registries;
 using PanguEngine.Threading;
 using PanguEngine.Windowing;
+using Microsoft.Extensions.Logging;
 using SDL;
 using Silk.NET.Maths;
 using Window = PanguEngine.Windowing.Window;
@@ -30,6 +31,7 @@ public sealed class ClientEngine
 
     private readonly LaunchOptions _launchOptions;
     private EngineWorkQueue _workQueue = null!;
+    private bool _shutdownRequested;
 
     private ClientEngine(LaunchOptions launchOptions)
     {
@@ -65,6 +67,11 @@ public sealed class ClientEngine
     /// Gets the system clipboard for this client.
     /// </summary>
     public Clipboard Clipboard { get; private set; } = null!;
+
+    /// <summary>
+    /// Gets the platform file and folder dialog service for this client.
+    /// </summary>
+    public FileDialogService FileDialogs { get; private set; } = null!;
 
     /// <summary>
     /// Gets the client main-thread dispatcher.
@@ -140,6 +147,7 @@ public sealed class ClientEngine
         GraphicsBackend = new VulkanBackend(
             new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" },
             enableValidation: _launchOptions.GpuValidation);
+        FileDialogs = new SdlFileDialogService();
         Clipboard = new SdlClipboard();
         var monitor = PrimaryWindow.Monitor ?? throw new InvalidOperationException(
             "UI scale initialization requires a current monitor.");
@@ -153,7 +161,7 @@ public sealed class ClientEngine
             Log.CreateLogger("Audio"));
 
         Loop = new ClientLoop(
-            () => WindowManager.VisibleWindows.Count > 0,
+            ShouldContinue,
             PumpClientEvents,
             OnUpdate,
             GraphicsBackend.Render);
@@ -181,11 +189,15 @@ public sealed class ClientEngine
         InputBridge = new ClientInputBridge(PrimaryWindow, Ui, Game.Input, TryHandleEscape);
     }
 
-    /// <summary>Requests the client engine to shut down after the current loop iteration.</summary>
+    /// <summary>Requests the client engine to shut down after outstanding native dialogs close.</summary>
     internal void RequestShutdown()
     {
-        Loop.RequestStop();
+        _shutdownRequested = true;
     }
+
+    private bool ShouldContinue() =>
+        (!_shutdownRequested && WindowManager.VisibleWindows.Count > 0) ||
+        FileDialogs.HasPendingNativeRequests;
 
     private void PumpClientEvents()
     {
@@ -233,6 +245,15 @@ public sealed class ClientEngine
     private void OnShutdown()
     {
         _workQueue.Destroy();
+
+        FileDialogs.Destroy();
+        if (FileDialogs.HasPendingNativeRequests)
+            Engine.Logger.LogInformation("Waiting for open native file dialogs to close before shutdown.");
+        while (FileDialogs.HasPendingNativeRequests)
+        {
+            WindowManager.DoEvents();
+            Thread.Sleep(1);
+        }
 
         Ui.CurrentScreenChanged -= OnCurrentScreenChanged;
         Ui.Destroy();
