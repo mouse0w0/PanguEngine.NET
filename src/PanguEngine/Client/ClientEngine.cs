@@ -147,6 +147,7 @@ public sealed class ClientEngine
         GraphicsBackend = new VulkanBackend(
             new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" },
             enableValidation: _launchOptions.GpuValidation);
+        PrimaryWindow.CenterOnScreen();
         PrimaryWindow.Show();
         FileDialogs = new SdlFileDialogService();
         Clipboard = new SdlClipboard();
