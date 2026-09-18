@@ -20,7 +20,7 @@ public record struct WindowOptions
     public WindowBorder WindowBorder { get; set; } = WindowBorder.Resizable;
 
     /// <summary>Whether the window is visible after creation.</summary>
-    public bool IsVisible { get; set; } = true;
+    public bool IsVisible { get; set; } = false;
 
     /// <summary>The target render events per second. Values less than or equal to zero mean unlimited.</summary>
     public double FramesPerSecond { get; set; } = 60;

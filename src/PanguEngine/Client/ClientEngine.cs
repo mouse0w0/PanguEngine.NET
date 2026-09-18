@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using PanguEngine.Audio;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.Rendering;
@@ -12,7 +13,6 @@ using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Registries;
 using PanguEngine.Threading;
 using PanguEngine.Windowing;
-using Microsoft.Extensions.Logging;
 using SDL;
 using Silk.NET.Maths;
 using Window = PanguEngine.Windowing.Window;
@@ -147,6 +147,7 @@ public sealed class ClientEngine
         GraphicsBackend = new VulkanBackend(
             new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" },
             enableValidation: _launchOptions.GpuValidation);
+        PrimaryWindow.Show();
         FileDialogs = new SdlFileDialogService();
         Clipboard = new SdlClipboard();
         var monitor = PrimaryWindow.Monitor ?? throw new InvalidOperationException(
