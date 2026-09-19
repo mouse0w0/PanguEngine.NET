@@ -22,6 +22,8 @@ internal sealed class MultiWindowScene : IClientTestScene
             Size = new Vector2D<int>(640, 480),
             FramesPerSecond = 60
         });
+        secondary.CenterOnScreen();
+        secondary.Show();
         _secondaryPresenter = secondary.Presenter;
         secondary.Render += (_, _) => Draw(_secondaryPresenter, new ClearColor(0.02f, 0.08f, 0.02f, 1));
     }

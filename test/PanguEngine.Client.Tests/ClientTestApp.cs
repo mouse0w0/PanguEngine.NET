@@ -90,6 +90,8 @@ public sealed class ClientTestApp
             enableValidation: true);
 
         Window = _graphicsBackend.PrimaryWindow;
+        Window.CenterOnScreen();
+        Window.Show();
         WindowManager = _graphicsBackend.WindowManager;
         if (_scene.RequiresAudio)
         {
