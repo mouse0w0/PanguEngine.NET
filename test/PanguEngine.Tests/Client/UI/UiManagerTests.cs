@@ -12,6 +12,35 @@ public sealed class UiManagerTests
         var manager = new UiManager();
 
         Assert.Null(manager.CurrentScreen);
+        Assert.NotNull(manager.Hud);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void CurrentScreenOperationsKeepHudMounted()
+    {
+        var manager = new UiManager();
+        var screen = new UiScreen(new TestNode());
+
+        manager.Open(screen);
+        manager.Update(new Size(200, 100));
+
+        Assert.Same(manager.Hud.Crosshair, Assert.Single(manager.Hud.Children));
+        Assert.Same(screen, manager.CurrentScreen);
+
+        manager.Close();
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void UpdateLayoutsHudWhenCurrentScreenIsAbsent()
+    {
+        var manager = new UiManager();
+
+        manager.Update(new Size(200, 100));
+
+        Assert.True(manager.Hud.Crosshair.IsArrangeValid);
+        manager.Destroy();
     }
 
     [Fact]
@@ -204,6 +233,26 @@ public sealed class UiManagerTests
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
         Assert.Same(screen, manager.CurrentScreen);
         manager.Close();
+    }
+
+    [Fact]
+    public void HudLayoutRejectsNestedManagerOperations()
+    {
+        var manager = new UiManager();
+        var errors = new List<Exception?>();
+        var node = new TestNode
+        {
+            CoreDesiredSize = new Size(5, 5),
+            MeasureAction = () => CaptureNestedOperationErrors(manager, errors),
+            ArrangeAction = () => CaptureNestedOperationErrors(manager, errors)
+        };
+        manager.Hud.Children.Add(node);
+
+        manager.Update(new Size(20, 20));
+
+        Assert.Equal(8, errors.Count);
+        Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
+        manager.Destroy();
     }
 
     [Fact]

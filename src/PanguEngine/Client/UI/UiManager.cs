@@ -1,10 +1,11 @@
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Input;
 using System.Runtime.ExceptionServices;
 
 namespace PanguEngine.Client.UI;
 
 /// <summary>
-/// Manages the lifecycle and layout of a single current UI screen.
+/// Manages the persistent HUD and the current regular UI screen.
 /// </summary>
 public sealed class UiManager
 {
@@ -16,7 +17,14 @@ public sealed class UiManager
     internal UiManager()
     {
         _ownerThreadId = Environment.CurrentManagedThreadId;
+        Hud = new HudScreen();
+        Hud.Open();
     }
+
+    /// <summary>
+    /// Gets the persistent client HUD.
+    /// </summary>
+    public HudScreen Hud { get; }
 
     /// <summary>
     /// Gets the current screen, or null when no screen is open.
@@ -97,13 +105,15 @@ public sealed class UiManager
     internal void Update(Size viewportSize)
     {
         VerifyAccess();
-        if (_isUpdating || _isTransitioning)
+        VerifyLifecycleOperation();
+        if (_isUpdating)
             throw new InvalidOperationException("The UI manager cannot update in its current state.");
 
         UiScreen.CreateViewportBounds(viewportSize);
         _isUpdating = true;
         try
         {
+            Hud.Update(viewportSize);
             var screen = CurrentScreen;
             if (screen is null)
                 return;
@@ -114,6 +124,15 @@ public sealed class UiManager
         {
             _isUpdating = false;
         }
+    }
+
+    internal void AppendDrawCommands(UiDrawCommandList commands)
+    {
+        VerifyAccess();
+        VerifyLifecycleOperation();
+        commands.Append(Hud.Screen);
+        if (CurrentScreen is { } screen)
+            commands.Append(screen);
     }
 
     internal void Destroy()
@@ -139,6 +158,15 @@ public sealed class UiManager
                 {
                     AddLifecycleErrors(errors, exception);
                 }
+            }
+
+            try
+            {
+                Hud.Close();
+            }
+            catch (Exception exception)
+            {
+                AddLifecycleErrors(errors, exception);
             }
 
             _destroyed = true;
@@ -224,6 +252,11 @@ public sealed class UiManager
     {
         if (_isTransitioning)
             throw new InvalidOperationException("The UI manager is already changing screens.");
+        if (Hud.Screen.IsUpdatingLayout || Hud.Screen.IsDrawing)
+        {
+            throw new InvalidOperationException(
+                "The UI manager cannot change screens while the HUD is updating or drawing.");
+        }
         if (CurrentScreen?.IsUpdatingLayout == true)
             throw new InvalidOperationException("The UI manager cannot change screens during layout.");
         if (CurrentScreen?.IsDrawing == true)

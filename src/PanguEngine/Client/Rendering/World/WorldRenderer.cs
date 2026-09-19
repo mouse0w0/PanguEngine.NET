@@ -28,7 +28,6 @@ internal sealed class WorldRenderer
     private readonly DescriptorSet[] _worldDescriptorSets;
     private readonly ChunkRenderer _chunkRenderer;
     private readonly SelectionRenderer _selectionRenderer;
-    private readonly CrosshairRenderer _crosshairRenderer;
     private List<UploadHandle> _preparedUploadHandles = [];
 
     /// <summary>
@@ -96,11 +95,6 @@ internal sealed class WorldRenderer
             _worldDescriptorLayout,
             world,
             frameSlotCount);
-        _crosshairRenderer = new CrosshairRenderer(
-            _device,
-            colorFormat,
-            depthStencilFormat,
-            frameSlotCount);
     }
 
     internal void PrepareFrame(Camera camera, double alpha)
@@ -135,8 +129,6 @@ internal sealed class WorldRenderer
             _chunkRenderer.PrepareDraw(frame.FrameSlot, worldRenderState);
             _selectionRenderer.Prepare(frame.FrameSlot, selection);
         }
-        _crosshairRenderer.Prepare(frame.FrameSlot, frame.Width, frame.Height);
-
         return uploadFailure;
     }
 
@@ -148,7 +140,6 @@ internal sealed class WorldRenderer
         var descriptorSet = _worldDescriptorSets[checked((int)frameSlot)];
         _chunkRenderer.Draw(commandList, descriptorSet, frameSlot);
         _selectionRenderer.Draw(commandList, descriptorSet, frameSlot, worldRenderState);
-        _crosshairRenderer.Draw(commandList, frameSlot);
     }
 
     /// <summary>
@@ -157,7 +148,6 @@ internal sealed class WorldRenderer
     public void Destroy()
     {
         _selectionRenderer.Destroy();
-        _crosshairRenderer.Destroy();
         _chunkRenderer.Destroy();
         foreach (var descriptorSet in _worldDescriptorSets)
             descriptorSet.Destroy();

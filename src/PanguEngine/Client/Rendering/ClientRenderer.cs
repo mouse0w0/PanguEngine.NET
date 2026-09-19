@@ -2,6 +2,7 @@ using PanguEngine.Client.Game;
 using PanguEngine.Client.Rendering.World;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Client.World;
 using PanguEngine.Graphics;
@@ -19,6 +20,7 @@ internal sealed class ClientRenderer
     private readonly UiManager _uiManager;
     private readonly WorldRenderer _worldRenderer;
     private readonly UiRenderer _uiRenderer;
+    private readonly UiDrawCommandList _uiCommands = new();
     private readonly Texture?[] _depthStencilTextures;
     private readonly TextureView?[] _depthStencilAttachments;
     private uint _depthStencilWidth;
@@ -63,8 +65,8 @@ internal sealed class ClientRenderer
 
     internal void DrawFrame(Camera camera, BlockHit? selection, double alpha)
     {
-        var screen = _uiManager.CurrentScreen;
-        var uiCommands = screen?.CreateDrawCommandList();
+        _uiCommands.Clear();
+        _uiManager.AppendDrawCommands(_uiCommands);
         if (!_presenter.TryBeginFrame(out var frame))
             return;
 
@@ -108,8 +110,8 @@ internal sealed class ClientRenderer
             commandList.SetScissor(0, 0, frame.Width, frame.Height);
             if (uploadFailure is null)
                 _worldRenderer.Draw(commandList, frame.FrameSlot, worldRenderState);
-            if (uiCommands is not null)
-                _uiRenderer.Draw(frame, uiCommands);
+            if (_uiCommands.Count > 0)
+                _uiRenderer.Draw(frame, _uiCommands);
             commandList.EndRendering();
             commandList.PrepareForPresent(frame.ColorOutput);
             commandList.EndRecording();
