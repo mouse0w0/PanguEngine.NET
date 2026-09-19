@@ -144,10 +144,25 @@ public sealed class ClientEngine
         if (!SDL3.SDL_InitSubSystem(SDL_InitFlags.SDL_INIT_VIDEO))
             throw new InvalidOperationException($"SDL video initialization failed: {SDL3.SDL_GetError()}");
 
+        var windowMode = _launchOptions.WindowMode;
         GraphicsBackend = new VulkanBackend(
-            new WindowOptions { Size = new Vector2D<int>(800, 600), Title = "PanguEngine" },
+            new WindowOptions
+            {
+                Size = _launchOptions.WindowSize ?? new Vector2D<int>(800, 600),
+                Title = _launchOptions.WindowTitle ?? "PanguEngine",
+                WindowState = windowMode switch
+                {
+                    WindowMode.Maximized => WindowState.Maximized,
+                    WindowMode.Fullscreen => WindowState.Fullscreen,
+                    _ => WindowState.Normal
+                },
+                WindowBorder = windowMode == WindowMode.Borderless
+                    ? WindowBorder.Hidden
+                    : WindowBorder.Resizable
+            },
             enableValidation: _launchOptions.GpuValidation);
-        PrimaryWindow.CenterOnScreen();
+        if (windowMode is not (WindowMode.Maximized or WindowMode.Fullscreen))
+            PrimaryWindow.CenterOnScreen();
         PrimaryWindow.Show();
         FileDialogs = new SdlFileDialogService();
         Clipboard = new SdlClipboard();

@@ -1,3 +1,5 @@
+using Silk.NET.Maths;
+
 namespace PanguEngine;
 
 /// <summary>
@@ -19,4 +21,19 @@ public sealed class LaunchOptions
     /// Additional mod paths to load during startup.
     /// </summary>
     public IReadOnlyList<string> ModPaths { get; init; } = [];
+
+    /// <summary>
+    /// The requested client window title.
+    /// </summary>
+    public string? WindowTitle { get; init; }
+
+    /// <summary>
+    /// The requested client window size in screen coordinates.
+    /// </summary>
+    public Vector2D<int>? WindowSize { get; init; }
+
+    /// <summary>
+    /// The requested client window mode.
+    /// </summary>
+    public WindowMode? WindowMode { get; init; }
 }
