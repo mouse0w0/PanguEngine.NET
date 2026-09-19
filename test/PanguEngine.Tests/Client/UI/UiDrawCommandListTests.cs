@@ -7,6 +7,171 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiDrawCommandListTests
 {
     [Fact]
+    public void SetTranslatePreservesScaleAndRestoresOriginalPosition()
+    {
+        var screen = CreateScreen(context =>
+        {
+            using (context.SetTranslate(new Point(20, 30)))
+            {
+                DrawRectangle(context);
+                using (context.SetTranslate(Point.Zero))
+                    DrawRectangle(context);
+                DrawRectangle(context);
+            }
+            DrawRectangle(context);
+        }, 2, new Point(3, 4));
+        var builder = new UiDrawBuilder();
+
+        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+
+        Assert.Equal(4, builder.RectangleCount);
+        Assert.Equal(new UiVertex(20, 30, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(24, 34, 1, 1, 1, 1), builder.Vertices[2]);
+        Assert.Equal(new UiVertex(0, 0, 1, 1, 1, 1), builder.Vertices[4]);
+        Assert.Equal(new UiVertex(4, 4, 1, 1, 1, 1), builder.Vertices[6]);
+        Assert.Equal(new UiVertex(20, 30, 1, 1, 1, 1), builder.Vertices[8]);
+        Assert.Equal(new UiVertex(6, 8, 1, 1, 1, 1), builder.Vertices[12]);
+        Assert.Equal(new UiVertex(10, 12, 1, 1, 1, 1), builder.Vertices[14]);
+        Assert.Equal(24u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Fact]
+    public void SetScalePreservesOriginAndRestoresAccumulatedScale()
+    {
+        var screen = CreateScreen(context =>
+        {
+            using var transform = context.PushTransform(new Point(1, 2), 3);
+            using (context.SetScale(0.5))
+            {
+                DrawRectangle(context);
+                using (context.SetScale(1))
+                    DrawRectangle(context);
+                using (context.SetTranslate(new Point(20, 30)))
+                    DrawRectangle(context);
+                DrawRectangle(context);
+            }
+            DrawRectangle(context);
+        }, 2, new Point(3, 4));
+        var builder = new UiDrawBuilder();
+
+        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+
+        Assert.Equal(5, builder.RectangleCount);
+        Assert.Equal(new UiVertex(8, 12, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(9, 13, 1, 1, 1, 1), builder.Vertices[2]);
+        Assert.Equal(new UiVertex(8, 12, 1, 1, 1, 1), builder.Vertices[4]);
+        Assert.Equal(new UiVertex(10, 14, 1, 1, 1, 1), builder.Vertices[6]);
+        Assert.Equal(new UiVertex(20, 30, 1, 1, 1, 1), builder.Vertices[8]);
+        Assert.Equal(new UiVertex(21, 31, 1, 1, 1, 1), builder.Vertices[10]);
+        Assert.Equal(new UiVertex(8, 12, 1, 1, 1, 1), builder.Vertices[12]);
+        Assert.Equal(new UiVertex(9, 13, 1, 1, 1, 1), builder.Vertices[14]);
+        Assert.Equal(new UiVertex(8, 12, 1, 1, 1, 1), builder.Vertices[16]);
+        Assert.Equal(new UiVertex(20, 24, 1, 1, 1, 1), builder.Vertices[18]);
+        Assert.Equal(30u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Fact]
+    public void SetTransformReplacesInheritedTransformAndRestoresItAfterNestedScopes()
+    {
+        var screen = CreateScreen(context =>
+        {
+            using (context.SetTransform(new Point(20, 30), 3))
+            {
+                using (context.PushTransform(new Point(1, 2), 2))
+                    DrawRectangle(context);
+                DrawRectangle(context);
+            }
+            DrawRectangle(context);
+        }, 2, new Point(3, 4));
+        var builder = new UiDrawBuilder();
+
+        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+
+        Assert.Equal(3, builder.RectangleCount);
+        Assert.Equal(new UiVertex(23, 36, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(35, 48, 1, 1, 1, 1), builder.Vertices[2]);
+        Assert.Equal(new UiVertex(20, 30, 1, 1, 1, 1), builder.Vertices[4]);
+        Assert.Equal(new UiVertex(26, 36, 1, 1, 1, 1), builder.Vertices[6]);
+        Assert.Equal(new UiVertex(6, 8, 1, 1, 1, 1), builder.Vertices[8]);
+        Assert.Equal(new UiVertex(10, 12, 1, 1, 1, 1), builder.Vertices[10]);
+        Assert.Equal(18u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Fact]
+    public void SetIdentityTransformResetsOuterStateAndKeepsScreenBoundariesIsolated()
+    {
+        var screen = CreateScreen(context =>
+        {
+            using (context.SetTransform(new Point(20, 30), 3))
+            {
+                using (context.SetTransform(Point.Zero))
+                    DrawRectangle(context);
+                DrawRectangle(context);
+            }
+            DrawRectangle(context);
+        }, 2, new Point(3, 4));
+        var commands = screen.CreateDrawCommandList();
+        commands.Append(CreateScreen(DrawRectangle, 0.5));
+        var builder = new UiDrawBuilder();
+
+        builder.Build(commands, 100, 100, false);
+
+        Assert.Equal(4, builder.RectangleCount);
+        Assert.Equal(new UiVertex(0, 0, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(2, 2, 1, 1, 1, 1), builder.Vertices[2]);
+        Assert.Equal(new UiVertex(20, 30, 1, 1, 1, 1), builder.Vertices[4]);
+        Assert.Equal(new UiVertex(26, 36, 1, 1, 1, 1), builder.Vertices[6]);
+        Assert.Equal(new UiVertex(6, 8, 1, 1, 1, 1), builder.Vertices[8]);
+        Assert.Equal(new UiVertex(0, 0, 1, 1, 1, 1), builder.Vertices[12]);
+        Assert.Equal(new UiVertex(1, 1, 1, 1, 1, 1), builder.Vertices[14]);
+        Assert.Equal(24u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AbsoluteTransformsPreserveEstablishedClipAndOpacity(bool separateComponents)
+    {
+        var screen = CreateScreen(context =>
+        {
+            using (context.PushClip(new Rect(0, 0, 10, 10)))
+            using (context.PushOpacity(0.25))
+            {
+                using (context.SetTransform(Point.Zero))
+                    DrawRectangle(context);
+                using (separateComponents
+                           ? context.SetTranslate(new Point(20, 20))
+                           : context.SetTransform(new Point(20, 20)))
+                using (separateComponents ? context.SetScale(1) : default(UiDrawingScope))
+                {
+                    DrawRectangle(context);
+                    using (context.PushClip(new Rect(1, 1, 1, 1)))
+                        DrawRectangle(context);
+                    DrawRectangle(context);
+                }
+                DrawRectangle(context);
+            }
+            DrawRectangle(context);
+        }, 2, new Point(5, 5));
+        var builder = new UiDrawBuilder();
+
+        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+
+        Assert.Equal(5, builder.RectangleCount);
+        Assert.Equal(new UiVertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[4]);
+        Assert.Equal(new UiVertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[8]);
+        Assert.Equal(new UiVertex(10, 10, 1, 1, 1, 0.25f), builder.Vertices[12]);
+        Assert.Equal(new UiVertex(10, 10, 1, 1, 1, 1), builder.Vertices[16]);
+        Assert.Equal(
+            [new UiBatch(new UiScissor(10, 10, 20, 20), 0, 6),
+             new UiBatch(new UiScissor(21, 21, 1, 1), 6, 6),
+             new UiBatch(new UiScissor(10, 10, 20, 20), 12, 12),
+             new UiBatch(new UiScissor(0, 0, 100, 100), 24, 6)],
+            builder.Batches.ToArray());
+    }
+
+    [Fact]
     public void ScreensWithDifferentScalesHaveIsolatedTransformsClipsAndOpacity()
     {
         var first = CreateScreen(context =>
@@ -122,6 +287,9 @@ public sealed class UiDrawCommandListTests
         {
             captured = context;
             _ = context.PushTransform(new Point(5, 6), 2);
+            _ = context.SetTransform(new Point(1, 2));
+            _ = context.SetTranslate(new Point(3, 4));
+            _ = context.SetScale(0.5);
             DrawRectangle(context);
             throw expected;
         }, 3);
@@ -139,14 +307,19 @@ public sealed class UiDrawCommandListTests
         Assert.Equal(new UiVertex(6, 6, 1, 1, 1, 1), builder.Vertices[2]);
     }
 
-    [Fact]
-    public void MissingScopeDiscardsCollectionAndInvalidatesContext()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MissingScopeDiscardsCollectionAndInvalidatesContext(bool absoluteTransform)
     {
         UiDrawingContext? captured = null;
         var screen = CreateScreen(context =>
         {
             captured = context;
-            _ = context.PushTransform(Point.Zero);
+            if (absoluteTransform)
+                _ = context.SetTransform(Point.Zero);
+            else
+                _ = context.PushTransform(Point.Zero);
             DrawRectangle(context);
         });
         var commands = new UiDrawCommandList();
@@ -155,6 +328,11 @@ public sealed class UiDrawCommandListTests
         Assert.Throws<InvalidOperationException>(() => commands.Append(screen));
         Assert.Empty(commands);
         Assert.Throws<InvalidOperationException>(() => { _ = captured!.PushTransform(Point.Zero); });
+        Assert.Throws<InvalidOperationException>(() => { _ = captured!.SetTransform(Point.Zero); });
+        Assert.Throws<InvalidOperationException>(() => { _ = captured!.SetTranslate(Point.Zero); });
+        Assert.Throws<InvalidOperationException>(() => { _ = captured!.SetScale(1); });
+        Assert.Throws<InvalidOperationException>(() => { _ = captured!.PushTranslate(Point.Zero); });
+        Assert.Throws<InvalidOperationException>(() => { _ = captured!.PushScale(1); });
 
         Assert.IsType<DrawingNode>(screen.Root).DrawAction = DrawRectangle;
         commands.Append(screen);
@@ -245,7 +423,8 @@ public sealed class UiDrawCommandListTests
         Exception? orderError = null;
         var screen = CreateScreen(context =>
         {
-            var transform = context.PushTransform(Point.Zero);
+            var transform = context.PushTranslate(Point.Zero);
+            var scale = context.PushScale(1);
             var opacity = context.PushOpacity(1);
             try
             {
@@ -256,8 +435,12 @@ public sealed class UiDrawCommandListTests
                 orderError = exception;
             }
             opacity.Dispose();
+            scale.Dispose();
             transform.Dispose();
             using (context.PushTransform(new Point(1, 2), 3))
+            using (context.SetTransform(Point.Zero))
+            using (context.SetTranslate(Point.Zero))
+            using (context.SetScale(1))
             using (context.PushClip(new Rect(0, 0, 1, 1)))
             using (context.PushOpacity(0.5))
             {
@@ -279,6 +462,9 @@ public sealed class UiDrawCommandListTests
         var screen = CreateScreen(context =>
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => { _ = context.PushTransform(Point.Zero, scale); });
+            Assert.Throws<ArgumentOutOfRangeException>(() => { _ = context.PushScale(scale); });
+            Assert.Throws<ArgumentOutOfRangeException>(() => { _ = context.SetTransform(Point.Zero, scale); });
+            Assert.Throws<ArgumentOutOfRangeException>(() => { _ = context.SetScale(scale); });
             DrawRectangle(context);
         });
 
@@ -295,7 +481,8 @@ public sealed class UiDrawCommandListTests
                 using (context.PushClip(new Rect(0, 0, 5, 5)))
                 using (context.PushOpacity(0.5))
                 {
-                    using (context.PushTransform(new Point(1, 1), 3))
+                    using (context.PushTranslate(new Point(1, 1)))
+                    using (context.PushScale(3))
                         DrawRectangle(context);
                     DrawRectangle(context);
                 }

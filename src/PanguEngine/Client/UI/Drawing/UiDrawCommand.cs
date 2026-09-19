@@ -40,6 +40,60 @@ public sealed class UiPushTransformCommand : UiDrawCommand
 }
 
 /// <summary>
+/// Saves the current drawing state and replaces its translation and uniform scale.
+/// </summary>
+/// <remarks>
+/// A local point maps directly to framebuffer pixels as <c>Translation + Scale * point</c>,
+/// independent of enclosing transforms. Established clips and opacity remain unchanged.
+/// </remarks>
+public sealed class UiSetTransformCommand : UiDrawCommand
+{
+    internal UiSetTransformCommand(Point translation, double scale)
+    {
+        Translation = translation;
+        Scale = scale;
+    }
+
+    /// <summary>
+    /// Gets the absolute translation in framebuffer pixels.
+    /// </summary>
+    public Point Translation { get; }
+
+    /// <summary>
+    /// Gets the positive uniform scale from local units to framebuffer pixels.
+    /// </summary>
+    public double Scale { get; }
+}
+
+/// <summary>
+/// Saves the current drawing state and replaces only its translation.
+/// </summary>
+/// <remarks>The current scale, established clips, and opacity remain unchanged.</remarks>
+public sealed class UiSetTranslateCommand : UiDrawCommand
+{
+    internal UiSetTranslateCommand(Point translation) => Translation = translation;
+
+    /// <summary>
+    /// Gets the absolute translation in framebuffer pixels.
+    /// </summary>
+    public Point Translation { get; }
+}
+
+/// <summary>
+/// Saves the current drawing state and replaces only its uniform scale.
+/// </summary>
+/// <remarks>The current framebuffer origin, established clips, and opacity remain unchanged.</remarks>
+public sealed class UiSetScaleCommand : UiDrawCommand
+{
+    internal UiSetScaleCommand(double scale) => Scale = scale;
+
+    /// <summary>
+    /// Gets the positive uniform scale from local units to framebuffer pixels.
+    /// </summary>
+    public double Scale { get; }
+}
+
+/// <summary>
 /// Pushes a rectangular clip established using the transform at this command's position.
 /// </summary>
 public sealed class UiPushClipCommand : UiDrawCommand
@@ -66,7 +120,7 @@ public sealed class UiPushOpacityCommand : UiDrawCommand
 }
 
 /// <summary>
-/// Restores the complete drawing state saved by the most recent unmatched push command.
+/// Restores the complete drawing state saved by the most recent unmatched state scope.
 /// </summary>
 public sealed class UiPopCommand : UiDrawCommand
 {

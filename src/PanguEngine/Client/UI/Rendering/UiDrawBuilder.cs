@@ -159,6 +159,27 @@ internal sealed class UiDrawBuilder
                             Scale = scale
                         };
                         continue;
+                    case UiSetTransformCommand absoluteTransform:
+                        _states.Add(state);
+                        state = state with
+                        {
+                            X = absoluteTransform.Translation.X,
+                            Y = absoluteTransform.Translation.Y,
+                            Scale = absoluteTransform.Scale
+                        };
+                        continue;
+                    case UiSetTranslateCommand absoluteTranslation:
+                        _states.Add(state);
+                        state = state with
+                        {
+                            X = absoluteTranslation.Translation.X,
+                            Y = absoluteTranslation.Translation.Y
+                        };
+                        continue;
+                    case UiSetScaleCommand absoluteScale:
+                        _states.Add(state);
+                        state = state with { Scale = absoluteScale.Scale };
+                        continue;
                     case UiPushClipCommand clip:
                         _states.Add(state);
                         var bounds = Transform(clip.Clip, state);

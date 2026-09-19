@@ -126,6 +126,49 @@ public sealed class UiTextDrawingTests
         Assert.Single(builder.Batches.ToArray());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AbsoluteTransformsControlTextPositionAndRasterSizeUntilRestored(bool separateComponents)
+    {
+        using var fonts = new TextFontContext();
+        var sourceRun = Assert.Single(Assert.Single(fonts.CreateLayout("A").Lines).GlyphRuns);
+        var glyph = new PositionedGlyph(sourceRun.Glyphs[0].GlyphId, 0, 3, 5, 10, 0, 1, -2, false);
+        var layout = new TextLayout(10, 20, TextBounds.Empty,
+            [new TextLine(0, 1, 0, 0, 10, 20, 20, 5, [new TextGlyphRun(sourceRun.FontFace, 0, 1, [glyph])])]);
+        var commands = new List<UiDrawCommand>();
+        var context = CreateDrawingContext(commands);
+        using (context.PushTransform(new Point(10, 20), 2))
+        {
+            using (separateComponents
+                       ? context.SetTranslate(new Point(30, 40))
+                       : context.SetTransform(new Point(30, 40)))
+            using (separateComponents ? context.SetScale(1) : default(UiDrawingScope))
+                context.DrawText(new Point(2, 3), layout, 10, new Color(255, 255, 255));
+            context.DrawText(new Point(2, 3), layout, 10, new Color(255, 255, 255));
+        }
+        context.Complete();
+        var builder = new UiDrawBuilder();
+        var resolvedKeys = new List<GlyphRasterKey>();
+
+        builder.Build(new UiDrawCommandList(commands), 100, 100, false, glyphResolver: key =>
+        {
+            resolvedKeys.Add(key);
+            return new UiGlyphRenderBinding(1, 64, 32, new GlyphAtlasRegion(2, 3, 5, 7), -1, 6);
+        });
+
+        Assert.Equal(new uint[] { 10, 20 }, resolvedKeys.Select(key => key.PixelSize).ToArray());
+        Assert.Equal(2, builder.RectangleCount);
+        Assert.Equal(35f, builder.Vertices[0].X);
+        Assert.Equal(40f, builder.Vertices[0].Y);
+        Assert.Equal(40f, builder.Vertices[2].X);
+        Assert.Equal(47f, builder.Vertices[2].Y);
+        Assert.Equal(21f, builder.Vertices[4].X);
+        Assert.Equal(26f, builder.Vertices[4].Y);
+        Assert.Equal(26f, builder.Vertices[6].X);
+        Assert.Equal(33f, builder.Vertices[6].Y);
+    }
+
     [Fact]
     public void BuilderMergesConsecutiveGlyphsOnOnePageAndSkipsPendingGlyphs()
     {

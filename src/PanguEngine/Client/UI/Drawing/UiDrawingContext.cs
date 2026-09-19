@@ -173,6 +173,71 @@ public sealed class UiDrawingContext
     }
 
     /// <summary>
+    /// Pushes a translation relative to the current drawing coordinates.
+    /// </summary>
+    /// <param name="translation">The local translation, affected by the current scale.</param>
+    /// <returns>A scope that restores the previous drawing state when disposed.</returns>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    public UiDrawingScope PushTranslate(Point translation) => PushTransform(translation);
+
+    /// <summary>
+    /// Pushes a positive uniform scale multiplied into the current drawing scale.
+    /// </summary>
+    /// <param name="scale">The finite positive relative scale.</param>
+    /// <returns>A scope that restores the previous drawing state when disposed.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when scale is not finite and positive.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    public UiDrawingScope PushScale(double scale) => PushTransform(Point.Zero, scale);
+
+    /// <summary>
+    /// Saves the current drawing state and replaces its translation and uniform scale.
+    /// </summary>
+    /// <param name="translation">The absolute translation in framebuffer pixels.</param>
+    /// <param name="scale">The finite positive scale from local units to framebuffer pixels.</param>
+    /// <returns>A scope that restores the previous drawing state when disposed.</returns>
+    /// <remarks>Established clips and opacity remain unchanged.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when scale is not finite and positive.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    public UiDrawingScope SetTransform(Point translation, double scale = 1)
+    {
+        VerifyActive();
+        if (!double.IsFinite(scale) || scale <= 0)
+            throw new ArgumentOutOfRangeException(nameof(scale), "Scale must be finite and greater than zero.");
+
+        return PushState(PushCommand(_commands, new UiSetTransformCommand(translation, scale)));
+    }
+
+    /// <summary>
+    /// Saves the current drawing state and replaces only its translation.
+    /// </summary>
+    /// <param name="translation">The absolute translation in framebuffer pixels.</param>
+    /// <returns>A scope that restores the previous drawing state when disposed.</returns>
+    /// <remarks>The current scale, established clips, and opacity remain unchanged.</remarks>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    public UiDrawingScope SetTranslate(Point translation)
+    {
+        VerifyActive();
+        return PushState(PushCommand(_commands, new UiSetTranslateCommand(translation)));
+    }
+
+    /// <summary>
+    /// Saves the current drawing state and replaces only its uniform scale.
+    /// </summary>
+    /// <param name="scale">The finite positive scale from local units to framebuffer pixels.</param>
+    /// <returns>A scope that restores the previous drawing state when disposed.</returns>
+    /// <remarks>The current framebuffer origin, established clips, and opacity remain unchanged.</remarks>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when scale is not finite and positive.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    public UiDrawingScope SetScale(double scale)
+    {
+        VerifyActive();
+        if (!double.IsFinite(scale) || scale <= 0)
+            throw new ArgumentOutOfRangeException(nameof(scale), "Scale must be finite and greater than zero.");
+
+        return PushState(PushCommand(_commands, new UiSetScaleCommand(scale)));
+    }
+
+    /// <summary>
     /// Pushes a rectangular clip established using the current drawing transform.
     /// </summary>
     /// <param name="clip">The local clip rectangle.</param>
