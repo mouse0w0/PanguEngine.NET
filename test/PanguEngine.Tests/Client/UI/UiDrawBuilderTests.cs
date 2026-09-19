@@ -23,26 +23,52 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
-    public void InvalidScaleFailsBeforePreviousResultChanges()
+    public void NonFiniteTransformCompositionFailsAndClearsGeometry()
     {
         var builder = new UiDrawBuilder();
-        builder.Build(Commands(Fill(new Rect(1, 2, 3, 4), new Color(1, 2, 3))), 100, 100, false);
-        var previous = builder.Vertices.ToArray();
+        builder.Build(
+            CommandList(Fill(new Rect(1, 2, 3, 4), new Color(255, 255, 255))),
+            100,
+            100,
+            false);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            builder.Build(Commands(double.NaN), 100, 100, false));
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            builder.Build(Commands(0), 100, 100, false));
-        Assert.Throws<ArgumentOutOfRangeException>(() =>
-            builder.Build(Commands(-1), 100, 100, false));
-        Assert.Equal(previous, builder.Vertices.ToArray());
+        var overflow = CommandList(
+            Transform(new Point(double.MaxValue, 0), 1),
+            Transform(new Point(double.MaxValue, 0), 1),
+            Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255)));
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build(overflow, 100, 100, false));
+        Assert.Empty(builder.Vertices.ToArray());
+        Assert.Empty(builder.Indices.ToArray());
+        Assert.Empty(builder.Batches.ToArray());
+
+        builder.Build(
+            CommandList(Fill(new Rect(1, 2, 3, 4), new Color(255, 255, 255))),
+            100,
+            100,
+            false);
+        Assert.Single(builder.Batches.ToArray());
+    }
+
+    [Fact]
+    public void TransformScaleUnderflowToZeroFailsAndClearsGeometry()
+    {
+        var builder = new UiDrawBuilder();
+        var commands = CommandList(
+            Transform(Point.Zero, 1e-200),
+            Transform(Point.Zero, 1e-200),
+            Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255)));
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build(commands, 100, 100, false));
+        Assert.Empty(builder.Vertices.ToArray());
+        Assert.Empty(builder.Batches.ToArray());
     }
 
     [Fact]
     public void ZeroFramebufferProducesAnEmptyResult()
     {
         var builder = new UiDrawBuilder();
-        var commands = Commands(Fill(new Rect(1, 2, 3, 4), new Color(1, 2, 3)));
+        var commands = CommandList(Fill(new Rect(1, 2, 3, 4), new Color(1, 2, 3)));
 
         builder.Build(commands, 0, 100, false);
 
@@ -57,7 +83,10 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(1.5, Fill(new Rect(-2, 4, 12, 20), new Color(255, 0, 0))),
+            CommandList(
+                Transform(Point.Zero, 1.5),
+                Fill(new Rect(-2, 4, 12, 20), new Color(255, 0, 0)),
+                Pop),
             12,
             20,
             false);
@@ -73,11 +102,30 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
-    public void ReusedBuilderUsesEachSnapshotScaleIndependently()
+    public void NestedTransformsComposeScaleAndTranslation()
+    {
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            CommandList(
+                Transform(new Point(10, 0), 2),
+                Transform(new Point(1, 2), 3),
+                Fill(new Rect(1, 1, 1, 1), new Color(255, 255, 255)),
+                Pop,
+                Pop),
+            200,
+            200,
+            false);
+
+        Assert.Equal(new UiVertex(18, 10, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(24, 16, 1, 1, 1, 1), builder.Vertices[2]);
+    }
+
+    [Fact]
+    public void ReusedBuilderUsesEachStreamStateIndependently()
     {
         var command = Fill(new Rect(1, 2, 3, 4), new Color(255, 255, 255));
-        var first = new UiDrawCommandList([command], 2);
-        var second = new UiDrawCommandList([command], 0.5);
+        var first = CommandList(Transform(Point.Zero, 2), command, Pop);
+        var second = CommandList(Transform(Point.Zero, 0.5), command, Pop);
         var builder = new UiDrawBuilder();
 
         builder.Build(first, 100, 100, false);
@@ -92,7 +140,7 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(new Rect(20, 20, 5, 5), new Color(255, 255, 255))),
+            CommandList(Fill(new Rect(20, 20, 5, 5), new Color(255, 255, 255))),
             10,
             10,
             false);
@@ -103,11 +151,14 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
-    public void ScalingOverflowSaturatesAtFramebufferWithoutInfiniteVertices()
+    public void ScalingClampsToFramebufferWithoutInfiniteVertices()
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(double.MaxValue, Fill(new Rect(0, 0, double.MaxValue, 1), new Color(255, 255, 255))),
+            CommandList(
+                Transform(Point.Zero, 1e6),
+                Fill(new Rect(0, 0, 1e6, 1), new Color(255, 255, 255)),
+                Pop),
             64,
             48,
             false);
@@ -117,6 +168,8 @@ public sealed class UiDrawBuilderTests
             Assert.True(float.IsFinite(vertex.X));
             Assert.True(float.IsFinite(vertex.Y));
         });
+        Assert.Equal(new UiVertex(0, 0, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(64, 48, 1, 1, 1, 1), builder.Vertices[2]);
     }
 
     [Fact]
@@ -124,10 +177,12 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(1.5, Fill(
-                new Rect(0, 0, 20, 20),
-                new Color(255, 255, 255),
-                new Rect(1.2, 2.2, 3.1, 4.1))),
+            CommandList(
+                Transform(Point.Zero, 1.5),
+                Clip(new Rect(1.2, 2.2, 3.1, 4.1)),
+                Fill(new Rect(0, 0, 20, 20), new Color(255, 255, 255)),
+                Pop,
+                Pop),
             100,
             100,
             false);
@@ -137,11 +192,28 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
+    public void FractionalZeroAreaClipProducesNoGeometry()
+    {
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            CommandList(
+                Clip(new Rect(5.5, 0, 0, 10)),
+                Fill(new Rect(0, 0, 20, 20), new Color(255, 255, 255)),
+                Pop),
+            10,
+            10,
+            false);
+
+        Assert.Empty(builder.Vertices.ToArray());
+        Assert.Empty(builder.Batches.ToArray());
+    }
+
+    [Fact]
     public void NullClipUsesFullFramebufferScissor()
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(new Rect(0, 0, 5, 5), new Color(255, 255, 255))),
+            CommandList(Fill(new Rect(0, 0, 5, 5), new Color(255, 255, 255))),
             80,
             60,
             false);
@@ -154,9 +226,13 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(
-                Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255), new Rect(20, 20, 5, 5)),
-                Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255), new Rect(1, 0, 1, 1))),
+            CommandList(
+                Clip(new Rect(20, 20, 5, 5)),
+                Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255)),
+                Pop,
+                Clip(new Rect(1, 0, 1, 1)),
+                Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255)),
+                Pop),
             10,
             10,
             false);
@@ -166,14 +242,56 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
+    public void NestedClipsIntersectAtPushTime()
+    {
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            CommandList(
+                Clip(new Rect(0, 0, 10, 10)),
+                Transform(new Point(5, 5), 1),
+                Clip(new Rect(0, 0, 10, 10)),
+                Fill(new Rect(0, 0, 20, 20), new Color(255, 255, 255)),
+                Pop,
+                Pop,
+                Pop),
+            100,
+            100,
+            false);
+
+        Assert.Equal(new UiScissor(5, 5, 5, 5), Assert.Single(builder.Batches.ToArray()).Scissor);
+    }
+
+    [Fact]
+    public void ClipKeepsItsPushTimeTransformWhenLaterTransformsChange()
+    {
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            CommandList(
+                Transform(Point.Zero, 2),
+                Clip(new Rect(0, 0, 5, 5)),
+                Transform(new Point(2, 2), 1),
+                Fill(new Rect(0, 0, 5, 5), new Color(255, 255, 255)),
+                Pop,
+                Pop,
+                Pop),
+            100,
+            100,
+            false);
+
+        Assert.Equal(new UiScissor(0, 0, 10, 10), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(new UiVertex(4, 4, 1, 1, 1, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(14, 14, 1, 1, 1, 1), builder.Vertices[2]);
+    }
+
+    [Fact]
     public void PartlyOutsideClipIsIntersectedWithFramebuffer()
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(
-                new Rect(0, 0, 5, 5),
-                new Color(255, 255, 255),
-                new Rect(-1, -1, 3, 3))),
+            CommandList(
+                Clip(new Rect(-1, -1, 3, 3)),
+                Fill(new Rect(0, 0, 5, 5), new Color(255, 255, 255)),
+                Pop),
             10,
             10,
             false);
@@ -186,7 +304,10 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(new Rect(0, 0, 1, 1), new Color(128, 64, 32, 128), opacity: 0.25)),
+            CommandList(
+                Opacity(0.25),
+                Fill(new Rect(0, 0, 1, 1), new Color(128, 64, 32, 128)),
+                Pop),
             10,
             10,
             false);
@@ -203,7 +324,10 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(new Rect(0, 0, 1, 1), new Color(128, 255, 0, 64), opacity: 0.5)),
+            CommandList(
+                Opacity(0.5),
+                Fill(new Rect(0, 0, 1, 1), new Color(128, 255, 0, 64)),
+                Pop),
             10,
             10,
             true);
@@ -222,12 +346,56 @@ public sealed class UiDrawBuilderTests
     {
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(Fill(new Rect(0, 0, 1, 1), new Color(10, 0, 0))),
+            CommandList(Fill(new Rect(0, 0, 1, 1), new Color(10, 0, 0))),
             10,
             10,
             true);
 
         Assert.Equal(10 / 255f / 12.92f, builder.Vertices[0].R);
+    }
+
+    [Fact]
+    public void NestedOpacityScopesRestorePreviousAlphaAndKeepOneBatch()
+    {
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            CommandList(
+                Opacity(0.5),
+                Fill(new Rect(0, 0, 1, 1), new Color(255, 255, 255)),
+                Opacity(0.5),
+                Fill(new Rect(1, 0, 1, 1), new Color(255, 255, 255)),
+                Pop,
+                Fill(new Rect(2, 0, 1, 1), new Color(255, 255, 255)),
+                Pop,
+                Fill(new Rect(3, 0, 1, 1), new Color(255, 255, 255))),
+            10,
+            10,
+            false);
+
+        Assert.Equal(
+            [0.5f, 0.25f, 0.5f, 1f],
+            builder.Vertices.ToArray().Chunk(4).Select(vertices => vertices[0].A));
+        Assert.Equal(24u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Fact]
+    public void TransformScopesDoNotSplitEqualScissorBatch()
+    {
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            CommandList(
+                Transform(Point.Zero, 1),
+                Fill(new Rect(0, 0, 1, 1), new Color(1, 0, 0)),
+                Transform(new Point(2, 0), 1),
+                Fill(new Rect(0, 0, 1, 1), new Color(2, 0, 0)),
+                Pop,
+                Fill(new Rect(0, 0, 1, 1), new Color(3, 0, 0)),
+                Pop),
+            10,
+            10,
+            false);
+
+        Assert.Equal(18u, Assert.Single(builder.Batches.ToArray()).IndexCount);
     }
 
     [Fact]
@@ -237,11 +405,17 @@ public sealed class UiDrawBuilderTests
         var secondClip = new Rect(20, 0, 10, 10);
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(
-                Fill(new Rect(0, 0, 2, 2), new Color(1, 0, 0), firstClip),
-                Fill(new Rect(2, 0, 2, 2), new Color(2, 0, 0), firstClip),
-                Fill(new Rect(20, 0, 2, 2), new Color(3, 0, 0), secondClip),
-                Fill(new Rect(4, 0, 2, 2), new Color(4, 0, 0), firstClip)),
+            CommandList(
+                Clip(firstClip),
+                Fill(new Rect(0, 0, 2, 2), new Color(1, 0, 0)),
+                Fill(new Rect(2, 0, 2, 2), new Color(2, 0, 0)),
+                Pop,
+                Clip(secondClip),
+                Fill(new Rect(20, 0, 2, 2), new Color(3, 0, 0)),
+                Pop,
+                Clip(firstClip),
+                Fill(new Rect(4, 0, 2, 2), new Color(4, 0, 0)),
+                Pop),
             100,
             100,
             false);
@@ -273,15 +447,87 @@ public sealed class UiDrawBuilderTests
         var clip = new Rect(0, 0, 10, 10);
         var builder = new UiDrawBuilder();
         builder.Build(
-            Commands(
-                Fill(new Rect(0, 0, 2, 2), new Color(1, 0, 0), clip),
-                Fill(new Rect(50, 50, 2, 2), new Color(2, 0, 0), clip),
-                Fill(new Rect(2, 0, 2, 2), new Color(3, 0, 0), clip)),
+            CommandList(
+                Clip(clip),
+                Fill(new Rect(0, 0, 2, 2), new Color(1, 0, 0)),
+                Fill(new Rect(50, 50, 2, 2), new Color(2, 0, 0)),
+                Fill(new Rect(2, 0, 2, 2), new Color(3, 0, 0)),
+                Pop),
             20,
             20,
             false);
 
         Assert.Equal(12u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Fact]
+    public void PreciseClipRejectsGeometryInsideOnlyTheRoundedScissor()
+    {
+        var image = UiImage.FromRgba(new byte[4], 1, 1);
+        var builder = new UiDrawBuilder();
+        var resolutions = 0;
+        builder.Build(
+            CommandList(
+                Clip(new Rect(2.2, 0, 0.1, 10)),
+                Fill(new Rect(2.05, 0, 0.05, 1), new Color(255, 255, 255)),
+                Image(new Rect(2.05, 0, 0.05, 1), image, image.FullSourceRect, ImageSamplingMode.Linear),
+                Pop),
+            100, 100, false,
+            _ =>
+            {
+                resolutions++;
+                return new UiImageRenderBinding(1, 1, 1, new UiImageAtlasRegion(0, 0, 1, 1));
+            });
+
+        Assert.Equal(0, resolutions);
+        Assert.Empty(builder.Vertices.ToArray());
+    }
+
+    [Fact]
+    public void EmptyIntersectionStaysEmptyUntilItsScopeIsPopped()
+    {
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            CommandList(
+                Clip(new Rect(1, 1, 5, 5)),
+                Clip(new Rect(10, 10, 5, 5)),
+                Transform(new Point(1, 1), 2),
+                Clip(new Rect(0, 0, 20, 20)),
+                Fill(new Rect(0, 0, 20, 20), new Color(255, 0, 0)),
+                Pop, Pop, Pop,
+                Fill(new Rect(0, 0, 20, 20), new Color(0, 255, 0)),
+                Pop,
+                Fill(new Rect(0, 0, 20, 20), new Color(0, 0, 255))),
+            100, 100, false);
+
+        Assert.Equal(2, builder.RectangleCount);
+        Assert.Equal(new UiVertex(0, 0, 0, 1, 0, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(0, 0, 0, 0, 1, 1), builder.Vertices[4]);
+        Assert.Equal(
+            [new UiBatch(new UiScissor(1, 1, 5, 5), 0, 6), new UiBatch(new UiScissor(0, 0, 100, 100), 6, 6)],
+            builder.Batches.ToArray());
+    }
+
+    [Fact]
+    public void ResolverExceptionDiscardsPartialGeometryAndRestoresBuilderState()
+    {
+        var image = UiImage.FromRgba(new byte[4], 1, 1);
+        var expected = new InvalidOperationException("resolver failed");
+        var builder = new UiDrawBuilder();
+        var commands = CommandList(
+            Transform(new Point(5, 6), 2),
+            Fill(new Rect(0, 0, 2, 2), new Color(255, 255, 255)),
+            Image(new Rect(0, 0, 2, 2), image, image.FullSourceRect, ImageSamplingMode.Linear),
+            Pop);
+
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() =>
+            builder.Build(commands, 100, 100, false, _ => throw expected)));
+        Assert.Empty(builder.Vertices.ToArray());
+        Assert.Empty(builder.Indices.ToArray());
+        Assert.Empty(builder.Batches.ToArray());
+
+        builder.Build(CommandList(Fill(new Rect(1, 2, 3, 4), new Color(255, 255, 255))), 100, 100, false);
+        Assert.Equal(new UiVertex(1, 2, 1, 1, 1, 1), builder.Vertices[0]);
     }
 
     [Fact]
@@ -297,13 +543,10 @@ public sealed class UiDrawBuilderTests
         var builder = new UiDrawBuilder();
 
         builder.Build(
-            Commands(new UiDrawImageCommand(
-                new Rect(0, 0, 8, 8),
-                image,
-                new Rect(1, 1, 2, 2),
-                ImageSamplingMode.Linear,
-                null,
-                0.5)),
+            CommandList(
+                Opacity(0.5),
+                Image(new Rect(0, 0, 8, 8), image, new Rect(1, 1, 2, 2), ImageSamplingMode.Linear),
+                Pop),
             16,
             16,
             false,
@@ -328,19 +571,92 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
+    public void ImageCommandsArePositionedByEffectiveTransform()
+    {
+        var image = UiImage.FromRgba(new byte[4], 1, 1);
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            CommandList(
+                Transform(new Point(4, 6), 2),
+                Image(new Rect(1, 1, 2, 2), image, image.FullSourceRect, ImageSamplingMode.Linear),
+                Pop),
+            100,
+            100,
+            false,
+            _ => new UiImageRenderBinding(1, 1, 1, new UiImageAtlasRegion(0, 0, 1, 1)));
+
+        Assert.Equal(6, builder.Vertices[0].X);
+        Assert.Equal(8, builder.Vertices[0].Y);
+        Assert.Equal(10, builder.Vertices[2].X);
+        Assert.Equal(12, builder.Vertices[2].Y);
+    }
+
+    [Fact]
+    public void SourceRectKeepsPixelUvUnderTransform()
+    {
+        var image = UiImage.FromRgba(new byte[64], 4, 4);
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            CommandList(
+                Transform(new Point(10, 20), 2),
+                Image(new Rect(0, 0, 8, 8), image, new Rect(1, 1, 2, 2), ImageSamplingMode.Linear),
+                Pop),
+            64,
+            64,
+            false,
+            _ => new UiImageRenderBinding(5, 16, 16, new UiImageAtlasRegion(4, 8, 4, 4)));
+
+        var first = builder.Vertices[0];
+        Assert.Equal(5 / 16f, first.U);
+        Assert.Equal(9 / 16f, first.V);
+        Assert.Equal(5.5f / 16, first.ClampMinU);
+        Assert.Equal(9.5f / 16, first.ClampMinV);
+        Assert.Equal(6.5f / 16, first.ClampMaxU);
+        Assert.Equal(10.5f / 16, first.ClampMaxV);
+        Assert.Equal(10, first.X);
+        Assert.Equal(20, first.Y);
+    }
+
+    [Fact]
+    public void ZeroOpacityDoesNotResolveImage()
+    {
+        var image = UiImage.FromRgba(new byte[4], 1, 1);
+        var resolutions = 0;
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            CommandList(
+                Opacity(0),
+                Image(new Rect(0, 0, 1, 1), image, image.FullSourceRect, ImageSamplingMode.Linear),
+                Pop),
+            10,
+            10,
+            false,
+            _ =>
+            {
+                resolutions++;
+                return new UiImageRenderBinding(1, 1, 1, new UiImageAtlasRegion(0, 0, 1, 1));
+            });
+
+        Assert.Equal(0, resolutions);
+        Assert.Empty(builder.Vertices.ToArray());
+    }
+
+    [Fact]
     public void SubTexelImageSourceClampsToItsCenter()
     {
         var image = UiImage.FromRgba(new byte[4], 1, 1);
         var builder = new UiDrawBuilder();
 
         builder.Build(
-            Commands(new UiDrawImageCommand(
-                new Rect(0, 0, 1, 1),
-                image,
-                new Rect(0.25, 0.125, 0.5, 0.25),
-                ImageSamplingMode.Linear,
-                null,
-                1)),
+            CommandList(
+                Image(
+                    new Rect(0, 0, 1, 1),
+                    image,
+                    new Rect(0.25, 0.125, 0.5, 0.25),
+                    ImageSamplingMode.Linear)),
             10,
             10,
             false,
@@ -361,15 +677,13 @@ public sealed class UiDrawBuilderTests
     public void PendingImageDoesNotSplitCompatibleSolidBatches()
     {
         var image = UiImage.FromRgba(new byte[4], 1, 1);
-        var clip = new Rect(0, 0, 10, 10);
         var builder = new UiDrawBuilder();
 
         builder.Build(
-            Commands(
-                Fill(new Rect(0, 0, 1, 1), new Color(1, 0, 0), clip),
-                new UiDrawImageCommand(new Rect(1, 0, 1, 1), image, image.FullSourceRect,
-                    ImageSamplingMode.Linear, clip, 1),
-                Fill(new Rect(2, 0, 1, 1), new Color(0, 1, 0), clip)),
+            CommandList(
+                Fill(new Rect(0, 0, 1, 1), new Color(1, 0, 0)),
+                Image(new Rect(1, 0, 1, 1), image, image.FullSourceRect, ImageSamplingMode.Linear),
+                Fill(new Rect(2, 0, 1, 1), new Color(0, 1, 0))),
             10,
             10,
             false,
@@ -386,15 +700,11 @@ public sealed class UiDrawBuilderTests
         var builder = new UiDrawBuilder();
 
         builder.Build(
-            Commands(
-                new UiDrawImageCommand(new Rect(0, 0, 1, 1), firstImage, firstImage.FullSourceRect,
-                    ImageSamplingMode.Linear, null, 1),
-                new UiDrawImageCommand(new Rect(1, 0, 1, 1), firstImage, firstImage.FullSourceRect,
-                    ImageSamplingMode.Linear, null, 1),
-                new UiDrawImageCommand(new Rect(2, 0, 1, 1), firstImage, firstImage.FullSourceRect,
-                    ImageSamplingMode.Nearest, null, 1),
-                new UiDrawImageCommand(new Rect(3, 0, 1, 1), secondImage, secondImage.FullSourceRect,
-                    ImageSamplingMode.Linear, null, 1)),
+            CommandList(
+                Image(new Rect(0, 0, 1, 1), firstImage, firstImage.FullSourceRect, ImageSamplingMode.Linear),
+                Image(new Rect(1, 0, 1, 1), firstImage, firstImage.FullSourceRect, ImageSamplingMode.Linear),
+                Image(new Rect(2, 0, 1, 1), firstImage, firstImage.FullSourceRect, ImageSamplingMode.Nearest),
+                Image(new Rect(3, 0, 1, 1), secondImage, secondImage.FullSourceRect, ImageSamplingMode.Linear)),
             10,
             10,
             false,
@@ -420,16 +730,27 @@ public sealed class UiDrawBuilderTests
     private static uint PackMaterialData(UiMaterialKind materialKind, uint textureIndex) =>
         (textureIndex << 8) | (uint)materialKind;
 
-    private static UiDrawCommandList Commands(params UiDrawCommand[] commands) =>
-        new(commands.ToList(), 1);
+    private static UiDrawCommandList CommandList(params UiDrawCommand[] commands) =>
+        new UiDrawCommandList([.. commands]);
 
-    private static UiDrawCommandList Commands(double scale, params UiDrawCommand[] commands) =>
-        new(commands.ToList(), scale);
+    private static UiPushTransformCommand Transform(Point translation, double scale = 1) =>
+        new(translation, scale);
 
-    private static UiFillRectangleCommand Fill(
+    private static UiPushClipCommand Clip(Rect clip) =>
+        new(clip);
+
+    private static UiPushOpacityCommand Opacity(double opacity) =>
+        new(opacity);
+
+    private static UiDrawCommand Pop => UiPopCommand.Instance;
+
+    private static UiFillRectangleCommand Fill(Rect bounds, Color color) =>
+        new(bounds, color);
+
+    private static UiDrawImageCommand Image(
         Rect bounds,
-        Color color,
-        Rect? clip = null,
-        double opacity = 1) =>
-        new(bounds, color, clip, opacity);
+        UiImage image,
+        Rect sourceRect,
+        ImageSamplingMode samplingMode) =>
+        new(bounds, image, sourceRect, samplingMode);
 }

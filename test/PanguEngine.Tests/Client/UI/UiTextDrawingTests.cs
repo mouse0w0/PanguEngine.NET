@@ -17,7 +17,7 @@ public sealed class UiTextDrawingTests
     }
 
     [Fact]
-    public void DrawTextSkipsEmptyLayoutTransparentColorAndEmptyClip()
+    public void DrawTextSkipsEmptyLayoutAndTransparentColor()
     {
         using var fonts = new TextFontContext();
         var commands = new List<UiDrawCommand>();
@@ -27,45 +27,52 @@ public sealed class UiTextDrawingTests
             new Color(255, 255, 255));
         context.DrawText(Point.Zero, fonts.CreateLayout("A"), 16,
             new Color(255, 255, 255, 0));
-        CreateDrawingContext(commands, isClipEmpty: true).DrawText(
-            Point.Zero,
-            fonts.CreateLayout("A"),
-            16,
-            new Color(255, 255, 255));
 
         Assert.Empty(commands);
     }
 
     [Fact]
-    public void DrawTextKeepsLayoutAndDoesNotCullOverflowingInkByLayoutBox()
+    public void DrawTextRecordsLocalOriginAndLayoutWithoutApplyingPendingState()
     {
         using var fonts = new TextFontContext();
         var layout = fonts.CreateLayout("A");
         var commands = new List<UiDrawCommand>();
-        var context = CreateDrawingContext(
+        var context = CreateDrawingContext(commands);
+
+        using (context.PushClip(new Rect(0, 0, 1, 1)))
+        using (context.PushOpacity(0.25))
+        {
+            context.DrawText(new Point(200, 300), layout, 18, new Color(10, 20, 30, 128));
+        }
+
+        Assert.Collection(
             commands,
-            originX: 10,
-            originY: 20,
-            clip: new Rect(0, 0, 1, 1),
-            opacity: 0.25);
-
-        context.DrawText(new Point(200, 300), layout, 18, new Color(10, 20, 30, 128));
-
-        var command = Assert.IsType<UiDrawTextCommand>(Assert.Single(commands));
-        Assert.Same(layout, command.Layout);
-        Assert.Equal(new Point(210, 320), command.Origin);
-        Assert.Equal(18, command.FontSize);
-        Assert.Equal(new Color(10, 20, 30, 128), command.Color);
-        Assert.Equal(new Rect(0, 0, 1, 1), command.Clip);
-        Assert.Equal(0.25, command.Opacity);
+            command => Assert.Equal(
+                new Rect(0, 0, 1, 1),
+                Assert.IsType<UiPushClipCommand>(command).Clip),
+            command => Assert.Equal(
+                0.25,
+                Assert.IsType<UiPushOpacityCommand>(command).Opacity),
+            command =>
+            {
+                var text = Assert.IsType<UiDrawTextCommand>(command);
+                Assert.Same(layout, text.Layout);
+                Assert.Equal(new Point(200, 300), text.Origin);
+                Assert.Equal(18, text.FontSize);
+                Assert.Equal(new Color(10, 20, 30, 128), text.Color);
+            },
+            command => Assert.IsType<UiPopCommand>(command),
+            command => Assert.IsType<UiPopCommand>(command));
     }
 
     [Fact]
-    public void BuilderUsesSnapshotScaleBaselineBearingAndAtlasUv()
+    public void BuilderUsesEffectiveScaleAndTranslationForText()
     {
         using var fonts = new TextFontContext();
-        var layout = fonts.CreateLayout("A");
-        var glyph = Assert.Single(Assert.Single(layout.Lines).GlyphRuns).Glyphs[0];
+        var sourceRun = Assert.Single(Assert.Single(fonts.CreateLayout("A").Lines).GlyphRuns);
+        var glyph = new PositionedGlyph(sourceRun.Glyphs[0].GlyphId, 0, 3, 5, 10, 0, 1, -2, false);
+        var layout = new TextLayout(10, 20, TextBounds.Empty,
+            [new TextLine(0, 1, 0, 0, 10, 20, 20, 5, [new TextGlyphRun(sourceRun.FontFace, 0, 1, [glyph])])]);
         var binding = new UiGlyphRenderBinding(
             7,
             64,
@@ -74,17 +81,22 @@ public sealed class UiTextDrawingTests
             -1,
             6);
         var command = new UiDrawTextCommand(
-            new Point(10, 20),
+            new Point(7, 11),
             layout,
             10,
-            new Color(128, 64, 32, 128),
-            null,
-            0.5);
+            new Color(128, 64, 32, 128));
         var builder = new UiDrawBuilder();
         var resolvedKeys = new List<GlyphRasterKey>();
 
         builder.Build(
-            new UiDrawCommandList([command], 1.5),
+            CommandList(
+                Transform(new Point(5, 7), 1.5),
+                Transform(new Point(2, 4), 2),
+                Opacity(0.5),
+                command,
+                Pop,
+                Pop,
+                Pop),
             400,
             300,
             true,
@@ -96,13 +108,13 @@ public sealed class UiTextDrawingTests
 
         var key = Assert.Single(resolvedKeys);
         Assert.Same(Assert.Single(layout.Lines).GlyphRuns[0].FontFace, key.FontFace);
-        Assert.Equal(15u, key.PixelSize);
+        Assert.Equal(30u, key.PixelSize);
         Assert.Equal(glyph.GlyphId, key.GlyphId);
-        var penX = (10 + glyph.X + glyph.XOffset) * 1.5;
-        var baselineY = (20 + glyph.Y + glyph.YOffset) * 1.5;
         var first = builder.Vertices[0];
-        Assert.Equal((float)(penX - 1), first.X);
-        Assert.Equal((float)(baselineY - 6), first.Y);
+        Assert.Equal(40f, first.X);
+        Assert.Equal(49f, first.Y);
+        Assert.Equal(45f, builder.Vertices[2].X);
+        Assert.Equal(56f, builder.Vertices[2].Y);
         Assert.Equal(2 / 64f, first.U);
         Assert.Equal(3 / 32f, first.V);
         Assert.Equal(2.5f / 64, first.ClampMinU);
@@ -132,13 +144,11 @@ public sealed class UiTextDrawingTests
             Point.Zero,
             layout,
             16,
-            new Color(255, 255, 255),
-            null,
-            1);
+            new Color(255, 255, 255));
         var builder = new UiDrawBuilder();
 
         builder.Build(
-            new UiDrawCommandList([command], 1),
+            CommandList(command),
             100,
             100,
             false,
@@ -148,7 +158,7 @@ public sealed class UiTextDrawingTests
         Assert.Equal(12u, Assert.Single(builder.Batches.ToArray()).IndexCount);
 
         builder.Build(
-            new UiDrawCommandList([command], 1),
+            CommandList(command),
             100,
             100,
             false,
@@ -156,6 +166,100 @@ public sealed class UiTextDrawingTests
 
         Assert.Equal(1, builder.RectangleCount);
         Assert.Equal(6u, Assert.Single(builder.Batches.ToArray()).IndexCount);
+    }
+
+    [Fact]
+    public void BuilderDoesNotResolveGlyphsWhenOpacityZero()
+    {
+        using var fonts = new TextFontContext();
+        var layout = fonts.CreateLayout("A");
+        var resolvedKeys = new List<GlyphRasterKey>();
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            CommandList(
+                Opacity(0),
+                new UiDrawTextCommand(Point.Zero, layout, 16, new Color(255, 255, 255)),
+                Pop),
+            100,
+            100,
+            false,
+            glyphResolver: key =>
+            {
+                resolvedKeys.Add(key);
+                return new UiGlyphRenderBinding(
+                    1,
+                    64,
+                    64,
+                    new GlyphAtlasRegion(0, 0, 1, 1),
+                    0,
+                    0);
+            });
+
+        Assert.Empty(resolvedKeys);
+        Assert.Empty(builder.Vertices.ToArray());
+    }
+
+    [Fact]
+    public void BuilderDropsTextUnderEmptyClipWithoutResolvingGlyphs()
+    {
+        using var fonts = new TextFontContext();
+        var layout = fonts.CreateLayout("A");
+        var resolvedKeys = new List<GlyphRasterKey>();
+        var builder = new UiDrawBuilder();
+
+        builder.Build(
+            CommandList(
+                Clip(Rect.Zero),
+                new UiDrawTextCommand(Point.Zero, layout, 16, new Color(255, 255, 255)),
+                Pop),
+            100,
+            100,
+            false,
+            glyphResolver: key =>
+            {
+                resolvedKeys.Add(key);
+                return new UiGlyphRenderBinding(
+                    1,
+                    64,
+                    64,
+                    new GlyphAtlasRegion(0, 0, 1, 1),
+                    0,
+                    0);
+            });
+
+        Assert.Empty(resolvedKeys);
+        Assert.Empty(builder.Vertices.ToArray());
+    }
+
+    [Fact]
+    public void BuilderPreservesRoundedScissorCullingForGlyphInk()
+    {
+        using var fonts = new TextFontContext();
+        var sourceRun = Assert.Single(Assert.Single(fonts.CreateLayout("A").Lines).GlyphRuns);
+        var glyph = new PositionedGlyph(sourceRun.Glyphs[0].GlyphId, 0, 0, 0, 1, 0, 0, 0, false);
+        var layout = new TextLayout(1, 1, TextBounds.Empty,
+            [new TextLine(0, 1, 0, 0, 1, 1, 1, 0, [new TextGlyphRun(sourceRun.FontFace, 0, 1, [glyph])])]);
+        var builder = new UiDrawBuilder();
+        var resolutions = 0;
+
+        builder.Build(
+            CommandList(
+                Clip(new Rect(2.2, 0, 0.1, 10)),
+                new UiDrawTextCommand(new Point(1.1, 0), layout, 16, new Color(255, 255, 255)),
+                Pop),
+            100, 100, false,
+            glyphResolver: _ =>
+            {
+                resolutions++;
+                return new UiGlyphRenderBinding(1, 8, 8, new GlyphAtlasRegion(0, 0, 1, 1), 0, 0);
+            });
+
+        Assert.Equal(1, resolutions);
+        Assert.Equal(1, builder.RectangleCount);
+        Assert.Equal(1.1f, builder.Vertices[0].X);
+        Assert.Equal(2.1f, builder.Vertices[2].X);
+        Assert.Equal(new UiScissor(2, 0, 1, 10), Assert.Single(builder.Batches.ToArray()).Scissor);
     }
 
     [Fact]
@@ -169,20 +273,15 @@ public sealed class UiTextDrawingTests
             Point.Zero,
             layout,
             16,
-            new Color(255, 255, 255),
-            null,
-            1);
+            new Color(255, 255, 255));
         var builder = new UiDrawBuilder();
 
         builder.Build(
-            new UiDrawCommandList(
-                [
-                    new UiFillRectangleCommand(new Rect(0, 0, 1, 1), new Color(255, 0, 0), null, 1),
-                    text,
-                    new UiDrawImageCommand(new Rect(0, 0, 1, 1), image, image.FullSourceRect,
-                        ImageSamplingMode.Linear, null, 1)
-                ],
-                1),
+            CommandList(
+                new UiFillRectangleCommand(new Rect(0, 0, 1, 1), new Color(255, 0, 0)),
+                text,
+                new UiDrawImageCommand(new Rect(0, 0, 1, 1), image, image.FullSourceRect,
+                    ImageSamplingMode.Linear)),
             100,
             100,
             false,
@@ -207,14 +306,22 @@ public sealed class UiTextDrawingTests
     private static uint PackMaterialData(UiMaterialKind materialKind, uint textureIndex) =>
         (textureIndex << 8) | (uint)materialKind;
 
-    private static UiDrawingContext CreateDrawingContext(
-        List<UiDrawCommand> commands,
-        double originX = 0,
-        double originY = 0,
-        Rect? clip = null,
-        bool isClipEmpty = false,
-        double opacity = 1) =>
-        new(commands, new UiDrawingState(originX, originY, clip, isClipEmpty, opacity));
+    private static UiDrawCommandList CommandList(params UiDrawCommand[] commands) =>
+        new UiDrawCommandList([.. commands]);
+
+    private static UiPushTransformCommand Transform(Point translation, double scale = 1) =>
+        new(translation, scale);
+
+    private static UiPushClipCommand Clip(Rect clip) =>
+        new(clip);
+
+    private static UiPushOpacityCommand Opacity(double opacity) =>
+        new(opacity);
+
+    private static UiDrawCommand Pop => UiPopCommand.Instance;
+
+    private static UiDrawingContext CreateDrawingContext(List<UiDrawCommand> commands) =>
+        new(commands);
 
     private sealed class TextFontContext : IDisposable
     {

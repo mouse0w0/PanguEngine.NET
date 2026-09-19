@@ -391,8 +391,11 @@ public sealed class TextBoxTests
             .OfType<UiFillRectangleCommand>()
             .Where(command => command.Color == textBox.SelectionBackground));
 
+        var clip = Assert.Single(commands.OfType<UiPushClipCommand>()).Clip;
         Assert.Single(text.Layout.Lines);
-        Assert.Equal(textBox.ContentBounds, selection.Clip);
+        Assert.Equal(textBox.ContentBounds, clip);
+        Assert.InRange(selection.Bounds.X, clip.X, clip.X + clip.Width);
+        Assert.InRange(selection.Bounds.Y, clip.Y, clip.Y + clip.Height);
         Assert.Equal(textBox.Foreground, text.Color);
         Assert.True(textBox.DesiredSize.Width >= 160);
     }
@@ -483,7 +486,7 @@ public sealed class TextBoxTests
         Assert.True(text.Origin.X < textBox.ContentBounds.X);
         Assert.InRange(caret.Bounds.X, textBox.ContentBounds.X, textBox.ContentBounds.X + textBox.ContentBounds.Width);
         Assert.True(caret.Bounds.X + caret.Bounds.Width <= textBox.ContentBounds.X + textBox.ContentBounds.Width);
-        Assert.Equal(textBox.ContentBounds, caret.Clip);
+        Assert.Equal(textBox.ContentBounds, Assert.Single(commands.OfType<UiPushClipCommand>()).Clip);
 
         var leftOfContent = new Point(
             textBox.ContentBounds.X - 1,

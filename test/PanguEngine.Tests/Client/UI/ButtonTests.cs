@@ -3,6 +3,7 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Input;
+using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 
@@ -291,15 +292,23 @@ public sealed class ButtonTests
         manager.Open(screen);
         manager.Update(new Size(120, 80));
 
-        var normal = GetFills(screen);
-        Assert.Equal(5, normal.Count);
+        var normalCommands = screen.CreateDrawCommandList();
+        var normal = normalCommands.OfType<UiFillRectangleCommand>().ToArray();
+        Assert.Equal(5, normal.Length);
         Assert.Equal(new Color(48, 54, 62), normal[0].Color);
-        Assert.All(normal, command => Assert.Null(command.Clip));
+        Assert.DoesNotContain(normalCommands, command => command is UiPushClipCommand);
 
         manager.ProcessPointerMoved(new Point(20, 20));
         var hovered = GetFills(screen);
         Assert.Equal(new Color(255, 255, 255, 24), hovered[5].Color);
-        Assert.Equal(new Rect(10, 10, 80, 32), hovered[5].Bounds);
+        Assert.Equal(new Rect(0, 0, 80, 32), hovered[5].Bounds);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(screen.CreateDrawCommandList(), 120, 80, false);
+        Assert.Equal(10f, builder.Vertices[20].X);
+        Assert.Equal(10f, builder.Vertices[20].Y);
+        Assert.Equal(90f, builder.Vertices[22].X);
+        Assert.Equal(42f, builder.Vertices[22].Y);
 
         manager.ProcessPointerPressed(new Point(20, 20), MouseButton.Left, KeyModifiers.None);
         var pressed = GetFills(screen);
@@ -327,10 +336,10 @@ public sealed class ButtonTests
         var fills = GetFills(screen);
 
         Assert.Equal(9, fills.Count);
-        Assert.Equal(new Rect(10, 10, 80, 1), fills[5].Bounds);
-        Assert.Equal(new Rect(89, 11, 1, 30), fills[6].Bounds);
-        Assert.Equal(new Rect(10, 41, 80, 1), fills[7].Bounds);
-        Assert.Equal(new Rect(10, 11, 1, 30), fills[8].Bounds);
+        Assert.Equal(new Rect(0, 0, 80, 1), fills[5].Bounds);
+        Assert.Equal(new Rect(79, 1, 1, 30), fills[6].Bounds);
+        Assert.Equal(new Rect(0, 31, 80, 1), fills[7].Bounds);
+        Assert.Equal(new Rect(0, 1, 1, 30), fills[8].Bounds);
         Assert.All(fills.Skip(5), command =>
             Assert.Equal(new Color(84, 169, 255), command.Color));
         manager.Close();
@@ -371,19 +380,15 @@ public sealed class ButtonTests
         manager.Update(new Size(140, 80));
 
         var commands = screen.CreateDrawCommandList();
-        var imageCommand = Assert.IsType<UiDrawImageCommand>(commands[5]);
-        var textCommand = Assert.IsType<UiDrawTextCommand>(commands[6]);
+        var imageCommand = Assert.Single(commands.OfType<UiDrawImageCommand>());
+        var textCommand = Assert.Single(commands.OfType<UiDrawTextCommand>());
         var image = Assert.IsType<ImageView>(button.Children[0]);
-        var imageOrigin = image.LocalToScreen(Point.Zero);
 
         Assert.Equal(
-            new Rect(
-                imageOrigin.X,
-                imageOrigin.Y,
-                image.LayoutBounds.Width,
-                image.LayoutBounds.Height),
-            imageCommand.Clip);
-        Assert.Null(textCommand.Clip);
+            new Rect(0, 0, image.LayoutBounds.Width, image.LayoutBounds.Height),
+            Assert.Single(commands.OfType<UiPushClipCommand>()).Clip);
+        var ordered = commands.ToArray();
+        Assert.True(Array.IndexOf(ordered, imageCommand) < Array.IndexOf(ordered, textCommand));
         manager.Close();
     }
 

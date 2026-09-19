@@ -118,6 +118,7 @@ internal sealed class UiDrawBuilder
     private readonly List<UiVertex> _vertices = [];
     private readonly List<uint> _indices = [];
     private readonly List<UiBatch> _batches = [];
+    private readonly List<DrawingState> _states = [];
 
     internal ReadOnlySpan<UiVertex> Vertices => CollectionsMarshal.AsSpan(_vertices);
     internal ReadOnlySpan<uint> Indices => CollectionsMarshal.AsSpan(_indices);
@@ -133,61 +134,113 @@ internal sealed class UiDrawBuilder
         UiGlyphResolver? glyphResolver = null)
     {
         ArgumentNullException.ThrowIfNull(commands);
-        var uiScale = commands.Scale;
-        if (!double.IsFinite(uiScale) || uiScale <= 0)
-        {
-            throw new ArgumentOutOfRangeException(
-                nameof(commands),
-                uiScale,
-                "UI drawing command scale must be finite and greater than zero.");
-        }
-
         _vertices.Clear();
         _indices.Clear();
         _batches.Clear();
         if (framebufferWidth == 0 || framebufferHeight == 0)
             return;
 
-        foreach (var command in commands)
+        var state = new DrawingState(0, 0, 1, null, 1);
+        try
         {
-            switch (command)
+            foreach (var command in commands)
             {
-                case UiFillRectangleCommand rectangle:
-                    AppendRectangle(
-                        rectangle,
-                        framebufferWidth,
-                        framebufferHeight,
-                        uiScale,
-                        convertSrgbToLinear);
-                    break;
-                case UiDrawImageCommand image:
-                    if (imageResolver is null)
-                        throw new NotSupportedException("Image drawing requires an image resource resolver.");
-                    if (imageResolver(image) is { } binding)
-                    {
-                        AppendImage(
-                            image,
-                            binding,
+                switch (command)
+                {
+                    case UiPushTransformCommand transform:
+                        _states.Add(state);
+                        var scale = Finite(state.Scale * transform.Scale);
+                        if (scale <= 0)
+                            throw new InvalidOperationException("UI drawing produced a non-positive scale.");
+                        state = state with
+                        {
+                            X = Finite(state.X + state.Scale * transform.Translation.X),
+                            Y = Finite(state.Y + state.Scale * transform.Translation.Y),
+                            Scale = scale
+                        };
+                        continue;
+                    case UiPushClipCommand clip:
+                        _states.Add(state);
+                        var bounds = Transform(clip.Clip, state);
+                        if (state.Clip is { } previousClip)
+                        {
+                            var left = Math.Max(previousClip.X, bounds.X);
+                            var top = Math.Max(previousClip.Y, bounds.Y);
+                            var right = Math.Min(previousClip.X + previousClip.Width, bounds.X + bounds.Width);
+                            var bottom = Math.Min(previousClip.Y + previousClip.Height, bounds.Y + bounds.Height);
+                            bounds = right <= left || bottom <= top
+                                ? Rect.Zero
+                                : new Rect(left, top, right - left, bottom - top);
+                        }
+
+                        state = state with { Clip = bounds };
+                        continue;
+                    case UiPushOpacityCommand opacity:
+                        _states.Add(state);
+                        state = state with { Opacity = state.Opacity * opacity.Opacity };
+                        continue;
+                    case UiPopCommand:
+                        state = _states[^1];
+                        _states.RemoveAt(_states.Count - 1);
+                        continue;
+                }
+
+                if (state.Opacity == 0 ||
+                    !TryGetScissor(state.Clip, framebufferWidth, framebufferHeight, out var scissor))
+                {
+                    continue;
+                }
+
+                switch (command)
+                {
+                    case UiFillRectangleCommand rectangle:
+                        AppendRectangle(
+                            rectangle,
                             framebufferWidth,
                             framebufferHeight,
-                            uiScale);
-                    }
+                            state,
+                            scissor,
+                            convertSrgbToLinear);
+                        break;
+                    case UiDrawImageCommand image:
+                        if (!TryGetPhysicalBounds(image.Bounds, framebufferWidth, framebufferHeight, state, out var imageBounds) ||
+                            !Intersects(imageBounds, scissor))
+                        {
+                            break;
+                        }
+                        if (imageResolver is null)
+                            throw new NotSupportedException("Image drawing requires an image resource resolver.");
+                        if (imageResolver(image) is { } binding)
+                        {
+                            AppendImage(
+                                image,
+                                binding,
+                                imageBounds,
+                                scissor,
+                                state.Opacity);
+                        }
 
-                    break;
-                case UiDrawTextCommand text:
-                    if (glyphResolver is null)
-                        throw new NotSupportedException("Text drawing requires a glyph resource resolver.");
-                    AppendText(
-                        text,
-                        glyphResolver,
-                        framebufferWidth,
-                        framebufferHeight,
-                        uiScale,
-                        convertSrgbToLinear);
-                    break;
-                default:
-                    throw new NotSupportedException($"UI draw command '{command.GetType().Name}' is not supported.");
+                        break;
+                    case UiDrawTextCommand text:
+                        if (glyphResolver is null)
+                            throw new NotSupportedException("Text drawing requires a glyph resource resolver.");
+                        AppendText(text, glyphResolver, state, scissor, convertSrgbToLinear);
+                        break;
+                    default:
+                        throw new NotSupportedException($"UI draw command '{command.GetType().Name}' is not supported.");
+                }
             }
+        }
+        catch
+        {
+            _vertices.Clear();
+            _indices.Clear();
+            _batches.Clear();
+            throw;
+        }
+        finally
+        {
+            _states.Clear();
         }
     }
 
@@ -213,11 +266,11 @@ internal sealed class UiDrawBuilder
         UiFillRectangleCommand command,
         uint framebufferWidth,
         uint framebufferHeight,
-        double uiScale,
+        DrawingState state,
+        UiScissor scissor,
         bool convertSrgbToLinear)
     {
-        if (!TryGetPhysicalBounds(command.Bounds, framebufferWidth, framebufferHeight, uiScale, out var bounds) ||
-            !TryGetScissor(command.Clip, framebufferWidth, framebufferHeight, uiScale, out var scissor) ||
+        if (!TryGetPhysicalBounds(command.Bounds, framebufferWidth, framebufferHeight, state, out var bounds) ||
             !Intersects(bounds, scissor))
         {
             return;
@@ -227,7 +280,7 @@ internal sealed class UiDrawBuilder
         var r = ToColorChannel(color.R, convertSrgbToLinear);
         var g = ToColorChannel(color.G, convertSrgbToLinear);
         var b = ToColorChannel(color.B, convertSrgbToLinear);
-        var a = (float)(color.A / 255.0 * command.Opacity);
+        var a = (float)(color.A / 255.0 * state.Opacity);
         AppendGeometry(
             bounds,
             scissor,
@@ -248,17 +301,10 @@ internal sealed class UiDrawBuilder
     private void AppendImage(
         UiDrawImageCommand command,
         UiImageRenderBinding binding,
-        uint framebufferWidth,
-        uint framebufferHeight,
-        double uiScale)
+        PhysicalBounds bounds,
+        UiScissor scissor,
+        double opacity)
     {
-        if (!TryGetPhysicalBounds(command.Bounds, framebufferWidth, framebufferHeight, uiScale, out var bounds) ||
-            !TryGetScissor(command.Clip, framebufferWidth, framebufferHeight, uiScale, out var scissor) ||
-            !Intersects(bounds, scissor))
-        {
-            return;
-        }
-
         var source = command.SourceRect;
         var textureWidth = (double)binding.TextureWidth;
         var textureHeight = (double)binding.TextureHeight;
@@ -281,7 +327,7 @@ internal sealed class UiDrawBuilder
             1,
             1,
             1,
-            (float)command.Opacity,
+            (float)opacity,
             (float)u0,
             (float)v0,
             clampMinU,
@@ -295,20 +341,16 @@ internal sealed class UiDrawBuilder
     private void AppendText(
         UiDrawTextCommand command,
         UiGlyphResolver glyphResolver,
-        uint framebufferWidth,
-        uint framebufferHeight,
-        double uiScale,
+        DrawingState state,
+        UiScissor scissor,
         bool convertSrgbToLinear)
     {
-        if (!TryGetScissor(command.Clip, framebufferWidth, framebufferHeight, uiScale, out var scissor))
-            return;
-
-        var pixelSize = GlyphRasterization.GetPixelSize(command.FontSize, uiScale);
+        var pixelSize = GlyphRasterization.GetPixelSize(command.FontSize, state.Scale);
         var color = command.Color;
         var r = ToColorChannel(color.R, convertSrgbToLinear);
         var g = ToColorChannel(color.G, convertSrgbToLinear);
         var b = ToColorChannel(color.B, convertSrgbToLinear);
-        var a = (float)(color.A / 255.0 * command.Opacity);
+        var a = (float)(color.A / 255.0 * state.Opacity);
         foreach (var line in command.Layout.Lines)
         {
             foreach (var run in line.GlyphRuns)
@@ -323,13 +365,13 @@ internal sealed class UiDrawBuilder
                     if (glyphResolver(key) is not { } binding)
                         continue;
 
-                    var penX = (command.Origin.X + glyph.X + glyph.XOffset) * uiScale;
-                    var baselineY = (command.Origin.Y + glyph.Y + glyph.YOffset) * uiScale;
+                    var penX = Finite(state.X + (command.Origin.X + glyph.X + glyph.XOffset) * state.Scale);
+                    var baselineY = Finite(state.Y + (command.Origin.Y + glyph.Y + glyph.YOffset) * state.Scale);
                     var bounds = new PhysicalBounds(
-                        penX + binding.Left,
-                        baselineY - binding.Top,
-                        penX + binding.Left + binding.Region.Width,
-                        baselineY - binding.Top + binding.Region.Height);
+                        Finite(penX + binding.Left),
+                        Finite(baselineY - binding.Top),
+                        Finite(penX + binding.Left + binding.Region.Width),
+                        Finite(baselineY - binding.Top + binding.Region.Height));
                     if (!Intersects(bounds, scissor))
                         continue;
 
@@ -486,13 +528,24 @@ internal sealed class UiDrawBuilder
         Rect bounds,
         uint framebufferWidth,
         uint framebufferHeight,
-        double uiScale,
+        DrawingState state,
         out PhysicalBounds physicalBounds)
     {
-        var left = ScaleAndClamp(bounds.X, uiScale, framebufferWidth);
-        var top = ScaleAndClamp(bounds.Y, uiScale, framebufferHeight);
-        var right = ScaleEndAndClamp(bounds.X, bounds.Width, uiScale, framebufferWidth);
-        var bottom = ScaleEndAndClamp(bounds.Y, bounds.Height, uiScale, framebufferHeight);
+        var transformed = Transform(bounds, state);
+        if (state.Clip is { } clip &&
+            (transformed.X + transformed.Width <= clip.X ||
+             transformed.Y + transformed.Height <= clip.Y ||
+             transformed.X >= clip.X + clip.Width ||
+             transformed.Y >= clip.Y + clip.Height))
+        {
+            physicalBounds = default;
+            return false;
+        }
+
+        var left = Math.Clamp(transformed.X, 0, framebufferWidth);
+        var top = Math.Clamp(transformed.Y, 0, framebufferHeight);
+        var right = Math.Clamp(transformed.X + transformed.Width, 0, framebufferWidth);
+        var bottom = Math.Clamp(transformed.Y + transformed.Height, 0, framebufferHeight);
         physicalBounds = new PhysicalBounds(left, top, right, bottom);
         return right > left && bottom > top;
     }
@@ -501,7 +554,6 @@ internal sealed class UiDrawBuilder
         Rect? clip,
         uint framebufferWidth,
         uint framebufferHeight,
-        double uiScale,
         out UiScissor scissor)
     {
         if (clip is null)
@@ -511,10 +563,16 @@ internal sealed class UiDrawBuilder
         }
 
         var value = clip.Value;
-        var left = Math.Floor(ScaleAndClamp(value.X, uiScale, framebufferWidth));
-        var top = Math.Floor(ScaleAndClamp(value.Y, uiScale, framebufferHeight));
-        var right = Math.Ceiling(ScaleEndAndClamp(value.X, value.Width, uiScale, framebufferWidth));
-        var bottom = Math.Ceiling(ScaleEndAndClamp(value.Y, value.Height, uiScale, framebufferHeight));
+        if (value.Width == 0 || value.Height == 0)
+        {
+            scissor = default;
+            return false;
+        }
+
+        var left = Math.Floor(Math.Clamp(value.X, 0, framebufferWidth));
+        var top = Math.Floor(Math.Clamp(value.Y, 0, framebufferHeight));
+        var right = Math.Ceiling(Math.Clamp(value.X + value.Width, 0, framebufferWidth));
+        var bottom = Math.Ceiling(Math.Clamp(value.Y + value.Height, 0, framebufferHeight));
         if (right <= left || bottom <= top)
         {
             scissor = default;
@@ -539,11 +597,23 @@ internal sealed class UiDrawBuilder
                bounds.Top < scissorBottom;
     }
 
-    private static double ScaleAndClamp(double value, double scale, uint maximum) =>
-        Math.Clamp(value * scale, 0, maximum);
+    private static Rect Transform(Rect bounds, DrawingState state)
+    {
+        var x = Finite(state.X + bounds.X * state.Scale);
+        var y = Finite(state.Y + bounds.Y * state.Scale);
+        var width = Finite(bounds.Width * state.Scale);
+        var height = Finite(bounds.Height * state.Scale);
+        Finite(x + width);
+        Finite(y + height);
+        return new Rect(x, y, width, height);
+    }
 
-    private static double ScaleEndAndClamp(double origin, double length, double scale, uint maximum) =>
-        Math.Clamp((origin + length) * scale, 0, maximum);
+    private static double Finite(double value)
+    {
+        if (!double.IsFinite(value))
+            throw new InvalidOperationException("UI drawing produced a non-finite coordinate or scale.");
+        return value;
+    }
 
     private static float ToColorChannel(byte value, bool convertSrgbToLinear)
     {
@@ -560,4 +630,11 @@ internal sealed class UiDrawBuilder
         double Top,
         double Right,
         double Bottom);
+
+    private readonly record struct DrawingState(
+        double X,
+        double Y,
+        double Scale,
+        Rect? Clip,
+        double Opacity);
 }

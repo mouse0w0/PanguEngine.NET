@@ -61,7 +61,7 @@ public sealed class UiDrawingTests
     }
 
     [Fact]
-    public void ClosedScreenDrawSnapshotsCaptureCurrentScaleWhenEmptyOrNonEmpty()
+    public void ClosedScreenRecordsScaleOnlyAroundNonEmptyCommands()
     {
         var emptyScreen = new UiScreen { Scale = 1.5 };
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
@@ -72,13 +72,14 @@ public sealed class UiDrawingTests
         var nonEmpty = screen.CreateDrawCommandList();
 
         Assert.Empty(empty);
-        Assert.Equal(1.5, empty.Scale);
-        Assert.Single(nonEmpty);
-        Assert.Equal(2, nonEmpty.Scale);
+        Assert.Single(nonEmpty.OfType<UiFillRectangleCommand>());
+        var transform = Assert.Single(nonEmpty.OfType<UiPushTransformCommand>());
+        Assert.Equal(Point.Zero, transform.Translation);
+        Assert.Equal(2, transform.Scale);
     }
 
     [Fact]
-    public void ScaleChangeProducesEmptyCurrentScaleSnapshotUntilLayoutUpdates()
+    public void ScaleChangeProducesEmptySnapshotUntilLayoutUpdates()
     {
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
         var screen = new UiScreen(node);
@@ -91,12 +92,11 @@ public sealed class UiDrawingTests
         screen.Update(new Size(100, 100));
         var after = screen.CreateDrawCommandList();
 
+        Assert.Single(before.OfType<UiFillRectangleCommand>());
+        Assert.Empty(before.OfType<UiPushTransformCommand>());
         Assert.Empty(pending);
-        Assert.Equal(2, pending.Scale);
-        Assert.Single(after);
-        Assert.Equal(2, after.Scale);
-        Assert.Single(before);
-        Assert.Equal(1, before.Scale);
+        Assert.Single(after.OfType<UiFillRectangleCommand>());
+        Assert.Equal(2, Assert.Single(after.OfType<UiPushTransformCommand>()).Scale);
         screen.Close();
     }
 
@@ -114,17 +114,14 @@ public sealed class UiDrawingTests
         screen.Update(new Size(100, 100));
         var after = screen.CreateDrawCommandList();
 
-        Assert.Single(before);
+        Assert.Single(before.OfType<UiFillRectangleCommand>());
         Assert.Empty(pending);
-        Assert.Single(after);
-        Assert.Equal(1, before.Scale);
-        Assert.Equal(1, pending.Scale);
-        Assert.Equal(1, after.Scale);
+        Assert.Single(after.OfType<UiFillRectangleCommand>());
         screen.Close();
     }
 
     [Fact]
-    public void OpenEmptyScreenDrawSnapshotCapturesCurrentScale()
+    public void OpenEmptyScreenDoesNotLeaveAnEmptyScaleScope()
     {
         var screen = new UiScreen { Scale = 2 };
         screen.Open();
@@ -133,7 +130,6 @@ public sealed class UiDrawingTests
         var commands = screen.CreateDrawCommandList();
 
         Assert.Empty(commands);
-        Assert.Equal(2, commands.Scale);
         screen.Close();
     }
 
@@ -149,8 +145,12 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node) { Scale = 1.5 };
         Arrange(node, new Rect(0, 0, 10, 10));
         var commands = screen.CreateDrawCommandList();
-        var builder = new UiDrawBuilder();
 
+        Assert.Equal(
+            new Rect(0.3, 0.7, 3.1, 4.1),
+            Assert.Single(commands.OfType<UiFillRectangleCommand>()).Bounds);
+
+        var builder = new UiDrawBuilder();
         builder.Build(commands, 100, 100, false);
 
         Assert.Equal(new UiVertex(0.45f, 1.05f, 1, 1, 1, 1), builder.Vertices[0]);
@@ -158,7 +158,7 @@ public sealed class UiDrawingTests
     }
 
     [Fact]
-    public void NestedNodesEmitScreenLogicalBoundsInDrawingOrder()
+    public void NestedNodesEmitLocalBoundsAndBuilderResolvesPositions()
     {
         var root = new DrawingParent
         {
@@ -182,18 +182,31 @@ public sealed class UiDrawingTests
         Arrange(first, new Rect(5, 6, 20, 20));
         Arrange(second, new Rect(7, 8, 20, 20));
 
-        var commands = screen.CreateDrawCommandList()
-            .Cast<UiFillRectangleCommand>()
-            .ToArray();
+        var list = screen.CreateDrawCommandList();
+        var commands = list.OfType<UiFillRectangleCommand>().ToArray();
 
         Assert.Equal(
             [new Color(1, 0, 0), new Color(2, 0, 0), new Color(3, 0, 0)],
             commands.Select(command => command.Color));
-        Assert.Equal(new Rect(11, 22, 3, 4), commands[0].Bounds);
-        Assert.Equal(new Rect(17, 29, 4, 5), commands[1].Bounds);
-        Assert.Equal(new Rect(20, 32, 5, 6), commands[2].Bounds);
-        Assert.All(commands, command => Assert.Null(command.Clip));
-        Assert.All(commands, command => Assert.Equal(1, command.Opacity));
+        Assert.Equal(new Rect(1, 2, 3, 4), commands[0].Bounds);
+        Assert.Equal(new Rect(2, 3, 4, 5), commands[1].Bounds);
+        Assert.Equal(new Rect(3, 4, 5, 6), commands[2].Bounds);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 400, 300, false);
+
+        Assert.Equal(11f, builder.Vertices[0].X);
+        Assert.Equal(22f, builder.Vertices[0].Y);
+        Assert.Equal(14f, builder.Vertices[2].X);
+        Assert.Equal(26f, builder.Vertices[2].Y);
+        Assert.Equal(17f, builder.Vertices[4].X);
+        Assert.Equal(29f, builder.Vertices[4].Y);
+        Assert.Equal(21f, builder.Vertices[6].X);
+        Assert.Equal(34f, builder.Vertices[6].Y);
+        Assert.Equal(20f, builder.Vertices[8].X);
+        Assert.Equal(32f, builder.Vertices[8].Y);
+        Assert.Equal(25f, builder.Vertices[10].X);
+        Assert.Equal(38f, builder.Vertices[10].Y);
     }
 
     [Fact]
@@ -208,10 +221,9 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(region);
         Arrange(region, new Rect(5, 7, 20, 30));
 
-        var command = Assert.IsType<UiFillRectangleCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var command = Assert.Single(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>());
 
-        Assert.Equal(new Rect(7, 10, 14, 22), command.Bounds);
+        Assert.Equal(new Rect(2, 3, 14, 22), command.Bounds);
         Assert.Equal(background, command.Color);
     }
 
@@ -239,19 +251,19 @@ public sealed class UiDrawingTests
         Arrange(region, new Rect(5, 7, 100, 120));
 
         var commands = screen.CreateDrawCommandList()
-            .Cast<UiFillRectangleCommand>()
+            .OfType<UiFillRectangleCommand>()
             .ToArray();
 
         Assert.Equal(
             [background, border, border, border, border, customColor, childColor],
             commands.Select(command => command.Color));
-        Assert.Equal(new Rect(15, 27, 60, 60), commands[0].Bounds);
-        Assert.Equal(new Rect(5, 7, 100, 20), commands[1].Bounds);
-        Assert.Equal(new Rect(75, 27, 30, 60), commands[2].Bounds);
-        Assert.Equal(new Rect(5, 87, 100, 40), commands[3].Bounds);
-        Assert.Equal(new Rect(5, 27, 10, 60), commands[4].Bounds);
-        Assert.Equal(new Rect(7, 10, 1, 1), commands[5].Bounds);
-        Assert.Equal(new Rect(15, 27, 1, 1), commands[6].Bounds);
+        Assert.Equal(new Rect(10, 20, 60, 60), commands[0].Bounds);
+        Assert.Equal(new Rect(0, 0, 100, 20), commands[1].Bounds);
+        Assert.Equal(new Rect(70, 20, 30, 60), commands[2].Bounds);
+        Assert.Equal(new Rect(0, 80, 100, 40), commands[3].Bounds);
+        Assert.Equal(new Rect(0, 20, 10, 60), commands[4].Bounds);
+        Assert.Equal(new Rect(2, 3, 1, 1), commands[5].Bounds);
+        Assert.Equal(new Rect(0, 0, 1, 1), commands[6].Bounds);
     }
 
     [Fact]
@@ -266,7 +278,7 @@ public sealed class UiDrawingTests
         Arrange(region, new Rect(0, 0, 40, 30));
 
         var commands = screen.CreateDrawCommandList()
-            .Cast<UiFillRectangleCommand>()
+            .OfType<UiFillRectangleCommand>()
             .ToArray();
 
         Assert.Equal(2, commands.Length);
@@ -285,8 +297,7 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(region);
         Arrange(region, new Rect(0, 0, 20, 30));
 
-        var command = Assert.IsType<UiFillRectangleCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var command = Assert.Single(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>());
 
         Assert.Equal(new Rect(0, 0, 4, 30), command.Bounds);
     }
@@ -306,7 +317,7 @@ public sealed class UiDrawingTests
         Arrange(region, new Rect(0, 0, 40, 30));
 
         var commands = screen.CreateDrawCommandList()
-            .Cast<UiFillRectangleCommand>()
+            .OfType<UiFillRectangleCommand>()
             .ToArray();
 
         Assert.Equal(5, commands.Length);
@@ -358,13 +369,19 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(region);
         Arrange(region, new Rect(0, 0, 20, 20));
 
-        var commands = screen.CreateDrawCommandList()
-            .Cast<UiFillRectangleCommand>()
-            .ToArray();
+        var list = screen.CreateDrawCommandList();
+        var commands = list.OfType<UiFillRectangleCommand>().ToArray();
 
         Assert.Equal([customColor, childColor], commands.Select(command => command.Color));
         Assert.Equal(new Rect(0, 0, 1, 1), commands[0].Bounds);
-        Assert.Equal(new Rect(2, 2, 1, 1), commands[1].Bounds);
+        Assert.Equal(new Rect(0, 0, 1, 1), commands[1].Bounds);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 100, 100, false);
+        Assert.Equal(0f, builder.Vertices[0].X);
+        Assert.Equal(0f, builder.Vertices[0].Y);
+        Assert.Equal(2f, builder.Vertices[4].X);
+        Assert.Equal(2f, builder.Vertices[4].Y);
     }
 
     [Fact]
@@ -381,12 +398,16 @@ public sealed class UiDrawingTests
         Arrange(parent, new Rect(10, 20, 30, 30));
         Arrange(region, new Rect(20, 20, 40, 40));
 
-        var command = Assert.IsType<UiFillRectangleCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiFillRectangleCommand>());
 
-        Assert.Equal(new Rect(30, 40, 40, 40), command.Bounds);
-        Assert.Equal(new Rect(10, 20, 30, 30), command.Clip);
-        Assert.Equal(0.25, command.Opacity);
+        Assert.Equal(new Rect(0, 0, 40, 40), command.Bounds);
+        Assert.Equal(new Rect(0, 0, 30, 30), Assert.Single(list.OfType<UiPushClipCommand>()).Clip);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 100, 100, false);
+        Assert.Equal(new UiScissor(10, 20, 30, 30), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(0.25f, builder.Vertices[0].A);
     }
 
     [Theory]
@@ -409,12 +430,12 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(region);
         Arrange(region, new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiDrawImageCommand>());
 
         Assert.Equal(new Rect(x, y, width, height), command.Bounds);
         Assert.Equal(new Rect(0, 0, 200, 100), command.SourceRect);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), Assert.Single(list.OfType<UiPushClipCommand>()).Clip);
     }
 
     [Theory]
@@ -436,18 +457,18 @@ public sealed class UiDrawingTests
         };
         Arrange(region, new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiDrawImageCommand>());
 
         Assert.Equal(new Rect(-0.5, 0.5, 101, 99), command.Bounds);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), Assert.Single(list.OfType<UiPushClipCommand>()).Clip);
     }
 
     [Theory]
-    [InlineData(ImageStretch.Fill, 5, 7, 100, 80, true)]
-    [InlineData(ImageStretch.None, -45, -3, 200, 100, true)]
-    [InlineData(ImageStretch.Uniform, 5, 22, 100, 50, false)]
-    [InlineData(ImageStretch.UniformToFill, -25, 7, 160, 80, true)]
+    [InlineData(ImageStretch.Fill, 0, 0, 100, 80, true)]
+    [InlineData(ImageStretch.None, -50, -10, 200, 100, true)]
+    [InlineData(ImageStretch.Uniform, 0, 15, 100, 50, false)]
+    [InlineData(ImageStretch.UniformToFill, -30, 0, 160, 80, true)]
     public void ImageBrushBorderUsesOneContinuousOuterMapping(
         ImageStretch stretch,
         double x,
@@ -465,18 +486,16 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(region);
         Arrange(region, new Rect(5, 7, 100, 80));
 
-        var commands = screen.CreateDrawCommandList()
-            .Cast<UiDrawImageCommand>()
-            .ToArray();
+        var list = screen.CreateDrawCommandList();
+        var commands = list.OfType<UiDrawImageCommand>().ToArray();
 
         var expectedClips = new List<Rect>
         {
-            new(5, 7, 100, 20),
-            new(75, 27, 30, 45)
+            new(0, 0, 100, 20),
+            new(70, 20, 30, 45),
+            new(0, 65, 100, 15),
+            new(0, 20, 10, 45)
         };
-        if (includesBottom)
-            expectedClips.Add(new Rect(5, 72, 100, 15));
-        expectedClips.Add(new Rect(5, 27, 10, 45));
 
         Assert.Equal(expectedClips.Count, commands.Length);
         Assert.All(commands, command =>
@@ -487,7 +506,12 @@ public sealed class UiDrawingTests
         });
         Assert.Equal(
             expectedClips,
-            commands.Select(command => command.Clip!.Value));
+            list.OfType<UiPushClipCommand>().Select(command => command.Clip));
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 200, 200, false,
+            _ => new UiImageRenderBinding(1, 200, 100, new UiImageAtlasRegion(0, 0, 200, 100)));
+        Assert.Equal(includesBottom ? 4 : 3, builder.RectangleCount);
     }
 
     [Fact]
@@ -504,9 +528,8 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(region);
         Arrange(region, new Rect(0, 0, 40, 30));
 
-        var commands = screen.CreateDrawCommandList()
-            .Cast<UiDrawImageCommand>()
-            .ToArray();
+        var list = screen.CreateDrawCommandList();
+        var commands = list.OfType<UiDrawImageCommand>().ToArray();
         var sourceX = new[] { 5d, 8, 20, 25 };
         var sourceY = new[] { 4d, 6, 18, 22 };
         var destinationX = new[] { 0d, 3, 35, 40 };
@@ -520,7 +543,6 @@ public sealed class UiDrawingTests
                 var command = commands[row * 3 + column];
                 Assert.Same(image, command.Image);
                 Assert.Equal(ImageSamplingMode.Linear, command.SamplingMode);
-                Assert.Null(command.Clip);
                 AssertBounds(
                     RectFromCuts(destinationX, destinationY, column, row),
                     command.Bounds);
@@ -529,6 +551,8 @@ public sealed class UiDrawingTests
                     command.SourceRect);
             }
         }
+
+        Assert.Empty(list.OfType<UiPushClipCommand>());
     }
 
     [Fact]
@@ -545,7 +569,7 @@ public sealed class UiDrawingTests
         Arrange(region, new Rect(0, 0, 10, 6));
 
         var commands = screen.CreateDrawCommandList()
-            .Cast<UiDrawImageCommand>()
+            .OfType<UiDrawImageCommand>()
             .ToArray();
         var split = 70d / 12;
 
@@ -579,18 +603,18 @@ public sealed class UiDrawingTests
         Arrange(region, new Rect(5, 7, 100, 80));
 
         var commands = screen.CreateDrawCommandList()
-            .Cast<UiDrawImageCommand>()
+            .OfType<UiDrawImageCommand>()
             .ToArray();
         var expectedBounds = new[]
         {
-            new Rect(5, 7, 10, 20),
-            new Rect(15, 7, 60, 20),
-            new Rect(75, 7, 30, 20),
-            new Rect(5, 27, 10, 45),
-            new Rect(75, 27, 30, 45),
-            new Rect(5, 72, 10, 15),
-            new Rect(15, 72, 60, 15),
-            new Rect(75, 72, 30, 15)
+            new Rect(0, 0, 10, 20),
+            new Rect(10, 0, 60, 20),
+            new Rect(70, 0, 30, 20),
+            new Rect(0, 20, 10, 45),
+            new Rect(70, 20, 30, 45),
+            new Rect(0, 65, 10, 15),
+            new Rect(10, 65, 60, 15),
+            new Rect(70, 65, 30, 15)
         };
         var expectedSources = new[]
         {
@@ -609,11 +633,10 @@ public sealed class UiDrawingTests
         {
             AssertBounds(expectedBounds[index], commands[index].Bounds);
             AssertBounds(expectedSources[index], commands[index].SourceRect);
-            Assert.Null(commands[index].Clip);
         }
 
         Assert.DoesNotContain(commands, command =>
-            command.Bounds == new Rect(15, 27, 60, 45));
+            command.Bounds == new Rect(10, 20, 60, 45));
     }
 
     [Fact]
@@ -630,7 +653,7 @@ public sealed class UiDrawingTests
         Arrange(region, new Rect(0, 0, 20, 20));
 
         var commands = screen.CreateDrawCommandList()
-            .Cast<UiDrawImageCommand>()
+            .OfType<UiDrawImageCommand>()
             .ToArray();
 
         Assert.Equal(5, commands.Length);
@@ -652,7 +675,7 @@ public sealed class UiDrawingTests
         Arrange(region, new Rect(0, 0, 40, 30));
 
         var commands = screen.CreateDrawCommandList()
-            .Cast<UiDrawImageCommand>()
+            .OfType<UiDrawImageCommand>()
             .ToArray();
 
         Assert.Equal(4, commands.Length);
@@ -682,16 +705,22 @@ public sealed class UiDrawingTests
         Arrange(parent, new Rect(10, 20, 30, 30));
         Arrange(region, new Rect(20, 20, 40, 40));
 
-        var commands = screen.CreateDrawCommandList()
-            .Cast<UiDrawImageCommand>()
-            .ToArray();
+        var list = screen.CreateDrawCommandList();
+        var commands = list.OfType<UiDrawImageCommand>().ToArray();
 
-        Assert.Equal(4, commands.Length);
-        Assert.All(commands, command =>
-        {
-            Assert.Equal(new Rect(10, 20, 30, 30), command.Clip);
-            Assert.Equal(0.25, command.Opacity);
-        });
+        Assert.Equal(9, commands.Length);
+        Assert.Equal(new Rect(0, 0, 30, 30), Assert.Single(list.OfType<UiPushClipCommand>()).Clip);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            list,
+            200,
+            200,
+            false,
+            _ => new UiImageRenderBinding(1, 12, 12, new UiImageAtlasRegion(0, 0, 12, 12)));
+        Assert.Equal(4, builder.RectangleCount);
+        Assert.Equal(new UiScissor(10, 20, 30, 30), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(0.25f, builder.Vertices[0].A);
     }
 
     [Fact]
@@ -736,11 +765,11 @@ public sealed class UiDrawingTests
             context.FillRectangle(new Rect(1, 1, 4, 5), secondColor);
         var secondSnapshot = screen.CreateDrawCommandList();
 
-        var firstCommand = Assert.IsType<UiFillRectangleCommand>(Assert.Single(firstSnapshot));
-        Assert.Equal(new Rect(5, 7, 2, 3), firstCommand.Bounds);
+        var firstCommand = Assert.Single(firstSnapshot.OfType<UiFillRectangleCommand>());
+        Assert.Equal(new Rect(0, 0, 2, 3), firstCommand.Bounds);
         Assert.Equal(firstColor, firstCommand.Color);
-        var secondCommand = Assert.IsType<UiFillRectangleCommand>(Assert.Single(secondSnapshot));
-        Assert.Equal(new Rect(6, 8, 4, 5), secondCommand.Bounds);
+        var secondCommand = Assert.Single(secondSnapshot.OfType<UiFillRectangleCommand>());
+        Assert.Equal(new Rect(1, 1, 4, 5), secondCommand.Bounds);
         Assert.Equal(secondColor, secondCommand.Color);
     }
 
@@ -764,10 +793,10 @@ public sealed class UiDrawingTests
 
         Assert.Equal(
             [new Color(1, 0, 0), new Color(2, 0, 0)],
-            original.Cast<UiFillRectangleCommand>().Select(command => command.Color));
+            original.OfType<UiFillRectangleCommand>().Select(command => command.Color));
         Assert.Equal(
             [new Color(2, 0, 0), new Color(1, 0, 0)],
-            reordered.Cast<UiFillRectangleCommand>().Select(command => command.Color));
+            reordered.OfType<UiFillRectangleCommand>().Select(command => command.Color));
     }
 
     [Fact]
@@ -789,11 +818,14 @@ public sealed class UiDrawingTests
         Arrange(root, new Rect(10, 20, 30, 30));
         Arrange(child, new Rect(20, 20, 40, 40));
 
-        var command = Assert.IsType<UiFillRectangleCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiFillRectangleCommand>());
 
-        Assert.Equal(new Rect(30, 40, 40, 40), command.Bounds);
-        Assert.Equal(new Rect(35, 45, 5, 5), command.Clip);
+        Assert.Equal(new Rect(0, 0, 40, 40), command.Bounds);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 200, 200, false);
+        Assert.Equal(new UiScissor(35, 45, 5, 5), Assert.Single(builder.Batches.ToArray()).Scissor);
     }
 
     [Fact]
@@ -815,11 +847,18 @@ public sealed class UiDrawingTests
         Arrange(root, new Rect(0, 0, 10, 10));
         Arrange(child, new Rect(0, 0, 10, 10));
 
-        var commands = screen.CreateDrawCommandList();
+        var list = screen.CreateDrawCommandList();
+        var commands = list.OfType<UiFillRectangleCommand>().ToArray();
 
-        var command = Assert.IsType<UiFillRectangleCommand>(Assert.Single(commands));
-        Assert.Equal(new Color(1, 0, 0), command.Color);
-        Assert.Null(command.Clip);
+        Assert.Equal(2, commands.Length);
+        Assert.Equal(new Rect(20, 0, 5, 5), commands[0].Bounds);
+        Assert.Equal(new Rect(20, 0, 5, 5), commands[1].Bounds);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 100, 100, false);
+        Assert.Equal(1, builder.RectangleCount);
+        Assert.Equal(1 / 255f, builder.Vertices[0].R);
+        Assert.Equal(0f, builder.Vertices[0].G);
     }
 
     [Fact]
@@ -836,15 +875,18 @@ public sealed class UiDrawingTests
         Arrange(root, new Rect(0, 0, 10, 10));
         Arrange(child, new Rect(0, 0, 10, 10));
 
-        var command = Assert.IsType<UiFillRectangleCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiFillRectangleCommand>());
 
         Assert.Equal(new Rect(20, 0, 5, 5), command.Bounds);
-        Assert.Null(command.Clip);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 100, 100, false);
+        Assert.Equal(1, builder.RectangleCount);
     }
 
     [Fact]
-    public void InvisibleRectangleCallsDoNotProduceCommands()
+    public void StateDependentCullingIsDeferredToBuilder()
     {
         var node = new DrawingNode
         {
@@ -863,7 +905,14 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        Assert.Empty(screen.CreateDrawCommandList());
+        var list = screen.CreateDrawCommandList();
+
+        Assert.Equal(3, list.OfType<UiFillRectangleCommand>().Count());
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 10, 10, false);
+        Assert.Empty(builder.Vertices.ToArray());
+        Assert.Empty(builder.Batches.ToArray());
     }
 
     [Fact]
@@ -884,13 +933,13 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(10, 20, 10, 10));
 
-        var command = Assert.IsType<UiFillRectangleCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiFillRectangleCommand>());
 
-        Assert.Equal(new Rect(10, 20, 5, 6), command.Bounds);
+        Assert.Equal(new Rect(0, 0, 5, 6), command.Bounds);
         Assert.Equal(color, command.Color);
-        Assert.Equal(new Rect(11, 22, 3, 4), command.Clip);
-        Assert.Equal(0.5, command.Opacity);
+        Assert.Equal(new Rect(1, 2, 3, 4), Assert.Single(list.OfType<UiPushClipCommand>()).Clip);
+        Assert.Equal(0.5, Assert.Single(list.OfType<UiPushOpacityCommand>()).Opacity);
     }
 
     [Fact]
@@ -912,11 +961,15 @@ public sealed class UiDrawingTests
         Arrange(root, new Rect(0, 0, 10, 10));
         Arrange(child, new Rect(0, 0, 10, 10));
 
-        var command = Assert.IsType<UiFillRectangleCommand>(
-            Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiFillRectangleCommand>());
 
-        Assert.Equal(0.0625, command.Opacity);
         Assert.Equal(color, command.Color);
+        Assert.Equal(new Rect(0, 0, 10, 10), command.Bounds);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 100, 100, false);
+        Assert.Equal((float)(128 / 255.0 * 0.0625), builder.Vertices[0].A);
     }
 
     [Fact]
@@ -974,10 +1027,12 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        var commands = screen.CreateDrawCommandList();
+        var list = screen.CreateDrawCommandList();
 
         Assert.All(errors, error => Assert.IsType<ArgumentOutOfRangeException>(error));
-        Assert.Equal(1, Assert.IsType<UiFillRectangleCommand>(Assert.Single(commands)).Opacity);
+        Assert.Equal(
+            new Rect(0, 0, 1, 1),
+            Assert.Single(list.OfType<UiFillRectangleCommand>()).Bounds);
     }
 
     [Fact]
@@ -1036,7 +1091,7 @@ public sealed class UiDrawingTests
         Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
 
         node.DrawAction = DrawUnitRectangle;
-        Assert.Single(screen.CreateDrawCommandList());
+        Assert.Single(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>());
     }
 
     [Fact]
@@ -1073,7 +1128,7 @@ public sealed class UiDrawingTests
 
         Assert.Same(expected, actual);
         node.DrawAction = DrawUnitRectangle;
-        Assert.Single(screen.CreateDrawCommandList());
+        Assert.Single(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>());
     }
 
     [Fact]
@@ -1251,12 +1306,12 @@ public sealed class UiDrawingTests
         screen.Close();
 
         var closedCount = RunOnBackgroundThread(() =>
-            screen.CreateDrawCommandList().Count);
+            screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().Count());
         Assert.Equal(1, closedCount);
     }
 
     [Fact]
-    public void CoordinateOverflowFailsWithoutReturningACommandList()
+    public void CoordinateOverflowFailsAtBuild()
     {
         var node = new DrawingNode
         {
@@ -1268,11 +1323,14 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(double.MaxValue, 0, 1, 1));
 
-        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
+        var list = screen.CreateDrawCommandList();
+
+        var builder = new UiDrawBuilder();
+        Assert.Throws<InvalidOperationException>(() => builder.Build(list, 100, 100, false));
     }
 
     [Fact]
-    public void NestedLayoutOriginOverflowFailsWithoutDrawingTheChild()
+    public void OverflowingLayoutWithNoOutputDoesNotComputeCoordinates()
     {
         var drawCalls = 0;
         var root = new DrawingParent();
@@ -1285,27 +1343,38 @@ public sealed class UiDrawingTests
         Arrange(root, new Rect(double.MaxValue, 0, 1, 1));
         Arrange(child, new Rect(double.MaxValue, 0, 1, 1));
 
-        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
-        Assert.Equal(0, drawCalls);
+        var list = screen.CreateDrawCommandList();
+
+        Assert.Empty(list);
+        Assert.Equal(1, drawCalls);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(list, 100, 100, false);
+        Assert.Empty(builder.Vertices.ToArray());
     }
 
     [Fact]
-    public void PushClipCoordinateOverflowFailsWithoutReturningACommandList()
+    public void PushClipCoordinateOverflowFailsAtBuild()
     {
         var node = new DrawingNode
         {
             DrawAction = context =>
-                _ = context.PushClip(
-                    new Rect(double.MaxValue, 0, 1, 1))
+            {
+                using (context.PushClip(new Rect(double.MaxValue, 0, 1, 1)))
+                    context.FillRectangle(new Rect(0, 0, 1, 1), new Color(1, 1, 1));
+            }
         };
         var screen = new UiScreen(node);
         Arrange(node, new Rect(double.MaxValue, 0, 1, 1));
 
-        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
+        var list = screen.CreateDrawCommandList();
+
+        var builder = new UiDrawBuilder();
+        Assert.Throws<InvalidOperationException>(() => builder.Build(list, 100, 100, false));
     }
 
     [Fact]
-    public void DrawImageUsesFinalClipOpacityAndSourceRect()
+    public void DrawImageUsesLocalBoundsClipAndOpacityState()
     {
         var image = UiImage.FromRgba(new byte[16], 2, 2);
         var node = new DrawingNode
@@ -1320,13 +1389,14 @@ public sealed class UiDrawingTests
         var screen = new UiScreen(node);
         Arrange(node, new Rect(10, 20, 10, 10));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var list = screen.CreateDrawCommandList();
+        var command = Assert.Single(list.OfType<UiDrawImageCommand>());
 
         Assert.Same(image, command.Image);
-        Assert.Equal(new Rect(10, 20, 5, 6), command.Bounds);
+        Assert.Equal(new Rect(0, 0, 5, 6), command.Bounds);
         Assert.Equal(new Rect(0, 0, 1, 2), command.SourceRect);
-        Assert.Equal(new Rect(11, 22, 3, 4), command.Clip);
-        Assert.Equal(0.5, command.Opacity);
+        Assert.Equal(new Rect(1, 2, 3, 4), Assert.Single(list.OfType<UiPushClipCommand>()).Clip);
+        Assert.Equal(0.5, Assert.Single(list.OfType<UiPushOpacityCommand>()).Opacity);
     }
 
     private static DrawingNode CreateColorNode(byte red) =>

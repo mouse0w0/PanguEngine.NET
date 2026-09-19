@@ -7,41 +7,91 @@ namespace PanguEngine.Client.UI.Drawing;
 /// </summary>
 public abstract class UiDrawCommand
 {
-    private protected UiDrawCommand(Rect? clip, double opacity)
+    private protected UiDrawCommand()
     {
-        Clip = clip;
-        Opacity = opacity;
+    }
+}
+
+/// <summary>
+/// Pushes a local translation and positive uniform scale onto the drawing state stack.
+/// </summary>
+/// <remarks>
+/// A local point maps to <c>Translation + Scale * point</c> in the enclosing coordinates.
+/// With enclosing translation T and scale S, the combined transform has translation
+/// <c>T + S * Translation</c> and scale <c>S * Scale</c>.
+/// </remarks>
+public sealed class UiPushTransformCommand : UiDrawCommand
+{
+    internal UiPushTransformCommand(Point translation, double scale)
+    {
+        Translation = translation;
+        Scale = scale;
     }
 
     /// <summary>
-    /// Gets the final explicit clip in screen logical coordinates, or null when no UI clip applies.
+    /// Gets the translation in the enclosing coordinate system, applied after the local scale.
     /// </summary>
-    public Rect? Clip { get; }
+    public Point Translation { get; }
 
     /// <summary>
-    /// Gets the accumulated opacity applied in addition to the command color alpha.
+    /// Gets the positive uniform scale relative to the enclosing coordinate system.
+    /// </summary>
+    public double Scale { get; }
+}
+
+/// <summary>
+/// Pushes a rectangular clip established using the transform at this command's position.
+/// </summary>
+public sealed class UiPushClipCommand : UiDrawCommand
+{
+    internal UiPushClipCommand(Rect clip) => Clip = clip;
+
+    /// <summary>
+    /// Gets the local clip rectangle. A zero-area rectangle suppresses drawing within the scope.
+    /// </summary>
+    public Rect Clip { get; }
+}
+
+/// <summary>
+/// Pushes an opacity factor multiplied into each draw within the scope.
+/// </summary>
+public sealed class UiPushOpacityCommand : UiDrawCommand
+{
+    internal UiPushOpacityCommand(double opacity) => Opacity = opacity;
+
+    /// <summary>
+    /// Gets the opacity factor from zero through one.
     /// </summary>
     public double Opacity { get; }
 }
 
 /// <summary>
-/// Represents a solid-color rectangle in screen logical coordinates.
+/// Restores the complete drawing state saved by the most recent unmatched push command.
+/// </summary>
+public sealed class UiPopCommand : UiDrawCommand
+{
+    internal static readonly UiPopCommand Instance = new();
+
+    private UiPopCommand()
+    {
+    }
+}
+
+/// <summary>
+/// Represents a solid-color rectangle in local drawing coordinates.
 /// </summary>
 public sealed class UiFillRectangleCommand : UiDrawCommand
 {
     internal UiFillRectangleCommand(
         Rect bounds,
-        Color color,
-        Rect? clip,
-        double opacity)
-        : base(clip, opacity)
+        Color color)
     {
         Bounds = bounds;
         Color = color;
     }
 
     /// <summary>
-    /// Gets the unclipped rectangle bounds in screen logical coordinates.
+    /// Gets the unclipped rectangle bounds in local drawing coordinates.
     /// </summary>
     public Rect Bounds { get; }
 
@@ -52,7 +102,7 @@ public sealed class UiFillRectangleCommand : UiDrawCommand
 }
 
 /// <summary>
-/// Represents an image draw in screen logical coordinates.
+/// Represents an image draw in local drawing coordinates.
 /// </summary>
 public sealed class UiDrawImageCommand : UiDrawCommand
 {
@@ -60,10 +110,7 @@ public sealed class UiDrawImageCommand : UiDrawCommand
         Rect bounds,
         UiImage image,
         Rect sourceRect,
-        ImageSamplingMode samplingMode,
-        Rect? clip,
-        double opacity)
-        : base(clip, opacity)
+        ImageSamplingMode samplingMode)
     {
         Bounds = bounds;
         Image = image;
@@ -72,7 +119,7 @@ public sealed class UiDrawImageCommand : UiDrawCommand
     }
 
     /// <summary>
-    /// Gets the unclipped destination bounds in screen logical coordinates.
+    /// Gets the unclipped destination bounds in local drawing coordinates.
     /// </summary>
     public Rect Bounds { get; }
 
@@ -93,7 +140,7 @@ public sealed class UiDrawImageCommand : UiDrawCommand
 }
 
 /// <summary>
-/// Represents an immutable laid-out text draw in screen logical coordinates.
+/// Represents an immutable laid-out text draw in local drawing coordinates.
 /// </summary>
 public sealed class UiDrawTextCommand : UiDrawCommand
 {
@@ -101,10 +148,7 @@ public sealed class UiDrawTextCommand : UiDrawCommand
         Point origin,
         TextLayout layout,
         double fontSize,
-        Color color,
-        Rect? clip,
-        double opacity)
-        : base(clip, opacity)
+        Color color)
     {
         Origin = origin;
         Layout = layout;
@@ -113,7 +157,7 @@ public sealed class UiDrawTextCommand : UiDrawCommand
     }
 
     /// <summary>
-    /// Gets the text origin in screen logical coordinates.
+    /// Gets the text origin in local drawing coordinates.
     /// </summary>
     public Point Origin { get; }
 

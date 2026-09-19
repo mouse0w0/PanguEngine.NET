@@ -248,7 +248,7 @@ public sealed class TextTests
     }
 
     private static UiDrawTextCommand GetCommand(UiScreen screen) =>
-        Assert.IsType<UiDrawTextCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        Assert.Single(screen.CreateDrawCommandList().OfType<UiDrawTextCommand>());
 
     private static void AssertProperty<T>(
         UiProperty<T> property,

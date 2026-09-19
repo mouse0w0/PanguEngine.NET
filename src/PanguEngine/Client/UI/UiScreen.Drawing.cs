@@ -7,7 +7,7 @@ public partial class UiScreen
     private bool _isDrawing;
 
     /// <summary>
-    /// Creates an immutable snapshot of drawing commands for the current root subtree.
+    /// Creates a new command list recording the current root subtree.
     /// </summary>
     /// <returns>The commands in stable drawing order.</returns>
     /// <remarks>
@@ -19,24 +19,19 @@ public partial class UiScreen
     /// </exception>
     public UiDrawCommandList CreateDrawCommandList()
     {
+        var commands = new UiDrawCommandList();
+        commands.Append(this);
+        return commands;
+    }
+
+    internal void AppendDrawCommands(List<UiDrawCommand> commands)
+    {
         BeginDrawing();
         try
         {
-            var snapshotScale = Scale;
-            var root = Root;
-            if (root is null)
-                return new UiDrawCommandList([], snapshotScale);
-
-            var commands = new List<UiDrawCommand>();
-            root.AppendDrawCommands(
-                commands,
-                new UiDrawingState(
-                    0,
-                    0,
-                    null,
-                    false,
-                    1));
-            return new UiDrawCommandList(commands, snapshotScale);
+            var transformIndex = UiDrawingContext.PushTransform(commands, Point.Zero, Scale);
+            Root?.AppendDrawCommands(commands, 1);
+            UiDrawingContext.PopCommand(commands, transformIndex);
         }
         finally
         {

@@ -35,12 +35,11 @@ public abstract partial class UiNode
 
     internal void AppendDrawCommands(
         List<UiDrawCommand> commands,
-        UiDrawingState inheritedState)
+        double inheritedOpacity)
     {
         if (!IsArrangeValid ||
             Visibility != Visibility.Visible ||
-            inheritedState.IsClipEmpty ||
-            inheritedState.Opacity == 0)
+            inheritedOpacity == 0)
         {
             return;
         }
@@ -49,24 +48,14 @@ public abstract partial class UiNode
         if (!double.IsFinite(opacity) || opacity < 0 || opacity > 1)
             throw new InvalidOperationException("Opacity must be finite and between zero and one.");
 
-        var combinedOpacity = inheritedState.Opacity * opacity;
+        var combinedOpacity = inheritedOpacity * opacity;
         if (combinedOpacity == 0)
             return;
 
-        var originX = UiDrawingContext.AddCoordinate(
-            inheritedState.OriginX,
-            LayoutBounds.X);
-        var originY = UiDrawingContext.AddCoordinate(
-            inheritedState.OriginY,
-            LayoutBounds.Y);
-        var nodeState = inheritedState with
-        {
-            OriginX = originX,
-            OriginY = originY,
-            Opacity = combinedOpacity
-        };
-
-        var context = new UiDrawingContext(commands, nodeState);
+        var transformIndex = UiDrawingContext.PushTransform(
+            commands, new Point(LayoutBounds.X, LayoutBounds.Y), 1);
+        var opacityIndex = UiDrawingContext.PushOpacity(commands, opacity);
+        var context = new UiDrawingContext(commands);
         try
         {
             DrawCore(context);
@@ -78,24 +67,18 @@ public abstract partial class UiNode
             throw;
         }
 
-        if (this is not Parent parent)
-            return;
-
-        var childState = nodeState;
-        if (parent.ClipToBounds)
+        if (this is Parent parent)
         {
-            childState = UiDrawingContext.ApplyClip(
-                childState,
-                new Rect(
-                    originX,
-                    originY,
-                    LayoutBounds.Width,
-                    LayoutBounds.Height));
-            if (childState.IsClipEmpty)
-                return;
+            var clipIndex = parent.ClipToBounds
+                ? UiDrawingContext.PushCommand(commands, new UiPushClipCommand(
+                    new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height)))
+                : -1;
+            foreach (var child in parent.Children)
+                child.AppendDrawCommands(commands, combinedOpacity);
+            UiDrawingContext.PopCommand(commands, clipIndex);
         }
 
-        foreach (var child in parent.Children)
-            child.AppendDrawCommands(commands, childState);
+        UiDrawingContext.PopCommand(commands, opacityIndex);
+        UiDrawingContext.PopCommand(commands, transformIndex);
     }
 }

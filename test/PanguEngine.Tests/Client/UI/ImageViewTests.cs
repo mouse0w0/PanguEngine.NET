@@ -1,6 +1,7 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Rendering;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -104,12 +105,26 @@ public sealed class ImageViewTests
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var commands = screen.CreateDrawCommandList();
+        var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(0, 25, 100, 50), command.Bounds);
         Assert.Equal(new Rect(0, 0, 200, 100), command.SourceRect);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
         Assert.Equal(ImageSamplingMode.Linear, command.SamplingMode);
+
+        var builder = new UiDrawBuilder();
+        builder.Build(
+            commands,
+            100,
+            100,
+            false,
+            _ => new UiImageRenderBinding(0, 200, 100, new UiImageAtlasRegion(0, 0, 200, 100)));
+        Assert.Equal(0f, builder.Vertices[0].X);
+        Assert.Equal(25f, builder.Vertices[0].Y);
+        Assert.Equal(100f, builder.Vertices[2].X);
+        Assert.Equal(75f, builder.Vertices[2].Y);
+        Assert.Equal(new UiScissor(0, 0, 100, 100), Assert.Single(builder.Batches.ToArray()).Scissor);
     }
 
     [Fact]
@@ -121,10 +136,11 @@ public sealed class ImageViewTests
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var commands = screen.CreateDrawCommandList();
+        var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(-50, 0, 200, 100), command.Bounds);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
     }
 
     [Fact]
@@ -136,7 +152,8 @@ public sealed class ImageViewTests
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var commands = screen.CreateDrawCommandList();
+        var command = GetImageCommand(commands);
 
         Assert.Equal(-1d / 1.5, command.Bounds.X, 12);
         Assert.Equal(1d / 1.5, command.Bounds.Y, 12);
@@ -144,7 +161,7 @@ public sealed class ImageViewTests
         Assert.Equal(149d / 1.5, command.Bounds.Height, 12);
         AssertAlignedToScaleGrid(command.Bounds, 1.5);
         Assert.Equal(new Rect(0, 0, 101, 99), command.SourceRect);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
         Assert.Equal(ImageSamplingMode.Linear, command.SamplingMode);
     }
 
@@ -156,7 +173,8 @@ public sealed class ImageViewTests
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var commands = screen.CreateDrawCommandList();
+        var command = GetImageCommand(commands);
 
         Assert.Equal(0, command.Bounds.X);
         Assert.Equal(38d / 1.5, command.Bounds.Y, 12);
@@ -164,7 +182,7 @@ public sealed class ImageViewTests
         Assert.Equal(50, command.Bounds.Height, 12);
         AssertAlignedToScaleGrid(command.Bounds, 1.5);
         Assert.Equal(new Rect(0, 0, 200, 100), command.SourceRect);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
         Assert.Equal(ImageSamplingMode.Linear, command.SamplingMode);
     }
 
@@ -177,7 +195,8 @@ public sealed class ImageViewTests
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var commands = screen.CreateDrawCommandList();
+        var command = GetImageCommand(commands);
 
         Assert.Equal(-1d / 1.5, command.Bounds.X, 12);
         Assert.Equal(0, command.Bounds.Y);
@@ -185,7 +204,7 @@ public sealed class ImageViewTests
         Assert.Equal(100, command.Bounds.Height, 12);
         AssertAlignedToScaleGrid(command.Bounds, 1.5);
         Assert.Equal(new Rect(0, 0, 101, 100), command.SourceRect);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
         Assert.Equal(ImageSamplingMode.Linear, command.SamplingMode);
     }
 
@@ -198,12 +217,13 @@ public sealed class ImageViewTests
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var commands = screen.CreateDrawCommandList();
+        var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(0, 0, 100, 100), command.Bounds);
         AssertAlignedToScaleGrid(command.Bounds, 1.5);
         Assert.Equal(new Rect(0, 0, 200, 100), command.SourceRect);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
     }
 
     [Fact]
@@ -215,20 +235,27 @@ public sealed class ImageViewTests
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        var commands = screen.CreateDrawCommandList();
+        var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(-0.5, 0.5, 101, 99), command.Bounds);
         Assert.Equal(new Rect(0, 0, 101, 99), command.SourceRect);
-        Assert.Equal(new Rect(0, 0, 100, 100), command.Clip);
+        Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
 
         screen.UseLayoutRounding = true;
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        command = Assert.IsType<UiDrawImageCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        command = GetImageCommand(screen.CreateDrawCommandList());
         Assert.Equal(-1d / 1.5, command.Bounds.X, 12);
         Assert.Equal(1d / 1.5, command.Bounds.Y, 12);
     }
+
+    private static UiDrawImageCommand GetImageCommand(UiDrawCommandList commands) =>
+        Assert.Single(commands.OfType<UiDrawImageCommand>());
+
+    private static Rect GetImageClip(UiDrawCommandList commands) =>
+        Assert.Single(commands.OfType<UiPushClipCommand>()).Clip;
 
     private static void AssertAlignedToScaleGrid(Rect bounds, double scale)
     {

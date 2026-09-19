@@ -363,9 +363,7 @@ public sealed class UiResourceManagerTests
             new Rect(0, 0, image.PixelWidth, image.PixelHeight),
             image,
             image.FullSourceRect,
-            ImageSamplingMode.Linear,
-            null,
-            1);
+            ImageSamplingMode.Linear);
 
     private static void CollectUntilDead<T>(WeakReference<T> reference) where T : class
     {
