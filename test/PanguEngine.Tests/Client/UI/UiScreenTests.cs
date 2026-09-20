@@ -1,6 +1,7 @@
 using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -99,7 +100,7 @@ public sealed class UiScreenTests
         screen = new UiScreen(root);
         screen.Open();
 
-        screen.Update(new Size(100, 80));
+        screen.PrepareFrame(new Size(100, 80), 0);
 
         Assert.IsType<InvalidOperationException>(error);
         Assert.Equal(1, screen.Scale);
@@ -119,7 +120,7 @@ public sealed class UiScreenTests
         screen = new UiScreen(root);
         screen.Open();
 
-        screen.Update(new Size(100, 80));
+        screen.PrepareFrame(new Size(100, 80), 0);
 
         Assert.IsType<InvalidOperationException>(error);
         Assert.True(screen.UseLayoutRounding);
@@ -155,7 +156,7 @@ public sealed class UiScreenTests
         root.Children.Add(child);
         var screen = new UiScreen(root);
         screen.Open();
-        screen.Update(new Size(100, 80));
+        screen.PrepareFrame(new Size(100, 80), 0);
         Assert.True(root.IsMeasureValid);
         Assert.True(child.IsMeasureValid);
         Assert.True(grandchild.IsMeasureValid);
@@ -181,7 +182,7 @@ public sealed class UiScreenTests
         root.Children.Add(child);
         var screen = new UiScreen(root);
         screen.Open();
-        screen.Update(new Size(100, 80));
+        screen.PrepareFrame(new Size(100, 80), 0);
 
         screen.UseLayoutRounding = false;
 
@@ -202,7 +203,7 @@ public sealed class UiScreenTests
         screen.Open();
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            screen.Update(new Size(100, 80)));
+            screen.PrepareFrame(new Size(100, 80), 0));
 
         Assert.Equal(0, root.MeasureCalls);
         Assert.Equal(0, root.ArrangeCalls);
@@ -215,7 +216,7 @@ public sealed class UiScreenTests
         var root = new LayoutNode();
         var screen = new UiScreen(root);
         screen.Open();
-        screen.Update(new Size(100, 80));
+        screen.PrepareFrame(new Size(100, 80), 0);
 
         screen.Scale = 1;
 
@@ -269,7 +270,7 @@ public sealed class UiScreenTests
         var source = new UiScreen(incoming);
         var target = new UiScreen(new LayoutNode());
         manager.Open(source);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.Close();
         Assert.True(incoming.IsMeasureValid);
         Assert.True(incoming.IsArrangeValid);
@@ -282,7 +283,7 @@ public sealed class UiScreenTests
         Assert.False(incoming.IsArrangeValid);
 
         manager.Open(target);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.True(incoming.IsMeasureValid);
         Assert.True(incoming.IsArrangeValid);
@@ -303,7 +304,7 @@ public sealed class UiScreenTests
         var target = new UiScreen();
         source.Open();
         target.Open();
-        source.Update(new Size(100, 100));
+        source.PrepareFrame(new Size(100, 100), 0);
         Assert.True(incoming.IsMeasureValid);
         Assert.True(child.IsMeasureValid);
         Assert.True(grandchild.IsMeasureValid);
@@ -324,15 +325,144 @@ public sealed class UiScreenTests
     public void NullRootUiScreenCompletesLifecycleAndUpdate()
     {
         var calls = 0;
-        var screen = new UiScreen();
+        var fixedUpdates = 0;
+        var frameUpdates = 0;
+        var screen = new RecordingUiScreen
+        {
+            FixedAction = () => fixedUpdates++,
+            FrameAction = _ => frameUpdates++
+        };
         screen.Open();
         screen.Post(() => calls++);
 
-        screen.Update(new Size(20, 20));
+        screen.Update();
+        Assert.Equal(0, calls);
+        screen.PrepareFrame(new Size(20, 20), 0);
         screen.Close();
 
         Assert.Equal(1, calls);
+        Assert.Equal(1, fixedUpdates);
+        Assert.Equal(1, frameUpdates);
         Assert.Null(screen.Root);
+    }
+
+    [Fact]
+    public void FixedUpdateDoesNotDrainPostsOrLayout()
+    {
+        var events = new List<string>();
+        var root = new LayoutNode { MeasureAction = () => events.Add("layout") };
+        var screen = new RecordingUiScreen(root)
+        {
+            FixedAction = () => events.Add("fixed"),
+            FrameAction = _ => events.Add("frame")
+        };
+        screen.Open();
+        screen.Post(() => events.Add("post"));
+
+        screen.Update();
+
+        Assert.Equal(["fixed"], events);
+        Assert.False(root.IsMeasureValid);
+
+        screen.PrepareFrame(new Size(100, 100), 0.25);
+
+        Assert.Equal(["fixed", "post", "frame", "layout"], events);
+        screen.Close();
+    }
+
+    [Theory]
+    [InlineData(Visibility.Hidden)]
+    [InlineData(Visibility.Collapsed)]
+    public void VisibilityDoesNotSuppressUpdates(Visibility visibility)
+    {
+        var fixedUpdates = 0;
+        var frameUpdates = 0;
+        var screen = new RecordingUiScreen(new LayoutNode { Visibility = visibility })
+        {
+            FixedAction = () => fixedUpdates++,
+            FrameAction = _ => frameUpdates++
+        };
+        screen.Open();
+
+        screen.Update();
+        screen.PrepareFrame(new Size(100, 100), 0);
+
+        Assert.Equal(1, fixedUpdates);
+        Assert.Equal(1, frameUpdates);
+        screen.Close();
+    }
+
+    [Fact]
+    public void PostsFromFrameCallbackWaitUntilNextFrame()
+    {
+        var events = new List<string>();
+        var screen = new RecordingUiScreen();
+        screen.FrameAction = _ =>
+        {
+            events.Add("frame");
+            screen.Post(() => events.Add("posted"));
+        };
+        screen.Open();
+
+        screen.PrepareFrame(new Size(10, 10), 0);
+        Assert.Equal(["frame"], events);
+        screen.PrepareFrame(new Size(10, 10), 0);
+        Assert.Equal(["frame", "posted", "frame"], events);
+        screen.Close();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void UpdatingScreenRejectsReentryAndDirectDrawing(bool fixedUpdate)
+    {
+        var screen = new RecordingUiScreen();
+        var calls = 0;
+        void Check()
+        {
+            calls++;
+            Assert.Throws<InvalidOperationException>(screen.Update);
+            Assert.Throws<InvalidOperationException>(() => screen.PrepareFrame(new Size(10, 10), 0));
+            Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
+            Assert.Throws<InvalidOperationException>(() => new UiDrawCommandList().Append(screen));
+        }
+        screen.FixedAction = Check;
+        screen.FrameAction = _ => Check();
+        screen.Open();
+
+        if (fixedUpdate)
+            screen.Update();
+        else
+            screen.PrepareFrame(new Size(10, 10), 0);
+
+        Assert.Equal(1, calls);
+        Assert.Null(Record.Exception(() => screen.CreateDrawCommandList()));
+        screen.Close();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ClosingDuringCallbackCannotReopenSameScreenUntilCallbackReturns(bool fixedUpdate)
+    {
+        var screen = new RecordingUiScreen();
+        void CloseAndReopen()
+        {
+            screen.Close();
+            Assert.Throws<InvalidOperationException>(screen.Open);
+        }
+        screen.FixedAction = CloseAndReopen;
+        screen.FrameAction = _ => CloseAndReopen();
+        screen.Open();
+
+        if (fixedUpdate)
+            screen.Update();
+        else
+            screen.PrepareFrame(new Size(10, 10), 0);
+
+        Assert.False(screen.IsOpen());
+        screen.Open();
+        screen.Close();
     }
 
     [Fact]
@@ -478,7 +608,7 @@ public sealed class UiScreenTests
             error = Record.Exception(() => screen.Root = replacement);
         screen.Open();
 
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
 
         Assert.IsType<InvalidOperationException>(error);
         Assert.Same(oldRoot, screen.Root);
@@ -636,7 +766,7 @@ public sealed class UiScreenTests
         screen.Open();
 
         Assert.Equal(0, calls);
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         Assert.Equal(2, calls);
         screen.Close();
     }
@@ -654,10 +784,10 @@ public sealed class UiScreenTests
 
         screen.Open();
         screen.Post(() => calls.Add("second"));
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
 
         Assert.Equal(["first", "second"], calls);
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         Assert.Equal(["first", "second", "deferred"], calls);
         screen.Close();
     }
@@ -686,7 +816,7 @@ public sealed class UiScreenTests
 
         Assert.Null(error);
         Assert.Equal(0, calls);
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         Assert.Equal(1, calls);
         screen.Close();
     }
@@ -705,11 +835,11 @@ public sealed class UiScreenTests
         });
         screen.Post(() => calls.Add("remaining"));
 
-        var actual = Assert.Throws<InvalidOperationException>(() => screen.Update(new Size(20, 20)));
+        var actual = Assert.Throws<InvalidOperationException>(() => screen.PrepareFrame(new Size(20, 20), 0));
 
         Assert.Same(expected, actual);
         Assert.Equal(["failing"], calls);
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         Assert.Equal(["failing", "remaining"], calls);
         screen.Close();
     }
@@ -729,7 +859,7 @@ public sealed class UiScreenTests
 
         screen.Close();
         screen.Open();
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
 
         Assert.Equal(0, calls);
         Assert.IsType<InvalidOperationException>(postError);
@@ -743,7 +873,7 @@ public sealed class UiScreenTests
         var screen = new UiScreen(root);
         Exception? reopenError = null;
         screen.Open();
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         var arrangeCalls = root.ArrangeCalls;
         screen.Post(() =>
         {
@@ -751,7 +881,7 @@ public sealed class UiScreenTests
             reopenError = Record.Exception(screen.Open);
         });
 
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
 
         Assert.IsType<InvalidOperationException>(reopenError);
         Assert.Equal(arrangeCalls, root.ArrangeCalls);
@@ -782,7 +912,7 @@ public sealed class UiScreenTests
         });
         thread.Start();
 
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         thread.Join();
 
         Assert.IsType<InvalidOperationException>(reopenError);
@@ -807,7 +937,7 @@ public sealed class UiScreenTests
         var root = new LayoutNode();
         var screen = new UiScreen(root);
         screen.Open();
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         var arrangeCalls = root.ArrangeCalls;
         screen.Post(() =>
         {
@@ -815,7 +945,7 @@ public sealed class UiScreenTests
             throw expected;
         });
 
-        var actual = Assert.Throws<InvalidOperationException>(() => screen.Update(new Size(20, 20)));
+        var actual = Assert.Throws<InvalidOperationException>(() => screen.PrepareFrame(new Size(20, 20), 0));
 
         Assert.Same(expected, actual);
         Assert.Equal(arrangeCalls, root.ArrangeCalls);
@@ -843,7 +973,7 @@ public sealed class UiScreenTests
         Assert.Same(screen, screen.Root!.Screen);
         screen.Opening = null;
         screen.Open();
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         Assert.Equal(0, postedCalls);
         screen.Close();
     }
@@ -869,7 +999,7 @@ public sealed class UiScreenTests
         Assert.Same(screen, screen.Root!.Screen);
         screen.Opened = null;
         screen.Open();
-        screen.Update(new Size(20, 20));
+        screen.PrepareFrame(new Size(20, 20), 0);
         Assert.Equal(0, postedCalls);
         screen.Close();
     }
@@ -881,7 +1011,7 @@ public sealed class UiScreenTests
         var screen = new UiScreen(root);
         screen.Open();
 
-        screen.Update(new Size(100, 80));
+        screen.PrepareFrame(new Size(100, 80), 0);
 
         Assert.Equal(new Size(100, 80), root.LastMeasureConstraint);
         Assert.Equal(new Size(100, 80), root.LastArrangeSize);
@@ -898,7 +1028,7 @@ public sealed class UiScreenTests
         Exception? closeError = null;
         var thread = new Thread(() =>
         {
-            updateError = Record.Exception(() => screen.Update(new Size(20, 20)));
+            updateError = Record.Exception(() => screen.PrepareFrame(new Size(20, 20), 0));
             closeError = Record.Exception(screen.Close);
         });
 
@@ -916,11 +1046,15 @@ public sealed class UiScreenTests
         internal Action? Opened { get; set; }
         internal Action? Closing { get; set; }
         internal Action? Closed { get; set; }
+        internal Action? FixedAction { get; set; }
+        internal Action<double>? FrameAction { get; set; }
 
         protected override void OnOpening() => Opening?.Invoke();
         protected override void OnOpened() => Opened?.Invoke();
         protected override void OnClosing() => Closing?.Invoke();
         protected override void OnClosed() => Closed?.Invoke();
+        protected override void OnFixedUpdate() => FixedAction?.Invoke();
+        protected override void OnFrameUpdate(double alpha) => FrameAction?.Invoke(alpha);
     }
 
     private sealed class LayoutNode : UiNode

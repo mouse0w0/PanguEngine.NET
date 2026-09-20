@@ -49,7 +49,7 @@ public sealed class UiNodeInputStateTests
         var manager = new UiManager();
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.Same(child, screen.HitTest(new Point(5, 5)));
 
@@ -68,14 +68,14 @@ public sealed class UiNodeInputStateTests
         var manager = new UiManager();
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         container.IsEnabled = false;
         Assert.False(child.Focus());
         Assert.Null(screen.FocusedNode);
 
         container.IsEnabled = true;
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.True(child.Focus());
         Assert.Same(child, screen.FocusedNode);
@@ -114,7 +114,7 @@ public sealed class UiNodeInputStateTests
         first.PointerMoved += (_, args) => args.Handled = true;
         outer.PointerMoved += (_, _) => outerMoveCalls++;
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerMoved(new Point(5, 5));
 
@@ -166,7 +166,7 @@ public sealed class UiNodeInputStateTests
         child.GotFocus += (_, _) => events.Add($"child-got:{child.IsFocused}:{container.IsFocused}");
         child.KeyDown += (_, args) => args.Handled = true;
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.True(container.Focus());
         Assert.True(container.Focus());
@@ -201,7 +201,7 @@ public sealed class UiNodeInputStateTests
         container.PointerExited += (_, _) =>
             events.Add($"exit:{child.IsFocused}:{container.IsHovered}");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(child.Focus());
         Assert.True(container.IsHovered);
@@ -227,7 +227,7 @@ public sealed class UiNodeInputStateTests
         UiNode? exitSource = null;
         branch.PointerExited += (_, args) => exitSource = args.Source;
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(branch.IsHovered);
         Assert.True(leaf.IsHovered);
@@ -268,7 +268,7 @@ public sealed class UiNodeInputStateTests
                 Assert.Null(screen.FocusedNode);
             });
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(child.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -293,7 +293,7 @@ public sealed class UiNodeInputStateTests
         Assert.False(child.IsPressed);
         Assert.False(child.IsFocused);
 
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.True(container.IsHovered);
         Assert.True(child.IsHovered);
@@ -317,7 +317,7 @@ public sealed class UiNodeInputStateTests
         };
         node.LostFocus += (_, _) => events.Add($"lost:{node.IsFocused}");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.True(node.Focus());
 
@@ -346,7 +346,7 @@ public sealed class UiNodeInputStateTests
             });
         inner.PointerMoved += (_, _) => movedCalls++;
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerMoved(new Point(5, 5));
 
@@ -384,7 +384,7 @@ public sealed class UiNodeInputStateTests
         outer.PointerEntered += (_, _) => events.Add("outer-enter");
         inner.PointerEntered += (_, _) => events.Add("inner-enter");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         var aggregate = Assert.Throws<AggregateException>(() =>
             manager.ProcessPointerMoved(new Point(5, 5)));

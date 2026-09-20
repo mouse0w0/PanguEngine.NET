@@ -454,7 +454,7 @@ public sealed class ClientInputBridgeTests
         node.Height = viewport.Height;
         root.Children.Add(node);
         manager.Open(new UiScreen(root));
-        manager.Update(viewport);
+        manager.PrepareFrame(viewport, 0);
     }
 
     private sealed class TestNode : UiNode

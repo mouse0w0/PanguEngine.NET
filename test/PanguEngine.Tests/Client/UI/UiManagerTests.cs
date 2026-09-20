@@ -1,6 +1,8 @@
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Threading;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -23,7 +25,7 @@ public sealed class UiManagerTests
         var screen = new UiScreen(new TestNode());
 
         manager.Open(screen);
-        manager.Update(new Size(200, 100));
+        manager.PrepareFrame(new Size(200, 100), 0);
 
         Assert.Same(manager.Hud.Crosshair, Assert.Single(manager.Hud.Children));
         Assert.Same(screen, manager.CurrentScreen);
@@ -37,7 +39,7 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
 
-        manager.Update(new Size(200, 100));
+        manager.PrepareFrame(new Size(200, 100), 0);
 
         Assert.True(manager.Hud.Crosshair.IsArrangeValid);
         manager.Destroy();
@@ -227,7 +229,7 @@ public sealed class UiManagerTests
         var screen = new UiScreen(root);
         manager.Open(screen);
 
-        manager.Update(new Size(20, 20));
+        manager.PrepareFrame(new Size(20, 20), 0);
 
         Assert.Equal(8, errors.Count);
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
@@ -248,7 +250,7 @@ public sealed class UiManagerTests
         };
         manager.Hud.Children.Add(node);
 
-        manager.Update(new Size(20, 20));
+        manager.PrepareFrame(new Size(20, 20), 0);
 
         Assert.Equal(8, errors.Count);
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
@@ -274,7 +276,7 @@ public sealed class UiManagerTests
             events.Add("post");
         });
 
-        manager.Update(new Size(20, 10));
+        manager.PrepareFrame(new Size(20, 10), 0);
 
         Assert.Equal(["post", "measure", "arrange"], events);
         Assert.Equal(new Size(10, 5), root.LastMeasureConstraint);
@@ -290,7 +292,7 @@ public sealed class UiManagerTests
         manager.Open(screen);
         screen.Post(() => screen.UseLayoutRounding = false);
 
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.Equal(new Size(10.25, 10.25), root.DesiredSize);
         manager.Close();
@@ -303,14 +305,14 @@ public sealed class UiManagerTests
         var root = new TestNode { CoreDesiredSize = new Size(10.25, 10.25) };
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         Assert.Equal(new Size(11, 11), root.DesiredSize);
 
         screen.UseLayoutRounding = false;
 
         Assert.False(root.IsMeasureValid);
         Assert.False(root.IsArrangeValid);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         Assert.Equal(new Size(10.25, 10.25), root.DesiredSize);
         manager.Close();
     }
@@ -323,7 +325,7 @@ public sealed class UiManagerTests
         var screen = new UiScreen(root) { Scale = 2 };
         manager.Open(screen);
 
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
 
         Assert.Equal(new Size(50, 40), root.LastMeasureConstraint);
         Assert.Equal(new Rect(0, 0, 50, 40), root.LayoutBounds);
@@ -333,7 +335,7 @@ public sealed class UiManagerTests
         Assert.False(root.IsMeasureValid);
         Assert.False(root.IsArrangeValid);
 
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
 
         Assert.Equal(new Size(25, 20), root.LastMeasureConstraint);
         Assert.Equal(new Rect(0, 0, 25, 20), root.LayoutBounds);
@@ -350,9 +352,9 @@ public sealed class UiManagerTests
         var second = new UiScreen(secondRoot) { Scale = 4 };
 
         manager.Open(first);
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
         manager.Open(second);
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
 
         Assert.Equal(2, first.Scale);
         Assert.Equal(new Size(50, 40), firstRoot.LastMeasureConstraint);
@@ -368,13 +370,13 @@ public sealed class UiManagerTests
         var root = new TestNode { CoreDesiredSize = new Size(10.25, 10.25) };
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.Close();
         var measureCalls = root.MeasureCalls;
         var arrangeCalls = root.ArrangeCalls;
 
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.Close();
 
         Assert.Equal(measureCalls, root.MeasureCalls);
@@ -382,7 +384,7 @@ public sealed class UiManagerTests
 
         screen.UseLayoutRounding = false;
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.Equal(measureCalls + 1, root.MeasureCalls);
         Assert.Equal(arrangeCalls + 1, root.ArrangeCalls);
@@ -390,57 +392,91 @@ public sealed class UiManagerTests
     }
 
     [Fact]
-    public void ScreenPostCanCloseManagerBeforeLayout()
+    public void ScreenPostRejectsSynchronousScreenChanges()
     {
         var manager = new UiManager();
         var root = new TestNode { CoreDesiredSize = new Size(5, 5) };
         var screen = new UiScreen(root);
-        manager.Open(screen);
-        screen.Post(manager.Close);
-
-        manager.Update(new Size(20, 10));
-
-        Assert.Null(manager.CurrentScreen);
-        Assert.Equal(0, root.MeasureCalls);
-        Assert.Equal(0, root.ArrangeCalls);
-    }
-
-    [Fact]
-    public void ScreenPostCannotCloseAndReopenTheSameScreenThroughManager()
-    {
-        var manager = new UiManager();
-        var screen = new UiScreen(new TestNode());
-        Exception? reopenError = null;
+        var replacement = new UiScreen();
         manager.Open(screen);
         screen.Post(() =>
         {
-            manager.Close();
-            reopenError = Record.Exception(() => manager.Open(screen));
+            Assert.Throws<InvalidOperationException>(manager.Close);
+            Assert.Throws<InvalidOperationException>(() => manager.Open(replacement));
         });
 
-        manager.Update(new Size(20, 10));
+        manager.PrepareFrame(new Size(20, 10), 0);
 
-        Assert.IsType<InvalidOperationException>(reopenError);
-        Assert.Null(manager.CurrentScreen);
-        manager.Open(screen);
-        manager.Close();
+        Assert.Same(screen, manager.CurrentScreen);
+        Assert.False(replacement.IsOpen());
+        Assert.Equal(1, root.MeasureCalls);
+        Assert.Equal(1, root.ArrangeCalls);
+        manager.Destroy();
     }
 
-    [Fact]
-    public void ScreenPostCanReplaceCurrentScreenWithDifferentScreen()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task DispatchedReplacementKeepsOldScreenUntilQueueRuns(bool fromFrameCallback)
     {
+        var queue = new EngineWorkQueue();
+        var dispatcher = new EngineDispatcher(queue);
         var manager = new UiManager();
-        var oldScreen = new UiScreen(new TestNode());
-        var replacement = new UiScreen(new TestNode());
+        manager.Hud.Children.Clear();
+        var events = new List<string>();
+        var oldScreen = new RecordingUiScreen(new TestNode
+        {
+            CoreDesiredSize = new Size(10, 10),
+            DrawAction = DrawRectangle
+        });
+        var replacement = new RecordingUiScreen(new TestNode
+        {
+            CoreDesiredSize = new Size(10, 10),
+            MeasureAction = () => events.Add("layout"),
+            DrawAction = DrawRectangle
+        }) { FrameAction = _ => events.Add("frame") };
+        Task change = Task.CompletedTask;
         manager.Open(oldScreen);
-        oldScreen.Post(() => manager.Open(replacement));
+        void Replace()
+        {
+            change = dispatcher.InvokeAsync(() =>
+            {
+                manager.Open(replacement);
+                replacement.Post(() => events.Add("post"));
+            });
+        }
+        if (fromFrameCallback)
+            oldScreen.FrameAction = _ => Replace();
+        else
+            oldScreen.Post(Replace);
 
-        manager.Update(new Size(20, 10));
+        manager.PrepareFrame(new Size(20, 10), 0);
 
         Assert.Same(oldScreen, oldScreen.Root!.Screen);
+        Assert.Same(oldScreen, manager.CurrentScreen);
+        Assert.False(change.IsCompleted);
+        Assert.False(replacement.IsOpen());
+        Assert.Empty(events);
+        Assert.False(replacement.Root!.IsMeasureValid);
+        var commands = new UiDrawCommandList();
+        manager.AppendDrawCommands(commands);
+        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+
+        queue.RunPending();
+        Assert.True(change.IsCompletedSuccessfully);
         Assert.Same(replacement, manager.CurrentScreen);
-        Assert.Same(replacement, replacement.Root!.Screen);
-        manager.Close();
+        Assert.False(oldScreen.IsOpen());
+
+        manager.PrepareFrame(new Size(20, 10), 0);
+
+        Assert.Equal(["post", "frame", "layout"], events);
+        Assert.True(replacement.Root!.IsArrangeValid);
+        commands.Clear();
+        manager.AppendDrawCommands(commands);
+        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        manager.Destroy();
+        queue.Destroy();
+        await change;
     }
 
     [Fact]
@@ -450,7 +486,7 @@ public sealed class UiManagerTests
         var root = new TestNode { CoreDesiredSize = new Size(5, 5) };
         manager.Open(new UiScreen(root));
 
-        manager.Update(new Size(20, 10));
+        manager.PrepareFrame(new Size(20, 10), 0);
 
         Assert.Equal(new Size(20, 10), root.LastMeasureConstraint);
         Assert.Equal(new Size(20, 10), root.LastArrangeSize);
@@ -458,11 +494,11 @@ public sealed class UiManagerTests
         Assert.Equal(1, root.MeasureCalls);
         Assert.Equal(1, root.ArrangeCalls);
 
-        manager.Update(new Size(20, 10));
+        manager.PrepareFrame(new Size(20, 10), 0);
         Assert.Equal(1, root.MeasureCalls);
         Assert.Equal(1, root.ArrangeCalls);
 
-        manager.Update(new Size(30, 15));
+        manager.PrepareFrame(new Size(30, 15), 0);
         Assert.Equal(2, root.MeasureCalls);
         Assert.Equal(2, root.ArrangeCalls);
         Assert.Equal(new Rect(0, 0, 30, 15), root.LayoutBounds);
@@ -478,10 +514,10 @@ public sealed class UiManagerTests
         manager.Open(screen);
         screen.Post(() => calls++);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => manager.Update(Size.Infinite));
+        Assert.Throws<ArgumentOutOfRangeException>(() => manager.PrepareFrame(Size.Infinite, 0));
         Assert.Equal(0, calls);
 
-        manager.Update(new Size(20, 10));
+        manager.PrepareFrame(new Size(20, 10), 0);
         Assert.Equal(1, calls);
         manager.Close();
     }
@@ -496,7 +532,7 @@ public sealed class UiManagerTests
         var errors = RunOnBackgroundThread(() =>
             (Open: Record.Exception(() => manager.Open(new UiScreen(new TestNode()))),
                 Close: Record.Exception(manager.Close),
-                Update: Record.Exception(() => manager.Update(new Size(20, 20))),
+                Update: Record.Exception(() => manager.PrepareFrame(new Size(20, 20), 0)),
                 Destroy: Record.Exception(manager.Destroy)));
 
         Assert.IsType<InvalidOperationException>(errors.Open);
@@ -592,11 +628,11 @@ public sealed class UiManagerTests
         Assert.Same(screen, screen.Root!.Screen);
         Assert.Throws<ObjectDisposedException>(() => manager.Open(new UiScreen(new TestNode())));
         Assert.Throws<ObjectDisposedException>(manager.Close);
-        Assert.Throws<ObjectDisposedException>(() => manager.Update(new Size(20, 20)));
+        Assert.Throws<ObjectDisposedException>(() => manager.PrepareFrame(new Size(20, 20), 0));
     }
 
     [Fact]
-    public void DestroyDuringScreenPostCompletesActionAndSkipsLayout()
+    public void DestroyDuringScreenPostIsRejectedAndLayoutContinues()
     {
         var manager = new UiManager();
         var root = new TestNode { CoreDesiredSize = new Size(5, 5) };
@@ -606,44 +642,68 @@ public sealed class UiManagerTests
         screen.Post(() =>
         {
             events.Add("current-start");
-            manager.Destroy();
+            Assert.Throws<InvalidOperationException>(manager.Destroy);
             events.Add("current-end");
         });
-        screen.Post(() => events.Add("discarded"));
+        screen.Post(() => events.Add("remaining"));
 
-        manager.Update(new Size(20, 10));
+        manager.PrepareFrame(new Size(20, 10), 0);
 
-        Assert.Equal(["current-start", "current-end"], events);
-        Assert.Equal(0, root.MeasureCalls);
-        Assert.Equal(0, root.ArrangeCalls);
-        Assert.Null(manager.CurrentScreen);
+        Assert.Equal(["current-start", "current-end", "remaining"], events);
+        Assert.Equal(1, root.MeasureCalls);
+        Assert.Equal(1, root.ArrangeCalls);
+        Assert.Same(screen, manager.CurrentScreen);
+        manager.Destroy();
     }
 
     [Fact]
-    public void HoverRefreshCallbacksCanReplaceAfterLayout()
+    public async Task HoverRefreshCanDispatchScreenReplacement()
     {
+        var queue = new EngineWorkQueue();
+        var dispatcher = new EngineDispatcher(queue);
         var manager = new UiManager();
+        manager.Hud.Children.Clear();
         var root = new Canvas();
-        var leaf = new TestNode { Width = 20, Height = 20 };
+        var leaf = new TestNode { Width = 20, Height = 20, DrawAction = DrawRectangle };
         root.Children.Add(leaf);
         var screen = new UiScreen(root);
-        var replacement = new UiScreen(new TestNode());
+        var replacement = new UiScreen(new TestNode
+        {
+            CoreDesiredSize = new Size(10, 10),
+            DrawAction = DrawRectangle
+        });
         Exception? updateError = null;
+        Task change = Task.CompletedTask;
         leaf.PointerExited += (_, _) =>
         {
-            updateError = Record.Exception(() => manager.Update(new Size(100, 100)));
-            manager.Open(replacement);
+            updateError = Record.Exception(() => manager.PrepareFrame(new Size(100, 100), 0));
+            Assert.Throws<InvalidOperationException>(() => manager.Open(replacement));
+            change = dispatcher.InvokeAsync(() => manager.Open(replacement));
         };
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         leaf.IsHitTestVisible = false;
 
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.IsType<InvalidOperationException>(updateError);
+        Assert.Same(screen, manager.CurrentScreen);
+        Assert.False(change.IsCompleted);
+        var commands = new UiDrawCommandList();
+        manager.AppendDrawCommands(commands);
+        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+
+        queue.RunPending();
+        Assert.True(change.IsCompletedSuccessfully);
         Assert.Same(replacement, manager.CurrentScreen);
-        manager.Close();
+        manager.PrepareFrame(new Size(100, 100), 0);
+        commands.Clear();
+        manager.AppendDrawCommands(commands);
+        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        manager.Destroy();
+        queue.Destroy();
+        await change;
     }
 
     [Fact]
@@ -654,10 +714,230 @@ public sealed class UiManagerTests
 
         Assert.Throws<ObjectDisposedException>(() => manager.Open(new UiScreen(new TestNode())));
         Assert.Throws<ObjectDisposedException>(manager.Close);
-        Assert.Throws<ObjectDisposedException>(() => manager.Update(new Size(20, 10)));
+        Assert.Throws<ObjectDisposedException>(() => manager.PrepareFrame(new Size(20, 10), 0));
         Assert.Throws<ObjectDisposedException>(() => manager.ProcessFocusChanged(false));
         Assert.Throws<ObjectDisposedException>(() => manager.ProcessFocusChanged(true));
     }
+
+    [Fact]
+    public void HudPreparationCompletesBeforeScreenPreparation()
+    {
+        var events = new List<string>();
+        var manager = new UiManager();
+        manager.Hud.Children.Add(new TestNode { MeasureAction = () => events.Add("hud-layout") });
+        manager.Hud.Post(() => events.Add("hud-post"));
+        var screen = new RecordingUiScreen(new TestNode { MeasureAction = () => events.Add("screen-layout") })
+        {
+            FixedAction = () => events.Add("screen-fixed"),
+            FrameAction = alpha =>
+            {
+                Assert.Equal(0.75, alpha);
+                events.Add("screen-frame");
+            }
+        };
+        manager.Open(screen);
+        screen.Post(() => events.Add("screen-post"));
+
+        manager.Update();
+        Assert.Equal(["screen-fixed"], events);
+        events.Clear();
+        manager.PrepareFrame(new Size(100, 100), 0.75);
+
+        Assert.Equal(["hud-post", "hud-layout", "screen-post", "screen-frame", "screen-layout"], events);
+        events.Clear();
+        manager.PrepareFrame(new Size(100, 100), 0.75);
+        Assert.Equal(["screen-frame"], events);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public async Task HudPostCanDispatchScreenOpening()
+    {
+        var queue = new EngineWorkQueue();
+        var dispatcher = new EngineDispatcher(queue);
+        var events = new List<string>();
+        var manager = new UiManager();
+        manager.Hud.Children.Clear();
+        var screen = new RecordingUiScreen(new TestNode
+        {
+            CoreDesiredSize = new Size(10, 10),
+            MeasureAction = () => events.Add("layout"),
+            DrawAction = DrawRectangle
+        }) { FrameAction = _ => events.Add("screen-frame") };
+        Task change = Task.CompletedTask;
+        manager.Hud.Post(() =>
+        {
+            events.Add("hud-post");
+            change = dispatcher.InvokeAsync(() =>
+            {
+                manager.Open(screen);
+                screen.Post(() => events.Add("screen-post"));
+            });
+        });
+
+        manager.PrepareFrame(new Size(100, 100), 0);
+
+        Assert.Equal(["hud-post"], events);
+        Assert.Null(manager.CurrentScreen);
+        Assert.False(change.IsCompleted);
+        Assert.False(screen.Root!.IsMeasureValid);
+        var commands = new UiDrawCommandList();
+        manager.AppendDrawCommands(commands);
+        Assert.Empty(commands.OfType<UiFillRectangleCommand>());
+
+        queue.RunPending();
+        Assert.True(change.IsCompletedSuccessfully);
+        manager.PrepareFrame(new Size(100, 100), 0);
+
+        Assert.Equal(["hud-post", "screen-post", "screen-frame", "layout"], events);
+        Assert.True(screen.Root!.IsArrangeValid);
+        commands.Clear();
+        manager.AppendDrawCommands(commands);
+        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        manager.Destroy();
+        queue.Destroy();
+        await change;
+    }
+
+    [Fact]
+    public async Task DispatchedCloseRunsOutsideFramePreparation()
+    {
+        var queue = new EngineWorkQueue();
+        var dispatcher = new EngineDispatcher(queue);
+        var manager = new UiManager();
+        Task change = Task.CompletedTask;
+        var screen = new RecordingUiScreen(new TestNode())
+        {
+            FrameAction = _ => change = dispatcher.InvokeAsync(manager.Close)
+        };
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+
+        Assert.Same(screen, manager.CurrentScreen);
+        Assert.True(screen.Root!.IsArrangeValid);
+        Assert.False(change.IsCompleted);
+
+        queue.RunPending();
+
+        Assert.Null(manager.CurrentScreen);
+        Assert.False(screen.IsOpen());
+        manager.Destroy();
+        queue.Destroy();
+        await change;
+    }
+
+    [Fact]
+    public async Task DispatchedOpeningFailureIsReportedThroughTask()
+    {
+        var queue = new EngineWorkQueue();
+        var dispatcher = new EngineDispatcher(queue);
+        var manager = new UiManager();
+        var failure = new InvalidOperationException("opening failed");
+        var replacement = new RecordingUiScreen
+        {
+            Opening = () => throw failure
+        };
+        Task change = Task.CompletedTask;
+        var screen = new RecordingUiScreen
+        {
+            FrameAction = _ => change = dispatcher.InvokeAsync(() => manager.Open(replacement))
+        };
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+
+        Assert.Same(screen, manager.CurrentScreen);
+        queue.RunPending();
+        Assert.Null(manager.CurrentScreen);
+        manager.Destroy();
+        queue.Destroy();
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => change);
+        Assert.Same(failure, actual);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void UpdateFailureRestoresGuardsAndAllowsCleanup(bool fixedUpdate)
+    {
+        var manager = new UiManager();
+        var failure = new InvalidOperationException("update failed");
+        var screen = new RecordingUiScreen(new TestNode())
+        {
+            FixedAction = () => throw failure,
+            FrameAction = _ => throw failure
+        };
+        manager.Open(screen);
+
+        var actual = fixedUpdate
+            ? Assert.Throws<InvalidOperationException>(manager.Update)
+            : Assert.Throws<InvalidOperationException>(() => manager.PrepareFrame(new Size(100, 100), 0));
+
+        Assert.Same(failure, actual);
+        Assert.Same(screen, manager.CurrentScreen);
+        manager.Destroy();
+        Assert.Null(manager.CurrentScreen);
+    }
+
+    [Fact]
+    public void ManagerRejectsNestedUpdateAndRecordingDuringPost()
+    {
+        var manager = new UiManager();
+        manager.Hud.Post(() =>
+        {
+            Assert.Throws<InvalidOperationException>(() => manager.Open(new UiScreen()));
+            Assert.Throws<InvalidOperationException>(manager.Close);
+            Assert.Throws<InvalidOperationException>(manager.Update);
+            Assert.Throws<InvalidOperationException>(manager.Destroy);
+            Assert.Throws<InvalidOperationException>(() => manager.PrepareFrame(new Size(10, 10), 0));
+            Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
+        });
+
+        manager.PrepareFrame(new Size(10, 10), 0);
+        manager.Destroy();
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void UpdateCallbacksRejectSynchronousScreenChangesAndDestruction(bool fixedUpdate)
+    {
+        var manager = new UiManager();
+        var root = new TestNode();
+        var replacement = new UiScreen();
+        var calls = 0;
+        void Check()
+        {
+            calls++;
+            Assert.Throws<InvalidOperationException>(() => manager.Open(replacement));
+            Assert.Throws<InvalidOperationException>(manager.Close);
+            Assert.Throws<InvalidOperationException>(manager.Destroy);
+        }
+        var screen = new RecordingUiScreen(root)
+        {
+            FixedAction = Check,
+            FrameAction = _ => Check()
+        };
+        manager.Open(screen);
+
+        if (fixedUpdate)
+            manager.Update();
+        else
+            manager.PrepareFrame(new Size(10, 10), 0);
+
+        Assert.Same(screen, manager.CurrentScreen);
+        Assert.Equal(1, calls);
+        Assert.False(replacement.IsOpen());
+        Assert.True(screen.IsOpen());
+        Assert.Equal(!fixedUpdate, root.IsMeasureValid);
+        manager.Destroy();
+        Assert.Throws<ObjectDisposedException>(manager.Update);
+        Assert.Throws<ObjectDisposedException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
+        manager.Destroy();
+    }
+
+    private static void DrawRectangle(UiDrawingContext context) =>
+        context.FillRectangle(new Rect(0, 0, 10, 10), new Color(255, 255, 255));
 
     private static void CaptureNestedOperationErrors(
         UiManager manager,
@@ -666,7 +946,7 @@ public sealed class UiManagerTests
         errors.Add(Record.Exception(() => manager.Open(new UiScreen(new TestNode()))));
         errors.Add(Record.Exception(manager.Close));
         errors.Add(Record.Exception(manager.Destroy));
-        errors.Add(Record.Exception(() => manager.Update(new Size(10, 10))));
+        errors.Add(Record.Exception(() => manager.PrepareFrame(new Size(10, 10), 0)));
     }
 
     private static T RunOnBackgroundThread<T>(Func<T> action)
@@ -700,6 +980,7 @@ public sealed class UiManagerTests
         internal Size LastArrangeSize { get; private set; }
         internal Action? MeasureAction { get; set; }
         internal Action? ArrangeAction { get; set; }
+        internal Action<UiDrawingContext>? DrawAction { get; set; }
         internal int MeasureCalls { get; private set; }
         internal int ArrangeCalls { get; private set; }
 
@@ -717,6 +998,8 @@ public sealed class UiManagerTests
             LastArrangeSize = finalSize;
             ArrangeAction?.Invoke();
         }
+
+        protected override void DrawCore(UiDrawingContext context) => DrawAction?.Invoke(context);
     }
 
     private sealed class RecordingUiScreen(UiNode? root = null) : UiScreen(root)
@@ -725,10 +1008,14 @@ public sealed class UiManagerTests
         internal Action? Opened { get; set; }
         internal Action? Closing { get; set; }
         internal Action? Closed { get; set; }
+        internal Action? FixedAction { get; set; }
+        internal Action<double>? FrameAction { get; set; }
 
         protected override void OnOpening() => Opening?.Invoke();
         protected override void OnOpened() => Opened?.Invoke();
         protected override void OnClosing() => Closing?.Invoke();
         protected override void OnClosed() => Closed?.Invoke();
+        protected override void OnFixedUpdate() => FixedAction?.Invoke();
+        protected override void OnFrameUpdate(double alpha) => FrameAction?.Invoke(alpha);
     }
 }

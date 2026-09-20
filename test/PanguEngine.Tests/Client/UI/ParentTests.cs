@@ -300,7 +300,7 @@ public sealed class ParentTests
         root.Children.Add(second);
         var screen = new UiScreen(root);
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         Assert.True(first.IsMeasureValid);
         Assert.True(firstLeaf.IsMeasureValid);
         Assert.True(second.IsMeasureValid);
@@ -330,7 +330,7 @@ public sealed class ParentTests
         root.Children.Add(newParent);
         var screen = new UiScreen(root);
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         Assert.True(child.IsMeasureValid);
         Assert.True(child.IsArrangeValid);
         Assert.True(leaf.IsMeasureValid);
@@ -388,7 +388,7 @@ public sealed class ParentTests
         var newScreen = new UiScreen(newRoot) { Scale = 3 };
         oldScreen.Open();
         newScreen.Open();
-        oldScreen.Update(new Size(100, 100));
+        oldScreen.PrepareFrame(new Size(100, 100), 0);
         Assert.True(child.IsMeasureValid);
         Assert.True(grandchild.IsMeasureValid);
 
@@ -415,7 +415,7 @@ public sealed class ParentTests
         var newScreen = new UiScreen(newRoot) { UseLayoutRounding = false };
         oldScreen.Open();
         newScreen.Open();
-        oldScreen.Update(new Size(100, 100));
+        oldScreen.PrepareFrame(new Size(100, 100), 0);
 
         newRoot.Children.Add(child);
 
@@ -440,7 +440,7 @@ public sealed class ParentTests
         var newScreen = new UiScreen(newRoot) { Scale = 2, UseLayoutRounding = false };
         oldScreen.Open();
         newScreen.Open();
-        oldScreen.Update(new Size(100, 100));
+        oldScreen.PrepareFrame(new Size(100, 100), 0);
 
         newRoot.Children.Add(child);
 
@@ -462,7 +462,7 @@ public sealed class ParentTests
         root.Children.Add(child);
         var screen = new UiScreen(root);
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
 
         root.Children.Remove(child);
 
@@ -513,8 +513,8 @@ public sealed class ParentTests
         var targetScreen = new UiScreen(targetRoot);
         sourceScreen.Open();
         targetScreen.Open();
-        sourceScreen.Update(new Size(100, 100));
-        targetScreen.Update(new Size(100, 100));
+        sourceScreen.PrepareFrame(new Size(100, 100), 0);
+        targetScreen.PrepareFrame(new Size(100, 100), 0);
         Assert.True(incoming.IsMeasureValid);
         Assert.True(incomingLeaf.IsMeasureValid);
         Assert.True(replaced.IsMeasureValid);

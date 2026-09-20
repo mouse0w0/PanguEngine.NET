@@ -290,7 +290,7 @@ public sealed class ButtonTests
         var manager = new UiManager();
         var screen = new UiScreen(root) { UseLayoutRounding = false };
         manager.Open(screen);
-        manager.Update(new Size(120, 80));
+        manager.PrepareFrame(new Size(120, 80), 0);
 
         var normalCommands = screen.CreateDrawCommandList();
         var normal = normalCommands.OfType<UiFillRectangleCommand>().ToArray();
@@ -330,7 +330,7 @@ public sealed class ButtonTests
         var manager = new UiManager();
         var screen = new UiScreen(root) { UseLayoutRounding = false };
         manager.Open(screen);
-        manager.Update(new Size(120, 80));
+        manager.PrepareFrame(new Size(120, 80), 0);
         Assert.True(button.Focus());
 
         var fills = GetFills(screen);
@@ -353,7 +353,7 @@ public sealed class ButtonTests
         var manager = new UiManager();
         var screen = new UiScreen(root) { Scale = 0.25 };
         manager.Open(screen);
-        manager.Update(new Size(30, 20));
+        manager.PrepareFrame(new Size(30, 20), 0);
         Assert.True(button.Focus());
 
         Assert.DoesNotContain(
@@ -377,7 +377,7 @@ public sealed class ButtonTests
         var manager = new UiManager();
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(140, 80));
+        manager.PrepareFrame(new Size(140, 80), 0);
 
         var commands = screen.CreateDrawCommandList();
         var imageCommand = Assert.Single(commands.OfType<UiDrawImageCommand>());
@@ -411,7 +411,7 @@ public sealed class ButtonTests
         button.PointerClicked += (_, eventArgs) => source = eventArgs.Source;
         button.Click += (_, _) => clicks++;
         manager.Open(screen);
-        manager.Update(new Size(140, 80));
+        manager.PrepareFrame(new Size(140, 80), 0);
 
         Click(manager, new Point(60, 30), MouseButton.Left);
 
@@ -433,7 +433,7 @@ public sealed class ButtonTests
         button.Click += (_, _) => calls.Add("click");
         root.PointerClicked += (_, _) => calls.Add("root");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Click(manager, new Point(5, 5), MouseButton.Left);
 
@@ -493,8 +493,8 @@ public sealed class ButtonTests
         button.Click += (_, _) => clicks++;
         firstManager.Open(firstScreen);
         secondManager.Open(secondScreen);
-        firstManager.Update(new Size(100, 100));
-        secondManager.Update(new Size(100, 100));
+        firstManager.PrepareFrame(new Size(100, 100), 0);
+        secondManager.PrepareFrame(new Size(100, 100), 0);
 
         firstManager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         firstManager.ProcessPointerReleased(new Point(80, 80), MouseButton.Left, KeyModifiers.None);
@@ -839,7 +839,7 @@ public sealed class ButtonTests
         var button = Place(root, new Button(), 0, 0, 80, 32);
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         return (manager, screen, root, button);
     }
 

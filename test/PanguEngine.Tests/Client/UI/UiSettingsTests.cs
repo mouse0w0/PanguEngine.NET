@@ -61,11 +61,11 @@ public sealed class UiSettingsTests
             var root = new LayoutNode();
             var screen = new UiScreen(root);
             manager.Open(screen);
-            manager.Update(new Size(100, 80));
+            manager.PrepareFrame(new Size(100, 80), 0);
             Assert.Equal(new Size(100, 80), root.LastMeasureConstraint);
 
             UiSettings.DefaultScale = 2;
-            manager.Update(new Size(100, 80));
+            manager.PrepareFrame(new Size(100, 80), 0);
 
             Assert.Equal(2, screen.Scale);
             Assert.Equal(new Size(50, 40), root.LastMeasureConstraint);
@@ -91,7 +91,7 @@ public sealed class UiSettingsTests
             manager.Open(screen);
 
             UiSettings.DefaultScale = 2;
-            manager.Update(new Size(100, 80));
+            manager.PrepareFrame(new Size(100, 80), 0);
 
             Assert.Equal(1, screen.Scale);
         }

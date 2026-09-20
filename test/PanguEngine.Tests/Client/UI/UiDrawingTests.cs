@@ -84,12 +84,12 @@ public sealed class UiDrawingTests
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
         var screen = new UiScreen(node);
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         var before = screen.CreateDrawCommandList();
 
         screen.Scale = 2;
         var pending = screen.CreateDrawCommandList();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         var after = screen.CreateDrawCommandList();
 
         Assert.Single(before.OfType<UiFillRectangleCommand>());
@@ -106,12 +106,12 @@ public sealed class UiDrawingTests
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
         var screen = new UiScreen(node);
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         var before = screen.CreateDrawCommandList();
 
         screen.UseLayoutRounding = false;
         var pending = screen.CreateDrawCommandList();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         var after = screen.CreateDrawCommandList();
 
         Assert.Single(before.OfType<UiFillRectangleCommand>());
@@ -125,7 +125,7 @@ public sealed class UiDrawingTests
     {
         var screen = new UiScreen { Scale = 2 };
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
 
         var commands = screen.CreateDrawCommandList();
 
@@ -1146,7 +1146,7 @@ public sealed class UiDrawingTests
         Arrange(first, new Rect(0, 0, 10, 10));
         Arrange(second, new Rect(20, 0, 10, 10));
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         var errors = new List<Exception?>();
         root.DrawAction = _ =>
         {
@@ -1286,7 +1286,7 @@ public sealed class UiDrawingTests
         _ = screen.CreateDrawCommandList();
         Assert.Equal(0, calls);
 
-        screen.Update(new Size(10, 10));
+        screen.PrepareFrame(new Size(10, 10), 0);
         Assert.Equal(1, calls);
         screen.Close();
     }

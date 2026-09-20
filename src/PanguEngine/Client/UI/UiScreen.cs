@@ -58,7 +58,7 @@ public partial class UiScreen
     }
 
     /// <summary>
-    /// Posts an action for execution on the next update of the open screen.
+    /// Posts an action for execution during the next frame preparation of the open screen.
     /// </summary>
     /// <param name="action">The action to enqueue.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="action"/> is null.</exception>
@@ -103,6 +103,17 @@ public partial class UiScreen
     /// Invoked after this screen closes.
     /// </summary>
     protected virtual void OnClosed()
+    {
+    }
+
+    /// <summary>Updates the screen at the client's fixed update frequency.</summary>
+    protected virtual void OnFixedUpdate()
+    {
+    }
+
+    /// <summary>Updates the screen before layout for a client frame.</summary>
+    /// <param name="alpha">The interpolation factor between fixed updates.</param>
+    protected virtual void OnFrameUpdate(double alpha)
     {
     }
 
@@ -160,47 +171,80 @@ public partial class UiScreen
         }
     }
 
-    internal void Update(Size viewportSize)
+    internal bool IsUpdating { get; private set; }
+
+    internal void Update()
+    {
+        VerifyOwnerThread();
+        VerifyNotTransitioningOrUpdatingLayout();
+        if (IsUpdating)
+            throw new InvalidOperationException("The UI screen is already updating.");
+
+        BeginRuntimeOperation();
+        IsUpdating = true;
+        try
+        {
+            if (IsScreenActive())
+                OnFixedUpdate();
+        }
+        finally
+        {
+            IsUpdating = false;
+            EndRuntimeOperation();
+        }
+    }
+
+    internal void PrepareFrame(Size viewportSize, double alpha)
     {
         CreateViewportBounds(viewportSize);
         VerifyOwnerThread();
         VerifyNotTransitioningOrUpdatingLayout();
+        if (IsUpdating)
+            throw new InvalidOperationException("The UI screen is already updating.");
+
         BeginRuntimeOperation();
+        IsUpdating = true;
         try
         {
             DrainPending();
-            if (!IsScreenActive())
-                return;
-
-            SynchronizeDefaultScale();
-            var scale = Scale;
-            var logicalViewportSize = new Size(
-                viewportSize.Width / scale,
-                viewportSize.Height / scale);
-            var viewportBounds = CreateViewportBounds(logicalViewportSize);
-            var root = Root;
-            if (root is null)
-                return;
-
-            IsUpdatingLayout = true;
-            try
-            {
-                root.Measure(logicalViewportSize);
-                if (root.IsMeasureValid)
-                    root.Arrange(viewportBounds);
-            }
-            finally
-            {
-                IsUpdatingLayout = false;
-            }
-
             if (IsScreenActive())
-                RefreshPointerAfterLayout();
+                OnFrameUpdate(alpha);
+            if (IsScreenActive())
+                UpdateLayout(viewportSize);
         }
         finally
         {
+            IsUpdating = false;
             EndRuntimeOperation();
         }
+    }
+
+    private void UpdateLayout(Size viewportSize)
+    {
+        SynchronizeDefaultScale();
+        var scale = Scale;
+        var logicalViewportSize = new Size(
+            viewportSize.Width / scale,
+            viewportSize.Height / scale);
+        var viewportBounds = CreateViewportBounds(logicalViewportSize);
+        var root = Root;
+        if (root is null)
+            return;
+
+        IsUpdatingLayout = true;
+        try
+        {
+            root.Measure(logicalViewportSize);
+            if (root.IsMeasureValid)
+                root.Arrange(viewportBounds);
+        }
+        finally
+        {
+            IsUpdatingLayout = false;
+        }
+
+        if (IsScreenActive())
+            RefreshPointerAfterLayout();
     }
 
     internal void VerifyOwnerThread()
@@ -418,6 +462,16 @@ public partial class UiScreen
             _isTransitioning = true;
             _isClosing = true;
             _isInteractionActive = false;
+            _pendingActions.Clear();
+        }
+    }
+
+    internal void StopAcceptingPosts()
+    {
+        lock (_stateSync)
+        {
+            VerifyOwnerThreadCore();
+            _isClosing = true;
             _pendingActions.Clear();
         }
     }

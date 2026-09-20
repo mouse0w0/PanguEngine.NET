@@ -177,7 +177,7 @@ public sealed class UiInputRoutingTests
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
         Assert.True(root.Children.Remove(first));
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(35, 5));
 
         Assert.Equal(0, firstMoves);
@@ -433,7 +433,7 @@ public sealed class UiInputRoutingTests
 
         manager.ProcessFocusChanged(false);
         manager.ProcessFocusChanged(true);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.False(control.IsFocused);
         Assert.False(control.IsHovered);
@@ -515,7 +515,7 @@ public sealed class UiInputRoutingTests
 
         eligible.InvalidateArrange();
         Assert.False(eligible.Focus());
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
     }
 
     [Fact]
@@ -765,7 +765,7 @@ public sealed class UiInputRoutingTests
         Assert.Same(first, screen.FocusedNode);
         Assert.IsType<InvalidOperationException>(reentryError);
 
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.Same(second, screen.FocusedNode);
     }
@@ -813,7 +813,7 @@ public sealed class UiInputRoutingTests
         Assert.Same(leaf, screen.FocusedNode);
         Assert.Empty(events);
 
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerReleased(new Point(55, 5), MouseButton.Left, KeyModifiers.None);
 
         Assert.Equal(["leaf-exit", "leaf-enter", "leaf-click"], events);
@@ -843,7 +843,7 @@ public sealed class UiInputRoutingTests
 
         oldManager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.DoesNotContain("release", events);
-        newManager.Update(new Size(100, 100));
+        newManager.PrepareFrame(new Size(100, 100), 0);
     }
 
     [Fact]
@@ -954,11 +954,11 @@ public sealed class UiInputRoutingTests
         events.Clear();
 
         leaf.IsHitTestVisible = false;
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         leaf.IsHitTestVisible = true;
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         Canvas.SetLeft(leaf, 30);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.Equal(["exit", "enter", "exit"], events);
     }
@@ -982,7 +982,7 @@ public sealed class UiInputRoutingTests
         };
         leaf.PointerWheel += (_, eventArgs) => wheel = eventArgs;
         manager.Open(screen);
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
 
         manager.ProcessPointerMoved(new Point(24, 8));
 
@@ -994,7 +994,7 @@ public sealed class UiInputRoutingTests
         Assert.False(root.IsArrangeValid);
         Assert.False(leaf.IsArrangeValid);
 
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
         manager.ProcessPointerWheel(new Point(48, 16), 3, -5);
 
         Assert.NotNull(wheel);
@@ -1011,16 +1011,16 @@ public sealed class UiInputRoutingTests
         var root = new LayoutActionNode();
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         root.MeasureAction = () => manager.ProcessPointerMoved(new Point(1, 1));
 
-        Assert.Throws<InvalidOperationException>(() => manager.Update(new Size(200, 200)));
+        Assert.Throws<InvalidOperationException>(() => manager.PrepareFrame(new Size(200, 200), 0));
         root.MeasureAction = null;
 
         Assert.Null(Record.Exception(() =>
         {
-            manager.Update(new Size(100, 100));
+            manager.PrepareFrame(new Size(100, 100), 0);
             manager.ProcessPointerMoved(new Point(1, 1));
         }));
         manager.Close();
@@ -1033,16 +1033,16 @@ public sealed class UiInputRoutingTests
         var root = new LayoutActionNode();
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         root.ArrangeAction = () => manager.ProcessPointerMoved(new Point(1, 1));
 
-        Assert.Throws<InvalidOperationException>(() => manager.Update(new Size(200, 200)));
+        Assert.Throws<InvalidOperationException>(() => manager.PrepareFrame(new Size(200, 200), 0));
         root.ArrangeAction = null;
 
         Assert.Null(Record.Exception(() =>
         {
-            manager.Update(new Size(100, 100));
+            manager.PrepareFrame(new Size(100, 100), 0);
             manager.ProcessPointerMoved(new Point(1, 1));
         }));
         manager.Close();
@@ -1066,14 +1066,14 @@ public sealed class UiInputRoutingTests
             leafPositions.Add(eventArgs.GetPosition(leaf));
         };
         manager.Open(screen);
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
 
         screen.Post(() =>
         {
             screen.Scale = 2;
             manager.ProcessPointerMoved(new Point(24, 8));
         });
-        manager.Update(new Size(100, 80));
+        manager.PrepareFrame(new Size(100, 80), 0);
         manager.ProcessPointerMoved(new Point(40, 16));
 
         Assert.Equal(2, screen.Scale);
@@ -1116,7 +1116,7 @@ public sealed class UiInputRoutingTests
         };
         root.PointerWheel += (_, _) => events.Add("root-wheel");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerMoved(new Point(44, 8));
 
@@ -1128,7 +1128,7 @@ public sealed class UiInputRoutingTests
         Assert.False(leaf.IsArrangeValid);
 
         events.Clear();
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerWheel(new Point(84, 8), 2.5, -1.5);
 
         Assert.Equal(["leaf-wheel", "root-wheel"], events);
@@ -1166,14 +1166,14 @@ public sealed class UiInputRoutingTests
         };
         leaf.PointerMoved += (_, eventArgs) => movedPosition = eventArgs.ScreenPosition;
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(15, 5));
 
         screen.Scale = 0.5;
         manager.ProcessPointerMoved(new Point(15, 5));
         Assert.Empty(events);
 
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.Equal(["enter"], events);
         Assert.Equal(new Point(30, 10), enteredPosition);
@@ -1182,7 +1182,7 @@ public sealed class UiInputRoutingTests
         Assert.Equal(new Point(32, 12), movedPosition);
 
         screen.Scale = 2;
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         Assert.Equal(["enter", "exit"], events);
         Assert.Equal(new Point(8, 3), exitedPosition);
@@ -1200,14 +1200,14 @@ public sealed class UiInputRoutingTests
         leaf.PointerEntered += (_, _) => events.Add("enter");
         leaf.PointerReleased += (_, _) => events.Add("release");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         events.Clear();
 
         manager.Close();
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(new Point(5, 5));
 
@@ -1285,7 +1285,7 @@ public sealed class UiInputRoutingTests
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
         Assert.Same(screen, root.Screen);
-        Assert.Throws<ObjectDisposedException>(() => manager.Update(new Size(20, 20)));
+        Assert.Throws<ObjectDisposedException>(() => manager.PrepareFrame(new Size(20, 20), 0));
     }
 
     [Fact]
@@ -1325,7 +1325,7 @@ public sealed class UiInputRoutingTests
         var expected = new InvalidOperationException("lost");
         leaf.LostFocus += (_, _) => throw expected;
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         Assert.True(leaf.Focus());
 
         var actual = Assert.Throws<InvalidOperationException>(manager.Close);
@@ -1356,7 +1356,7 @@ public sealed class UiInputRoutingTests
             screenError = Record.Exception(() => screen.ProcessPointerMoved(Point.Zero));
         };
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         Assert.True(leaf.Focus());
 
         manager.Close();
@@ -1412,7 +1412,7 @@ public sealed class UiInputRoutingTests
         leaf.PointerExited += (_, _) => events.Add("exit");
 
         screen.Open();
-        screen.Update(new Size(100, 100));
+        screen.PrepareFrame(new Size(100, 100), 0);
         screen.ProcessPointerMoved(new Point(5, 5));
         screen.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         screen.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -1462,7 +1462,7 @@ public sealed class UiInputRoutingTests
         };
         root.PointerMoved += (_, _) => events.Add("root");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerMoved(new Point(5, 5));
 
@@ -1487,7 +1487,7 @@ public sealed class UiInputRoutingTests
             reopenError = Record.Exception(() => manager.Open(screen));
         };
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         Assert.True(first.Focus());
 
         screen.ClearFocus();
@@ -1523,7 +1523,7 @@ public sealed class UiInputRoutingTests
             events.Add("branch-exit");
         };
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(leaf.Focus());
 
@@ -1553,7 +1553,7 @@ public sealed class UiInputRoutingTests
         leaf.PointerExited += (_, _) => events.Add("leaf-exit");
         branch.PointerExited += (_, _) => events.Add("branch-exit");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(leaf.Focus());
 
@@ -1581,7 +1581,7 @@ public sealed class UiInputRoutingTests
         leaf.PointerExited += (_, _) => events.Add("leaf-exit");
         branch.PointerExited += (_, _) => events.Add("branch-exit");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(leaf.Focus());
 
@@ -1613,7 +1613,7 @@ public sealed class UiInputRoutingTests
         leaf.PointerExited += (_, _) => events.Add("leaf-exit");
         leaf.PointerClicked += (_, _) => events.Add("click");
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.True(leaf.Focus());
@@ -1626,7 +1626,7 @@ public sealed class UiInputRoutingTests
         Assert.Same(screen, incoming.Screen);
         Assert.Same(screen, leaf.Screen);
 
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.Equal(["click"], events);
         manager.Close();
@@ -1666,8 +1666,8 @@ public sealed class UiInputRoutingTests
         var source = new UiScreen(sourceRoot);
         target.Open();
         source.Open();
-        target.Update(new Size(100, 100));
-        source.Update(new Size(100, 100));
+        target.PrepareFrame(new Size(100, 100), 0);
+        source.PrepareFrame(new Size(100, 100), 0);
         Assert.True(targetLeaf.Focus());
         Assert.True(sourceLeaf.Focus());
         UiNode? sourceFocusDuringTargetNotification = source.FocusedNode;
@@ -1697,8 +1697,8 @@ public sealed class UiInputRoutingTests
         sourceLeaf.LostFocus += (_, _) => throw sourceError;
         target.Open();
         source.Open();
-        target.Update(new Size(100, 100));
-        source.Update(new Size(100, 100));
+        target.PrepareFrame(new Size(100, 100), 0);
+        source.PrepareFrame(new Size(100, 100), 0);
         Assert.True(targetLeaf.Focus());
         Assert.True(sourceLeaf.Focus());
 
@@ -1751,7 +1751,7 @@ public sealed class UiInputRoutingTests
         var root = new Canvas();
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         return (manager, screen, root);
     }
 

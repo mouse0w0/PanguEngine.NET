@@ -7,6 +7,7 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Manages the persistent HUD and the current regular UI screen.
 /// </summary>
+/// <remarks>The engine owns this manager and destroys it after UI dispatch has stopped.</remarks>
 public sealed class UiManager
 {
     private readonly int _ownerThreadId;
@@ -36,11 +37,12 @@ public sealed class UiManager
     /// <summary>
     /// Opens a screen, replacing the current screen when necessary.
     /// </summary>
+    /// <remarks>Screen changes from update callbacks must be scheduled through the engine dispatcher.</remarks>
     /// <param name="screen">The screen to open.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="screen"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the screen cannot be opened or the manager is performing another lifecycle,
-    /// layout, or drawing operation.
+    /// update, layout, or drawing operation.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
     public void Open(UiScreen screen)
@@ -48,6 +50,7 @@ public sealed class UiManager
         ArgumentNullException.ThrowIfNull(screen);
         VerifyAccess();
         VerifyLifecycleOperation();
+        VerifyNotUpdating();
         if (ReferenceEquals(screen, CurrentScreen))
             return;
 
@@ -76,14 +79,16 @@ public sealed class UiManager
     /// <summary>
     /// Closes the current screen.
     /// </summary>
+    /// <remarks>Screen changes from update callbacks must be scheduled through the engine dispatcher.</remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the manager is performing another lifecycle, layout, or drawing operation.
+    /// Thrown when the manager is performing another lifecycle, update, layout, or drawing operation.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
     public void Close()
     {
         VerifyAccess();
         VerifyLifecycleOperation();
+        VerifyNotUpdating();
         var screen = CurrentScreen;
         if (screen is null)
             return;
@@ -102,23 +107,35 @@ public sealed class UiManager
         }
     }
 
-    internal void Update(Size viewportSize)
+    internal void Update()
     {
         VerifyAccess();
         VerifyLifecycleOperation();
-        if (_isUpdating)
-            throw new InvalidOperationException("The UI manager cannot update in its current state.");
+        VerifyNotUpdating();
 
-        UiScreen.CreateViewportBounds(viewportSize);
         _isUpdating = true;
         try
         {
-            Hud.Update(viewportSize);
-            var screen = CurrentScreen;
-            if (screen is null)
-                return;
+            Hud.Update();
+            CurrentScreen?.Update();
+        }
+        finally
+        {
+            _isUpdating = false;
+        }
+    }
 
-            screen.Update(viewportSize);
+    internal void PrepareFrame(Size viewportSize, double alpha)
+    {
+        VerifyAccess();
+        VerifyLifecycleOperation();
+        VerifyNotUpdating();
+
+        _isUpdating = true;
+        try
+        {
+            Hud.PrepareFrame(viewportSize, alpha);
+            CurrentScreen?.PrepareFrame(viewportSize, alpha);
         }
         finally
         {
@@ -130,6 +147,7 @@ public sealed class UiManager
     {
         VerifyAccess();
         VerifyLifecycleOperation();
+        VerifyNotUpdating();
         commands.Append(Hud.Screen);
         if (CurrentScreen is { } screen)
             commands.Append(screen);
@@ -142,6 +160,7 @@ public sealed class UiManager
 
         VerifyAccess();
         VerifyLifecycleOperation();
+        VerifyNotUpdating();
         var errors = new List<Exception>();
         var screen = CurrentScreen;
         CurrentScreen = null;
@@ -176,7 +195,14 @@ public sealed class UiManager
             _isTransitioning = false;
         }
 
-        NotifyCurrentScreenChanged(screen);
+        try
+        {
+            NotifyCurrentScreenChanged(screen);
+        }
+        catch (Exception exception)
+        {
+            AddLifecycleErrors(errors, exception);
+        }
         ThrowLifecycleErrors(errors);
     }
 
@@ -264,6 +290,12 @@ public sealed class UiManager
             throw new InvalidOperationException(
                 "The UI manager cannot change screens while drawing commands are generated.");
         }
+    }
+
+    private void VerifyNotUpdating()
+    {
+        if (_isUpdating || Hud.Screen.IsUpdating || CurrentScreen?.IsUpdating == true)
+            throw new InvalidOperationException("The UI manager cannot perform this operation during an update.");
     }
 
     private static void ThrowLifecycleErrors(List<Exception> errors)

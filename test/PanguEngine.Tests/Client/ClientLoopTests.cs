@@ -21,7 +21,11 @@ public sealed class ClientLoopTests
                 loop.RequestStop();
             },
             () => events.Add("update"),
-            _ => events.Add("render"));
+            alpha =>
+            {
+                Assert.Equal(0, alpha);
+                events.Add("render");
+            });
         loop.UpdatesPerSecond = 0;
 
         loop.Run();

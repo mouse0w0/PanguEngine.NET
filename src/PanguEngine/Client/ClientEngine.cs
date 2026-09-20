@@ -233,6 +233,7 @@ public sealed class ClientEngine
     {
         Game.Update();
         Audio.Update();
+        Ui.Update();
     }
 
     private void OnCurrentScreenChanged(UiScreen? oldScreen, UiScreen? newScreen)

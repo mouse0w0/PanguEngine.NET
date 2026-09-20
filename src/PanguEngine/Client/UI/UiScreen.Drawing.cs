@@ -11,11 +11,11 @@ public partial class UiScreen
     /// </summary>
     /// <returns>The commands in stable drawing order.</returns>
     /// <remarks>
-    /// An open screen must be updated before its first draw and after its output size or scale changes.
+    /// An open screen must be laid out before its first draw and after its output size or scale changes.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the open screen is accessed from the wrong thread, the screen is changing lifecycle
-    /// or layout state, command generation is reentered, or drawing code mutates UI state.
+    /// or layout state, an update callback is running, command generation is reentered, or drawing code mutates UI state.
     /// </exception>
     public UiDrawCommandList CreateDrawCommandList()
     {
@@ -72,6 +72,8 @@ public partial class UiScreen
                 throw new InvalidOperationException("The UI screen cannot draw during a lifecycle transition.");
             if (IsUpdatingLayout)
                 throw new InvalidOperationException("The UI screen cannot draw while layout is updating.");
+            if (IsUpdating)
+                throw new InvalidOperationException("The UI screen cannot draw during an update callback.");
             if (_isDrawing)
                 throw new InvalidOperationException("The UI screen is already generating drawing commands.");
 

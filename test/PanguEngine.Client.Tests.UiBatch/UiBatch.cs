@@ -30,6 +30,7 @@ internal sealed class UiBatchScene : IClientTestScene
     private UiImage _nineSliceImage = null!;
     private UiImage _oversizedImage = null!;
     private bool _buttonStatesInitialized;
+    private uint _completedFrames;
 
     public string Name => "UI Batch";
 
@@ -70,6 +71,7 @@ internal sealed class UiBatchScene : IClientTestScene
         _screen = new UiScreen(_root) { Scale = UiScale };
         _uiManager = new UiManager();
         _uiManager.Open(_screen);
+        window.PreRender += (_, alpha) => PrepareFrame(alpha);
         window.Render += (_, _) => DrawFrame();
     }
 
@@ -92,6 +94,17 @@ internal sealed class UiBatchScene : IClientTestScene
         }
     }
 
+    private void PrepareFrame(double alpha)
+    {
+        _root.Dense = _completedFrames >= _presenter.MaxFramesInFlight;
+        _uiManager.PrepareFrame(new Size(_presenter.Width, _presenter.Height), alpha);
+        if (!_buttonStatesInitialized)
+        {
+            _root.EstablishButtonStates(_uiManager);
+            _buttonStatesInitialized = true;
+        }
+    }
+
     private void DrawFrame()
     {
         if (!_presenter.TryBeginFrame(out var frame))
@@ -106,39 +119,34 @@ internal sealed class UiBatchScene : IClientTestScene
             {
                 commandList.PrepareForPresent(frame.ColorOutput);
                 commandList.EndRecording();
-                return;
             }
-
-            _root.Dense = frame.FrameNumber >= _presenter.MaxFramesInFlight;
-            _uiManager.Update(new Size(frame.Width, frame.Height));
-            if (!_buttonStatesInitialized)
+            else
             {
-                _root.EstablishButtonStates(_uiManager);
-                _buttonStatesInitialized = true;
+                var drawCommands = _screen.CreateDrawCommandList();
+
+                commandList.BeginRendering(new RenderingDescription
+                {
+                    Width = frame.Width,
+                    Height = frame.Height,
+                    ColorAttachments =
+                    [
+                        new ColorAttachmentDescription(
+                            frame.ColorOutput,
+                            new ClearColor(0.015f, 0.018f, 0.024f, 1))
+                    ]
+                });
+                _renderer.Draw(frame, drawCommands);
+                commandList.EndRendering();
+                commandList.PrepareForPresent(frame.ColorOutput);
+                commandList.EndRecording();
             }
-
-            var drawCommands = _screen.CreateDrawCommandList();
-
-            commandList.BeginRendering(new RenderingDescription
-            {
-                Width = frame.Width,
-                Height = frame.Height,
-                ColorAttachments =
-                [
-                    new ColorAttachmentDescription(
-                        frame.ColorOutput,
-                        new ClearColor(0.015f, 0.018f, 0.024f, 1))
-                ]
-            });
-            _renderer.Draw(frame, drawCommands);
-            commandList.EndRendering();
-            commandList.PrepareForPresent(frame.ColorOutput);
-            commandList.EndRecording();
         }
         finally
         {
             _presenter.EndFrame(frame);
         }
+
+        _completedFrames++;
     }
 
     private static UiImage CreateCheckerImage(int width, int height, Color first, Color second)

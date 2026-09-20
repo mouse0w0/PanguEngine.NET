@@ -58,7 +58,7 @@ internal sealed class ClientRenderer
 
     internal void PrepareFrame(Camera camera, double alpha)
     {
-        _uiManager.Update(new Size(_presenter.Width, _presenter.Height));
+        _uiManager.PrepareFrame(new Size(_presenter.Width, _presenter.Height), alpha);
         _worldRenderer.PrepareFrame(camera, alpha);
         EnsureDepthStencilAttachmentSize();
     }

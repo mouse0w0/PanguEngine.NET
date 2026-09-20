@@ -43,7 +43,7 @@ public sealed class HudScreenTests
             Assert.Same(hud.Crosshair.Parent, panel.Parent);
             Assert.False(executed);
 
-            manager.Update(new Size(200, 100));
+            manager.PrepareFrame(new Size(200, 100), 0);
 
             Assert.True(executed);
             Assert.Same(hud.Crosshair.Parent, panel.Parent);
@@ -98,7 +98,7 @@ public sealed class HudScreenTests
         try
         {
             manager.Hud.Children.Add(leaf);
-            manager.Update(new Size(200, 100));
+            manager.PrepareFrame(new Size(200, 100), 0);
 
             manager.ProcessPointerMoved(new Point(5, 5));
             manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -137,7 +137,7 @@ public sealed class HudScreenTests
                     context.FillRectangle(new Rect(1, 2, 4, 6), new Color(0, 255, 0))
             }) { Scale = 0.5 };
             manager.Open(screen);
-            manager.Update(new Size(200, 100));
+            manager.PrepareFrame(new Size(200, 100), 0);
             var commands = new UiDrawCommandList();
             var builder = new UiDrawBuilder();
 
@@ -179,7 +179,7 @@ public sealed class HudScreenTests
             {
                 DrawAction = _ => throw expected
             }));
-            manager.Update(new Size(200, 100));
+            manager.PrepareFrame(new Size(200, 100), 0);
             var commands = new UiDrawCommandList();
 
             Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(commands)));
@@ -217,7 +217,7 @@ public sealed class HudScreenTests
                     errors.Add(Record.Exception(manager.Destroy));
                     errors.Add(Record.Exception(() => manager.Open(new UiScreen(new Panel()))));
                     errors.Add(Record.Exception(() => manager.AppendDrawCommands(commands)));
-                    errors.Add(Record.Exception(() => manager.Update(new Size(200, 100))));
+                    errors.Add(Record.Exception(() => manager.PrepareFrame(new Size(200, 100), 0)));
                     context.FillRectangle(new Rect(0, 0, 10, 10), new Color(255, 0, 0));
                 }
             };
@@ -230,7 +230,7 @@ public sealed class HudScreenTests
             {
                 manager.Open(new UiScreen(node));
             }
-            manager.Update(new Size(200, 100));
+            manager.PrepareFrame(new Size(200, 100), 0);
             manager.Hud.Post(() => postedActionExecuted = true);
 
             manager.AppendDrawCommands(commands);
@@ -240,7 +240,7 @@ public sealed class HudScreenTests
             Assert.Single(commands.OfType<UiFillRectangleCommand>());
             Assert.False(postedActionExecuted);
 
-            manager.Update(new Size(200, 100));
+            manager.PrepareFrame(new Size(200, 100), 0);
 
             Assert.True(postedActionExecuted);
         }

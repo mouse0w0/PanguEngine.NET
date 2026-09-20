@@ -32,7 +32,7 @@ public sealed class HudScreen
     /// <summary>
     /// Posts a HUD tree operation to the client UI owner thread.
     /// </summary>
-    /// <param name="action">The operation to execute during the next UI update.</param>
+    /// <param name="action">The operation to execute during the next HUD frame preparation.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="action"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the HUD is not accepting posted actions.
@@ -43,7 +43,9 @@ public sealed class HudScreen
 
     internal void Open() => _screen.Open();
 
-    internal void Update(Size viewportSize) => _screen.Update(viewportSize);
+    internal void Update() => _screen.Update();
+
+    internal void PrepareFrame(Size viewportSize, double alpha) => _screen.PrepareFrame(viewportSize, alpha);
 
     internal void Close() => _screen.Close();
 }

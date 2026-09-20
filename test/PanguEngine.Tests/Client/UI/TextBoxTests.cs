@@ -474,7 +474,7 @@ public sealed class TextBoxTests
         using var context = new UiTextTestContext();
         var (manager, screen, textBox) = OpenTextBox("A long value that exceeds the viewport");
         textBox.Width = 80;
-        manager.Update(new Size(240, 80));
+        manager.PrepareFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
 
         var commands = screen.CreateDrawCommandList();
@@ -504,7 +504,7 @@ public sealed class TextBoxTests
         using var context = new UiTextTestContext();
         var (manager, screen, textBox) = OpenTextBox();
         textBox.Placeholder = "hint";
-        manager.Update(new Size(240, 80));
+        manager.PrepareFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
 
         var commands = screen.CreateDrawCommandList().ToArray();
@@ -536,14 +536,14 @@ public sealed class TextBoxTests
         Assert.True(textBox.Focus());
         manager.ProcessTextInput("a");
         screen.ClearFocus();
-        manager.Update(new Size(240, 80));
+        manager.PrepareFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
         manager.ProcessTextInput("b");
 
         textBox.Undo();
 
         Assert.Equal("a", textBox.Text);
-        manager.Update(new Size(240, 80));
+        manager.PrepareFrame(new Size(240, 80), 0);
         textBox.SelectAll();
         Assert.Contains(
             screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
@@ -566,7 +566,7 @@ public sealed class TextBoxTests
         root.Children.Add(textBox);
         var screen = new UiScreen(root);
         manager.Open(screen);
-        manager.Update(new Size(240, 80));
+        manager.PrepareFrame(new Size(240, 80), 0);
         return (manager, screen, textBox);
     }
 

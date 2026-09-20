@@ -233,7 +233,7 @@ public sealed class UiKeyBindingsTests
         var screen = new UiScreen(root);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.Update(new Size(100, 100));
+        manager.PrepareFrame(new Size(100, 100), 0);
         return (manager, screen, node);
     }
 
