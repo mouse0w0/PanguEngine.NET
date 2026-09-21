@@ -27,10 +27,13 @@ public sealed class UiStyleSelector
         TargetTypeDepth = targetTypeDepth;
     }
 
-    /// <summary>Gets the CLR target type, or null when the selector uses a CSS node name.</summary>
+    /// <summary>Gets the CLR target type, or null for a CSS selector.</summary>
     public Type? TargetType { get; }
 
-    /// <summary>Gets the CSS node name or the simple name of the CLR target type.</summary>
+    /// <summary>
+    /// Gets the CSS node name, <c>*</c> when the element type is unrestricted,
+    /// or the simple name of the CLR target type.
+    /// </summary>
     public string TypeName { get; }
 
     /// <summary>Gets the required classes, deduplicated and kept in first-seen order.</summary>
@@ -48,8 +51,14 @@ public sealed class UiStyleSelector
     /// <summary>Gets the combined class and pseudo-state contribution to specificity.</summary>
     public int ClassAndPseudoCount { get; }
 
-    /// <summary>Gets the CLR target depth, or zero for a CSS name whose target is resolved during binding.</summary>
+    /// <summary>
+    /// Gets the inheritance distance from the CLR target type to <see cref="UiNode"/> plus one,
+    /// or zero for a CSS selector. CSS element specificity is determined during binding.
+    /// </summary>
     public int TargetTypeDepth { get; }
+
+    /// <summary>Gets a value indicating whether the selector constrains the node element type.</summary>
+    internal bool HasTypeConstraint => TargetType is not null || TypeName != "*";
 
     /// <summary>Creates a selector for a target node type.</summary>
     /// <typeparam name="TNode">The target node type.</typeparam>
@@ -65,6 +74,7 @@ public sealed class UiStyleSelector
         where TNode : UiNode
         => Create(typeof(TNode), typeof(TNode).Name, classes, id, states);
 
+    /// <summary>Creates a CSS selector with an element name or <c>*</c> for any element type.</summary>
     internal static UiStyleSelector Create(
         string typeName,
         IEnumerable<string>? classes,
@@ -117,6 +127,8 @@ public sealed class UiStyleSelector
     {
         if (TargetType != null)
             return TargetType.IsAssignableFrom(nodeType) ? TargetType : null;
+        if (TypeName == "*")
+            return nodeType;
         return UiCssRegistry.MatchElement(nodeType, TypeName);
     }
 
@@ -140,12 +152,14 @@ public sealed class UiStyleSelector
         return true;
     }
 
-    /// <summary>Gets the reconstructed selector text, e.g. <c>Button.primary:hover</c>.</summary>
+    /// <summary>Gets normalized selector text, omitting an unrestricted wildcard when other conditions exist.</summary>
     public string SelectorText
     {
         get
         {
-            var builder = new StringBuilder(TypeName);
+            var builder = new StringBuilder();
+            if (HasTypeConstraint || (Classes.Count == 0 && Id is null && States == UiPseudoStates.None))
+                builder.Append(TypeName);
             foreach (var className in Classes)
                 builder.Append('.').Append(className);
             if (Id is not null)
@@ -177,7 +191,7 @@ public sealed class UiStyleSelector
 
     internal static int ComputeTargetTypeDepth(Type type)
     {
-        var depth = 0;
+        var depth = 1;
         var current = type;
         while (current != typeof(UiNode))
         {

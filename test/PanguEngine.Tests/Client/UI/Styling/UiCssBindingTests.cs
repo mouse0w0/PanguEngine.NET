@@ -138,6 +138,83 @@ public sealed class UiCssBindingTests
     }
 
     [Fact]
+    public void InactiveUnqualifiedConditionStillValidatesValues()
+    {
+        var theme = new UiStyleResolver([], [UiStyleSheet.Parse(".extra { padding: nope; }")]);
+
+        var error = Assert.Throws<UiStyleParseException>(() => theme.Resolve(new Button()));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
+    [Fact]
+    public void StatefulUnqualifiedRuleRejectsLayoutProperty()
+    {
+        var theme = new UiStyleResolver([], [UiStyleSheet.Parse(":hover { padding: 4; }")]);
+
+        var error = Assert.Throws<UiStyleParseException>(() => theme.Resolve(new Button()));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
+    [Fact]
+    public void UnqualifiedClassIdAndStateRulesRefreshOnChanges()
+    {
+        var node = new Panel();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse("""
+            .danger { opacity: 0.25; }
+            #save { opacity: 0.6; }
+            :hover { background: #040404; }
+            """)]);
+
+        Assert.Equal(1d, node.Opacity);
+        Assert.Empty(node.GetStyleValueSources(Region.BackgroundProperty));
+
+        node.Classes.Add("danger");
+        Assert.Equal(0.25, node.Opacity);
+
+        node.StyleId = "save";
+        Assert.Equal(0.6, node.Opacity);
+
+        node.SetHovered(true);
+        Assert.Equal(new SolidColorBrush(4, 4, 4), node.Background);
+        Assert.Equal(0.6, node.Opacity);
+
+        node.StyleId = null;
+        Assert.Equal(0.25, node.Opacity);
+    }
+
+    [Fact]
+    public void UnqualifiedSelectorBindsFromRuntimeTypeAndSkipsUnknownProperties()
+    {
+        var theme = new UiStyleResolver([], [UiStyleSheet.Parse(".shared { level: 12; ghost: 1; }")]);
+        var numeric = new NumericNode();
+        numeric.Classes.Add("shared");
+        var length = new LengthNode();
+        length.Classes.Add("shared");
+
+        Assert.Equal(12d, theme.Resolve(numeric).GetValue(NumericNode.LevelProperty));
+        Assert.Equal(2d, theme.Resolve(length).GetValue(LengthNode.LevelProperty));
+    }
+
+    [Fact]
+    public void UnqualifiedSelectorConvertsOncePerNodeType()
+    {
+        CountingNode.Conversions = 0;
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(".counted { counted-value: abc; ghost: 1; }")]);
+        var first = new CountingNode();
+        first.Classes.Add("counted");
+        var second = new CountingNode();
+        second.Classes.Add("counted");
+
+        Assert.Equal(3d, resolver.Resolve(first).GetValue(CountingNode.ValueProperty));
+        Assert.Equal(3d, resolver.Resolve(second).GetValue(CountingNode.ValueProperty));
+
+        Assert.Equal(1, CountingNode.Conversions);
+    }
+
+    [Fact]
     public void StyleSheetApplicationFailureLeavesPreviousSourcesAndValue()
     {
         var button = new Button();

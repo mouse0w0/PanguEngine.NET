@@ -149,4 +149,26 @@ public sealed class UiStyleRuleTests
         Assert.Equal(new Thickness(2, 1, 2, 1), (Thickness)bound[0].Setter.BoxedValue!);
         Assert.NotNull(bound[0].SourceLocation);
     }
+
+    [Fact]
+    public void TargetTypeDepthStartsAtOneForUiNodeAndGrowsWithInheritance()
+    {
+        Assert.Equal(1, UiStyleSelector.For<UiNode>().TargetTypeDepth);
+        Assert.True(UiStyleSelector.For<Control>().TargetTypeDepth > UiStyleSelector.For<UiNode>().TargetTypeDepth);
+        Assert.True(UiStyleSelector.For<Button>().TargetTypeDepth > UiStyleSelector.For<Control>().TargetTypeDepth);
+    }
+
+    [Theory]
+    [InlineData("*")]
+    [InlineData(".danger")]
+    [InlineData("#save")]
+    [InlineData(":disabled")]
+    [InlineData("Button")]
+    public void ParsedSelectorHasNoClrTargetAndZeroDepth(string text)
+    {
+        var selector = Assert.Single(UiStyleSheet.Parse(text + " { }").Rules).Selector;
+
+        Assert.Null(selector.TargetType);
+        Assert.Equal(0, selector.TargetTypeDepth);
+    }
 }

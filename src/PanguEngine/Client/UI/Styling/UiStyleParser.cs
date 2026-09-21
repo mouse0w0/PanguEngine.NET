@@ -65,7 +65,7 @@ internal static class UiStyleParser
             var rules = new List<UiStyleRule>();
             while (_pos < text.Length)
             {
-                if (!IsIdentifierStart(Peek()))
+                if (!IsIdentifierStart(Peek()) && Peek() is not ('*' or '.' or '#' or ':'))
                     throw Error(UiStyleParseError.TrailingToken, GetMark(), 1);
                 rules.Add(ParseRule());
                 SkipTrivia();
@@ -77,7 +77,15 @@ internal static class UiStyleParser
         private UiStyleRule ParseRule()
         {
             var selectorStart = GetMark();
-            var typeName = ReadIdentifier();
+            var typeName = "*";
+            if (Peek() == '*')
+            {
+                Advance();
+            }
+            else if (IsIdentifierStart(Peek()))
+            {
+                typeName = ReadIdentifier();
+            }
 
             var classes = new List<string>();
             string? id = null;

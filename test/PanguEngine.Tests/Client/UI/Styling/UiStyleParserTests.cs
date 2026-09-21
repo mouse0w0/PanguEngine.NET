@@ -51,6 +51,52 @@ public sealed class UiStyleParserTests
         Assert.Equal(0.8, (double)setters[1].Setter.BoxedValue!);
     }
 
+    [Theory]
+    [InlineData("*", "*", "*")]
+    [InlineData(".danger", "*", ".danger")]
+    [InlineData("*.danger", "*", ".danger")]
+    [InlineData("*#save", "*", "#save")]
+    [InlineData("#save.danger", "*", ".danger#save")]
+    [InlineData(":disabled", "*", ":disabled")]
+    [InlineData("*:hover", "*", ":hover")]
+    [InlineData(".primary.large", "*", ".primary.large")]
+    [InlineData("Button.danger:hover#save", "Button", "Button.danger#save:hover")]
+    public void ParsesUnqualifiedSelector(string text, string typeName, string normalized)
+    {
+        var selector = Assert.Single(ParseCss(text + " { }").Rules).Selector;
+
+        Assert.Null(selector.TargetType);
+        Assert.Equal(typeName, selector.TypeName);
+        Assert.Equal(normalized, selector.SelectorText);
+    }
+
+    [Theory]
+    [InlineData(".danger")]
+    [InlineData("#save")]
+    [InlineData(":hover")]
+    [InlineData(".danger#save:hover")]
+    public void ExplicitAndOmittedWildcardHaveSameNormalizedRepresentation(string conditions)
+    {
+        var omitted = SingleRule(conditions + " { }").Selector;
+        var explicitWildcard = SingleRule("*" + conditions + " { }").Selector;
+
+        Assert.Equal("*", omitted.TypeName);
+        Assert.Equal(omitted.TypeName, explicitWildcard.TypeName);
+        Assert.Equal(conditions, omitted.SelectorText);
+        Assert.Equal(omitted.SelectorText, explicitWildcard.SelectorText);
+    }
+
+    [Fact]
+    public void UnqualifiedSelectorDeduplicatesClassesAndPseudoStates()
+    {
+        var selector = SingleRule(".danger.danger:hover:hover { }").Selector;
+
+        Assert.Equal(".danger:hover", selector.SelectorText);
+        Assert.Equal(new[] { "danger" }, selector.Classes);
+        Assert.Equal(UiPseudoStates.Hovered, selector.States);
+        Assert.Equal(2, selector.ClassAndPseudoCount);
+    }
+
     [Fact]
     public void InvalidValueReportsSourceSpanWhenBoundWithoutClosingStream()
     {
@@ -208,6 +254,57 @@ public sealed class UiStyleParserTests
         Assert.Equal(
             UiStyleParseError.TrailingToken,
             Assert.Throws<UiStyleParseException>(() => ParseCss("Button { } ;")).Error);
+    }
+
+    [Fact]
+    public void EmptySelectorReportsTrailingTokenAtStart()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("{}"));
+
+        Assert.Equal(UiStyleParseError.TrailingToken, error.Error);
+        Assert.Equal(1, error.Line);
+        Assert.Equal(1, error.Column);
+        Assert.Equal(1, error.Length);
+    }
+
+    [Theory]
+    [InlineData(". { }", 2)]
+    [InlineData("# { }", 2)]
+    [InlineData(": { }", 2)]
+    [InlineData(".danger. { }", 9)]
+    public void IsolatedConditionPrefixReportsInvalidSyntax(string css, int column)
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss(css));
+
+        Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
+        Assert.Equal(1, error.Line);
+        Assert.Equal(column, error.Column);
+        Assert.Equal(1, error.Length);
+    }
+
+    [Theory]
+    [InlineData("** { }", 2)]
+    [InlineData("Button* { }", 7)]
+    [InlineData("*.danger* { }", 9)]
+    [InlineData("Button ** { }", 8)]
+    [InlineData("* .danger { }", 3)]
+    public void RepeatedOrMisplacedWildcardReportsInvalidSyntax(string css, int column)
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss(css));
+
+        Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
+        Assert.Equal(1, error.Line);
+        Assert.Equal(column, error.Column);
+    }
+
+    [Fact]
+    public void CommaGroupingReportsInvalidSyntax()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button, Button { }"));
+
+        Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
+        Assert.Equal(1, error.Line);
+        Assert.Equal(7, error.Column);
     }
 
     [Fact]

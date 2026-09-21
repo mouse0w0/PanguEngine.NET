@@ -133,7 +133,9 @@ internal sealed class UiStyleResolver
                     continue;
 
                 var bound = entry.Rule.Bind(targetType);
-                var typeDepth = UiStyleSelector.ComputeTargetTypeDepth(targetType);
+                var typeDepth = entry.Rule.Selector.HasTypeConstraint
+                    ? UiStyleSelector.ComputeTargetTypeDepth(targetType)
+                    : 0;
                 foreach (var declaration in bound)
                 {
                     foreach (var setter in declaration.Setter.Expand())

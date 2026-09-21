@@ -172,6 +172,158 @@ public sealed class UiStyleResolverTests
         Assert.Equal("order.css", source.SheetSourceName);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UiNodeElementSelectorBeatsWildcardRegardlessOfOrder(bool wildcardFirst)
+    {
+        const string wildcard = "*.danger { opacity: 0.1; }";
+        const string typed = "UiNode.danger { opacity: 0.4; }";
+        var css = wildcardFirst ? wildcard + typed : typed + wildcard;
+        var node = new Button();
+        node.Classes.Add("danger");
+
+        var value = new UiStyleResolver([], [UiStyleSheet.Parse(css)]).Resolve(node).GetValue(UiNode.OpacityProperty);
+
+        Assert.Equal(0.4, value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NamedElementSelectorBeatsUnqualifiedPrefixRegardlessOfOrder(bool typedFirst)
+    {
+        const string unqualified = ".danger { background: #010101; }";
+        const string named = "Button.danger { background: #040404; }";
+        var css = typedFirst ? named + unqualified : unqualified + named;
+        var node = new Button();
+        node.Classes.Add("danger");
+
+        var value = new UiStyleResolver([], [UiStyleSheet.Parse(css)]).Resolve(node).GetValue(Region.BackgroundProperty);
+
+        Assert.Equal(Brush(4), value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClassConditionBeatsPlainElementSelectorRegardlessOfOrder(bool classFirst)
+    {
+        const string plain = "Button { background: #010101; }";
+        const string classed = ".danger { background: #040404; }";
+        var css = classFirst ? classed + plain : plain + classed;
+        var node = new Button();
+        node.Classes.Add("danger");
+
+        var value = new UiStyleResolver([], [UiStyleSheet.Parse(css)]).Resolve(node).GetValue(Region.BackgroundProperty);
+
+        Assert.Equal(Brush(4), value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void IdConditionBeatsClassConditionRegardlessOfOrder(bool idFirst)
+    {
+        const string classed = ".danger { background: #010101; }";
+        const string identified = "#save { background: #040404; }";
+        var css = idFirst ? identified + classed : classed + identified;
+        var node = new Button { StyleId = "save" };
+        node.Classes.Add("danger");
+
+        var value = new UiStyleResolver([], [UiStyleSheet.Parse(css)]).Resolve(node).GetValue(Region.BackgroundProperty);
+
+        Assert.Equal(Brush(4), value);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void NormalizedWildcardSelectorsTieByDeclarationOrder(bool wildcardFirst)
+    {
+        const string wildcard = "*.danger { background: #010101; }";
+        const string bare = ".danger { background: #040404; }";
+        var css = wildcardFirst ? wildcard + bare : bare + wildcard;
+        var node = new Button();
+        node.Classes.Add("danger");
+
+        var snapshot = new UiStyleResolver([], [UiStyleSheet.Parse(css)]).Resolve(node);
+
+        Assert.Equal(wildcardFirst ? Brush(4) : Brush(1), snapshot.GetValue(Region.BackgroundProperty));
+        Assert.Equal(".danger",
+            Assert.Single(snapshot.GetSources(Region.BackgroundProperty)).SelectorText);
+    }
+
+    [Fact]
+    public void BareWildcardAppliesAcrossNodeTypesWithoutConditions()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("* { opacity: 0.4; }")]);
+
+        Assert.Equal(0.4, resolver.Resolve(new Panel()).GetValue(UiNode.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(new Button()).GetValue(UiNode.OpacityProperty));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StronglyTypedSelectorBeatsWildcardRegardlessOfOrder(bool csharpFirst)
+    {
+        var csharp = Sheet(Rule(
+            UiStyleSelector.For<UiNode>(classes: ["danger"]),
+            UiStyleSetter.Create(UiNode.OpacityProperty, 0.4)));
+        var wildcard = UiStyleSheet.Parse("*.danger { opacity: 0.1; }");
+        var resolver = csharpFirst
+            ? new UiStyleResolver([], [csharp, wildcard])
+            : new UiStyleResolver([], [wildcard, csharp]);
+        var node = new Button();
+        node.Classes.Add("danger");
+
+        Assert.Equal(0.4, resolver.Resolve(node).GetValue(UiNode.OpacityProperty));
+    }
+
+    [Fact]
+    public void UnqualifiedConditionsRequireAllClassesAndExactIdCase()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            ".primary.large { opacity: 0.5; } #Save { background: #010203; }")]);
+
+        var partial = new Button();
+        partial.Classes.Add("primary");
+        var partialSnapshot = resolver.Resolve(partial);
+        Assert.Equal(1d, partialSnapshot.GetValue(UiNode.OpacityProperty));
+        Assert.Empty(partialSnapshot.GetSources(Region.BackgroundProperty));
+
+        var matched = new Button { StyleId = "Save" };
+        matched.Classes.Add("primary");
+        matched.Classes.Add("large");
+        var matchedSnapshot = resolver.Resolve(matched);
+        Assert.Equal(0.5, matchedSnapshot.GetValue(UiNode.OpacityProperty));
+        Assert.Equal(new SolidColorBrush(1, 2, 3), matchedSnapshot.GetValue(Region.BackgroundProperty));
+
+        var wrongCase = new Button { StyleId = "save" };
+        wrongCase.Classes.Add("primary");
+        wrongCase.Classes.Add("large");
+        var wrongCaseSnapshot = resolver.Resolve(wrongCase);
+        Assert.Equal(0.5, wrongCaseSnapshot.GetValue(UiNode.OpacityProperty));
+        Assert.Empty(wrongCaseSnapshot.GetSources(Region.BackgroundProperty));
+    }
+
+    [Fact]
+    public void RequiredPseudoStatesMustAllBeActive()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(".danger:hover:focus { background: #040404; }")]);
+        var node = new Button();
+        node.Classes.Add("danger");
+
+        Assert.Empty(resolver.Resolve(node).GetSources(Region.BackgroundProperty));
+
+        node.SetHovered(true);
+        Assert.Empty(resolver.Resolve(node).GetSources(Region.BackgroundProperty));
+
+        node.SetFocused(true);
+        Assert.Equal(Brush(4), resolver.Resolve(node).GetValue(Region.BackgroundProperty));
+    }
+
     private static UiStyleSheet Sheet(params UiStyleRule[] rules) => new(rules);
 
     private static UiStyleRule Rule(UiStyleSelector selector, params UiStyleSetter[] setters) => new(selector, setters);
