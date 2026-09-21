@@ -46,6 +46,10 @@ public static class BuiltinInputActions
         InputBinding.Button("ui", BuiltinInputContexts.Ui, Key.Escape)
     ]);
 
+    /// <summary>The debug information toggle action.</summary>
+    public static InputAction ToggleDebugInfo { get; } = new(InputValueType.Button,
+        [InputBinding.Button("default", BuiltinInputContexts.Game, Key.F3)]);
+
     internal static void Register(IWritableRegistry<InputAction> registry)
     {
         registry.Register(ResourceKey.Create("pangu", "move"), Move);
@@ -54,5 +58,6 @@ public static class BuiltinInputActions
         registry.Register(ResourceKey.Create("pangu", "place_block"), PlaceBlock);
         registry.Register(ResourceKey.Create("pangu", "capture_pointer"), CapturePointer);
         registry.Register(ResourceKey.Create("pangu", "toggle_pause"), TogglePause);
+        registry.Register(ResourceKey.Create("pangu", "toggle_debug_info"), ToggleDebugInfo);
     }
 }

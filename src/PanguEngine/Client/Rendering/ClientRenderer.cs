@@ -21,6 +21,7 @@ internal sealed class ClientRenderer
     private readonly WorldRenderer _worldRenderer;
     private readonly UiRenderer _uiRenderer;
     private readonly UiDrawCommandList _uiCommands = new();
+    private readonly ClientFrameTimeTracker _frameTimeTracker = new();
     private readonly Texture?[] _depthStencilTextures;
     private readonly TextureView?[] _depthStencilAttachments;
     private uint _depthStencilWidth;
@@ -55,6 +56,11 @@ internal sealed class ClientRenderer
         _depthStencilTextures = new Texture?[frameSlotCount];
         _depthStencilAttachments = new TextureView?[frameSlotCount];
     }
+
+    /// <summary>
+    /// Gets the rolling statistics of frames presented by this renderer.
+    /// </summary>
+    internal ClientFrameStatistics FrameStatistics => _frameTimeTracker.CreateSnapshot();
 
     internal void PrepareFrame(Camera camera, double alpha)
     {
@@ -119,6 +125,7 @@ internal sealed class ClientRenderer
         finally
         {
             _presenter.EndFrame(frame);
+            _frameTimeTracker.RecordPresentedFrame();
         }
 
         if (uploadFailure is not null)

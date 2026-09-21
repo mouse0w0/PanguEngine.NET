@@ -10,6 +10,11 @@ public sealed class ChunkManager
     private readonly Dictionary<ChunkPos, Chunk> _chunks = [];
 
     /// <summary>
+    /// Gets the number of chunks that have been created.
+    /// </summary>
+    public int Count => _chunks.Count;
+
+    /// <summary>
     /// Gets a block state by world block position.
     /// </summary>
     /// <param name="position">The world block position.</param>

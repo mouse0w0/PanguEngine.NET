@@ -1049,6 +1049,51 @@ public sealed class InputManagerTests
         ui.Destroy();
     }
 
+    [Fact]
+    public void DebugInfoToggleIgnoresRepeatAndIsBlockedByOpenScreen()
+    {
+        var action = BuiltinInputActions.ToggleDebugInfo;
+        var (input, window, ui) = CreateManager(("pangu:toggle_debug_info", action));
+        var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
+        var key = ResourceKey.Create("pangu", "debug_info");
+        definitions.Register(key, BuiltinHuds.DebugInfo);
+        definitions.Freeze();
+        ui.InitializeHud(definitions);
+        var debugInfo = Assert.IsType<DebugInfoHud>(ui.Hud.Get(key));
+        using var activation = input.ActivateContext(BuiltinInputContexts.Game);
+        input.RegisterHandler(action, args =>
+        {
+            if (args.Phase != InputActionPhase.Started)
+                return InputHandling.Pass;
+
+            debugInfo.Toggle();
+            return InputHandling.Handled;
+        });
+        input.Start();
+
+        Assert.Equal(Visibility.Collapsed, debugInfo.Root.Visibility);
+        window.RaiseKeyDown(new KeyEventArgs(Key.F3, KeyAction.Press, KeyModifiers.None));
+        Assert.Equal(Visibility.Visible, debugInfo.Root.Visibility);
+        window.RaiseKeyDown(new KeyEventArgs(Key.F3, KeyAction.Press, KeyModifiers.None)
+        {
+            IsRepeat = true
+        });
+        window.RaiseKeyUp(new KeyEventArgs(Key.F3, KeyAction.Release, KeyModifiers.None));
+        Assert.Equal(Visibility.Visible, debugInfo.Root.Visibility);
+
+        ui.Open(new UiScreen(new Panel()));
+        window.RaiseKeyDown(new KeyEventArgs(Key.F3, KeyAction.Press, KeyModifiers.None));
+        window.RaiseKeyUp(new KeyEventArgs(Key.F3, KeyAction.Release, KeyModifiers.None));
+        Assert.Equal(Visibility.Visible, debugInfo.Root.Visibility);
+
+        ui.Close();
+        window.RaiseKeyDown(new KeyEventArgs(Key.F3, KeyAction.Press, KeyModifiers.None));
+        window.RaiseKeyUp(new KeyEventArgs(Key.F3, KeyAction.Release, KeyModifiers.None));
+        Assert.Equal(Visibility.Collapsed, debugInfo.Root.Visibility);
+        input.Destroy();
+        ui.Destroy();
+    }
+
     private static (InputManager Input, TestWindow Window, UiManager Ui) CreateManager(
         params (string Key, InputAction Action)[] definitions)
     {

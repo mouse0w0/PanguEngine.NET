@@ -15,7 +15,6 @@ namespace PanguEngine.Client.Game;
 public sealed class ClientGame
 {
     private readonly ClientEngine _engine;
-    private readonly Camera _camera;
     private readonly CameraController _cameraController;
     private readonly InputManager _input;
     private readonly AudioSystem _audio;
@@ -26,8 +25,8 @@ public sealed class ClientGame
     internal ClientGame(ClientEngine engine)
     {
         _engine = engine;
-        _camera = new Camera(new Vector3D<double>(8, 22, 24), -90, -20);
-        _cameraController = new CameraController(_camera);
+        Camera = new Camera(new Vector3D<double>(8, 22, 24), -90, -20);
+        _cameraController = new CameraController(Camera);
         _input = engine.Input;
         _audio = engine.Audio;
         World = new ClientWorld();
@@ -48,13 +47,16 @@ public sealed class ClientGame
     /// <summary>The local client world state.</summary>
     public ClientWorld World { get; }
 
-    /// <summary>The block currently selected by the camera ray.</summary>
+    /// <summary>The local client camera.</summary>
+    public Camera Camera { get; }
+
+    /// <summary>The block selected by the latest fixed update, or null when the camera ray misses.</summary>
     public BlockHit? SelectedBlock { get; private set; }
 
     /// <summary>
     /// Updates the client game state for the current tick.
     /// </summary>
-    public void Update()
+    internal void Update()
     {
         if (IsPaused)
             return;
@@ -62,11 +64,11 @@ public sealed class ClientGame
         var movement = _input.GetValue(BuiltinInputActions.Move).Axis2D;
         _cameraController.Move(movement.Y, movement.X);
         _audio.SetListener(new AudioListenerState(
-            _camera.CurrentPosition,
-            _camera.Forward,
+            Camera.CurrentPosition,
+            Camera.Forward,
             Vector3D<double>.UnitY));
 
-        SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+        SelectedBlock = RaycastSelection(Camera.CurrentPosition);
         var breakSelection = SelectedBlock;
         if (_leftClickRequested
             && TryBreakBlock(World, breakSelection))
@@ -75,7 +77,7 @@ public sealed class ClientGame
             _audio.PlayAt(
                 BuiltinSoundEvents.BlockBreak,
                 GetBlockCenter(breakSelection!.Value.BlockPosition));
-            SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+            SelectedBlock = RaycastSelection(Camera.CurrentPosition);
         }
         else
         {
@@ -90,7 +92,7 @@ public sealed class ClientGame
             _audio.PlayAt(
                 BuiltinSoundEvents.BlockPlace,
                 GetBlockCenter(placeSelection!.Value.BlockPosition.Offset(placeSelection.Value.Face)));
-            SelectedBlock = RaycastSelection(_camera.CurrentPosition);
+            SelectedBlock = RaycastSelection(Camera.CurrentPosition);
         }
         else
         {
@@ -110,19 +112,18 @@ public sealed class ClientGame
     /// Prepares resources for the next client frame.
     /// </summary>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
-    public void PrepareFrame(double alpha)
+    internal void PrepareFrame(double alpha)
     {
-        _engine.Renderer.PrepareFrame(_camera, alpha);
+        _engine.Renderer.PrepareFrame(Camera, alpha);
     }
 
     /// <summary>
     /// Draws a frame for the client game.
     /// </summary>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
-    public void DrawFrame(double alpha)
+    internal void DrawFrame(double alpha)
     {
-        var renderSelection = RaycastSelection(_camera.GetInterpolatedPosition(alpha));
-        _engine.Renderer.DrawFrame(_camera, renderSelection, alpha);
+        _engine.Renderer.DrawFrame(Camera, SelectedBlock, alpha);
     }
 
     internal static bool TryBreakBlock(ClientWorld world, BlockHit? selection)
@@ -194,14 +195,14 @@ public sealed class ClientGame
 
     private BlockHit? RaycastSelection(Vector3D<double> position)
     {
-        var ray = new Ray3D<double>(position, _camera.Forward);
+        var ray = new Ray3D<double>(position, Camera.Forward);
         return BlockRaycaster.TryRaycast(
             World,
             ray,
             5d,
             out var hit)
             ? hit
-             : null;
+            : null;
     }
 
     private static Vector3D<double> GetBlockCenter(BlockPos position) =>
@@ -210,7 +211,7 @@ public sealed class ClientGame
     /// <summary>
     /// Releases resources owned by the client game.
     /// </summary>
-    public void Destroy()
+    internal void Destroy()
     {
         _input.StateInvalidated -= ClearInteractionRequests;
         _gameContextActivation.Dispose();

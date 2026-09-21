@@ -5,7 +5,7 @@ namespace PanguEngine.Client.Game;
 /// <summary>
 /// Represents a client camera with fixed-update position state.
 /// </summary>
-internal sealed class Camera
+public sealed class Camera
 {
     private const double DirectionComponentEpsilon = 0.000001d;
 
@@ -30,13 +30,13 @@ internal sealed class Camera
     internal Vector3D<double> PreviousPosition { get; private set; }
 
     /// <summary>The position from the current fixed update.</summary>
-    internal Vector3D<double> CurrentPosition { get; private set; }
+    public Vector3D<double> CurrentPosition { get; private set; }
 
     /// <summary>The horizontal camera angle in degrees.</summary>
-    internal double Yaw { get; set; }
+    public double Yaw { get; internal set; }
 
     /// <summary>The vertical camera angle in degrees.</summary>
-    internal double Pitch { get; set; }
+    public double Pitch { get; internal set; }
 
     /// <summary>The presentation width divided by height.</summary>
     internal double AspectRatio { get; set; } = 1;

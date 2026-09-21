@@ -23,6 +23,7 @@ public sealed class ChunkManagerTests
 
         var chunk = Assert.Single(manager.EnumerateChunks());
         Assert.Equal(new ChunkPos(1, 0, 0), chunk.Position);
+        Assert.Equal(1, manager.Count);
     }
 
     [Fact]
@@ -40,5 +41,8 @@ public sealed class ChunkManagerTests
         Assert.Equal(
             [new ChunkPos(-1, 0, 0), new ChunkPos(0, 0, 0), new ChunkPos(1, 0, 0)],
             manager.EnumerateChunks().Select(chunk => chunk.Position).OrderBy(pos => pos.X).ToArray());
+        Assert.Equal(3, manager.Count);
+        manager.SetBlock(new BlockPos(16, 1, 0), BuiltinBlocks.Stone.DefaultState);
+        Assert.Equal(3, manager.Count);
     }
 }

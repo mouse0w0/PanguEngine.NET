@@ -90,7 +90,10 @@ public sealed class ClientEngine
     /// </summary>
     public InputManager Input { get; private set; } = null!;
 
-    private ClientGame Game { get; set; } = null!;
+    /// <summary>
+    /// Gets the local client game.
+    /// </summary>
+    public ClientGame Game { get; private set; } = null!;
 
     internal ClientRenderer Renderer { get; private set; } = null!;
 
@@ -196,6 +199,7 @@ public sealed class ClientEngine
             GraphicsBackend.Render);
         Game = new ClientGame(this);
         Input.RegisterHandler(BuiltinInputActions.TogglePause, HandleTogglePause);
+        Input.RegisterHandler(BuiltinInputActions.ToggleDebugInfo, HandleToggleDebugInfo);
         Ui.CurrentScreenChanged += OnCurrentScreenChanged;
         OnCurrentScreenChanged(null, Ui.CurrentScreen);
         Engine.ModManager.RunClientSetup();
@@ -275,6 +279,15 @@ public sealed class ClientEngine
         }
 
         return InputHandling.Pass;
+    }
+
+    private InputHandling HandleToggleDebugInfo(InputActionEvent args)
+    {
+        if (args.Phase != InputActionPhase.Started || Ui.CurrentScreen is not null)
+            return InputHandling.Pass;
+
+        ((DebugInfoHud)Ui.Hud.Get(ResourceKey.Create("pangu", "debug_info"))).Toggle();
+        return InputHandling.Handled;
     }
 
     private void OnShutdown()
