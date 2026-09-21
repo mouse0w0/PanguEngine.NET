@@ -4,6 +4,7 @@ using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Input;
 using PanguEngine.Client.UI.Rendering;
+using PanguEngine.Client.UI.Styling;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 
@@ -49,6 +50,8 @@ public sealed class ButtonTests
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
         Assert.Equal(new SolidColorBrush(92, 103, 116), button.BorderBrush);
         Assert.Equal(new Thickness(1), button.BorderThickness);
+        Assert.Equal("Button", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+        Assert.False(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
         Assert.False(button.ClipToBounds);
         Assert.Empty(button.Children);
         Assert.NotNull(typeof(Button).GetEvent(
@@ -283,7 +286,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void NormalAndInteractiveStatesDrawInTheSpecifiedOrder()
+    public void InteractiveStatesChangeExistingBackgroundAndBorder()
     {
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 80, 32);
@@ -300,30 +303,149 @@ public sealed class ButtonTests
 
         manager.ProcessPointerMoved(new Point(20, 20));
         var hovered = GetFills(screen);
-        Assert.Equal(new Color(255, 255, 255, 24), hovered[5].Color);
-        Assert.Equal(new Rect(0, 0, 80, 32), hovered[5].Bounds);
+        Assert.Equal(5, hovered.Count);
+        Assert.Equal(new Color(67, 73, 80), hovered[0].Color);
+        Assert.Equal(new Rect(1, 1, 78, 30), hovered[0].Bounds);
 
         var builder = new UiDrawBuilder();
         builder.Build(screen.CreateDrawCommandList(), 120, 80, false);
-        Assert.Equal(10f, builder.Vertices[20].X);
-        Assert.Equal(10f, builder.Vertices[20].Y);
-        Assert.Equal(90f, builder.Vertices[22].X);
-        Assert.Equal(42f, builder.Vertices[22].Y);
+        Assert.Equal(11f, builder.Vertices[0].X);
+        Assert.Equal(11f, builder.Vertices[0].Y);
+        Assert.Equal(89f, builder.Vertices[2].X);
+        Assert.Equal(41f, builder.Vertices[2].Y);
 
         manager.ProcessPointerPressed(new Point(20, 20), MouseButton.Left, KeyModifiers.None);
         var pressed = GetFills(screen);
-        Assert.Equal(new Color(0, 0, 0, 56), pressed[5].Color);
-        Assert.Equal(new Color(84, 169, 255), pressed[6].Color);
+        Assert.Equal(5, pressed.Count);
+        Assert.Equal(new Color(37, 42, 48), pressed[0].Color);
+        Assert.All(pressed.Skip(1), command => Assert.Equal(new Color(84, 169, 255), command.Color));
 
         button.IsEnabled = false;
         var disabled = GetFills(screen);
-        Assert.Equal(6, disabled.Count);
-        Assert.Equal(new Color(0, 0, 0, 112), disabled[5].Color);
+        Assert.Equal(5, disabled.Count);
+        Assert.Equal(new Color(27, 30, 35), disabled[0].Color);
+        Assert.All(disabled.Skip(1), command => Assert.Equal(new Color(52, 58, 65), command.Color));
+        Assert.Equal(new Color(139, 148, 160), button.Foreground);
         manager.Close();
     }
 
     [Fact]
-    public void FocusFrameUsesFourNonOverlappingInnerRectangles()
+    public void LocalBackgroundAndBorderOverrideStateStylesUntilCleared()
+    {
+        var root = new Canvas();
+        var button = Place(
+            root,
+            new Button
+            {
+                Background = new SolidColorBrush(104, 43, 45),
+                BorderBrush = new SolidColorBrush(157, 73, 77)
+            },
+            10,
+            10,
+            80,
+            32);
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(120, 80), 0);
+
+        manager.ProcessPointerMoved(new Point(20, 20));
+        Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
+        Assert.Equal(new Color(104, 43, 45), GetFills(screen)[0].Color);
+        manager.ProcessPointerPressed(new Point(20, 20), MouseButton.Left, KeyModifiers.None);
+        Assert.True(button.IsFocused);
+        Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
+        Assert.Equal(new SolidColorBrush(157, 73, 77), button.BorderBrush);
+
+        button.IsEnabled = false;
+        var fills = GetFills(screen);
+        Assert.Equal(5, fills.Count);
+        Assert.Equal(new Color(104, 43, 45), fills[0].Color);
+        Assert.All(fills.Skip(1), command => Assert.Equal(new Color(157, 73, 77), command.Color));
+        Assert.True(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
+        Assert.Equal(new Color(139, 148, 160), button.Foreground);
+
+        button.ClearValue(Region.BackgroundProperty);
+        button.ClearValue(Region.BorderBrushProperty);
+        Assert.Equal(new SolidColorBrush(27, 30, 35), button.Background);
+        Assert.Equal(new SolidColorBrush(52, 58, 65), button.BorderBrush);
+        Assert.False(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
+        manager.Close();
+    }
+
+    [Fact]
+    public void DangerClassProvidesNormalAndCombinedStateStyles()
+    {
+        var root = new Canvas();
+        var button = Place(root, new Button(), 10, 10, 80, 32);
+        button.Classes.Add("danger");
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(120, 80), 0);
+
+        Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
+        Assert.Equal(new SolidColorBrush(157, 73, 77), button.BorderBrush);
+        Assert.Equal("Button.danger", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+        Assert.False(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
+
+        manager.ProcessPointerMoved(new Point(20, 20));
+        Assert.Equal(new SolidColorBrush(118, 63, 65), button.Background);
+        Assert.Equal("Button.danger:hover", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+
+        manager.ProcessPointerPressed(new Point(20, 20), MouseButton.Left, KeyModifiers.None);
+        Assert.Equal(new SolidColorBrush(81, 34, 35), button.Background);
+        Assert.Equal(new SolidColorBrush(84, 169, 255), button.BorderBrush);
+        Assert.Equal("Button.danger:pressed", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+        Assert.Equal("Button.danger:focus", StyleSource(button, Region.BorderBrushProperty)?.SelectorText);
+
+        button.IsEnabled = false;
+        Assert.Equal(new SolidColorBrush(58, 24, 25), button.Background);
+        Assert.Equal(new SolidColorBrush(88, 41, 43), button.BorderBrush);
+        Assert.Equal(new Color(139, 148, 160), button.Foreground);
+        Assert.Equal("Button.danger:disabled", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+
+        button.Classes.Remove("danger");
+        Assert.Equal(new SolidColorBrush(27, 30, 35), button.Background);
+        Assert.Equal(new SolidColorBrush(52, 58, 65), button.BorderBrush);
+        manager.Close();
+    }
+
+    [Fact]
+    public void StyleDrivenContentRemovalSkipsDetachedChildFromStaleBatch()
+    {
+        var button = new Button();
+        var screen = new UiScreen(button);
+        screen.SetStyleSheets([new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<Button>(),
+                [UiStyleSetter.Create(Button.TextProperty, "Old")]),
+            new UiStyleRule(
+                UiStyleSelector.For<Text>(),
+                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.4)])
+        ])]);
+        var oldText = Assert.IsType<Text>(Assert.Single(button.Children));
+        var opacityNotifications = 0;
+        oldText.PropertyChanged += (_, e) =>
+            opacityNotifications += ReferenceEquals(e.Property, UiNode.OpacityProperty) ? 1 : 0;
+
+        screen.SetStyleSheets([new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<Button>(),
+                [UiStyleSetter.Create(Button.TextProperty, string.Empty)]),
+            new UiStyleRule(
+                UiStyleSelector.For<Text>(),
+                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.8)])
+        ])]);
+
+        Assert.Empty(button.Children);
+        Assert.Null(oldText.Screen);
+        Assert.Equal(1, oldText.Opacity);
+        Assert.Equal(1, opacityNotifications);
+    }
+
+    [Fact]
+    public void FocusChangesExistingBorderWithoutChangingLayoutOrGeometry()
     {
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 80, 32);
@@ -331,22 +453,62 @@ public sealed class ButtonTests
         var screen = new UiScreen(root) { UseLayoutRounding = false };
         manager.Open(screen);
         manager.PrepareFrame(new Size(120, 80), 0);
+        var originalBounds = GetFills(screen).Select(command => command.Bounds).ToArray();
         Assert.True(button.Focus());
 
         var fills = GetFills(screen);
 
-        Assert.Equal(9, fills.Count);
-        Assert.Equal(new Rect(0, 0, 80, 1), fills[5].Bounds);
-        Assert.Equal(new Rect(79, 1, 1, 30), fills[6].Bounds);
-        Assert.Equal(new Rect(0, 31, 80, 1), fills[7].Bounds);
-        Assert.Equal(new Rect(0, 1, 1, 30), fills[8].Bounds);
-        Assert.All(fills.Skip(5), command =>
+        Assert.True(button.IsMeasureValid);
+        Assert.True(button.IsArrangeValid);
+        Assert.Equal(new Thickness(1), button.BorderThickness);
+        Assert.Equal(5, fills.Count);
+        Assert.Equal(originalBounds, fills.Select(command => command.Bounds).ToArray());
+        Assert.All(fills.Skip(1), command =>
             Assert.Equal(new Color(84, 169, 255), command.Color));
         manager.Close();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DisabledStyleWinsWhenOtherPseudoStatesRemainActive(bool danger)
+    {
+        var button = new Button();
+        if (danger)
+            button.Classes.Add("danger");
+        button.SetHovered(true);
+        button.SetPressed(true);
+        button.SetFocused(true);
+
+        button.IsEnabled = false;
+
+        Assert.Equal(
+            danger ? new SolidColorBrush(58, 24, 25) : new SolidColorBrush(27, 30, 35),
+            button.Background);
+        Assert.Equal(
+            danger ? new SolidColorBrush(88, 41, 43) : new SolidColorBrush(52, 58, 65),
+            button.BorderBrush);
+        Assert.Equal(new Color(139, 148, 160), button.Foreground);
+    }
+
     [Fact]
-    public void LowScaleUsesSharedRoundingAndCanOmitTheFocusFrame()
+    public void DisabledForegroundSynchronizesTextAndHonorsLocalOverride()
+    {
+        var button = new Button { Text = "Delete" };
+        button.Classes.Add("danger");
+        var text = Assert.IsType<Text>(Assert.Single(button.Children));
+
+        button.IsEnabled = false;
+
+        Assert.Equal(new Color(139, 148, 160), text.Color);
+        button.Foreground = new Color(240, 230, 220);
+        Assert.Equal(new Color(240, 230, 220), text.Color);
+        button.ClearValue(Button.ForegroundProperty);
+        Assert.Equal(new Color(139, 148, 160), text.Color);
+    }
+
+    [Fact]
+    public void LowScaleCanRoundFocusedBorderToZero()
     {
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 40, 20);
@@ -359,6 +521,23 @@ public sealed class ButtonTests
         Assert.DoesNotContain(
             GetFills(screen),
             command => command.Color == new Color(84, 169, 255));
+        manager.Close();
+    }
+
+    [Fact]
+    public void FocusDoesNotAddGeometryWhenLocalBorderThicknessIsZero()
+    {
+        var root = new Canvas();
+        var button = Place(root, new Button { BorderThickness = Thickness.Zero }, 10, 10, 80, 32);
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(120, 80), 0);
+
+        Assert.True(button.Focus());
+
+        Assert.Single(GetFills(screen));
+        Assert.Equal(Thickness.Zero, button.BorderThickness);
         manager.Close();
     }
 
@@ -606,16 +785,58 @@ public sealed class ButtonTests
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
 
         Assert.Equal(["down:False", "down:False"], calls);
+        Assert.Equal(
+            "Button:pressed",
+            StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         Assert.Contains(
             GetFills(screen),
-            command => command.Color == new Color(0, 0, 0, 56));
+            command => command.Color == new Color(37, 42, 48));
 
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
         Assert.Equal(["down:False", "down:False", "up:False", "click"], calls);
         Assert.DoesNotContain(
             GetFills(screen),
-            command => command.Color == new Color(0, 0, 0, 56));
+            command => command.Color == new Color(37, 42, 48));
+        Assert.Equal("Button", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+        manager.Close();
+    }
+
+    [Fact]
+    public void LostFocusClearsSpacePressedStyleSource()
+    {
+        var (manager, screen, root, button) = OpenButtonScene();
+        Assert.True(button.Focus());
+        manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
+        Assert.Equal(
+            "Button:pressed",
+            StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+
+        screen.ClearFocus();
+
+        Assert.Equal("Button", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+        manager.Close();
+    }
+
+    [Fact]
+    public void PressedStyleRemainsUntilPointerAndSpaceAreBothReleased()
+    {
+        var (manager, screen, root, button) = OpenButtonScene();
+        Assert.True(button.Focus());
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
+
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+
+        Assert.Equal(
+            "Button:pressed",
+            StyleSource(button, Region.BackgroundProperty)?.SelectorText);
+
+        manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
+
+        Assert.Equal(
+            button.IsHovered ? "Button:hover" : "Button",
+            StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         manager.Close();
     }
 
@@ -868,6 +1089,9 @@ public sealed class ButtonTests
 
     private static IReadOnlyList<UiFillRectangleCommand> GetFills(UiScreen screen) =>
         screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().ToArray();
+
+    private static UiStyleValueSource? StyleSource(UiNode node, UiProperty property) =>
+        node.GetStyleValueSources(property).SingleOrDefault();
 
     private static UiImage CreateImage(int width, int height) =>
         UiImage.FromRgba(new byte[checked(width * height * 4)], width, height);

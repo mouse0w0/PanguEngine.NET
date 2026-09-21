@@ -1,5 +1,6 @@
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Input;
+using PanguEngine.Client.UI.Styling;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 
@@ -73,21 +74,26 @@ public sealed class Button : Control
             6d,
             UiPropertyInvalidation.Measure);
 
+    static Button()
+    {
+        UiCssRegistry.RegisterElement<Button>("Button");
+        UiCssRegistry.RegisterProperty<Button, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<Button, Color>("foreground", ForegroundProperty, UiCssValueConverters.ParseColor);
+        UiCssRegistry.RegisterProperty<Button, double>("icon-size", IconSizeProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<Button, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
+    }
+
     private ImageView? _imageNode;
     private Text? _textNode;
     private bool _enterKeyDown;
     private bool _spaceKeyDown;
 
     /// <summary>
-    /// Initializes a button with its default focus and decoration values.
+    /// Initializes a button with keyboard focus enabled.
     /// </summary>
     public Button()
     {
         Focusable = true;
-        Padding = new Thickness(12, 7);
-        Background = new SolidColorBrush(48, 54, 62);
-        BorderBrush = new SolidColorBrush(92, 103, 116);
-        BorderThickness = new Thickness(1);
     }
 
     /// <summary>
@@ -239,21 +245,6 @@ public sealed class Button : Control
     }
 
     /// <inheritdoc />
-    protected override void DrawCore(UiDrawingContext context)
-    {
-        base.DrawCore(context);
-        if (!IsEnabled)
-            context.FillRectangle(DecorationBounds, new Color(0, 0, 0, 112));
-        else if (IsPressed || _spaceKeyDown)
-            context.FillRectangle(DecorationBounds, new Color(0, 0, 0, 56));
-        else if (IsHovered)
-            context.FillRectangle(DecorationBounds, new Color(255, 255, 255, 24));
-
-        if (IsEnabled && IsFocused)
-            DrawFocusFrame(context);
-    }
-
-    /// <inheritdoc />
     protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
@@ -298,7 +289,7 @@ public sealed class Button : Control
                 return;
             }
             case Key.Space:
-                _spaceKeyDown = true;
+                SetSpaceKeyDown(true);
                 base.OnKeyDown(eventArgs);
                 eventArgs.Handled = true;
                 return;
@@ -321,7 +312,7 @@ public sealed class Button : Control
             case Key.Space:
             {
                 var activate = _spaceKeyDown && IsEnabled && IsFocused;
-                _spaceKeyDown = false;
+                SetSpaceKeyDown(false);
                 base.OnKeyUp(eventArgs);
                 eventArgs.Handled = true;
                 if (activate)
@@ -338,8 +329,17 @@ public sealed class Button : Control
     protected override void OnLostFocus(UiFocusChangedEventArgs eventArgs)
     {
         _enterKeyDown = false;
-        _spaceKeyDown = false;
+        SetSpaceKeyDown(false);
         base.OnLostFocus(eventArgs);
+    }
+
+    /// <inheritdoc />
+    protected override UiPseudoStates GetStylePseudoStates()
+    {
+        var states = base.GetStylePseudoStates();
+        if (_spaceKeyDown)
+            states |= UiPseudoStates.Pressed;
+        return states;
     }
 
     private void SynchronizeText()
@@ -426,41 +426,12 @@ public sealed class Button : Control
         return spacing;
     }
 
-    private void DrawFocusFrame(UiDrawingContext context)
+    private void SetSpaceKeyDown(bool value)
     {
-        var screen = Screen;
-        var thickness = screen?.UseLayoutRounding ?? true
-            ? UiLayoutHelper.RoundLayoutValue(1d, screen?.Scale ?? 1)
-            : 1d;
-        if (thickness == 0)
+        if (_spaceKeyDown == value)
             return;
-
-        var bounds = DecorationBounds;
-        var innerX = bounds.X + Math.Min(thickness, bounds.Width);
-        var innerY = bounds.Y + Math.Min(thickness, bounds.Height);
-        var innerWidth = Math.Max(0, bounds.Width - thickness - thickness);
-        var innerHeight = Math.Max(0, bounds.Height - thickness - thickness);
-        var color = new Color(84, 169, 255);
-        context.FillRectangle(
-            new Rect(bounds.X, bounds.Y, bounds.Width, innerY - bounds.Y),
-            color);
-        context.FillRectangle(
-            new Rect(
-                innerX + innerWidth,
-                innerY,
-                bounds.X + bounds.Width - (innerX + innerWidth),
-                innerHeight),
-            color);
-        context.FillRectangle(
-            new Rect(
-                bounds.X,
-                innerY + innerHeight,
-                bounds.Width,
-                bounds.Y + bounds.Height - (innerY + innerHeight)),
-            color);
-        context.FillRectangle(
-            new Rect(bounds.X, innerY, innerX - bounds.X, innerHeight),
-            color);
+        _spaceKeyDown = value;
+        RefreshStylePseudoStates();
     }
 
     private static void ArrangeCentered(UiNode child, Rect contentBounds)

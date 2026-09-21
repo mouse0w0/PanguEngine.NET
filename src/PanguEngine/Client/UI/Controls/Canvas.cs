@@ -1,3 +1,5 @@
+using PanguEngine.Client.UI.Styling;
+
 namespace PanguEngine.Client.UI.Controls;
 
 /// <summary>
@@ -40,6 +42,15 @@ public sealed class Canvas : Panel
             "Bottom",
             double.NaN,
             UiPropertyInvalidation.Arrange);
+
+    static Canvas()
+    {
+        UiCssRegistry.RegisterElement<Canvas>("Canvas");
+        UiCssRegistry.RegisterProperty<UiNode, double>("left", LeftProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("top", TopProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("right", RightProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("bottom", BottomProperty, UiCssValueConverters.ParseLength);
+    }
 
     /// <summary>
     /// Gets the attached horizontal position of a node.

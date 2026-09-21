@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
 using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI.Controls;
@@ -70,6 +71,22 @@ public sealed class Text : UiNode
             nameof(Alignment),
             TextAlignment.Left,
             UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+
+    static Text()
+    {
+        UiCssRegistry.RegisterElement<Text>("Text");
+        UiCssRegistry.RegisterProperty<Text, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<Text, double>("line-height", LineHeightProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<Text, Color>("color", ColorProperty, UiCssValueConverters.ParseColor);
+        UiCssRegistry.RegisterProperty<Text, TextWrapping>(
+            "wrapping",
+            WrappingProperty,
+            UiCssValueConverters.ParseTextWrapping);
+        UiCssRegistry.RegisterProperty<Text, TextAlignment>(
+            "text-alignment",
+            AlignmentProperty,
+            UiCssValueConverters.ParseTextAlignment);
+    }
 
     private TextLayout? _layout;
 

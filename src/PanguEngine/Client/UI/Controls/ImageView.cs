@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI.Controls;
 
@@ -42,6 +43,19 @@ public sealed class ImageView : UiNode
             nameof(SamplingMode),
             ImageSamplingMode.Linear,
             UiPropertyInvalidation.Render);
+
+    static ImageView()
+    {
+        UiCssRegistry.RegisterElement<ImageView>("ImageView");
+        UiCssRegistry.RegisterProperty<ImageView, ImageStretch>(
+            "stretch",
+            StretchProperty,
+            UiCssValueConverters.ParseImageStretch);
+        UiCssRegistry.RegisterProperty<ImageView, ImageSamplingMode>(
+            "sampling-mode",
+            SamplingModeProperty,
+            UiCssValueConverters.ParseImageSamplingMode);
+    }
 
     /// <summary>
     /// Initializes an image view.

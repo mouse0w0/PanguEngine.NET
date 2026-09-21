@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Runtime.ExceptionServices;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
 
@@ -22,6 +23,11 @@ public abstract class Parent : UiNode
 
     private readonly List<UiNode> _children = [];
     private readonly ReadOnlyCollection<UiNode> _readOnlyChildren;
+
+    static Parent()
+    {
+        UiCssRegistry.RegisterElement<Parent>("Parent");
+    }
 
     /// <summary>
     /// Initializes a UI parent node.
@@ -102,7 +108,12 @@ public abstract class Parent : UiNode
                 child.InvalidateMeasureSubtree();
             oldParent?.InvalidateTreeStructure();
             InvalidateTreeStructure();
-            CommitAndNotifyInputState(activeScreens);
+
+            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
+            if (!ReferenceEquals(oldScreen, newScreen))
+                styleEntries.Add((child, newScreen?.StyleResolver ?? UiStyleResolver.Default));
+
+            CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
         finally
         {
@@ -164,7 +175,7 @@ public abstract class Parent : UiNode
         var screen = Screen;
         screen?.VerifyTreeMutationAccess();
         var oldScreens = _children
-            .Select(child => (Child: child, Screen: child.Screen))
+            .Select(child => (Child: child, child.Screen))
             .ToArray();
         var affectedScreens = new List<UiScreen>();
         AddAffectedScreen(affectedScreens, screen);
@@ -186,7 +197,15 @@ public abstract class Parent : UiNode
                     child.InvalidateMeasureSubtree();
             }
             InvalidateTreeStructure();
-            CommitAndNotifyInputState(activeScreens);
+
+            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
+            foreach (var (child, oldScreen) in oldScreens)
+            {
+                if (oldScreen is not null)
+                    styleEntries.Add((child, UiStyleResolver.Default));
+            }
+
+            CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
         finally
         {
@@ -236,7 +255,14 @@ public abstract class Parent : UiNode
                 replacedChild.InvalidateMeasureSubtree();
             oldParent?.InvalidateTreeStructure();
             InvalidateTreeStructure();
-            CommitAndNotifyInputState(activeScreens);
+
+            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
+            if (replacedScreen is not null)
+                styleEntries.Add((replacedChild, UiStyleResolver.Default));
+            if (!ReferenceEquals(oldScreen, newScreen))
+                styleEntries.Add((child, newScreen?.StyleResolver ?? UiStyleResolver.Default));
+
+            CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
         finally
         {
@@ -280,7 +306,12 @@ public abstract class Parent : UiNode
             if (!ReferenceEquals(screen, child.Screen))
                 child.InvalidateMeasureSubtree();
             InvalidateTreeStructure();
-            CommitAndNotifyInputState(activeScreens);
+
+            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
+            if (screen is not null)
+                styleEntries.Add((child, UiStyleResolver.Default));
+
+            CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
         finally
         {
@@ -357,7 +388,9 @@ public abstract class Parent : UiNode
             screens[index].EndRuntimeOperation();
     }
 
-    private static void CommitAndNotifyInputState(List<UiScreen> screens)
+    private static void CommitAndNotifyWithStyle(
+        List<UiScreen> screens,
+        IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> styleEntries)
     {
         var snapshots = new List<(UiScreen Screen, UiScreen.InputStateCleanupSnapshot Snapshot)>();
         foreach (var screen in screens)
@@ -367,6 +400,20 @@ public abstract class Parent : UiNode
         }
 
         var errors = new List<Exception>();
+        try
+        {
+            RecomputeStyleSubtreeBatch(styleEntries, errors);
+        }
+        catch (Exception exception)
+        {
+            ClearStyleSubtreeBatch(styleEntries);
+            errors.AddRange(exception switch
+            {
+                AggregateException aggregate => aggregate.InnerExceptions,
+                _ => [exception]
+            });
+        }
+
         foreach (var (screen, snapshot) in snapshots)
         {
             try

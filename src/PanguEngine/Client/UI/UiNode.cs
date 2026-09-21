@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
 
@@ -17,6 +18,7 @@ public abstract partial class UiNode
     /// </summary>
     protected UiNode()
     {
+        Classes = new UiStyleClassCollection(this);
     }
 
     /// <summary>
@@ -29,7 +31,10 @@ public abstract partial class UiNode
     /// </summary>
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The property descriptor.</param>
-    /// <returns>The local value or the descriptor default value.</returns>
+    /// <returns>
+    /// The local or binding value when present, otherwise the resolved value from the active style sheets,
+    /// otherwise the descriptor default value.
+    /// </returns>
     public T GetValue<T>(UiProperty<T> property)
     {
         ArgumentNullException.ThrowIfNull(property);
@@ -74,13 +79,14 @@ public abstract partial class UiNode
     }
 
     /// <summary>
-    /// Clears a local value and restores the descriptor default value.
+    /// Clears a local value and restores the resolved style value, or the descriptor default when no style applies.
     /// </summary>
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The property descriptor.</param>
     /// <remarks>
-    /// Clearing a bound property removes its binding and restores the descriptor default value.
-    /// Use <see cref="Unbind{T}(UiProperty{T})"/> to remove a binding while preserving its current value.
+    /// Clearing a bound property removes its binding and restores the resolved style value, or the
+    /// descriptor default value when no style applies. Use <see cref="Unbind{T}(UiProperty{T})"/> to
+    /// remove a binding while preserving its current value.
     /// </remarks>
     /// <exception cref="InvalidOperationException">Thrown when the property is read-only.</exception>
     public void ClearValue<T>(UiProperty<T> property)
@@ -145,10 +151,13 @@ public abstract partial class UiNode
     {
         ArgumentNullException.ThrowIfNull(eventArgs);
         List<Exception>? errors = null;
+        var isPseudoState = IsPseudoStateProperty(eventArgs.Property);
+        if (isPseudoState)
+            errors = [];
         if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) &&
             eventArgs is UiPropertyChangedEventArgs<bool> { NewValue: false })
         {
-            errors = [];
+            errors ??= [];
             try
             {
                 Screen?.CommitAndNotifyInputStateAfterNodeDisabled(this);
@@ -181,6 +190,19 @@ public abstract partial class UiNode
             AddErrors(errors, exception);
         }
 
+        if (isPseudoState)
+        {
+            try
+            {
+                RecomputeStyle();
+            }
+            catch (Exception exception)
+            {
+                errors ??= [];
+                AddErrors(errors, exception);
+            }
+        }
+
         if (errors is null || errors.Count == 0)
             return;
         if (errors.Count == 1)
@@ -190,10 +212,12 @@ public abstract partial class UiNode
 
     private T GetValueCore<T>(UiProperty<T> property)
     {
-        if (_localValues is null || !_localValues.TryGetValue(property, out var value))
-            return property.DefaultValue;
-
-        return value is null ? default! : (T)value;
+        if (_localValues is not null && _localValues.TryGetValue(property, out var local))
+            return local is null ? default! : (T)local;
+        EnsureStyleSnapshot();
+        if (_styleSnapshot is not null && _styleSnapshot.TryGetBoxedValue(property, out var style))
+            return style is null ? default! : (T)style;
+        return property.DefaultValue;
     }
 
     private void SetValueCore<T>(UiProperty<T> property, T value)
@@ -214,7 +238,7 @@ public abstract partial class UiNode
             return;
 
         var oldValue = storedValue is null ? default! : (T)storedValue;
-        var newValue = property.DefaultValue;
+        var newValue = GetValueCore(property);
         if (EqualityComparer<T>.Default.Equals(oldValue, newValue))
             return;
 

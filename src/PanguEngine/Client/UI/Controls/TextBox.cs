@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Input;
+using PanguEngine.Client.UI.Styling;
 using PanguEngine.Desktop;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
@@ -93,6 +94,18 @@ public sealed class TextBox : Control
             nameof(IsReadOnly),
             false,
             UiPropertyInvalidation.Render);
+
+    static TextBox()
+    {
+        UiCssRegistry.RegisterElement<TextBox>("TextBox");
+        UiCssRegistry.RegisterProperty<TextBox, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<TextBox, Color>("foreground", ForegroundProperty, UiCssValueConverters.ParseColor);
+        UiCssRegistry.RegisterProperty<TextBox, Color>(
+            "placeholder-foreground", PlaceholderForegroundProperty, UiCssValueConverters.ParseColor);
+        UiCssRegistry.RegisterProperty<TextBox, Color>(
+            "selection-background", SelectionBackgroundProperty, UiCssValueConverters.ParseColor);
+        UiCssRegistry.RegisterProperty<TextBox, Color>("caret-color", CaretColorProperty, UiCssValueConverters.ParseColor);
+    }
 
     private static readonly UiKeyBindings<TextBox> KeyBindings =
         new UiKeyBindings<TextBox>()
@@ -220,16 +233,11 @@ public sealed class TextBox : Control
     private bool _layoutIsPlaceholder;
 
     /// <summary>
-    /// Initializes a text box with its default focus and decoration values.
+    /// Initializes a focusable text box.
     /// </summary>
     public TextBox()
     {
         Focusable = true;
-        MinWidth = 160;
-        Padding = new Thickness(8, 6);
-        Background = new SolidColorBrush(31, 35, 41);
-        BorderBrush = new SolidColorBrush(92, 103, 116);
-        BorderThickness = new Thickness(1);
     }
 
     /// <summary>
@@ -551,11 +559,6 @@ public sealed class TextBox : Control
                     CaretColor);
             }
         }
-
-        if (!IsEnabled)
-            context.FillRectangle(DecorationBounds, new Color(0, 0, 0, 112));
-        else if (IsFocused)
-            DrawFocusFrame(context);
     }
 
     /// <inheritdoc />
@@ -767,39 +770,6 @@ public sealed class TextBox : Control
     {
         var halfPeriod = Stopwatch.Frequency / 2;
         return (Stopwatch.GetTimestamp() - _caretPhaseStart) / halfPeriod % 2 == 0;
-    }
-
-    private void DrawFocusFrame(UiDrawingContext context)
-    {
-        var screen = Screen;
-        var thickness = screen?.UseLayoutRounding ?? true
-            ? UiLayoutHelper.RoundLayoutValue(1d, screen?.Scale ?? 1)
-            : 1d;
-        if (thickness == 0)
-            return;
-
-        var bounds = DecorationBounds;
-        var innerX = bounds.X + Math.Min(thickness, bounds.Width);
-        var innerY = bounds.Y + Math.Min(thickness, bounds.Height);
-        var innerWidth = Math.Max(0, bounds.Width - thickness - thickness);
-        var innerHeight = Math.Max(0, bounds.Height - thickness - thickness);
-        var color = new Color(84, 169, 255);
-        context.FillRectangle(new Rect(bounds.X, bounds.Y, bounds.Width, innerY - bounds.Y), color);
-        context.FillRectangle(
-            new Rect(
-                innerX + innerWidth,
-                innerY,
-                bounds.X + bounds.Width - (innerX + innerWidth),
-                innerHeight),
-            color);
-        context.FillRectangle(
-            new Rect(
-                bounds.X,
-                innerY + innerHeight,
-                bounds.Width,
-                bounds.Y + bounds.Height - (innerY + innerHeight)),
-            color);
-        context.FillRectangle(new Rect(bounds.X, innerY, innerX - bounds.X, innerHeight), color);
     }
 
     private static string FilterInput(string text)

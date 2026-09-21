@@ -1,3 +1,5 @@
+using PanguEngine.Client.UI.Styling;
+
 namespace PanguEngine.Client.UI.Controls;
 
 /// <summary>
@@ -5,6 +7,11 @@ namespace PanguEngine.Client.UI.Controls;
 /// </summary>
 public class Panel : Region
 {
+    static Panel()
+    {
+        UiCssRegistry.RegisterElement<Panel>("Panel");
+    }
+
     /// <summary>
     /// Initializes a UI panel.
     /// </summary>

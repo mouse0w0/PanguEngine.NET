@@ -2,6 +2,7 @@ using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -30,6 +31,25 @@ public sealed class UiScreenTests
 
         Assert.True(screen.PausesGame);
         Assert.True(screen.CloseOnEscape);
+    }
+
+    [Fact]
+    public void PauseScreenExitButtonUsesDangerClassWithoutLocalColors()
+    {
+        var screen = new PauseScreen();
+        var root = Assert.IsType<Panel>(screen.Root);
+        var panel = Assert.IsType<StackPanel>(Assert.Single(root.Children));
+        var buttons = panel.Children.OfType<Button>().ToArray();
+
+        Assert.Equal(2, buttons.Length);
+        Assert.DoesNotContain("danger", buttons[0].Classes);
+        var exit = buttons[1];
+        Assert.Contains("danger", exit.Classes);
+        Assert.Equal(new SolidColorBrush(104, 43, 45), exit.Background);
+        Assert.Equal(new SolidColorBrush(157, 73, 77), exit.BorderBrush);
+        Assert.Equal("Button.danger", Assert.Single(exit.GetStyleValueSources(Region.BackgroundProperty)).SelectorText);
+        Assert.False(Assert.Single(exit.GetStyleValueSources(Region.BackgroundProperty)).IsMaskedByLocalValue);
+        Assert.False(Assert.Single(exit.GetStyleValueSources(Region.BorderBrushProperty)).IsMaskedByLocalValue);
     }
 
     [Fact]
@@ -1057,6 +1077,365 @@ public sealed class UiScreenTests
         protected override void OnFrameUpdate(double alpha) => FrameAction?.Invoke(alpha);
     }
 
+    [Fact]
+    public void StyleSheetsDefaultToEngineBaseAndRejectNull()
+    {
+        var screen = new UiScreen(new ProbeNode());
+        Assert.Single(screen.BaseStyleSheets);
+        Assert.Empty(screen.StyleSheets);
+        Assert.Same(UiStyleResolver.Default, screen.StyleResolver);
+        Assert.Throws<ArgumentNullException>(() => screen.SetStyleSheets(null!));
+        Assert.Throws<ArgumentNullException>(() => screen.SetBaseStyleSheets(null!));
+    }
+
+    [Fact]
+    public void AssigningSameStyleSheetSequenceIsNoOp()
+    {
+        var node = new ProbeNode();
+        var screen = new UiScreen(node);
+        var sheets = SourceStyleSheets;
+        var notifications = 0;
+        node.PropertyChanged += (_, e) =>
+            notifications += ReferenceEquals(e.Property, ProbeNode.ValueProperty) ? 1 : 0;
+
+        screen.SetStyleSheets(sheets);
+        Assert.Equal(1, notifications);
+        Assert.Equal(1, node.Value);
+
+        var resolver = screen.StyleResolver;
+        screen.SetStyleSheets(sheets);
+        Assert.Same(resolver, screen.StyleResolver);
+        Assert.Equal(1, notifications);
+        Assert.Equal(1, node.Value);
+    }
+
+    [Fact]
+    public void StyleSheetReplacementCommitsAllSnapshotsBeforeNotifications()
+    {
+        var first = new ProbeNode { ValueUnderNewStyles = 2 };
+        var second = new ProbeNode { ValueUnderNewStyles = 2 };
+        var root = new Panel();
+        root.Children.Add(first);
+        root.Children.Add(second);
+        var screen = new UiScreen(root);
+
+        first.PropertyChanged += (_, _) => Assert.Equal(second.ValueUnderNewStyles, second.Value);
+
+        screen.SetStyleSheets(NewStyleSheets);
+
+        Assert.Equal(first.ValueUnderNewStyles, first.Value);
+    }
+
+    [Fact]
+    public void StyleSheetChangeContinuesNotificationsAndKeepsCommitted()
+    {
+        var first = new ProbeNode { ValueUnderNewStyles = 2 };
+        var second = new ProbeNode { ValueUnderNewStyles = 2 };
+        var root = new Panel();
+        root.Children.Add(first);
+        root.Children.Add(second);
+        var screen = new UiScreen(root);
+
+        first.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Property, ProbeNode.ValueProperty))
+                throw new InvalidOperationException("first-fail");
+        };
+
+        var exception = Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets(NewStyleSheets));
+        Assert.Equal("first-fail", exception.Message);
+        Assert.Equal(2, second.Value);
+        Assert.Equal(2, first.Value);
+    }
+
+    [Fact]
+    public void StyleSheetChangeAggregatesErrorsAndNotifiesRemainingNodes()
+    {
+        var first = new ProbeNode();
+        var second = new ProbeNode();
+        var third = new ProbeNode();
+        var root = new Panel();
+        root.Children.Add(first);
+        root.Children.Add(second);
+        root.Children.Add(third);
+        var screen = new UiScreen(root);
+        var firstError = new InvalidOperationException("first");
+        var secondError = new InvalidOperationException("second");
+        var thirdNotified = false;
+        first.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Property, ProbeNode.ValueProperty))
+                throw firstError;
+        };
+        second.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Property, ProbeNode.ValueProperty))
+                throw secondError;
+        };
+        third.PropertyChanged += (_, e) =>
+            thirdNotified |= ReferenceEquals(e.Property, ProbeNode.ValueProperty);
+
+        var error = Assert.Throws<AggregateException>(() => screen.SetStyleSheets(NewStyleSheets));
+
+        Assert.Equal(2, error.InnerExceptions.Count);
+        Assert.Same(firstError, error.InnerExceptions[0]);
+        Assert.Same(secondError, error.InnerExceptions[1]);
+        Assert.True(thirdNotified);
+        Assert.Equal(2, first.Value);
+        Assert.Equal(2, second.Value);
+        Assert.Equal(2, third.Value);
+    }
+
+    [Fact]
+    public void StyleSheetApplicationRejectsReentrantReplacementOrStyleInput()
+    {
+        var first = new ProbeNode { ValueUnderNewStyles = 2 };
+        var second = new ProbeNode { ValueUnderNewStyles = 2 };
+        var root = new Panel();
+        root.Children.Add(first);
+        root.Children.Add(second);
+        var screen = new UiScreen(root);
+
+        Exception? sheetError = null;
+        Exception? styleError = null;
+        first.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Property, ProbeNode.ValueProperty))
+            {
+                sheetError = Record.Exception(() => screen.SetStyleSheets(NewStyleSheets));
+                styleError = Record.Exception(() => second.StyleId = "x");
+            }
+        };
+
+        screen.SetStyleSheets(NewStyleSheets);
+
+        Assert.IsType<InvalidOperationException>(sheetError);
+        Assert.IsType<InvalidOperationException>(styleError);
+    }
+
+    [Fact]
+    public void OpenScreenStyleSheetsRejectWrongThreadButAllowCurrentSnapshot()
+    {
+        var sheets = SourceStyleSheets;
+        var replacement = TargetStyleSheets;
+        var screen = new UiScreen(new ProbeNode());
+        screen.SetStyleSheets(sheets);
+        var snapshot = screen.StyleSheets;
+        screen.Open();
+        Exception? changeError = null;
+        Exception? sameValueError = null;
+        var thread = new Thread(() =>
+        {
+            changeError = Record.Exception(() => screen.SetStyleSheets(replacement));
+            sameValueError = Record.Exception(() => screen.SetStyleSheets(snapshot));
+        });
+
+        thread.Start();
+        thread.Join();
+
+        Assert.IsType<InvalidOperationException>(changeError);
+        Assert.Null(sameValueError);
+        Assert.Same(snapshot, screen.StyleSheets);
+        screen.Close();
+    }
+
+    [Fact]
+    public void StyleSheetsCannotChangeDuringLayout()
+    {
+        UiScreen screen = null!;
+        Exception? error = null;
+        var root = new LayoutNode
+        {
+            MeasureAction = () => error = Record.Exception(() => screen.SetStyleSheets(SourceStyleSheets))
+        };
+        screen = new UiScreen(root);
+        screen.Open();
+
+        screen.PrepareFrame(new Size(20, 20), 0);
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Same(UiStyleResolver.Default, screen.StyleResolver);
+        screen.Close();
+    }
+
+    [Fact]
+    public void StyleSheetsCannotChangeDuringDrawing()
+    {
+        UiScreen screen = null!;
+        Exception? error = null;
+        var root = new DrawingNode
+        {
+            DrawAction = () => error = Record.Exception(() => screen.SetStyleSheets(SourceStyleSheets))
+        };
+        screen = new UiScreen(root);
+        screen.Open();
+        screen.PrepareFrame(new Size(20, 20), 0);
+
+        _ = screen.CreateDrawCommandList();
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Same(UiStyleResolver.Default, screen.StyleResolver);
+        screen.Close();
+    }
+
+    [Fact]
+    public void ClosedScreenCanReplaceStyleSheetsAndRefreshRetainedRoot()
+    {
+        var node = new ProbeNode();
+        var screen = new UiScreen(node);
+        screen.Open();
+        screen.Close();
+
+        screen.SetStyleSheets(TargetStyleSheets);
+
+        Assert.Same(screen, node.Screen);
+        Assert.Equal(2, node.Value);
+    }
+
+    [Fact]
+    public void StylePrecomputeFailureKeepsPreviousResolverAndSnapshot()
+    {
+        var node = new ThrowingStyleNode();
+        var screen = new UiScreen(node);
+        var sheets = new[] { new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<UiNode>(states: UiPseudoStates.Disabled),
+                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])
+        ]) };
+        node.ThrowOnStyleStateRead = true;
+
+        Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets(sheets));
+
+        Assert.Same(UiStyleResolver.Default, screen.StyleResolver);
+        Assert.Equal(1, node.Opacity);
+    }
+
+    [Fact]
+    public void StyleSheetChangeDoesNotNotifyLocallyMaskedProperty()
+    {
+        var node = new ProbeNode();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets(SourceStyleSheets);
+        node.Value = 5;
+        Assert.Equal(5, node.Value);
+
+        var notifications = 0;
+        node.PropertyChanged += (_, e) =>
+            notifications += ReferenceEquals(e.Property, ProbeNode.ValueProperty) ? 1 : 0;
+
+        screen.SetStyleSheets(TargetStyleSheets);
+
+        Assert.Equal(5, node.Value);
+        Assert.Equal(0, notifications);
+    }
+
+    [Fact]
+    public void CrossScreenMigrationReadsTargetStyleSheets()
+    {
+        var node = new ProbeNode();
+        var source = new UiScreen(node);
+        source.SetStyleSheets(SourceStyleSheets);
+        var target = new UiScreen();
+        target.SetStyleSheets(TargetStyleSheets);
+
+        Assert.Equal(1, node.Value);
+        Assert.Same(source, node.Screen);
+
+        target.Root = node;
+
+        Assert.Same(target, node.Screen);
+        Assert.Equal(2, node.Value);
+    }
+
+    [Fact]
+    public void ParentCrossScreenMigrationReadsTargetStyleSheets()
+    {
+        var node = new ProbeNode();
+        var sourceRoot = new Panel();
+        sourceRoot.Children.Add(node);
+        var source = new UiScreen(sourceRoot);
+        source.SetStyleSheets(SourceStyleSheets);
+        var targetRoot = new Panel();
+        var target = new UiScreen(targetRoot);
+        target.SetStyleSheets(TargetStyleSheets);
+
+        targetRoot.Children.Add(node);
+
+        Assert.Same(source, sourceRoot.Screen);
+        Assert.Same(target, node.Screen);
+        Assert.Equal(2, node.Value);
+    }
+
+    [Fact]
+    public void FailedCrossScreenStyleRefreshDoesNotKeepSourceSnapshot()
+    {
+        var node = new FailOnceStyleNode { Focusable = true };
+        var sourceSheets = new[] { new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<FailOnceStyleNode>(),
+                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, 1)])
+        ]) };
+        var targetSheets = new[] { new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<FailOnceStyleNode>(),
+                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, 2)]),
+            new UiStyleRule(
+                UiStyleSelector.For<FailOnceStyleNode>(states: UiPseudoStates.Disabled),
+                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])
+        ]) };
+        var source = new UiScreen(node);
+        source.SetStyleSheets(sourceSheets);
+        var target = new UiScreen();
+        target.SetStyleSheets(targetSheets);
+        source.Open();
+        target.Open();
+        source.PrepareFrame(new Size(20, 20), 0);
+        Assert.True(node.Focus());
+        Assert.Equal(1, node.Value);
+        node.FailNextStyleStateRead = true;
+
+        Assert.Throws<InvalidOperationException>(() => target.Root = node);
+
+        Assert.Null(source.Root);
+        Assert.Same(target, node.Screen);
+        Assert.False(node.IsFocused);
+        Assert.Equal(2, node.Value);
+        target.Close();
+        source.Close();
+    }
+
+    private sealed class ProbeNode : UiNode
+    {
+        public static readonly UiProperty<int> ValueProperty =
+            UiProperty.Register<ProbeNode, int>(nameof(Value));
+
+        public int Value
+        {
+            get => GetValue(ValueProperty);
+            set => SetValue(ValueProperty, value);
+        }
+
+        public int ValueUnderNewStyles { get; set; }
+    }
+
+    private static UiStyleSheet[] NewStyleSheets => [new UiStyleSheet([
+        new UiStyleRule(
+            UiStyleSelector.For<ProbeNode>(),
+            [UiStyleSetter.Create(ProbeNode.ValueProperty, 2)])
+    ])];
+
+    private static UiStyleSheet[] SourceStyleSheets => [new UiStyleSheet([
+        new UiStyleRule(
+            UiStyleSelector.For<ProbeNode>(),
+            [UiStyleSetter.Create(ProbeNode.ValueProperty, 1)])
+    ])];
+
+    private static UiStyleSheet[] TargetStyleSheets => [new UiStyleSheet([
+        new UiStyleRule(
+            UiStyleSelector.For<ProbeNode>(),
+            [UiStyleSetter.Create(ProbeNode.ValueProperty, 2)])
+    ])];
+
     private sealed class LayoutNode : UiNode
     {
         internal Action? MeasureAction { get; set; }
@@ -1079,6 +1458,46 @@ public sealed class UiScreenTests
             ArrangeAction?.Invoke();
             LastArrangeSize = finalSize;
             ArrangeCalls++;
+        }
+    }
+
+    private sealed class DrawingNode : UiNode
+    {
+        internal Action? DrawAction { get; set; }
+
+        protected override void DrawCore(UiDrawingContext context) => DrawAction?.Invoke();
+    }
+
+    private sealed class ThrowingStyleNode : UiNode
+    {
+        internal bool ThrowOnStyleStateRead { get; set; }
+
+        protected override UiPseudoStates GetStylePseudoStates()
+        {
+            if (ThrowOnStyleStateRead)
+                throw new InvalidOperationException("style state failed");
+            return base.GetStylePseudoStates();
+        }
+    }
+
+    private sealed class FailOnceStyleNode : UiNode
+    {
+        internal static readonly UiProperty<int> ValueProperty =
+            UiProperty.Register<FailOnceStyleNode, int>("Value");
+
+        internal bool FailNextStyleStateRead { get; set; }
+
+        internal int Value => GetValue(ValueProperty);
+
+        protected override UiPseudoStates GetStylePseudoStates()
+        {
+            if (FailNextStyleStateRead)
+            {
+                FailNextStyleStateRead = false;
+                throw new InvalidOperationException("style state failed once");
+            }
+
+            return base.GetStylePseudoStates();
         }
     }
 }

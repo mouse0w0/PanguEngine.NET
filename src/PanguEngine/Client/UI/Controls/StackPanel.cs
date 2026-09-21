@@ -1,3 +1,5 @@
+using PanguEngine.Client.UI.Styling;
+
 namespace PanguEngine.Client.UI.Controls;
 
 /// <summary>
@@ -21,6 +23,16 @@ public sealed class StackPanel : Panel
         UiProperty.Register<StackPanel, double>(
             nameof(Spacing),
             invalidation: UiPropertyInvalidation.Measure);
+
+    static StackPanel()
+    {
+        UiCssRegistry.RegisterElement<StackPanel>("StackPanel");
+        UiCssRegistry.RegisterProperty<StackPanel, Orientation>(
+            "orientation",
+            OrientationProperty,
+            UiCssValueConverters.ParseOrientation);
+        UiCssRegistry.RegisterProperty<StackPanel, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
+    }
 
     /// <summary>
     /// Gets or sets the axis along which children are arranged.

@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI.Controls;
 
@@ -46,6 +47,30 @@ public abstract class Region : Parent
     private Rect _committedDecorationBounds;
     private Rect _committedBorderInnerBounds;
     private Rect _committedContentBounds;
+
+    static Region()
+    {
+        UiCssRegistry.RegisterElement<Region>("Region");
+        UiCssRegistry.RegisterProperty<Region, Thickness>("padding", PaddingProperty, UiCssValueConverters.ParseThickness);
+        UiCssRegistry.RegisterProperty<Region>("padding-top", value =>
+            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Top, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<Region>("padding-right", value =>
+            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Right, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<Region>("padding-bottom", value =>
+            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Bottom, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<Region>("padding-left", value =>
+            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<Region, Brush?>("background", BackgroundProperty, UiCssValueConverters.ParseBrush);
+        UiCssRegistry.RegisterProperty<Region, Brush?>(
+            "background-color",
+            BackgroundProperty,
+            UiCssValueConverters.ParseBrush);
+        UiCssRegistry.RegisterProperty<Region, Brush?>("border-brush", BorderBrushProperty, UiCssValueConverters.ParseBrush);
+        UiCssRegistry.RegisterProperty<Region, Thickness>(
+            "border-thickness",
+            BorderThicknessProperty,
+            UiCssValueConverters.ParseThickness);
+    }
 
     /// <summary>
     /// Initializes a UI region.

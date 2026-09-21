@@ -4,6 +4,7 @@ using System.Text;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
 using PanguEngine.Desktop;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
@@ -47,6 +48,114 @@ public sealed class TextBoxTests
                 name,
                 BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static).SingleOrDefault());
         }
+    }
+
+    [Fact]
+    public void BaseStylesSupplyDefaultsAndClearingThemRestoresDescriptorValues()
+    {
+        var node = new TextBox();
+        var screen = new UiScreen(node);
+        var properties = new UiProperty[]
+        {
+            UiNode.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
+            Region.BorderBrushProperty, Region.BorderThicknessProperty, TextBox.FontSizeProperty,
+            TextBox.ForegroundProperty, TextBox.PlaceholderForegroundProperty,
+            TextBox.SelectionBackgroundProperty, TextBox.CaretColorProperty
+        };
+        foreach (var property in properties)
+        {
+            Assert.All(node.GetStyleValueSources(property), source =>
+            {
+                Assert.Equal(UiStyleOrigin.Base, source.Origin);
+                Assert.Equal("pangu-default", source.SheetSourceName);
+                Assert.False(source.IsMaskedByLocalValue);
+            });
+            Assert.NotEmpty(node.GetStyleValueSources(property));
+        }
+
+        screen.SetBaseStyleSheets([]);
+
+        Assert.Equal(UiNode.MinWidthProperty.DefaultValue, node.MinWidth);
+        Assert.Equal(Region.PaddingProperty.DefaultValue, node.Padding);
+        Assert.Equal(Region.BackgroundProperty.DefaultValue, node.Background);
+        Assert.Equal(Region.BorderBrushProperty.DefaultValue, node.BorderBrush);
+        Assert.Equal(Region.BorderThicknessProperty.DefaultValue, node.BorderThickness);
+        Assert.True(node.Focusable);
+        Assert.All(properties, property => Assert.Empty(node.GetStyleValueSources(property)));
+    }
+
+    [Fact]
+    public void StateStylesPreferFocusOverHoverAndDisabledOverBoth()
+    {
+        var node = new TextBox();
+        node.SetHovered(true);
+        Assert.Equal(new SolidColorBrush(139, 148, 160), node.BorderBrush);
+        node.SetFocused(true);
+        Assert.Equal(new SolidColorBrush(84, 169, 255), node.BorderBrush);
+        node.IsEnabled = false;
+        Assert.Equal(new SolidColorBrush(52, 58, 65), node.BorderBrush);
+        Assert.Equal(new Color(139, 148, 160), node.Foreground);
+        Assert.Equal(new Thickness(1), node.BorderThickness);
+        Assert.Equal(new Thickness(8, 6), node.Padding);
+        node.IsEnabled = true;
+        Assert.Equal(new SolidColorBrush(84, 169, 255), node.BorderBrush);
+        node.SetFocused(false);
+        node.SetHovered(false);
+        Assert.Equal(new SolidColorBrush(92, 103, 116), node.BorderBrush);
+    }
+
+    [Fact]
+    public void AuthorStylesOverrideDefaultsAndLocalValuesRestoreAfterClear()
+    {
+        var node = new TextBox();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse("""
+            TextBox {
+                min-width: 90px;
+                padding: 2px;
+                background-color: #010203;
+                border-brush: #040506;
+                border-thickness: 2px;
+                font-size: 20px;
+                foreground: #070809;
+                placeholder-foreground: #101112;
+                selection-background: #131415;
+                caret-color: #161718;
+            }
+            """)]);
+        node.SetHovered(true);
+        node.SetFocused(true);
+        node.IsEnabled = false;
+
+        Assert.Equal(90d, node.MinWidth);
+        Assert.Equal(new Thickness(2), node.Padding);
+        Assert.Equal(new SolidColorBrush(1, 2, 3), node.Background);
+        Assert.Equal(new SolidColorBrush(4, 5, 6), node.BorderBrush);
+        Assert.Equal(new Thickness(2), node.BorderThickness);
+        Assert.Equal(20d, node.FontSize);
+        Assert.Equal(new Color(7, 8, 9), node.Foreground);
+        Assert.Equal(new Color(16, 17, 18), node.PlaceholderForeground);
+        Assert.Equal(new Color(19, 20, 21), node.SelectionBackground);
+        Assert.Equal(new Color(22, 23, 24), node.CaretColor);
+
+        node.Background = new SolidColorBrush(30, 31, 32);
+        node.SetFocused(false);
+        Assert.Equal(new SolidColorBrush(30, 31, 32), node.Background);
+        node.ClearValue(Region.BackgroundProperty);
+        Assert.Equal(new SolidColorBrush(1, 2, 3), node.Background);
+    }
+
+    [Fact]
+    public void FocusDoesNotDrawASeparateFrameWhenBorderIsLocallyDisabled()
+    {
+        using var context = new UiTextTestContext();
+        var (manager, screen, node) = OpenTextBox();
+        node.BorderThickness = Thickness.Zero;
+        manager.PrepareFrame(new Size(240, 80), 0);
+        Assert.True(node.Focus());
+
+        Assert.DoesNotContain(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
+            command => command.Color == new Color(84, 169, 255));
     }
 
     [Fact]
@@ -499,7 +608,7 @@ public sealed class TextBoxTests
     }
 
     [Fact]
-    public void PlaceholderAndStateLayersUseStableDrawingOrder()
+    public void PlaceholderAndStateStylesUseStableDrawingOrder()
     {
         using var context = new UiTextTestContext();
         var (manager, screen, textBox) = OpenTextBox();
@@ -517,13 +626,18 @@ public sealed class TextBoxTests
 
         Assert.True(placeholderIndex >= 0);
         Assert.True(caretIndex > placeholderIndex);
-        Assert.True(focusIndex > caretIndex);
+        Assert.True(focusIndex >= 0);
+        Assert.True(focusIndex < placeholderIndex);
 
         textBox.IsEnabled = false;
         commands = screen.CreateDrawCommandList().ToArray();
         var overlayIndex = Array.FindLastIndex(commands, command =>
             command is UiFillRectangleCommand fill && fill.Color == new Color(0, 0, 0, 112));
-        Assert.True(overlayIndex > placeholderIndex);
+        Assert.Equal(-1, overlayIndex);
+        Assert.Equal(new SolidColorBrush(27, 30, 35), textBox.Background);
+        Assert.Equal(new SolidColorBrush(52, 58, 65), textBox.BorderBrush);
+        Assert.Equal(new Color(92, 103, 116), textBox.PlaceholderForeground);
+        Assert.Equal(textBox.PlaceholderForeground, Assert.Single(commands.OfType<UiDrawTextCommand>()).Color);
         Assert.DoesNotContain(commands, command =>
             command is UiFillRectangleCommand fill && fill.Color == new Color(84, 169, 255));
     }

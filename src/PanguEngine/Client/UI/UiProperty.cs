@@ -7,6 +7,7 @@ public abstract class UiProperty
 {
     private static readonly Lock RegistryLock = new();
     private static readonly Dictionary<(Type OwnerType, string Name), UiProperty> Registry = [];
+    private static int _registrationOrderCounter;
 
     private protected UiProperty(
         string name,
@@ -32,13 +33,6 @@ public abstract class UiProperty
         DefaultValue = defaultValue;
         Invalidation = invalidation;
         IsReadOnly = isReadOnly;
-
-        lock (RegistryLock)
-        {
-            if (!Registry.TryAdd((ownerType, name), this))
-                throw new InvalidOperationException(
-                    $"A UI property named '{name}' is already registered for owner '{ownerType}'.");
-        }
     }
 
     /// <summary>Gets the registered property name.</summary>
@@ -53,7 +47,7 @@ public abstract class UiProperty
     /// <summary>Gets the registered value type.</summary>
     public Type ValueType { get; }
 
-    /// <summary>Gets the value used when a node has no local value.</summary>
+    /// <summary>Gets the fallback value used when no local, binding, or style value applies.</summary>
     public object? DefaultValue { get; }
 
     /// <summary>Gets the kinds of UI work that the property may invalidate.</summary>
@@ -61,6 +55,9 @@ public abstract class UiProperty
 
     /// <summary>Gets whether the property can only be written through its registration key.</summary>
     public bool IsReadOnly { get; }
+
+    /// <summary>Gets the zero-based order in which this property was registered.</summary>
+    internal int RegistrationOrder { get; private set; }
 
     /// <summary>
     /// Registers a strongly typed property for an owner node type.
@@ -79,7 +76,13 @@ public abstract class UiProperty
         TValue defaultValue = default!,
         UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
         where TOwner : UiNode =>
-        new(name, typeof(TOwner), typeof(TOwner), defaultValue, invalidation, isReadOnly: false);
+        new(
+            name,
+            typeof(TOwner),
+            typeof(TOwner),
+            defaultValue,
+            invalidation,
+            isReadOnly: false);
 
     /// <summary>
     /// Registers a strongly typed read-only property for an owner node type.
@@ -128,7 +131,30 @@ public abstract class UiProperty
         UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
         where TOwner : UiNode
         where TTarget : UiNode =>
-        new(name, typeof(TOwner), typeof(TTarget), defaultValue, invalidation, isReadOnly: false);
+        new(
+            name,
+            typeof(TOwner),
+            typeof(TTarget),
+            defaultValue,
+            invalidation,
+            isReadOnly: false);
+
+    /// <summary>
+    /// Publishes this descriptor and assigns its registration order.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
+    private protected void PublishDescriptor()
+    {
+        lock (RegistryLock)
+        {
+            if (Registry.ContainsKey((OwnerType, Name)))
+                throw new InvalidOperationException(
+                    $"A UI property named '{Name}' is already registered for owner '{OwnerType}'.");
+
+            Registry[(OwnerType, Name)] = this;
+            RegistrationOrder = _registrationOrderCounter++;
+        }
+    }
 
     internal bool IsOwnedBy(UiNode node) =>
         TargetType.IsInstanceOfType(node);
@@ -145,6 +171,10 @@ public abstract class UiProperty
         if (IsReadOnly)
             throw new InvalidOperationException($"Property '{Name}' is read-only.");
     }
+
+    internal abstract void RaiseEffectiveValueChanged(UiNode node, object? oldValue, object? newValue);
+
+    internal abstract bool AreEqual(object? left, object? right);
 }
 
 /// <summary>
@@ -163,8 +193,17 @@ public sealed class UiProperty<T> : UiProperty
         : base(name, ownerType, targetType, typeof(T), defaultValue, invalidation, isReadOnly)
     {
         DefaultValue = defaultValue;
+        PublishDescriptor();
     }
 
     /// <summary>Gets the strongly typed default value.</summary>
     public new T DefaultValue { get; }
+
+    internal override void RaiseEffectiveValueChanged(UiNode node, object? oldValue, object? newValue) =>
+        node.RaiseStyleEffectiveValueChanged(this, oldValue, newValue);
+
+    internal override bool AreEqual(object? left, object? right) =>
+        EqualityComparer<T>.Default.Equals(
+            left is null ? default! : (T)left,
+            right is null ? default! : (T)right);
 }

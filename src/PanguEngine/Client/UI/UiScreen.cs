@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
 
@@ -13,12 +14,15 @@ public partial class UiScreen
     private readonly Lock _stateSync = new();
     private readonly Queue<Action> _pendingActions = [];
     private UiNode? _root;
+    private UiStyleResolver _styleResolver = UiStyleResolver.Default;
     private int? _ownerThreadId;
     private int _operationDepth;
     private bool _isClosing;
     private bool _isDraining;
     private bool _isInteractionActive;
     private bool _isTransitioning;
+    private bool _isApplyingStyleSheets;
+    private bool _isPreparingStyleSheets;
 
     /// <summary>
     /// Initializes a UI screen with an optional root node.
@@ -282,6 +286,15 @@ public partial class UiScreen
 
     internal bool IsUpdatingLayout { get; private set; }
 
+    internal bool IsApplyingStyleSheets
+    {
+        get
+        {
+            lock (_stateSync)
+                return _isApplyingStyleSheets;
+        }
+    }
+
     private void SetRoot(UiNode? root)
     {
         if (ReferenceEquals(_root, root))
@@ -318,6 +331,21 @@ public partial class UiScreen
                 root.InvalidateMeasureSubtree();
             oldRoot?.InvalidateTreeStructure();
             root?.InvalidateTreeStructure();
+
+            var styleEntries = new (UiNode? Root, UiStyleResolver Resolver)[]
+            {
+                (oldRoot, UiStyleResolver.Default),
+                (root, _styleResolver)
+            };
+            try
+            {
+                UiNode.RecomputeStyleSubtreeBatch(styleEntries, errors);
+            }
+            catch (Exception exception)
+            {
+                UiNode.ClearStyleSubtreeBatch(styleEntries);
+                AddLifecycleErrors(errors, exception);
+            }
 
             if (targetOperation)
                 targetSnapshot = CommitInputStateAfterTreeChange();
@@ -363,6 +391,7 @@ public partial class UiScreen
     {
         lock (_stateSync)
         {
+            VerifyNotPreparingStyleSheets();
             if (_ownerThreadId is not null)
                 VerifyOwnerThreadCore();
             if (_isDrawing)
@@ -400,6 +429,7 @@ public partial class UiScreen
 
     private void VerifyCanOpenCore()
     {
+        VerifyNotPreparingStyleSheets();
         if (_ownerThreadId is not null)
             throw new InvalidOperationException("The UI screen is already open.");
         if (_isTransitioning || _operationDepth != 0)
@@ -562,6 +592,7 @@ public partial class UiScreen
     {
         lock (_stateSync)
         {
+            VerifyNotPreparingStyleSheets();
             if (_isTransitioning)
                 throw new InvalidOperationException("The UI screen is already changing lifecycle state.");
             if (IsUpdatingLayout)

@@ -52,6 +52,7 @@ public partial class UiScreen
     {
         lock (_stateSync)
         {
+            VerifyNotPreparingStyleSheets();
             if (_ownerThreadId is not null)
                 VerifyOwnerThreadCore();
             if (_isDrawing)

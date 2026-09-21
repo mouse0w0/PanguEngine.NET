@@ -26,10 +26,9 @@ internal sealed class PauseScreen : UiScreen
         {
             Text = "退出游戏",
             MinWidth = 220,
-            MinHeight = 42,
-            Background = new SolidColorBrush(104, 43, 45),
-            BorderBrush = new SolidColorBrush(157, 73, 77)
+            MinHeight = 42
         };
+        exitButton.Classes.Add("danger");
         resumeButton.Click += (_, _) => ClientEngine.Current.Ui.Close();
         exitButton.Click += (_, _) => ClientEngine.Current.RequestShutdown();
 

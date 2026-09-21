@@ -1,3 +1,5 @@
+using PanguEngine.Client.UI.Styling;
+
 namespace PanguEngine.Client.UI.Controls;
 
 /// <summary>
@@ -14,6 +16,11 @@ public abstract class Control : Region
     /// Identifies the <see cref="IsPressed"/> property.
     /// </summary>
     public static readonly UiProperty<bool> IsPressedProperty = IsPressedPropertyKey.Property;
+
+    static Control()
+    {
+        UiCssRegistry.RegisterElement<Control>("Control");
+    }
 
     /// <summary>
     /// Initializes a UI control.
@@ -33,5 +40,13 @@ public abstract class Control : Region
             SetValue(IsPressedPropertyKey, true);
         else
             ClearValue(IsPressedPropertyKey);
+    }
+
+    /// <inheritdoc />
+    protected override UiPseudoStates GetStylePseudoStates()
+    {
+        var states = base.GetStylePseudoStates();
+        if (IsPressed) states |= UiPseudoStates.Pressed;
+        return states;
     }
 }

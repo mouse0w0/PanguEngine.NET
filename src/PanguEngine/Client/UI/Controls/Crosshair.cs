@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI.Controls;
 
@@ -76,6 +77,11 @@ public sealed class Crosshair : UiNode
             nameof(UseUiScale),
             false,
             UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+
+    static Crosshair()
+    {
+        UiCssRegistry.RegisterElement<Crosshair>("Crosshair");
+    }
 
     /// <summary>
     /// Initializes a crosshair that centers itself within its layout slot.

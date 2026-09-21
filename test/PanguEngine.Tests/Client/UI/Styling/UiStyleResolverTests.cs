@@ -1,0 +1,180 @@
+using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
+
+namespace PanguEngine.Tests.Client.UI.Styling;
+
+public sealed class UiStyleResolverTests
+{
+    [Theory]
+    [InlineData(UiStyleOrigin.Base)]
+    [InlineData(UiStyleOrigin.Author)]
+    public void EarlierSpecificRuleWinsOverLaterSheet(UiStyleOrigin origin)
+    {
+        var defaultSheet = Sheet(
+            Rule(UiStyleSelector.For<Button>(classes: ["primary"]),
+                UiStyleSetter.Create(Region.BackgroundProperty, Brush(1))));
+        var overrideSheet = Sheet(
+            Rule(UiStyleSelector.For<Button>(),
+                UiStyleSetter.Create(Region.BackgroundProperty, Brush(2))));
+        var resolver = origin == UiStyleOrigin.Base
+            ? new UiStyleResolver([defaultSheet, overrideSheet], [])
+            : new UiStyleResolver([], [defaultSheet, overrideSheet]);
+        var button = new Button();
+        button.Classes.Add("primary");
+
+        Assert.Equal(Brush(1), resolver.Resolve(button).GetValue(Region.BackgroundProperty));
+    }
+
+    [Fact]
+    public void MoreSpecificRuleWinsWithinOneSheetPerProperty()
+    {
+        var sheet = Sheet(
+            Rule(UiStyleSelector.For<Control>(), UiStyleSetter.Create(Region.BackgroundProperty, Brush(1))),
+            Rule(UiStyleSelector.For<Button>(classes: ["primary"]), UiStyleSetter.Create(Region.BackgroundProperty, Brush(2))));
+        var button = new Button();
+        button.Classes.Add("primary");
+
+        Assert.Equal(Brush(2), new UiStyleResolver([], [sheet]).Resolve(button).GetValue(Region.BackgroundProperty));
+    }
+
+    [Fact]
+    public void DeclarationOrderBreaksTieWithinOneSheet()
+    {
+        var sheet = Sheet(
+            Rule(UiStyleSelector.For<Button>(), UiStyleSetter.Create(Region.BackgroundProperty, Brush(1))),
+            Rule(UiStyleSelector.For<Button>(), UiStyleSetter.Create(Region.BackgroundProperty, Brush(2))));
+
+        Assert.Equal(Brush(2), new UiStyleResolver([], [sheet]).Resolve(new Button()).GetValue(Region.BackgroundProperty));
+    }
+
+    [Fact]
+    public void TypeDepthIncreasesSpecificityOverBaseSelector()
+    {
+        var sheet = Sheet(
+            Rule(UiStyleSelector.For<Control>(), UiStyleSetter.Create(Region.BackgroundProperty, Brush(1))),
+            Rule(UiStyleSelector.For<Button>(), UiStyleSetter.Create(Region.BackgroundProperty, Brush(2))));
+
+        Assert.Equal(Brush(2), new UiStyleResolver([], [sheet]).Resolve(new Button()).GetValue(Region.BackgroundProperty));
+    }
+
+    [Fact]
+    public void ResolveReturnsDescriptorDefaultWhenNoRuleMatches()
+    {
+        var sheet = Sheet(Rule(
+            UiStyleSelector.For<Button>(classes: ["absent"]),
+            UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)));
+        var result = new UiStyleResolver([], [sheet]).Resolve(new Button());
+
+        Assert.Equal(1, result.GetValue(UiNode.OpacityProperty));
+    }
+
+    [Fact]
+    public void DefaultBaseStyleSheetsDefineBuiltInButtonRules()
+    {
+        Assert.Single(UiStyleResolver.Default.BaseStyleSheets);
+        Assert.Empty(UiStyleResolver.Default.StyleSheets);
+        var result = UiStyleResolver.Default.Resolve(new Button());
+
+        Assert.Equal(new Thickness(12, 7), result.GetValue(Region.PaddingProperty));
+        Assert.Equal(new SolidColorBrush(48, 54, 62), result.GetValue(Region.BackgroundProperty));
+        Assert.Equal(new SolidColorBrush(92, 103, 116), result.GetValue(Region.BorderBrushProperty));
+        Assert.Equal(new Thickness(1), result.GetValue(Region.BorderThicknessProperty));
+        Assert.Equal(new Color(242, 244, 247), result.GetValue(Button.ForegroundProperty));
+        var source = Assert.Single(result.GetSources(Region.BackgroundProperty));
+        Assert.Equal("pangu-default", source.SheetSourceName);
+        Assert.Equal(UiStyleOrigin.Base, source.Origin);
+        Assert.Equal(0, source.SheetIndex);
+        Assert.Equal("background-color", source.CssPropertyName);
+        Assert.NotNull(source.SourceLocation);
+    }
+
+    [Fact]
+    public void AuthorRulesOverrideMoreSpecificBaseRules()
+    {
+        var baseSheet = Sheet(Rule(
+            UiStyleSelector.For<Button>(classes: ["primary"]),
+            UiStyleSetter.Create(Region.BackgroundProperty, Brush(1))));
+        var authorSheet = Sheet(Rule(
+            UiStyleSelector.For<Button>(),
+            UiStyleSetter.Create(Region.BackgroundProperty, Brush(2))));
+        var button = new Button();
+        button.Classes.Add("primary");
+        var resolver = new UiStyleResolver([baseSheet], [authorSheet]);
+
+        Assert.Equal(Brush(2), resolver.Resolve(button).GetValue(Region.BackgroundProperty));
+    }
+
+    [Theory]
+    [InlineData(UiStyleOrigin.Base)]
+    [InlineData(UiStyleOrigin.Author)]
+    public void LaterSheetWinsWhenSpecificityIsEqual(UiStyleOrigin origin)
+    {
+        var first = Sheet(Rule(UiStyleSelector.For<Button>(), UiStyleSetter.Create(Region.BackgroundProperty, Brush(1))));
+        var second = Sheet(Rule(UiStyleSelector.For<Button>(), UiStyleSetter.Create(Region.BackgroundProperty, Brush(2))));
+        var resolver = origin == UiStyleOrigin.Base
+            ? new UiStyleResolver([first, second], [])
+            : new UiStyleResolver([], [first, second]);
+
+        var result = resolver.Resolve(new Button());
+
+        Assert.Equal(Brush(2), result.GetValue(Region.BackgroundProperty));
+        var source = Assert.Single(result.GetSources(Region.BackgroundProperty));
+        Assert.Equal(origin, source.Origin);
+        Assert.Equal(1, source.SheetIndex);
+    }
+
+    [Fact]
+    public void ResolveRecordsSourceForWinningDeclaration()
+    {
+        var sheet = Sheet(Rule(
+            UiStyleSelector.For<Button>(),
+            UiStyleSetter.Create(Region.BackgroundProperty, Brush(7))));
+        var source = Assert.Single(
+            new UiStyleResolver(UiStyleResolver.Default.BaseStyleSheets, [sheet])
+                .Resolve(new Button()).GetSources(Region.BackgroundProperty));
+
+        Assert.Equal("Button", source.SelectorText);
+        Assert.Equal(UiStyleOrigin.Author, source.Origin);
+        Assert.Equal(0, source.SheetIndex);
+        Assert.Equal(0, source.RuleIndex);
+        Assert.Equal(0, source.DeclarationIndex);
+        Assert.Null(source.CssPropertyName);
+        Assert.False(source.IsMaskedByLocalValue);
+    }
+
+    [Fact]
+    public void CssTargetDepthWinsBeforeRuleOrder()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""
+            Button { background: #010203; }
+            Control { background: #040506; }
+            """)]);
+
+        Assert.Equal(new SolidColorBrush(1, 2, 3), resolver.Resolve(new Button()).GetValue(Region.BackgroundProperty));
+    }
+
+    [Fact]
+    public void SourceDeclarationIndexIncludesEarlierRules()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""
+            Button { padding: 2px; background: #010203; }
+            Button { background: #040506; }
+            """, "order.css")]);
+
+        var source = Assert.Single(resolver.Resolve(new Button()).GetSources(Region.BackgroundProperty));
+
+        Assert.Equal(UiStyleOrigin.Author, source.Origin);
+        Assert.Equal(0, source.SheetIndex);
+        Assert.Equal(1, source.RuleIndex);
+        Assert.Equal(2, source.DeclarationIndex);
+        Assert.Equal("order.css", source.SheetSourceName);
+    }
+
+    private static UiStyleSheet Sheet(params UiStyleRule[] rules) => new(rules);
+
+    private static UiStyleRule Rule(UiStyleSelector selector, params UiStyleSetter[] setters) => new(selector, setters);
+
+    private static Brush Brush(byte value) => new SolidColorBrush(value, value, value);
+}

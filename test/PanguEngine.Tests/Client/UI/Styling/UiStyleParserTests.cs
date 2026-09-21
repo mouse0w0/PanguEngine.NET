@@ -1,0 +1,527 @@
+using System.Text;
+using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Styling;
+using PanguEngine.Graphics.Text;
+
+namespace PanguEngine.Tests.Client.UI.Styling;
+
+public sealed class UiStyleParserTests
+{
+    private static Stream Utf8(string text) => new MemoryStream(Encoding.UTF8.GetBytes(text));
+
+    private static UiStyleSheet ParseCss(string text, string? sourceName = null) =>
+        UiStyleSheet.Parse(text, sourceName);
+
+    private static UiStyleRule SingleRule(string css) => Assert.Single(ParseCss(css).Rules);
+
+    private static IReadOnlyList<UiStyleRule.BoundDeclaration> BoundDeclarations(string css, Type targetType) =>
+        SingleRule(css).Bind(targetType);
+
+    private static IReadOnlyList<UiStyleSetter> BoundSetters(string css, Type targetType) =>
+        BoundDeclarations(css, targetType).Select(declaration => declaration.Setter).ToArray();
+
+    private static T ParsedValue<T>(Type targetType, string css)
+    {
+        var setter = Assert.Single(BoundSetters(css, targetType));
+        return (T)setter.BoxedValue!;
+    }
+
+    [Fact]
+    public void ParsesCompoundSelectorAndBuiltInValues()
+    {
+        var sheet = UiStyleSheet.Parse("""
+            Button.primary#save:hover:focus {
+                background: #112233cc;
+                opacity: 0.8;
+            }
+            """, "menu.css");
+
+        var rule = Assert.Single(sheet.Rules);
+        Assert.Null(rule.Selector.TargetType);
+        Assert.Equal("Button", rule.Selector.TypeName);
+        Assert.Equal(new[] { "primary" }, rule.Selector.Classes);
+        Assert.Equal("save", rule.Selector.Id);
+        Assert.Equal(UiPseudoStates.Hovered | UiPseudoStates.Focused, rule.Selector.States);
+        Assert.Equal("menu.css", sheet.SourceName);
+
+        var setters = rule.Bind(typeof(Button));
+        Assert.Equal(new Color(0x11, 0x22, 0x33, 0xcc), Assert.IsType<SolidColorBrush>(setters[0].Setter.BoxedValue).Color);
+        Assert.Equal(0.8, (double)setters[1].Setter.BoxedValue!);
+    }
+
+    [Fact]
+    public void InvalidValueReportsSourceSpanWhenBoundWithoutClosingStream()
+    {
+        using var stream = Utf8("Button { padding: nope; }");
+
+        var sheet = UiStyleSheet.Parse(stream, "bad.css");
+        var rule = Assert.Single(sheet.Rules);
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        Assert.Equal("bad.css", error.SourceName);
+        Assert.Equal(1, error.Line);
+        Assert.True(stream.CanRead);
+    }
+
+    [Fact]
+    public void StringAndStreamParseProduceSameModel()
+    {
+        const string css = "Button { background: #112233; }";
+        var fromString = ParseCss(css);
+        using var stream = Utf8(css);
+        var fromStream = UiStyleSheet.Parse(stream);
+
+        var ruleA = Assert.Single(fromString.Rules);
+        var ruleB = Assert.Single(fromStream.Rules);
+        var a = (SolidColorBrush)Assert.Single(ruleA.Bind(typeof(Button))).Setter.BoxedValue!;
+        var b = (SolidColorBrush)Assert.Single(ruleB.Bind(typeof(Button))).Setter.BoxedValue!;
+        Assert.Equal(a.Color, b.Color);
+    }
+
+    [Fact]
+    public void AcceptsUtf8BomAndLeavesStreamOpen()
+    {
+        var bytes = Encoding.UTF8.GetPreamble()
+            .Concat(Encoding.UTF8.GetBytes("Button { opacity: 0.5; }"))
+            .ToArray();
+        using var stream = new MemoryStream(bytes);
+
+        var sheet = UiStyleSheet.Parse(stream, "bom.css");
+
+        Assert.True(stream.CanRead);
+        var rule = Assert.Single(sheet.Rules);
+        Assert.Equal(0.5, (double)Assert.Single(rule.Bind(typeof(Button))).Setter.BoxedValue!);
+    }
+
+    [Fact]
+    public void InvalidUtf8ThrowsInvalidEncoding()
+    {
+        var bytes = new byte[] { 0x42, 0x75, 0x74, 0x74, 0x6f, 0x6e, 0xff, 0xfe };
+        using var stream = new MemoryStream(bytes);
+
+        var error = Assert.Throws<UiStyleParseException>(() => UiStyleSheet.Parse(stream));
+
+        Assert.Equal(UiStyleParseError.InvalidEncoding, error.Error);
+    }
+
+    [Fact]
+    public void IOExceptionPropagatesFromStream()
+    {
+        using var stream = new FailingStream();
+        Assert.Throws<IOException>(() => UiStyleSheet.Parse(stream));
+    }
+
+    [Fact]
+    public void CrLfCountsAsOneLineForErrorPosition()
+    {
+        var css = "Button {\r\n\twidth: 1;\r\n}\r\nCanvas {\r\n\theight: bad;\r\n}\r\n";
+
+        var rule = Assert.Single(ParseCss(css, "crlf.css").Rules.Where(r => r.Selector.TypeName == "Canvas"));
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Canvas)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        Assert.Equal(5, error.Line);
+        Assert.Equal(10, error.Column);
+    }
+
+    [Fact]
+    public void TabCountsAsOneColumn()
+    {
+        var rule = SingleRule("Button:hover {\n\twidth: 1;\n}");
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        Assert.Equal(2, error.Line);
+        Assert.Equal(2, error.Column);
+    }
+
+    [Fact]
+    public void ParsesMultipleClassesPseudoStatesAndSingleId()
+    {
+        var rule = SingleRule("Button.a.b.c:hover:focus:disabled { }");
+
+        Assert.Equal(new[] { "a", "b", "c" }, rule.Selector.Classes);
+        Assert.Equal(UiPseudoStates.Hovered | UiPseudoStates.Focused | UiPseudoStates.Disabled, rule.Selector.States);
+        Assert.Null(rule.Selector.Id);
+        Assert.Empty(rule.Setters);
+    }
+
+    [Fact]
+    public void WhitespaceCannotCreateACompoundOrTreeSelector()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button .primary { }"));
+
+        Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
+    }
+
+    [Fact]
+    public void SkipsBlockCommentsAsTrivia()
+    {
+        var rule = SingleRule("/* header */ Button { /* inner */ width: 1; /* tail */ } /* footer */");
+
+        Assert.Single(rule.Bind(typeof(Button)));
+    }
+
+    [Fact]
+    public void SkipsBlockCommentsInsideDeclarationValues()
+    {
+        var value = ParsedValue<Thickness>(typeof(Region), "Region { padding: 1 /* ; } */ 2; }");
+
+        Assert.Equal(new Thickness(2, 1, 2, 1), value);
+    }
+
+    [Fact]
+    public void UnterminatedCommentInsideValueReportsError()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() =>
+            ParseCss("Region { padding: 1 /* never closed"));
+
+        Assert.Equal(UiStyleParseError.UnterminatedComment, error.Error);
+    }
+
+    [Fact]
+    public void EmptyDeclarationBlockIsAllowed()
+    {
+        var rule = SingleRule("Button { }");
+
+        Assert.Empty(rule.Setters);
+        Assert.Empty(rule.Bind(typeof(Button)));
+    }
+
+    [Fact]
+    public void MissingSemicolonReportsError()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button { width: 1 }"));
+
+        Assert.Equal(UiStyleParseError.MissingSemicolon, error.Error);
+    }
+
+    [Fact]
+    public void TrailingTokenReportsError()
+    {
+        Assert.Equal(
+            UiStyleParseError.TrailingToken,
+            Assert.Throws<UiStyleParseException>(() => ParseCss("Button { } }")).Error);
+        Assert.Equal(
+            UiStyleParseError.TrailingToken,
+            Assert.Throws<UiStyleParseException>(() => ParseCss("Button { } ;")).Error);
+    }
+
+    [Fact]
+    public void UnknownTypeNameIsAcceptedWithoutTargetType()
+    {
+        var rule = SingleRule("Ghost { }");
+
+        Assert.Equal("Ghost", rule.Selector.TypeName);
+        Assert.Null(rule.Selector.TargetType);
+    }
+
+    [Fact]
+    public void UnknownPseudoStateReportsError()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button:phantom { }"));
+
+        Assert.Equal(UiStyleParseError.UnknownPseudoState, error.Error);
+    }
+
+    [Fact]
+    public void UnknownPropertyIsIgnoredWhenBound()
+    {
+        var rule = SingleRule("Button { ghost: 1; }");
+
+        Assert.Empty(rule.Bind(typeof(Button)));
+    }
+
+    [Fact]
+    public void DuplicateIdReportsError()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button#a#b { }"));
+
+        Assert.Equal(UiStyleParseError.DuplicateId, error.Error);
+    }
+
+    [Fact]
+    public void UnterminatedCommentReportsError()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button { /* never closed "));
+
+        Assert.Equal(UiStyleParseError.UnterminatedComment, error.Error);
+    }
+
+    [Fact]
+    public void ParsesBuiltInDoubleValues()
+    {
+        var setters = BoundSetters("UiNode { width: 10px; height: 10; opacity: 1.5; }", typeof(UiNode));
+
+        Assert.Equal(10d, (double)setters[0].BoxedValue!);
+        Assert.Equal(10d, (double)setters[1].BoxedValue!);
+        Assert.Equal(1.5, (double)setters[2].BoxedValue!);
+    }
+
+    [Fact]
+    public void DoubleRejectsExponentSyntax()
+    {
+        var rule = SingleRule("UiNode { width: 1e2; }");
+
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(UiNode)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
+    [Fact]
+    public void ParsesBuiltInThicknessValues()
+    {
+        Assert.Equal(new Thickness(5), ParsedValue<Thickness>(typeof(Region), "Region { padding: 5; }"));
+        Assert.Equal(new Thickness(6, 5, 6, 5), ParsedValue<Thickness>(typeof(Region), "Region { padding: 5 6; }"));
+        Assert.Equal(new Thickness(2, 5, 2, 8), ParsedValue<Thickness>(typeof(Region), "Region { padding: 5 2 8; }"));
+        Assert.Equal(new Thickness(4, 1, 2, 3), ParsedValue<Thickness>(typeof(Region), "Region { padding: 1 2 3 4; }"));
+    }
+
+    [Fact]
+    public void ThicknessRejectsCountsOtherThanOneToFour()
+    {
+        var rule = SingleRule("Region { padding: 5 2 8 1 3; }");
+
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Region)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
+    [Fact]
+    public void ParsesBuiltInColorAndBrushValues()
+    {
+        Assert.Equal(new Color(0xaa, 0xbb, 0xcc), ParsedValue<Color>(typeof(Text), "Text { color: #aabbcc; }"));
+        Assert.Equal(new Color(0xaa, 0xbb, 0xcc, 0xdd), ParsedValue<Color>(typeof(Text), "Text { color: #aabbccdd; }"));
+        Assert.Equal(new Color(0, 0, 0, 0), ParsedValue<Color>(typeof(Text), "Text { color: transparent; }"));
+
+        var brush = ParsedValue<Brush>(typeof(Region), "Region { background: #112233; }");
+        Assert.Equal(new Color(0x11, 0x22, 0x33), Assert.IsType<SolidColorBrush>(brush).Color);
+
+        var transparent = ParsedValue<Brush>(typeof(Region), "Region { background: transparent; }");
+        Assert.Equal(new Color(0, 0, 0, 0), Assert.IsType<SolidColorBrush>(transparent).Color);
+    }
+
+    [Fact]
+    public void ParsesBuiltInEnumValuesCaseInsensitively()
+    {
+        Assert.Equal(Orientation.Horizontal, ParsedValue<Orientation>(typeof(StackPanel), "StackPanel { orientation: HORIZONTAL; }"));
+        Assert.Equal(Visibility.Collapsed, ParsedValue<Visibility>(typeof(UiNode), "UiNode { visibility: collapsed; }"));
+        Assert.Equal(HorizontalAlignment.Center, ParsedValue<HorizontalAlignment>(typeof(UiNode), "UiNode { horizontal-alignment: CENTER; }"));
+        Assert.Equal(TextWrapping.Wrap, ParsedValue<TextWrapping>(typeof(Text), "Text { wrapping: wrap; }"));
+        Assert.Equal(TextAlignment.Right, ParsedValue<TextAlignment>(typeof(Text), "Text { text-alignment: right; }"));
+        Assert.Equal(ImageStretch.UniformToFill, ParsedValue<ImageStretch>(typeof(ImageView), "ImageView { stretch: uniformToFill; }"));
+        Assert.Equal(ImageSamplingMode.Nearest, ParsedValue<ImageSamplingMode>(typeof(ImageView), "ImageView { sampling-mode: nearest; }"));
+    }
+
+    [Fact]
+    public void PropertyNameResolutionIsCaseInsensitive()
+    {
+        var setter = Assert.Single(BoundSetters("Button { BACKGROUND: #112233; }", typeof(Button)));
+
+        Assert.Same(Region.BackgroundProperty, setter.Property);
+    }
+
+    [Fact]
+    public void BindingInitializesCanvasAttachedProperties()
+    {
+        Assert.Equal("Panel", SingleRule("Panel { }").Selector.TypeName);
+
+        var expected = Canvas.LeftProperty;
+        var setter = Assert.Single(BoundSetters("Button { left: 4; }", typeof(Button)));
+        Assert.Same(expected, setter.Property);
+        Assert.Equal(4d, (double)setter.BoxedValue!);
+    }
+
+    [Fact]
+    public void StatefulLayoutPropertyReportsDiagnosticWhenBound()
+    {
+        var rule = SingleRule("Button:hover { padding: 4; }");
+
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
+    [Fact]
+    public void CustomPropertyConverterParsesValueAndReportsInvalidValue()
+    {
+        Assert.True(ParsedValue<bool>(typeof(FlagConvNode), "FlagConvNode { flag: yes; }"));
+
+        var rule = SingleRule("FlagConvNode { flag: maybe; }");
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(FlagConvNode)));
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
+    [Fact]
+    public void BuiltInBooleanConverterAcceptsTrueAndFalse()
+    {
+        Assert.True(ParsedValue<bool>(typeof(BoolNode), "BoolNode { flag: TRUE; }"));
+        Assert.False(ParsedValue<bool>(typeof(BoolNode), "BoolNode { flag: false; }"));
+
+        var rule = SingleRule("BoolNode { flag: yes; }");
+        Assert.Equal(
+            UiStyleParseError.InvalidValue,
+            Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(BoolNode))).Error);
+    }
+
+    [Fact]
+    public void CustomConverterReceivesOuterTrimWithoutInternalWhitespaceChanges()
+    {
+        TrimNode.Received = null;
+
+        _ = ParsedValue<string>(typeof(TrimNode), "TrimNode { raw:  alpha\t beta  ; }");
+
+        Assert.Equal("alpha\t beta", TrimNode.Received);
+    }
+
+    [Fact]
+    public void ConverterExceptionIsPreservedAsInvalidValueInnerException()
+    {
+        var expected = new FormatException("converter failed");
+        ThrowingNode.Error = expected;
+        var rule = SingleRule("ThrowingNode { raw: value; }");
+
+        var actual = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(ThrowingNode)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, actual.Error);
+        Assert.Same(expected, actual.InnerException);
+    }
+
+    [Fact]
+    public void BindingResolvesNearestDerivedPropertyForDerivedType()
+    {
+        var rule = SingleRule("DerivedStyleNode { tone: bright; }");
+
+        var setter = Assert.Single(rule.Bind(typeof(DerivedStyleNode)));
+
+        Assert.Same(DerivedStyleNode.ToneProperty, setter.Setter.Property);
+    }
+
+    [Fact]
+    public void BoundDeclarationRecordsOriginalDeclarationAndCssName()
+    {
+        var rule = SingleRule("Button { opacity: 0.2; background: #010203; }");
+
+        var bound = rule.Bind(typeof(Button));
+
+        Assert.Equal(2, bound.Count);
+        Assert.Equal("opacity", bound[0].CssPropertyName);
+        Assert.Equal("background", bound[1].CssPropertyName);
+        Assert.Equal(0, bound[0].DeclarationIndex);
+        Assert.Equal(1, bound[1].DeclarationIndex);
+        Assert.NotNull(bound[1].SourceLocation);
+    }
+
+    [Fact]
+    public void NullTextOrStreamThrows()
+    {
+        Assert.Throws<ArgumentNullException>(() => UiStyleSheet.Parse((string)null!));
+        Assert.Throws<ArgumentNullException>(() => UiStyleSheet.Parse((Stream)null!));
+    }
+
+    private sealed class FlagConvNode : UiNode
+    {
+        static FlagConvNode()
+        {
+            UiCssRegistry.RegisterProperty<FlagConvNode, bool>(
+                "flag",
+                FlagProperty,
+                value => value switch
+                {
+                    "yes" => true,
+                    "no" => false,
+                    _ => throw new FormatException($"Unknown flag value '{value}'.")
+                });
+        }
+
+        internal static readonly UiProperty<bool> FlagProperty =
+            UiProperty.Register<FlagConvNode, bool>("Flag", false);
+    }
+
+    private sealed class BoolNode : UiNode
+    {
+        static BoolNode()
+        {
+            UiCssRegistry.RegisterProperty<BoolNode, bool>("flag", FlagProperty, UiCssValueConverters.ParseBool);
+        }
+
+        internal static readonly UiProperty<bool> FlagProperty =
+            UiProperty.Register<BoolNode, bool>("Flag", false);
+    }
+
+    private sealed class TrimNode : UiNode
+    {
+        static TrimNode()
+        {
+            UiCssRegistry.RegisterProperty<TrimNode, string>("raw", RawProperty, value => Received = value);
+        }
+
+        internal static string? Received;
+
+        internal static readonly UiProperty<string> RawProperty =
+            UiProperty.Register<TrimNode, string>("Raw", string.Empty);
+    }
+
+    private sealed class ThrowingNode : UiNode
+    {
+        static ThrowingNode()
+        {
+            UiCssRegistry.RegisterProperty<ThrowingNode, string>("raw", RawProperty, _ => throw Error);
+        }
+
+        internal static Exception Error = new FormatException("default");
+
+        internal static readonly UiProperty<string> RawProperty =
+            UiProperty.Register<ThrowingNode, string>("Raw", string.Empty);
+    }
+
+    private class BaseStyleNode : UiNode
+    {
+        static BaseStyleNode()
+        {
+            UiCssRegistry.RegisterProperty<BaseStyleNode, string>("tone", ToneProperty, static value => value);
+        }
+
+        internal static readonly UiProperty<string> ToneProperty =
+            UiProperty.Register<BaseStyleNode, string>("Tone", string.Empty);
+    }
+
+    private sealed class DerivedStyleNode : BaseStyleNode
+    {
+        static DerivedStyleNode()
+        {
+            UiCssRegistry.RegisterProperty<DerivedStyleNode, string>("tone", ToneProperty, static value => value);
+        }
+
+        internal new static readonly UiProperty<string> ToneProperty =
+            UiProperty.Register<DerivedStyleNode, string>("Tone", string.Empty);
+    }
+
+    private sealed class FailingStream : Stream
+    {
+        public override int Read(byte[] buffer, int offset, int count) => throw new IOException("boom");
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position { get => 0; set => throw new NotSupportedException(); }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+}
