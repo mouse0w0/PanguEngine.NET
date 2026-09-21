@@ -1,9 +1,10 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Huds;
 using PanguEngine.Registries;
 
-namespace PanguEngine.Tests.Client.UI;
+namespace PanguEngine.Tests.Client.UI.Huds;
 
 public sealed class HudRegistrationTests
 {

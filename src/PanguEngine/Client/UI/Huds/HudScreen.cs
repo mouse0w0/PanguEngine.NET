@@ -2,7 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Registries;
 
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.Client.UI.Huds;
 
 /// <summary>
 /// Provides the persistent, non-interactive client HUD and hosts registered HUD components.

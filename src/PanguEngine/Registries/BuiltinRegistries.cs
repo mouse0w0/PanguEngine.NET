@@ -1,5 +1,5 @@
 using PanguEngine.Audio;
-using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
 using PanguEngine.World.Blocks;
 

@@ -1,4 +1,4 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.Client.UI.Huds;
 
 /// <summary>
 /// Represents a business component hosted by the persistent client HUD.

@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 

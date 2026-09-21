@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using PanguEngine.Audio;
-using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Huds;
 using PanguEngine.Events;
 using PanguEngine.Input;
 using PanguEngine.Modding;

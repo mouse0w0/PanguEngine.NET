@@ -3,6 +3,7 @@ using PanguEngine.Client.Input;
 using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Huds;
 using PanguEngine.Client.UI.Input;
 using PanguEngine.Input;
 using PanguEngine.Registries;

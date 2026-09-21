@@ -1,4 +1,4 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.Client.UI.Huds;
 
 /// <summary>
 /// Describes a HUD component that the client host can create.
