@@ -204,7 +204,7 @@ public sealed class UiManagerTests
     }
 
     [Fact]
-    public void LifecycleCallbacksRejectNestedManagerOperations()
+    public void LifecycleCallbacksRejectUpdateAndDestroy()
     {
         var manager = new UiManager();
         var errors = new List<Exception?>();
@@ -217,8 +217,299 @@ public sealed class UiManagerTests
         manager.Open(screen);
         manager.Close();
 
-        Assert.Equal(16, errors.Count);
+        Assert.Equal(8, errors.Count);
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
+
+        void Capture()
+        {
+            errors.Add(Record.Exception(manager.Update));
+            errors.Add(Record.Exception(manager.Destroy));
+        }
+    }
+
+    [Theory]
+    [InlineData("opening")]
+    [InlineData("opened")]
+    [InlineData("closing")]
+    [InlineData("closed")]
+    public void LifecycleCallbackQueuesScreenRequests(string hook)
+    {
+        var manager = new UiManager();
+        var first = new RecordingUiScreen(new TestNode());
+        var second = new RecordingUiScreen(new TestNode());
+        var third = new RecordingUiScreen(new TestNode());
+        var notifications = new List<(UiScreen? Old, UiScreen? New)>();
+        manager.CurrentScreenChanged += (oldScreen, newScreen) => notifications.Add((oldScreen, newScreen));
+        UiScreen? currentDuringCallback = null;
+        Action callback = () =>
+        {
+            currentDuringCallback = manager.CurrentScreen;
+            manager.Open(second);
+            manager.Close();
+            manager.Close();
+            manager.Open(third);
+            Assert.Same(currentDuringCallback, manager.CurrentScreen);
+        };
+
+        switch (hook)
+        {
+            case "opening":
+                first.Opening = callback;
+                break;
+            case "opened":
+                first.Opened = callback;
+                break;
+            case "closing":
+                first.Closing = callback;
+                break;
+            case "closed":
+                first.Closed = callback;
+                break;
+        }
+
+        manager.Open(first);
+        if (hook is "closing" or "closed")
+            manager.Close();
+
+        Assert.Null(currentDuringCallback);
+        Assert.Same(third, manager.CurrentScreen);
+        var expected = hook is "closing" or "closed"
+            ? new (UiScreen? Old, UiScreen? New)[]
+            {
+                (null, first), (first, null), (null, second), (second, null), (null, third)
+            }
+            : new (UiScreen? Old, UiScreen? New)[]
+            {
+                (null, first), (first, second), (second, null), (null, third)
+            };
+        Assert.Equal(expected, notifications);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void NotificationSubscribersObserveEachTransitionNewScreen()
+    {
+        var manager = new UiManager();
+        var first = new UiScreen(new TestNode());
+        var second = new UiScreen(new TestNode());
+        var third = new UiScreen(new TestNode());
+        var events = new List<(string Subscriber, UiScreen? New)>();
+        var queued = false;
+        manager.CurrentScreenChanged += (_, newScreen) =>
+        {
+            events.Add(("first", newScreen));
+            if (!queued && ReferenceEquals(newScreen, first))
+            {
+                queued = true;
+                Assert.Throws<InvalidOperationException>(manager.Update);
+                Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
+                Assert.Throws<InvalidOperationException>(manager.Destroy);
+                manager.Open(second);
+                manager.Open(third);
+            }
+        };
+        manager.CurrentScreenChanged += (_, newScreen) =>
+        {
+            events.Add(("second", newScreen));
+            Assert.Same(manager.CurrentScreen, newScreen);
+        };
+
+        manager.Open(first);
+        manager.Close();
+
+        var expected = new (string Subscriber, UiScreen? New)[]
+        {
+            ("first", first), ("second", first),
+            ("first", second), ("second", second),
+            ("first", third), ("second", third),
+            ("first", null), ("second", null)
+        };
+        Assert.Equal(expected, events);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void NotificationCanCloseAndReopenSameScreen()
+    {
+        var manager = new UiManager();
+        var screen = new RecordingUiScreen(new TestNode());
+        var openedCalls = 0;
+        var closedCalls = 0;
+        screen.Opened = () => openedCalls++;
+        screen.Closed = () => closedCalls++;
+        var queued = false;
+        manager.CurrentScreenChanged += (_, newScreen) =>
+        {
+            if (queued || !ReferenceEquals(newScreen, screen))
+                return;
+
+            queued = true;
+            manager.Close();
+            manager.Open(screen);
+            manager.Open(screen);
+        };
+
+        manager.Open(screen);
+
+        Assert.Same(screen, manager.CurrentScreen);
+        Assert.Equal(2, openedCalls);
+        Assert.Equal(1, closedCalls);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void LifecycleCallbackFailureDropsQueuedRequests()
+    {
+        var manager = new UiManager();
+        var expected = new InvalidOperationException("opening");
+        var second = new RecordingUiScreen(new TestNode());
+        var secondOpened = 0;
+        second.Opened = () => secondOpened++;
+        var first = new RecordingUiScreen(new TestNode())
+        {
+            Opening = () =>
+            {
+                manager.Open(second);
+                manager.Close();
+                throw expected;
+            }
+        };
+
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.Open(first));
+
+        Assert.Same(expected, actual);
+        Assert.Null(manager.CurrentScreen);
+        Assert.Equal(0, secondOpened);
+        manager.Destroy();
+        Assert.Throws<ObjectDisposedException>(() => manager.Open(new UiScreen(new TestNode())));
+    }
+
+    [Fact]
+    public void NotificationFailureDropsQueuedRequests()
+    {
+        var manager = new UiManager();
+        var expected = new InvalidOperationException("changed");
+        var first = new RecordingUiScreen(new TestNode());
+        var second = new RecordingUiScreen(new TestNode());
+        var secondOpened = 0;
+        second.Opened = () => secondOpened++;
+        var queued = false;
+        manager.CurrentScreenChanged += (_, newScreen) =>
+        {
+            if (queued || !ReferenceEquals(newScreen, first))
+                return;
+
+            queued = true;
+            manager.Open(second);
+            throw expected;
+        };
+
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.Open(first));
+
+        Assert.Same(expected, actual);
+        Assert.Same(first, manager.CurrentScreen);
+        Assert.Equal(0, secondOpened);
+        manager.Destroy();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void DequeuedTargetFailureKeepsPreviouslyCommittedScreen(bool precedingSuccess)
+    {
+        var manager = new UiManager();
+        var owner = new UiManager();
+        var first = new RecordingUiScreen(new TestNode());
+        var middle = new UiScreen(new TestNode());
+        var closingCalls = 0;
+        first.Closing = () => closingCalls++;
+        var occupied = new UiScreen(new TestNode());
+        var tail = new RecordingUiScreen(new TestNode());
+        var tailOpened = 0;
+        tail.Opened = () => tailOpened++;
+        owner.Open(occupied);
+        var queued = false;
+        manager.CurrentScreenChanged += (_, newScreen) =>
+        {
+            if (queued || !ReferenceEquals(newScreen, first))
+                return;
+
+            queued = true;
+            if (precedingSuccess)
+                manager.Open(middle);
+            manager.Open(occupied);
+            manager.Open(tail);
+        };
+        var changes = new List<(UiScreen? Old, UiScreen? New)>();
+        manager.CurrentScreenChanged += (oldScreen, newScreen) => changes.Add((oldScreen, newScreen));
+
+        Assert.Throws<InvalidOperationException>(() => manager.Open(first));
+
+        Assert.Same(precedingSuccess ? middle : first, manager.CurrentScreen);
+        Assert.Equal(precedingSuccess ? 1 : 0, closingCalls);
+        (UiScreen? Old, UiScreen? New)[] expected = precedingSuccess
+            ? [(null, first), (first, middle)]
+            : [(null, first)];
+        Assert.Equal(expected, changes);
+        Assert.Equal(0, tailOpened);
+        owner.Close();
+        owner.Destroy();
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void CloseAndNotificationFailuresArePreserved()
+    {
+        var manager = new UiManager();
+        var closeError = new InvalidOperationException("close");
+        var notifyError = new InvalidOperationException("notify");
+        var oldScreen = new RecordingUiScreen(new TestNode())
+        {
+            Closing = () => throw closeError
+        };
+        var next = new RecordingUiScreen(new TestNode());
+        var tail = new RecordingUiScreen(new TestNode());
+        var openedCalls = 0;
+        next.Opened = () => openedCalls++;
+        tail.Opened = () => openedCalls++;
+        var queued = false;
+        manager.CurrentScreenChanged += (_, newScreen) =>
+        {
+            if (!queued && ReferenceEquals(newScreen, oldScreen))
+            {
+                queued = true;
+                manager.Open(next);
+                manager.Open(tail);
+                return;
+            }
+
+            throw notifyError;
+        };
+
+        var actual = Assert.Throws<AggregateException>(() => manager.Open(oldScreen));
+
+        Assert.Contains(closeError, actual.InnerExceptions);
+        Assert.Contains(notifyError, actual.InnerExceptions);
+        Assert.Null(manager.CurrentScreen);
+        Assert.Equal(0, openedCalls);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void DestroyLifecycleCallbacksRejectNestedManagerOperations()
+    {
+        var manager = new UiManager();
+        var errors = new List<Exception?>();
+        var screen = new RecordingUiScreen(new TestNode());
+        screen.Closing = Capture;
+        screen.Closed = Capture;
+        manager.Open(screen);
+
+        manager.Destroy();
+
+        Assert.Equal(8, errors.Count);
+        Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
+        Assert.Throws<ObjectDisposedException>(() => manager.Open(new UiScreen(new TestNode())));
 
         void Capture() => CaptureNestedOperationErrors(manager, errors);
     }

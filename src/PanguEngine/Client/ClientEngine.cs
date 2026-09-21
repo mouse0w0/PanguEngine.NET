@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PanguEngine.Audio;
 using PanguEngine.Client.Game;
+using PanguEngine.Client.Input;
 using PanguEngine.Client.Rendering;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.Screens;
@@ -10,6 +11,7 @@ using PanguEngine.Desktop.Sdl;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Graphics.Vulkan;
+using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.Threading;
 using PanguEngine.Windowing;
@@ -83,11 +85,14 @@ public sealed class ClientEngine
     /// </summary>
     public UiManager Ui { get; private set; } = null!;
 
+    /// <summary>
+    /// The client input manager.
+    /// </summary>
+    public InputManager Input { get; private set; } = null!;
+
     private ClientGame Game { get; set; } = null!;
 
     internal ClientRenderer Renderer { get; private set; } = null!;
-
-    private ClientInputBridge InputBridge { get; set; } = null!;
 
     internal BlockModelManager BlockModelManager { get; private set; } = null!;
 
@@ -171,6 +176,12 @@ public sealed class ClientEngine
         UiSettings.DefaultScale = monitor.ContentScale;
         Ui = new UiManager();
         Ui.InitializeHud(Engine.RegistryManager.Get<HudDefinition>(RegistryKeys.Hud));
+        Input = new InputManager(
+            PrimaryWindow,
+            Ui,
+            InputBindingMap.CreateFromRegistries(
+                BuiltinRegistries.InputAction,
+                BuiltinRegistries.InputContext));
 
         Audio = new AudioSystem(
             Engine.ResourceManager,
@@ -183,6 +194,10 @@ public sealed class ClientEngine
             PumpClientEvents,
             OnUpdate,
             GraphicsBackend.Render);
+        Game = new ClientGame(this);
+        Input.RegisterHandler(BuiltinInputActions.TogglePause, HandleTogglePause);
+        Ui.CurrentScreenChanged += OnCurrentScreenChanged;
+        OnCurrentScreenChanged(null, Ui.CurrentScreen);
         Engine.ModManager.RunClientSetup();
         BlockModelManager = new BlockModelManager(
             Engine.ResourceManager,
@@ -194,9 +209,6 @@ public sealed class ClientEngine
         Audio.MarkReady();
         Engine.ModManager.RunReady();
 
-        Game = new ClientGame(this);
-        Ui.CurrentScreenChanged += OnCurrentScreenChanged;
-        OnCurrentScreenChanged(null, Ui.CurrentScreen);
         Renderer = new ClientRenderer(
             Device,
             PrimaryWindow.Presenter,
@@ -204,7 +216,7 @@ public sealed class ClientEngine
             Ui,
             Game.World,
             BlockModelManager);
-        InputBridge = new ClientInputBridge(PrimaryWindow, Ui, Game.Input, TryHandleEscape);
+        Input.Start();
     }
 
     /// <summary>Requests the client engine to shut down after outstanding native dialogs close.</summary>
@@ -245,20 +257,24 @@ public sealed class ClientEngine
             Game.Resume();
     }
 
-    private bool TryHandleEscape()
+    private InputHandling HandleTogglePause(InputActionEvent args)
     {
-        var screen = Ui.CurrentScreen;
-        if (screen is null)
+        if (args.Phase != InputActionPhase.Started)
+            return InputHandling.Pass;
+
+        if (Ui.CurrentScreen is null)
         {
             Ui.Open(new PauseScreen());
-            return true;
+            return InputHandling.Handled;
         }
 
-        if (!screen.CloseOnEscape)
-            return false;
+        if (Ui.CurrentScreen.CloseOnEscape)
+        {
+            Ui.Close();
+            return InputHandling.Handled;
+        }
 
-        Ui.Close();
-        return true;
+        return InputHandling.Pass;
     }
 
     private void OnShutdown()
@@ -276,7 +292,7 @@ public sealed class ClientEngine
 
         Ui.CurrentScreenChanged -= OnCurrentScreenChanged;
         Ui.Destroy();
-        InputBridge.Destroy();
+        Input.Destroy();
         Game.Destroy();
         Renderer.Destroy();
         Audio.Destroy();

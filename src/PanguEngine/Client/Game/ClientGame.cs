@@ -1,5 +1,6 @@
 using PanguEngine.Audio;
 using PanguEngine.Client.World;
+using PanguEngine.Client.Input;
 using PanguEngine.Input;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
@@ -16,22 +17,31 @@ public sealed class ClientGame
     private readonly ClientEngine _engine;
     private readonly Camera _camera;
     private readonly CameraController _cameraController;
-    private readonly ClientInputState _input;
+    private readonly InputManager _input;
     private readonly AudioSystem _audio;
+    private readonly IDisposable _gameContextActivation;
+    private bool _leftClickRequested;
+    private bool _rightClickRequested;
 
     internal ClientGame(ClientEngine engine)
     {
         _engine = engine;
         _camera = new Camera(new Vector3D<double>(8, 22, 24), -90, -20);
         _cameraController = new CameraController(_camera);
-        _input = new ClientInputState(state => engine.PrimaryWindow.CursorState = state);
+        _input = engine.Input;
         _audio = engine.Audio;
-        _input.MouseDelta += _cameraController.ApplyMouseDelta;
         World = new ClientWorld();
         FlatWorldGenerator.Generate(World);
-    }
 
-    internal ClientInputState Input => _input;
+        _gameContextActivation = _input.ActivateContext(BuiltinInputContexts.Game);
+        _input.StateInvalidated += ClearInteractionRequests;
+        _input.RegisterHandler(BuiltinInputActions.Look, HandleLook);
+        _input.RegisterHandler(BuiltinInputActions.BreakBlock, HandleBreakBlock);
+        _input.RegisterHandler(BuiltinInputActions.PlaceBlock, HandlePlaceBlock);
+        _input.RegisterHandler(
+            BuiltinInputActions.CapturePointer,
+            HandleCapturePointer);
+    }
 
     internal bool IsPaused { get; private set; }
 
@@ -49,11 +59,8 @@ public sealed class ClientGame
         if (IsPaused)
             return;
 
-        var forward = (_input.IsKeyDown(Key.W) ? 1 : 0)
-                      - (_input.IsKeyDown(Key.S) ? 1 : 0);
-        var right = (_input.IsKeyDown(Key.D) ? 1 : 0)
-                    - (_input.IsKeyDown(Key.A) ? 1 : 0);
-        _cameraController.Move(forward, right);
+        var movement = _input.GetValue(BuiltinInputActions.Move).Axis2D;
+        _cameraController.Move(movement.Y, movement.X);
         _audio.SetListener(new AudioListenerState(
             _camera.CurrentPosition,
             _camera.Forward,
@@ -61,27 +68,41 @@ public sealed class ClientGame
 
         SelectedBlock = RaycastSelection(_camera.CurrentPosition);
         var breakSelection = SelectedBlock;
-        if (_input.ConsumeLeftClickRequest()
+        if (_leftClickRequested
             && TryBreakBlock(World, breakSelection))
         {
+            _leftClickRequested = false;
             _audio.PlayAt(
                 BuiltinSoundEvents.BlockBreak,
                 GetBlockCenter(breakSelection!.Value.BlockPosition));
             SelectedBlock = RaycastSelection(_camera.CurrentPosition);
         }
+        else
+        {
+            _leftClickRequested = false;
+        }
 
         var placeSelection = SelectedBlock;
-        if (_input.ConsumeRightClickRequest()
+        if (_rightClickRequested
             && TryPlaceBlock(World, placeSelection))
         {
+            _rightClickRequested = false;
             _audio.PlayAt(
                 BuiltinSoundEvents.BlockPlace,
                 GetBlockCenter(placeSelection!.Value.BlockPosition.Offset(placeSelection.Value.Face)));
             SelectedBlock = RaycastSelection(_camera.CurrentPosition);
         }
+        else
+        {
+            _rightClickRequested = false;
+        }
     }
 
-    internal void Pause() => IsPaused = true;
+    internal void Pause()
+    {
+        IsPaused = true;
+        ClearInteractionRequests();
+    }
 
     internal void Resume() => IsPaused = false;
 
@@ -126,6 +147,51 @@ public sealed class ClientGame
         return true;
     }
 
+    private InputHandling HandleLook(InputActionEvent args)
+    {
+        if (args.Phase != InputActionPhase.Updated || !_input.IsPointerCaptured)
+            return InputHandling.Pass;
+
+        var delta = args.Value.Axis2D;
+        _cameraController.ApplyMouseDelta(new Vector2D<float>((float)delta.X, (float)delta.Y));
+        return InputHandling.Handled;
+    }
+
+    private InputHandling HandleBreakBlock(InputActionEvent args) =>
+        HandleInteractionRequest(ref _leftClickRequested, args);
+
+    private InputHandling HandlePlaceBlock(InputActionEvent args) =>
+        HandleInteractionRequest(ref _rightClickRequested, args);
+
+    internal static InputHandling HandleInteractionRequest(ref bool requested, InputActionEvent args)
+    {
+        if (args.Phase == InputActionPhase.Started)
+        {
+            requested = true;
+            return InputHandling.Handled;
+        }
+
+        if (args.Phase == InputActionPhase.Stopped && args.Source is null)
+            requested = false;
+        return InputHandling.Pass;
+    }
+
+    private void ClearInteractionRequests()
+    {
+        _leftClickRequested = false;
+        _rightClickRequested = false;
+    }
+
+    private InputHandling HandleCapturePointer(InputActionEvent args)
+    {
+        if (args.Phase != InputActionPhase.Started || _input.IsPointerCaptured)
+            return InputHandling.Pass;
+
+        return _input.TryCapturePointer()
+            ? InputHandling.Handled
+            : InputHandling.Pass;
+    }
+
     private BlockHit? RaycastSelection(Vector3D<double> position)
     {
         var ray = new Ray3D<double>(position, _camera.Forward);
@@ -146,7 +212,8 @@ public sealed class ClientGame
     /// </summary>
     public void Destroy()
     {
-        _input.MouseDelta -= _cameraController.ApplyMouseDelta;
-        _input.Destroy();
+        _input.StateInvalidated -= ClearInteractionRequests;
+        _gameContextActivation.Dispose();
+        ClearInteractionRequests();
     }
 }

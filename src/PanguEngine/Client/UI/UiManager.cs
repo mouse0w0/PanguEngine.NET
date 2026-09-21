@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Input;
 using PanguEngine.Registries;
@@ -11,7 +12,10 @@ namespace PanguEngine.Client.UI;
 public sealed class UiManager
 {
     private readonly int _ownerThreadId;
+    private readonly Queue<UiScreen?> _pendingScreens = [];
     private bool _isTransitioning;
+    private bool _isDestroying;
+    private bool _isInitializingHud;
     private bool _isUpdating;
     private bool _destroyed;
 
@@ -43,12 +47,14 @@ public sealed class UiManager
             throw new InvalidOperationException("HUD initialization requires frozen definitions.");
 
         _isTransitioning = true;
+        _isInitializingHud = true;
         try
         {
             Hud.Initialize(definitions);
         }
         finally
         {
+            _isInitializingHud = false;
             _isTransitioning = false;
         }
     }
@@ -56,73 +62,90 @@ public sealed class UiManager
     /// <summary>
     /// Opens a screen, replacing the current screen when necessary.
     /// </summary>
-    /// <remarks>Screen changes from update callbacks must be scheduled through the engine dispatcher.</remarks>
+    /// <remarks>
+    /// Reentrant requests execute in order after the current screen change and its notifications complete.
+    /// Deferred failures are reported by the outermost Open or Close call, and remaining requests are discarded.
+    /// Screen changes from update callbacks must be scheduled through the engine dispatcher.
+    /// </remarks>
     /// <param name="screen">The screen to open.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="screen"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the screen cannot be opened or the manager is performing another lifecycle,
-    /// update, layout, or drawing operation.
+    /// Thrown when the screen cannot be opened or the manager is initializing the HUD, shutting down,
+    /// updating, updating layout, or generating drawing commands.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
     public void Open(UiScreen screen)
     {
         ArgumentNullException.ThrowIfNull(screen);
-        VerifyAccess();
-        VerifyLifecycleOperation();
-        VerifyNotUpdating();
-        if (ReferenceEquals(screen, CurrentScreen))
-            return;
-
-        screen.VerifyCanOpen();
-        var oldScreen = CurrentScreen;
-        _isTransitioning = true;
-        try
-        {
-            if (oldScreen is not null)
-            {
-                oldScreen.VerifyCanClose();
-                CurrentScreen = null;
-                oldScreen.Close();
-            }
-
-            screen.Open();
-            CurrentScreen = screen;
-        }
-        finally
-        {
-            _isTransitioning = false;
-            NotifyCurrentScreenChanged(oldScreen);
-        }
+        RequestScreenChange(screen);
     }
 
     /// <summary>
     /// Closes the current screen.
     /// </summary>
-    /// <remarks>Screen changes from update callbacks must be scheduled through the engine dispatcher.</remarks>
+    /// <remarks>
+    /// Reentrant requests execute after the current screen change and its notifications complete.
+    /// A deferred close applies to the screen current when the request executes.
+    /// Deferred failures are reported by the outermost Open or Close call, and remaining requests are discarded.
+    /// Screen changes from update callbacks must be scheduled through the engine dispatcher.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the manager is performing another lifecycle, update, layout, or drawing operation.
+    /// Thrown when the manager is initializing the HUD, shutting down, updating, updating layout,
+    /// or generating drawing commands.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
-    public void Close()
+    public void Close() => RequestScreenChange(null);
+
+    private void RequestScreenChange(UiScreen? screen)
     {
         VerifyAccess();
-        VerifyLifecycleOperation();
+        VerifyLifecycleOperation(allowQueuedChange: true);
         VerifyNotUpdating();
-        var screen = CurrentScreen;
-        if (screen is null)
+        _pendingScreens.Enqueue(screen);
+        if (_isTransitioning)
             return;
 
-        screen.VerifyCanClose();
         _isTransitioning = true;
-        CurrentScreen = null;
         try
         {
-            screen.Close();
+            while (_pendingScreens.TryDequeue(out var nextScreen))
+            {
+                if (ReferenceEquals(nextScreen, CurrentScreen))
+                    continue;
+
+                nextScreen?.VerifyCanOpen();
+                var oldScreen = CurrentScreen;
+                oldScreen?.VerifyCanClose();
+                var errors = new List<Exception>();
+                try
+                {
+                    if (oldScreen is not null)
+                    {
+                        CurrentScreen = null;
+                        oldScreen.Close();
+                    }
+                    nextScreen?.Open();
+                    CurrentScreen = nextScreen;
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(exception);
+                }
+                try
+                {
+                    NotifyCurrentScreenChanged(oldScreen);
+                }
+                catch (Exception exception)
+                {
+                    errors.Add(exception);
+                }
+                ThrowLifecycleErrors(errors);
+            }
         }
         finally
         {
+            _pendingScreens.Clear();
             _isTransitioning = false;
-            NotifyCurrentScreenChanged(screen);
         }
     }
 
@@ -183,60 +206,61 @@ public sealed class UiManager
         var screen = CurrentScreen;
         CurrentScreen = null;
         _isTransitioning = true;
+        _isDestroying = true;
         try
         {
             screen?.Close();
             Hud.Close();
             _destroyed = true;
+            NotifyCurrentScreenChanged(screen);
         }
         finally
         {
+            _isDestroying = false;
             _isTransitioning = false;
         }
-
-        NotifyCurrentScreenChanged(screen);
     }
 
-    internal void ProcessPointerMoved(Point position)
+    internal bool ProcessPointerMoved(Point position)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessPointerMoved(position);
+        return CurrentScreen?.ProcessPointerMoved(position) ?? false;
     }
 
-    internal void ProcessPointerPressed(
+    internal bool ProcessPointerPressed(
         Point position,
         MouseButton button,
         KeyModifiers modifiers)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessPointerPressed(position, button, modifiers);
+        return CurrentScreen?.ProcessPointerPressed(position, button, modifiers) ?? false;
     }
 
-    internal void ProcessPointerReleased(
+    internal bool ProcessPointerReleased(
         Point position,
         MouseButton button,
         KeyModifiers modifiers)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessPointerReleased(position, button, modifiers);
+        return CurrentScreen?.ProcessPointerReleased(position, button, modifiers) ?? false;
     }
 
-    internal void ProcessPointerWheel(Point position, double deltaX, double deltaY)
+    internal bool ProcessPointerWheel(Point position, double deltaX, double deltaY)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessPointerWheel(position, deltaX, deltaY);
+        return CurrentScreen?.ProcessPointerWheel(position, deltaX, deltaY) ?? false;
     }
 
-    internal void ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
+    internal bool ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessKeyDown(key, modifiers, isRepeat);
+        return CurrentScreen?.ProcessKeyDown(key, modifiers, isRepeat) ?? false;
     }
 
-    internal void ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
+    internal bool ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
         VerifyAccess();
-        CurrentScreen?.ProcessKeyUp(key, modifiers, isRepeat);
+        return CurrentScreen?.ProcessKeyUp(key, modifiers, isRepeat) ?? false;
     }
 
     internal void ProcessTextInput(string text)
@@ -265,10 +289,10 @@ public sealed class UiManager
             throw new InvalidOperationException("UI manager access requires its owner thread.");
     }
 
-    private void VerifyLifecycleOperation()
+    private void VerifyLifecycleOperation(bool allowQueuedChange = false)
     {
-        if (_isTransitioning)
-            throw new InvalidOperationException("The UI manager is already performing a lifecycle operation.");
+        if (_isTransitioning && (!allowQueuedChange || _isDestroying || _isInitializingHud))
+            throw new InvalidOperationException("The UI manager is already changing screens.");
         if (Hud.Screen.IsUpdatingLayout || Hud.Screen.IsDrawing)
         {
             throw new InvalidOperationException(
@@ -287,5 +311,13 @@ public sealed class UiManager
     {
         if (_isUpdating || Hud.Screen.IsUpdating || CurrentScreen?.IsUpdating == true)
             throw new InvalidOperationException("The UI manager cannot perform this operation during an update.");
+    }
+
+    private static void ThrowLifecycleErrors(List<Exception> errors)
+    {
+        if (errors.Count == 1)
+            ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        if (errors.Count > 1)
+            throw new AggregateException(errors);
     }
 }

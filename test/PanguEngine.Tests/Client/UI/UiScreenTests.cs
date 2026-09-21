@@ -3,6 +3,7 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.Input;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -20,6 +21,7 @@ public sealed class UiScreenTests
 
         Assert.False(defaultScreen.PausesGame);
         Assert.False(defaultScreen.CloseOnEscape);
+        Assert.Same(BuiltinInputContexts.Ui, defaultScreen.InputContext);
         Assert.True(configuredScreen.PausesGame);
         Assert.True(configuredScreen.CloseOnEscape);
     }
@@ -31,6 +33,7 @@ public sealed class UiScreenTests
 
         Assert.True(screen.PausesGame);
         Assert.True(screen.CloseOnEscape);
+        Assert.Same(BuiltinInputContexts.Ui, screen.InputContext);
     }
 
     [Fact]

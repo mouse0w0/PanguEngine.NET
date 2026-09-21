@@ -19,4 +19,10 @@ public static class RegistryKeys
 
     /// <summary>The key of the HUD component registry.</summary>
     public static ResourceKey Hud { get; } = ResourceKey.Create("pangu", "hud");
+
+    /// <summary>The key of the input action registry.</summary>
+    public static ResourceKey InputAction { get; } = ResourceKey.Create("pangu", "input_action");
+
+    /// <summary>The key of the input context registry.</summary>
+    public static ResourceKey InputContext { get; } = ResourceKey.Create("pangu", "input_context");
 }

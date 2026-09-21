@@ -1,5 +1,6 @@
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.Input;
 
 namespace PanguEngine.Client.UI;
 
@@ -33,6 +34,11 @@ public partial class UiScreen
         _scale = UiSettings.DefaultScale;
         Root = root;
     }
+
+    /// <summary>
+    /// Gets the input context active while this screen is current.
+    /// </summary>
+    public InputContext InputContext { get; init; } = BuiltinInputContexts.Ui;
 
     /// <summary>
     /// Gets whether the game host pauses the game while this screen is current.

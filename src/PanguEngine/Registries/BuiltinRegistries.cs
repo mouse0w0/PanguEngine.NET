@@ -1,5 +1,6 @@
 using PanguEngine.Audio;
 using PanguEngine.Client.UI;
+using PanguEngine.Input;
 using PanguEngine.World.Blocks;
 
 namespace PanguEngine.Registries;
@@ -22,6 +23,12 @@ public static class BuiltinRegistries
     /// <summary>The built-in HUD component registry.</summary>
     public static readonly Registry<HudDefinition> Hud = new(RegistryKeys.Hud);
 
+    /// <summary>The built-in input action registry.</summary>
+    public static readonly Registry<InputAction> InputAction = new(RegistryKeys.InputAction);
+
+    /// <summary>The built-in input context registry.</summary>
+    public static readonly Registry<InputContext> InputContext = new(RegistryKeys.InputContext);
+
     /// <summary>
     /// Registers the built-in registries in the specified registry manager.
     /// </summary>
@@ -32,5 +39,7 @@ public static class BuiltinRegistries
         manager.Register(SoundCategory);
         manager.Register(SoundEvent);
         manager.Register(Hud);
+        manager.Register(InputAction);
+        manager.Register(InputContext);
     }
 }

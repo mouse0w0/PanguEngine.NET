@@ -100,7 +100,7 @@ public partial class UiScreen
         }
     }
 
-    internal void ProcessPointerMoved(Point position)
+    internal bool ProcessPointerMoved(Point position)
     {
         BeginInputRouting();
         try
@@ -108,7 +108,7 @@ public partial class UiScreen
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
             if (!IsScreenActive())
-                return;
+                return false;
 
             UiHitPathEntry[] path;
             var pressedTarget = _pressedTargets[GetButtonIndex(MouseButton.Left)];
@@ -117,13 +117,14 @@ public partial class UiScreen
             else
                 path = _hoverPath.ToArray();
             if (path.Length == 0)
-                return;
+                return false;
 
             var args = new UiPointerEventArgs(path[^1].Node, logicalPosition, path);
             Bubble(
                 path,
                 args,
                 static (node, eventArgs) => node.RaisePointerMoved(eventArgs));
+            return args.Handled;
         }
         finally
         {
@@ -131,7 +132,7 @@ public partial class UiScreen
         }
     }
 
-    internal void ProcessPointerPressed(
+    internal bool ProcessPointerPressed(
         Point position,
         MouseButton button,
         KeyModifiers modifiers)
@@ -142,7 +143,7 @@ public partial class UiScreen
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
             if (!IsScreenActive())
-                return;
+                return false;
 
             var path = _hoverPath.ToArray();
             var index = GetButtonIndex(button);
@@ -172,7 +173,7 @@ public partial class UiScreen
 
             _ = ChangeFocus(focusCandidate);
             if (!IsScreenActive() || path.Length == 0)
-                return;
+                return false;
 
             var args = new UiPointerButtonEventArgs(
                 path[^1].Node,
@@ -184,6 +185,7 @@ public partial class UiScreen
                 path,
                 args,
                 static (node, eventArgs) => node.RaisePointerPressed(eventArgs));
+            return args.Handled;
         }
         finally
         {
@@ -191,7 +193,7 @@ public partial class UiScreen
         }
     }
 
-    internal void ProcessPointerReleased(
+    internal bool ProcessPointerReleased(
         Point position,
         MouseButton button,
         KeyModifiers modifiers)
@@ -202,7 +204,7 @@ public partial class UiScreen
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
             if (!IsScreenActive())
-                return;
+                return false;
 
             var buttonIndex = GetButtonIndex(button);
             var target = _pressedTargets[buttonIndex];
@@ -217,11 +219,11 @@ public partial class UiScreen
             }
 
             if (target is null || !IsActive(target))
-                return;
+                return false;
 
             var path = BuildPathForNode(target, logicalPosition);
             if (path.Count == 0)
-                return;
+                return false;
 
             var args = new UiPointerButtonEventArgs(
                 target,
@@ -233,13 +235,14 @@ public partial class UiScreen
                 path,
                 args,
                 static (node, eventArgs) => node.RaisePointerReleased(eventArgs));
+            var handled = args.Handled;
 
             if (!IsScreenActive() || !IsActive(target))
-                return;
+                return handled;
 
             var currentPath = BuildHitPath(logicalPosition);
             if (currentPath.Count == 0 || !ReferenceEquals(currentPath[^1].Node, target))
-                return;
+                return handled;
 
             var pointerClickedArgs = new UiPointerButtonEventArgs(
                 target,
@@ -251,6 +254,7 @@ public partial class UiScreen
                 currentPath,
                 pointerClickedArgs,
                 static (node, eventArgs) => node.RaisePointerClicked(eventArgs));
+            return handled || pointerClickedArgs.Handled;
         }
         finally
         {
@@ -258,7 +262,7 @@ public partial class UiScreen
         }
     }
 
-    internal void ProcessPointerWheel(Point position, double deltaX, double deltaY)
+    internal bool ProcessPointerWheel(Point position, double deltaX, double deltaY)
     {
         BeginInputRouting(deltaX, deltaY);
         try
@@ -266,7 +270,7 @@ public partial class UiScreen
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
             if (!IsScreenActive() || _hoverPath.Count == 0)
-                return;
+                return false;
 
             var path = _hoverPath.ToArray();
             var args = new UiPointerWheelEventArgs(
@@ -279,6 +283,7 @@ public partial class UiScreen
                 path,
                 args,
                 static (node, eventArgs) => node.RaisePointerWheel(eventArgs));
+            return args.Handled;
         }
         finally
         {
@@ -286,19 +291,19 @@ public partial class UiScreen
         }
     }
 
-    internal void ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
+    internal bool ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
-        ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyDown(eventArgs));
+        return ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyDown(eventArgs));
     }
 
-    internal void ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
+    internal bool ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
-        ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyUp(eventArgs));
+        return ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyUp(eventArgs));
     }
 
     internal void ProcessTextInput(string text)
     {
-        ProcessFocusedInput(
+        _ = ProcessFocusedInput(
             source => new UiTextInputEventArgs(source, text),
             static (node, eventArgs) => node.RaiseTextInput(eventArgs));
     }
@@ -542,18 +547,18 @@ public partial class UiScreen
         return path;
     }
 
-    private void ProcessKey(
+    private bool ProcessKey(
         Key key,
         KeyModifiers modifiers,
         bool isRepeat,
         Action<UiNode, UiKeyEventArgs> raise)
     {
-        ProcessFocusedInput(
+        return ProcessFocusedInput(
             source => new UiKeyEventArgs(source, key, modifiers, isRepeat),
             raise);
     }
 
-    private void ProcessFocusedInput<TEventArgs>(
+    private bool ProcessFocusedInput<TEventArgs>(
         Func<UiNode, TEventArgs> createEventArgs,
         Action<UiNode, TEventArgs> raise)
         where TEventArgs : UiInputEventArgs
@@ -564,11 +569,11 @@ public partial class UiScreen
             if (FocusedNode is not null && !CanRetainFocus(FocusedNode))
                 _ = ChangeFocus(null);
             if (!IsScreenActive() || FocusedNode is null)
-                return;
+                return false;
 
             var path = BuildPathForNode(FocusedNode, _pointerPosition);
             if (path.Count == 0)
-                return;
+                return false;
 
             var nodes = path.Select(static entry => entry.Node).ToArray();
             var args = createEventArgs(FocusedNode);
@@ -582,6 +587,7 @@ public partial class UiScreen
                 if (args.Handled)
                     break;
             }
+            return args.Handled;
         }
         finally
         {
