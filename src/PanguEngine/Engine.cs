@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using PanguEngine.Audio;
+using PanguEngine.Client.UI;
 using PanguEngine.Events;
 using PanguEngine.Modding;
 using PanguEngine.Registries;
@@ -59,6 +60,7 @@ public static class Engine
         EventBus = new EventBus(ThrowingEventExceptionHandler.Instance);
         RegistryManager = new RegistryManager();
         BuiltinRegistries.Register(RegistryManager);
+        BuiltinHuds.Register(BuiltinRegistries.Hud);
         BuiltinBlocks.Register(BuiltinRegistries.Block);
         BuiltinSoundCategories.Register(BuiltinRegistries.SoundCategory);
         BuiltinSoundEvents.Register(BuiltinRegistries.SoundEvent);

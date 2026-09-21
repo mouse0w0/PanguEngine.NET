@@ -1,4 +1,5 @@
 using PanguEngine.Audio;
+using PanguEngine.Client.UI;
 using PanguEngine.World.Blocks;
 
 namespace PanguEngine.Registries;
@@ -18,6 +19,9 @@ public static class BuiltinRegistries
     /// <summary>The built-in sound event registry.</summary>
     public static readonly Registry<SoundEvent> SoundEvent = new(RegistryKeys.SoundEvent);
 
+    /// <summary>The built-in HUD component registry.</summary>
+    public static readonly Registry<HudDefinition> Hud = new(RegistryKeys.Hud);
+
     /// <summary>
     /// Registers the built-in registries in the specified registry manager.
     /// </summary>
@@ -27,5 +31,6 @@ public static class BuiltinRegistries
         manager.Register(Block);
         manager.Register(SoundCategory);
         manager.Register(SoundEvent);
+        manager.Register(Hud);
     }
 }

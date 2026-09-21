@@ -1,6 +1,6 @@
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Input;
-using System.Runtime.ExceptionServices;
+using PanguEngine.Registries;
 
 namespace PanguEngine.Client.UI;
 
@@ -33,6 +33,25 @@ public sealed class UiManager
     public UiScreen? CurrentScreen { get; private set; }
 
     internal event Action<UiScreen?, UiScreen?>? CurrentScreenChanged;
+
+    internal void InitializeHud(IRegistry<HudDefinition> definitions)
+    {
+        VerifyAccess();
+        VerifyLifecycleOperation();
+        VerifyNotUpdating();
+        if (!definitions.IsFrozen)
+            throw new InvalidOperationException("HUD initialization requires frozen definitions.");
+
+        _isTransitioning = true;
+        try
+        {
+            Hud.Initialize(definitions);
+        }
+        finally
+        {
+            _isTransitioning = false;
+        }
+    }
 
     /// <summary>
     /// Opens a screen, replacing the current screen when necessary.
@@ -161,33 +180,13 @@ public sealed class UiManager
         VerifyAccess();
         VerifyLifecycleOperation();
         VerifyNotUpdating();
-        var errors = new List<Exception>();
         var screen = CurrentScreen;
         CurrentScreen = null;
         _isTransitioning = true;
         try
         {
-            if (screen is not null)
-            {
-                try
-                {
-                    screen.Close();
-                }
-                catch (Exception exception)
-                {
-                    AddLifecycleErrors(errors, exception);
-                }
-            }
-
-            try
-            {
-                Hud.Close();
-            }
-            catch (Exception exception)
-            {
-                AddLifecycleErrors(errors, exception);
-            }
-
+            screen?.Close();
+            Hud.Close();
             _destroyed = true;
         }
         finally
@@ -195,15 +194,7 @@ public sealed class UiManager
             _isTransitioning = false;
         }
 
-        try
-        {
-            NotifyCurrentScreenChanged(screen);
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-        ThrowLifecycleErrors(errors);
+        NotifyCurrentScreenChanged(screen);
     }
 
     internal void ProcessPointerMoved(Point position)
@@ -277,7 +268,7 @@ public sealed class UiManager
     private void VerifyLifecycleOperation()
     {
         if (_isTransitioning)
-            throw new InvalidOperationException("The UI manager is already changing screens.");
+            throw new InvalidOperationException("The UI manager is already performing a lifecycle operation.");
         if (Hud.Screen.IsUpdatingLayout || Hud.Screen.IsDrawing)
         {
             throw new InvalidOperationException(
@@ -296,22 +287,5 @@ public sealed class UiManager
     {
         if (_isUpdating || Hud.Screen.IsUpdating || CurrentScreen?.IsUpdating == true)
             throw new InvalidOperationException("The UI manager cannot perform this operation during an update.");
-    }
-
-    private static void ThrowLifecycleErrors(List<Exception> errors)
-    {
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
-    }
-
-    private static void AddLifecycleErrors(List<Exception> errors, Exception exception)
-    {
-        errors.AddRange(exception switch
-        {
-            AggregateException aggregate => aggregate.InnerExceptions,
-            _ => [exception]
-        });
     }
 }

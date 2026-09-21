@@ -16,4 +16,7 @@ public static class RegistryKeys
 
     /// <summary>The key of the sound event registry.</summary>
     public static ResourceKey SoundEvent { get; } = ResourceKey.Create("pangu", "sound_event");
+
+    /// <summary>The key of the HUD component registry.</summary>
+    public static ResourceKey Hud { get; } = ResourceKey.Create("pangu", "hud");
 }

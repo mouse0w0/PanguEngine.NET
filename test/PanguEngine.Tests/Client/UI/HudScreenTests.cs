@@ -3,75 +3,33 @@ using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Input;
+using PanguEngine.Registries;
 
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class HudScreenTests
 {
     [Fact]
-    public void ManagerCreatesHudWithBuiltInChildren()
+    public void PostedActionsCanChangeComponentChildren()
     {
         var manager = new UiManager();
 
         try
         {
-            var hud = manager.Hud;
-
-            Assert.Same(hud.Crosshair, Assert.Single(hud.Children));
-        }
-        finally
-        {
-            manager.Destroy();
-        }
-    }
-
-    [Fact]
-    public void HudChildrenCanBeExtendedAndPosted()
-    {
-        var manager = new UiManager();
-
-        try
-        {
-            var hud = manager.Hud;
+            var root = new Panel();
+            InitializeHud(manager, root);
             var panel = new Panel { Width = 10, Height = 10 };
-            var executed = false;
 
-            hud.Children.Add(panel);
-            hud.Post(() => executed = true);
+            manager.Hud.Post(() => root.Children.Add(panel));
 
-            Assert.Same(hud.Children[1], panel);
-            Assert.Same(hud.Crosshair.Parent, panel.Parent);
-            Assert.False(executed);
+            Assert.Empty(root.Children);
 
             manager.PrepareFrame(new Size(200, 100), 0);
 
-            Assert.True(executed);
-            Assert.Same(hud.Crosshair.Parent, panel.Parent);
-        }
-        finally
-        {
-            manager.Destroy();
-        }
-    }
-
-    [Fact]
-    public void RemovingBuiltInNodesKeepsStableReferences()
-    {
-        var manager = new UiManager();
-
-        try
-        {
-            var hud = manager.Hud;
-            var crosshair = hud.Crosshair;
-
-            hud.Children.Remove(crosshair);
-
-            Assert.Same(crosshair, hud.Crosshair);
-            Assert.Empty(hud.Children);
-
-            hud.Children.Add(crosshair);
-
-            Assert.Same(crosshair, hud.Children[0]);
+            Assert.Same(panel, Assert.Single(root.Children));
+            Assert.Same(root, panel.Parent);
+            Assert.Same(manager.Hud.Screen, panel.Screen);
+            Assert.True(panel.IsArrangeValid);
         }
         finally
         {
@@ -97,7 +55,7 @@ public sealed class HudScreenTests
 
         try
         {
-            manager.Hud.Children.Add(leaf);
+            InitializeHud(manager, leaf);
             manager.PrepareFrame(new Size(200, 100), 0);
 
             manager.ProcessPointerMoved(new Point(5, 5));
@@ -120,9 +78,8 @@ public sealed class HudScreenTests
         var manager = new UiManager();
         try
         {
-            manager.Hud.Children.Clear();
             manager.Hud.Screen.Scale = 2;
-            manager.Hud.Children.Add(new DrawingNode
+            InitializeHud(manager, new DrawingNode
             {
                 DrawAction = context =>
                 {
@@ -174,6 +131,11 @@ public sealed class HudScreenTests
         var manager = new UiManager();
         try
         {
+            InitializeHud(manager, new DrawingNode
+            {
+                DrawAction = context =>
+                    context.FillRectangle(new Rect(0, 0, 10, 10), new Color(255, 255, 255))
+            });
             var expected = new InvalidOperationException("screen drawing failed");
             manager.Open(new UiScreen(new DrawingNode
             {
@@ -190,7 +152,7 @@ public sealed class HudScreenTests
             var builder = new UiDrawBuilder();
             builder.Build(commands, 200, 100, false);
 
-            Assert.Equal(8, builder.RectangleCount);
+            Assert.Equal(1, builder.RectangleCount);
         }
         finally
         {
@@ -221,10 +183,9 @@ public sealed class HudScreenTests
                     context.FillRectangle(new Rect(0, 0, 10, 10), new Color(255, 0, 0));
                 }
             };
-            manager.Hud.Children.Clear();
             if (drawInHud)
             {
-                manager.Hud.Children.Add(node);
+                InitializeHud(manager, node);
             }
             else
             {
@@ -248,6 +209,18 @@ public sealed class HudScreenTests
         {
             manager.Destroy();
         }
+    }
+
+    private static void InitializeHud(UiManager manager, UiNode root)
+    {
+        var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
+        definitions.Register(ResourceKey.Create("test", "hud"), new HudDefinition(() => new TestHud(root)));
+        definitions.Freeze();
+        manager.InitializeHud(definitions);
+    }
+
+    private sealed class TestHud(UiNode root) : Hud(root)
+    {
     }
 
     private sealed class DrawingNode : UiNode

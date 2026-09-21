@@ -170,6 +170,7 @@ public sealed class ClientEngine
             "UI scale initialization requires a current monitor.");
         UiSettings.DefaultScale = monitor.ContentScale;
         Ui = new UiManager();
+        Ui.InitializeHud(Engine.RegistryManager.Get<HudDefinition>(RegistryKeys.Hud));
 
         Audio = new AudioSystem(
             Engine.ResourceManager,

@@ -2,6 +2,7 @@ using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Registries;
 using PanguEngine.Threading;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -22,12 +23,17 @@ public sealed class UiManagerTests
     public void CurrentScreenOperationsKeepHudMounted()
     {
         var manager = new UiManager();
+        var hudRoot = new TestNode();
+        var key = InitializeHud(manager, hudRoot);
         var screen = new UiScreen(new TestNode());
 
         manager.Open(screen);
         manager.PrepareFrame(new Size(200, 100), 0);
 
-        Assert.Same(manager.Hud.Crosshair, Assert.Single(manager.Hud.Children));
+        var hud = manager.Hud.Get(key);
+        Assert.Same(hudRoot, hud.Root);
+        Assert.Same(manager.Hud.Screen.Root, hudRoot.Parent);
+        Assert.Same(manager.Hud.Screen, hudRoot.Screen);
         Assert.Same(screen, manager.CurrentScreen);
 
         manager.Close();
@@ -38,10 +44,12 @@ public sealed class UiManagerTests
     public void UpdateLayoutsHudWhenCurrentScreenIsAbsent()
     {
         var manager = new UiManager();
+        var hudRoot = new TestNode { CoreDesiredSize = new Size(5, 5) };
+        var key = InitializeHud(manager, hudRoot);
 
         manager.PrepareFrame(new Size(200, 100), 0);
 
-        Assert.True(manager.Hud.Crosshair.IsArrangeValid);
+        Assert.True(manager.Hud.Get(key).Root.IsArrangeValid);
         manager.Destroy();
     }
 
@@ -248,7 +256,7 @@ public sealed class UiManagerTests
             MeasureAction = () => CaptureNestedOperationErrors(manager, errors),
             ArrangeAction = () => CaptureNestedOperationErrors(manager, errors)
         };
-        manager.Hud.Children.Add(node);
+        InitializeHud(manager, node);
 
         manager.PrepareFrame(new Size(20, 20), 0);
 
@@ -422,7 +430,6 @@ public sealed class UiManagerTests
         var queue = new EngineWorkQueue();
         var dispatcher = new EngineDispatcher(queue);
         var manager = new UiManager();
-        manager.Hud.Children.Clear();
         var events = new List<string>();
         var oldScreen = new RecordingUiScreen(new TestNode
         {
@@ -591,7 +598,7 @@ public sealed class UiManagerTests
     }
 
     [Fact]
-    public void DestroyPublishesFinalChangeAfterCloseFailure()
+    public void DestroyStopsBeforeHudAndNotificationWhenScreenCloseFails()
     {
         var manager = new UiManager();
         var expected = new InvalidOperationException("closing");
@@ -605,13 +612,11 @@ public sealed class UiManagerTests
         changes.Clear();
 
         var actual = Assert.Throws<InvalidOperationException>(manager.Destroy);
-        manager.Destroy();
 
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
-        var change = Assert.Single(changes);
-        Assert.Same(screen, change.Old);
-        Assert.Null(change.New);
+        Assert.True(manager.Hud.Screen.IsOpen());
+        Assert.Empty(changes);
     }
 
     [Fact]
@@ -662,7 +667,6 @@ public sealed class UiManagerTests
         var queue = new EngineWorkQueue();
         var dispatcher = new EngineDispatcher(queue);
         var manager = new UiManager();
-        manager.Hud.Children.Clear();
         var root = new Canvas();
         var leaf = new TestNode { Width = 20, Height = 20, DrawAction = DrawRectangle };
         root.Children.Add(leaf);
@@ -724,7 +728,19 @@ public sealed class UiManagerTests
     {
         var events = new List<string>();
         var manager = new UiManager();
-        manager.Hud.Children.Add(new TestNode { MeasureAction = () => events.Add("hud-layout") });
+        var hud = new RecordingHud(new TestNode { MeasureAction = () => events.Add("hud-layout") })
+        {
+            FixedAction = () => events.Add("hud-fixed"),
+            FrameAction = alpha =>
+            {
+                Assert.Equal(0.75, alpha);
+                events.Add("hud-frame");
+            }
+        };
+        var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
+        definitions.Register(ResourceKey.Create("test", "updates"), new HudDefinition(() => hud));
+        definitions.Freeze();
+        manager.InitializeHud(definitions);
         manager.Hud.Post(() => events.Add("hud-post"));
         var screen = new RecordingUiScreen(new TestNode { MeasureAction = () => events.Add("screen-layout") })
         {
@@ -739,25 +755,27 @@ public sealed class UiManagerTests
         screen.Post(() => events.Add("screen-post"));
 
         manager.Update();
-        Assert.Equal(["screen-fixed"], events);
+        Assert.Equal(["hud-fixed", "screen-fixed"], events);
         events.Clear();
         manager.PrepareFrame(new Size(100, 100), 0.75);
 
-        Assert.Equal(["hud-post", "hud-layout", "screen-post", "screen-frame", "screen-layout"], events);
+        Assert.Equal(["hud-post", "hud-frame", "hud-layout", "screen-post", "screen-frame", "screen-layout"], events);
         events.Clear();
         manager.PrepareFrame(new Size(100, 100), 0.75);
-        Assert.Equal(["screen-frame"], events);
+        Assert.Equal(["hud-frame", "screen-frame"], events);
         manager.Destroy();
     }
 
-    [Fact]
-    public async Task HudPostCanDispatchScreenOpening()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HudPostAndFrameCallbackCanDispatchScreenOpening(bool fromFrameCallback)
     {
         var queue = new EngineWorkQueue();
         var dispatcher = new EngineDispatcher(queue);
         var events = new List<string>();
         var manager = new UiManager();
-        manager.Hud.Children.Clear();
+        var hud = new RecordingHud(new TestNode());
         var screen = new RecordingUiScreen(new TestNode
         {
             CoreDesiredSize = new Size(10, 10),
@@ -765,19 +783,28 @@ public sealed class UiManagerTests
             DrawAction = DrawRectangle
         }) { FrameAction = _ => events.Add("screen-frame") };
         Task change = Task.CompletedTask;
-        manager.Hud.Post(() =>
+        void OpenScreen()
         {
-            events.Add("hud-post");
+            hud.FrameAction = null;
+            events.Add("hud-request");
             change = dispatcher.InvokeAsync(() =>
             {
                 manager.Open(screen);
                 screen.Post(() => events.Add("screen-post"));
             });
-        });
+        }
+        if (fromFrameCallback)
+            hud.FrameAction = _ => OpenScreen();
+        else
+            manager.Hud.Post(OpenScreen);
+        var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
+        definitions.Register(ResourceKey.Create("test", "opener"), new HudDefinition(() => hud));
+        definitions.Freeze();
+        manager.InitializeHud(definitions);
 
         manager.PrepareFrame(new Size(100, 100), 0);
 
-        Assert.Equal(["hud-post"], events);
+        Assert.Equal(["hud-request"], events);
         Assert.Null(manager.CurrentScreen);
         Assert.False(change.IsCompleted);
         Assert.False(screen.Root!.IsMeasureValid);
@@ -789,7 +816,7 @@ public sealed class UiManagerTests
         Assert.True(change.IsCompletedSuccessfully);
         manager.PrepareFrame(new Size(100, 100), 0);
 
-        Assert.Equal(["hud-post", "screen-post", "screen-frame", "layout"], events);
+        Assert.Equal(["hud-request", "screen-post", "screen-frame", "layout"], events);
         Assert.True(screen.Root!.IsArrangeValid);
         commands.Clear();
         manager.AppendDrawCommands(commands);
@@ -949,6 +976,16 @@ public sealed class UiManagerTests
         errors.Add(Record.Exception(() => manager.PrepareFrame(new Size(10, 10), 0)));
     }
 
+    private static ResourceKey InitializeHud(UiManager manager, UiNode root)
+    {
+        var key = ResourceKey.Create("test", "hud");
+        var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
+        definitions.Register(key, new HudDefinition(() => new RecordingHud(root)));
+        definitions.Freeze();
+        manager.InitializeHud(definitions);
+        return key;
+    }
+
     private static T RunOnBackgroundThread<T>(Func<T> action)
     {
         T result = default!;
@@ -1000,6 +1037,15 @@ public sealed class UiManagerTests
         }
 
         protected override void DrawCore(UiDrawingContext context) => DrawAction?.Invoke(context);
+    }
+
+    private sealed class RecordingHud(UiNode root) : Hud(root)
+    {
+        internal Action? FixedAction { get; init; }
+        internal Action<double>? FrameAction { get; set; }
+
+        protected override void OnFixedUpdate() => FixedAction?.Invoke();
+        protected override void OnFrameUpdate(double alpha) => FrameAction?.Invoke(alpha);
     }
 
     private sealed class RecordingUiScreen(UiNode? root = null) : UiScreen(root)

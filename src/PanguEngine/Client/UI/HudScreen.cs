@@ -1,33 +1,23 @@
+using System.Diagnostics.CodeAnalysis;
 using PanguEngine.Client.UI.Controls;
+using PanguEngine.Registries;
 
 namespace PanguEngine.Client.UI;
 
 /// <summary>
-/// Provides the persistent, non-interactive client HUD.
+/// Provides the persistent, non-interactive client HUD and hosts registered HUD components.
 /// </summary>
 public sealed class HudScreen
 {
-    private readonly UiScreen _screen;
     private readonly Panel _root;
-    private readonly Crosshair _crosshair;
+    private readonly Dictionary<ResourceKey, Hud> _hudsByKey = [];
+    private readonly List<Hud> _hudsInOrder = [];
 
     internal HudScreen()
     {
-        _crosshair = new Crosshair();
         _root = new Panel();
-        _root.Children.Add(_crosshair);
-        _screen = new UiScreen(_root);
+        Screen = new HudUiScreen(this, _root);
     }
-
-    /// <summary>
-    /// Gets the mutable direct children of the HUD root in drawing order.
-    /// </summary>
-    public UiNodeCollection Children => _root.Children;
-
-    /// <summary>
-    /// Gets the built-in configurable crosshair node.
-    /// </summary>
-    public Crosshair Crosshair => _crosshair;
 
     /// <summary>
     /// Posts a HUD tree operation to the client UI owner thread.
@@ -37,15 +27,91 @@ public sealed class HudScreen
     /// <exception cref="InvalidOperationException">
     /// Thrown when the HUD is not accepting posted actions.
     /// </exception>
-    public void Post(Action action) => _screen.Post(action);
+    public void Post(Action action) => Screen.Post(action);
 
-    internal UiScreen Screen => _screen;
+    /// <summary>
+    /// Gets a running HUD component by its registry key.
+    /// </summary>
+    /// <param name="key">The key of the HUD component.</param>
+    /// <returns>The running HUD component.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the HUD screen is closed or access is not on its owner thread.
+    /// </exception>
+    /// <exception cref="KeyNotFoundException">Thrown when no component with the key is running.</exception>
+    public Hud Get(ResourceKey key)
+    {
+        Screen.VerifyOwnerThread();
+        return _hudsByKey[key];
+    }
 
-    internal void Open() => _screen.Open();
+    /// <summary>
+    /// Attempts to get a running HUD component by its registry key.
+    /// </summary>
+    /// <param name="key">The key of the HUD component.</param>
+    /// <param name="hud">The running HUD component when found.</param>
+    /// <returns>Whether a component with the key is running.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the HUD screen is closed or access is not on its owner thread.
+    /// </exception>
+    public bool TryGet(ResourceKey key, [NotNullWhen(true)] out Hud? hud)
+    {
+        Screen.VerifyOwnerThread();
+        return _hudsByKey.TryGetValue(key, out hud);
+    }
 
-    internal void Update() => _screen.Update();
+    internal UiScreen Screen { get; }
 
-    internal void PrepareFrame(Size viewportSize, double alpha) => _screen.PrepareFrame(viewportSize, alpha);
+    internal void Open() => Screen.Open();
 
-    internal void Close() => _screen.Close();
+    internal void Initialize(IRegistry<HudDefinition> definitions)
+    {
+        foreach (var entry in definitions.Entries)
+            Accept(entry.Key, entry.Value.Create());
+    }
+
+    internal void Update() => Screen.Update();
+
+    internal void PrepareFrame(Size viewportSize, double alpha) => Screen.PrepareFrame(viewportSize, alpha);
+
+    internal void Close()
+    {
+        Screen.StopAcceptingPosts();
+        for (var index = _hudsInOrder.Count - 1; index >= 0; index--)
+            _hudsInOrder[index].DestroyHud();
+
+        Screen.Close();
+        _hudsByKey.Clear();
+        _hudsInOrder.Clear();
+    }
+
+    private void Accept(ResourceKey key, Hud hud)
+    {
+        if (hud is null)
+            throw new InvalidOperationException($"HUD factory for '{key}' returned null.");
+        if (hud.Root.Parent is not null || hud.Root.Screen is not null)
+            throw new InvalidOperationException($"HUD factory for '{key}' returned an already mounted root node.");
+
+        _hudsByKey.Add(key, hud);
+        _hudsInOrder.Add(hud);
+        _root.Children.Add(hud.Root);
+    }
+
+    private void DispatchFixedUpdate()
+    {
+        foreach (var hud in _hudsInOrder)
+            hud.UpdateFixed();
+    }
+
+    private void DispatchFrameUpdate(double alpha)
+    {
+        foreach (var hud in _hudsInOrder)
+            hud.UpdateFrame(alpha);
+    }
+
+    private sealed class HudUiScreen(HudScreen owner, Panel root) : UiScreen(root)
+    {
+        protected override void OnFixedUpdate() => owner.DispatchFixedUpdate();
+
+        protected override void OnFrameUpdate(double alpha) => owner.DispatchFrameUpdate(alpha);
+    }
 }

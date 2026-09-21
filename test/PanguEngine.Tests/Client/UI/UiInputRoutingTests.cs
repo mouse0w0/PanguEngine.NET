@@ -1268,7 +1268,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void DestroyCompletesAfterCleanupFailure()
+    public void DestroyStopsBeforeHudAfterInputCleanupFailure()
     {
         var manager = new UiManager();
         var root = new TestNode { Focusable = true };
@@ -1285,7 +1285,7 @@ public sealed class UiInputRoutingTests
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
         Assert.Same(screen, root.Screen);
-        Assert.Throws<ObjectDisposedException>(() => manager.PrepareFrame(new Size(20, 20), 0));
+        Assert.True(manager.Hud.Screen.IsOpen());
     }
 
     [Fact]
