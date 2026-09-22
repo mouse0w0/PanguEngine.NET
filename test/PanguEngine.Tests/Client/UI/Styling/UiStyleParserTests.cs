@@ -43,7 +43,10 @@ public sealed class UiStyleParserTests
         Assert.Equal("Button", rule.Selector.TypeName);
         Assert.Equal(new[] { "primary" }, rule.Selector.Classes);
         Assert.Equal("save", rule.Selector.Id);
-        Assert.Equal(UiPseudoStates.Hovered | UiPseudoStates.Focused, rule.Selector.States);
+        Assert.Equal(new[] { "focus", "hover" }, rule.Selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Same(UiPseudoClass.Focus, rule.Selector.PseudoClasses[0]);
+        Assert.Same(UiPseudoClass.Hover, rule.Selector.PseudoClasses[1]);
+        Assert.Equal("Button.primary#save:focus:hover", rule.Selector.SelectorText);
         Assert.Equal("menu.css", sheet.SourceName);
 
         var setters = rule.Bind(typeof(Button));
@@ -87,13 +90,14 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void UnqualifiedSelectorDeduplicatesClassesAndPseudoStates()
+    public void UnqualifiedSelectorDeduplicatesClassesAndPseudoClasses()
     {
         var selector = SingleRule(".danger.danger:hover:hover { }").Selector;
 
         Assert.Equal(".danger:hover", selector.SelectorText);
         Assert.Equal(new[] { "danger" }, selector.Classes);
-        Assert.Equal(UiPseudoStates.Hovered, selector.States);
+        Assert.Equal(new[] { "hover" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Same(UiPseudoClass.Hover, Assert.Single(selector.PseudoClasses));
         Assert.Equal(2, selector.ClassAndPseudoCount);
     }
 
@@ -185,12 +189,12 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void ParsesMultipleClassesPseudoStatesAndSingleId()
+    public void ParsesMultipleClassesPseudoClassesAndSingleId()
     {
         var rule = SingleRule("Button.a.b.c:hover:focus:disabled { }");
 
         Assert.Equal(new[] { "a", "b", "c" }, rule.Selector.Classes);
-        Assert.Equal(UiPseudoStates.Hovered | UiPseudoStates.Focused | UiPseudoStates.Disabled, rule.Selector.States);
+        Assert.Equal(new[] { "disabled", "focus", "hover" }, rule.Selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
         Assert.Null(rule.Selector.Id);
         Assert.Empty(rule.Setters);
     }
@@ -317,11 +321,36 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void UnknownPseudoStateReportsError()
+    public void UnknownPseudoClassIsAcceptedAsNamedCondition()
     {
-        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button:phantom { }"));
+        var selector = SingleRule("Button:phantom { }").Selector;
 
-        Assert.Equal(UiStyleParseError.UnknownPseudoState, error.Error);
+        Assert.Equal(new[] { "phantom" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Same(UiPseudoClass.Get("phantom"), Assert.Single(selector.PseudoClasses));
+        Assert.Equal("Button:phantom", selector.SelectorText);
+    }
+
+    [Fact]
+    public void PseudoClassNamesAreNormalizedDeduplicatedAndSortedByOrdinal()
+    {
+        var selector = SingleRule("Button:LOADING:Hover:loading:hover { }").Selector;
+
+        Assert.Equal(new[] { "hover", "loading" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Same(UiPseudoClass.Hover, selector.PseudoClasses[0]);
+        Assert.Same(UiPseudoClass.Get("loading"), selector.PseudoClasses[1]);
+        Assert.Equal("Button:hover:loading", selector.SelectorText);
+        Assert.Equal(2, selector.ClassAndPseudoCount);
+    }
+
+    [Theory]
+    [InlineData("Button:not(.primary) { }")]
+    [InlineData("Button:is(.primary) { }")]
+    [InlineData("Button:nth-child(2) { }")]
+    public void FunctionPseudoClassSyntaxIsRejected(string css)
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss(css));
+
+        Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
     }
 
     [Fact]

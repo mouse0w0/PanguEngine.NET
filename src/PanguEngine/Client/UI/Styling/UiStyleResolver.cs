@@ -12,7 +12,7 @@ internal sealed class UiStyleResolver
 
     private readonly List<RuleEntry> _rules;
     private readonly Lock _bindingSync = new();
-    private readonly Dictionary<Type, IReadOnlyList<DeclarationEntry>> _boundDeclarations = [];
+    private readonly Dictionary<Type, IReadOnlyList<BoundRuleEntry>> _boundRules = [];
 
     internal UiStyleResolver(
         IEnumerable<UiStyleSheet> baseStyleSheets,
@@ -52,26 +52,29 @@ internal sealed class UiStyleResolver
     {
         ArgumentNullException.ThrowIfNull(node);
         var winners = new Dictionary<(UiProperty Property, UiStyleEdge? Component), (CascadeKey Key, DeclarationEntry Entry)>();
-        foreach (var entry in GetBoundDeclarations(node))
+        foreach (var rule in GetBoundRules(node))
         {
-            if (!entry.Rule.Selector.MatchesConditions(node))
+            if (!rule.Selector.MatchesConditions(node))
                 continue;
-            var key = new CascadeKey(
-                entry.Origin,
-                entry.Rule.Selector.IdCount,
-                entry.Rule.Selector.ClassAndPseudoCount,
-                entry.TargetTypeDepth,
-                entry.SheetIndex,
-                entry.DeclarationIndex);
-            var component = (entry.Setter.Property, entry.Setter.Component);
-            if (winners.TryGetValue(component, out var current))
+            foreach (var entry in rule.Declarations)
             {
-                if (current.Key.CompareTo(key) < 0)
+                var key = new CascadeKey(
+                    entry.Origin,
+                    entry.Rule.Selector.IdCount,
+                    entry.Rule.Selector.ClassAndPseudoCount,
+                    entry.TargetTypeDepth,
+                    entry.SheetIndex,
+                    entry.DeclarationIndex);
+                var component = (entry.Setter.Property, entry.Setter.Component);
+                if (winners.TryGetValue(component, out var current))
+                {
+                    if (current.Key.CompareTo(key) < 0)
+                        winners[component] = (key, entry);
+                }
+                else
+                {
                     winners[component] = (key, entry);
-            }
-            else
-            {
-                winners[component] = (key, entry);
+                }
             }
         }
 
@@ -109,12 +112,12 @@ internal sealed class UiStyleResolver
         return new UiStyleSnapshot(values, sources);
     }
 
-    private IReadOnlyList<DeclarationEntry> GetBoundDeclarations(UiNode node)
+    private IReadOnlyList<BoundRuleEntry> GetBoundRules(UiNode node)
     {
         var nodeType = node.GetType();
         lock (_bindingSync)
         {
-            if (_boundDeclarations.TryGetValue(nodeType, out var cached))
+            if (_boundRules.TryGetValue(nodeType, out var cached))
                 return cached;
         }
 
@@ -122,10 +125,10 @@ internal sealed class UiStyleResolver
 
         lock (_bindingSync)
         {
-            if (_boundDeclarations.TryGetValue(nodeType, out var cached))
+            if (_boundRules.TryGetValue(nodeType, out var cached))
                 return cached;
 
-            var declarations = new List<DeclarationEntry>();
+            var rules = new List<BoundRuleEntry>();
             foreach (var entry in _rules)
             {
                 var targetType = entry.Rule.Selector.MatchTargetType(nodeType);
@@ -136,6 +139,7 @@ internal sealed class UiStyleResolver
                 var typeDepth = entry.Rule.Selector.HasTypeConstraint
                     ? UiStyleSelector.ComputeTargetTypeDepth(targetType)
                     : 0;
+                var declarations = new List<DeclarationEntry>();
                 foreach (var declaration in bound)
                 {
                     foreach (var setter in declaration.Setter.Expand())
@@ -152,12 +156,14 @@ internal sealed class UiStyleResolver
                             declaration.SourceLocation));
                     }
                 }
+                if (declarations.Count > 0)
+                    rules.Add(new BoundRuleEntry(entry.Rule.Selector, declarations.ToArray()));
             }
 
-            if (_boundDeclarations.TryGetValue(nodeType, out var published))
+            if (_boundRules.TryGetValue(nodeType, out var published))
                 return published;
-            var result = declarations.AsReadOnly();
-            _boundDeclarations.Add(nodeType, result);
+            var result = rules.AsReadOnly();
+            _boundRules.Add(nodeType, result);
             return result;
         }
     }
@@ -175,6 +181,10 @@ internal sealed class UiStyleResolver
         int RuleIndex,
         UiStyleRule Rule,
         int DeclarationIndex);
+
+    private readonly record struct BoundRuleEntry(
+        UiStyleSelector Selector,
+        DeclarationEntry[] Declarations);
 
     private readonly record struct DeclarationEntry(
         UiStyleOrigin Origin,

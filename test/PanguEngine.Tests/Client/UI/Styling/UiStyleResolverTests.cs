@@ -309,7 +309,7 @@ public sealed class UiStyleResolverTests
     }
 
     [Fact]
-    public void RequiredPseudoStatesMustAllBeActive()
+    public void RequiredPseudoClassesMustAllBeActive()
     {
         var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(".danger:hover:focus { background: #040404; }")]);
         var node = new Button();
@@ -322,6 +322,140 @@ public sealed class UiStyleResolverTests
 
         node.SetFocused(true);
         Assert.Equal(Brush(4), resolver.Resolve(node).GetValue(Region.BackgroundProperty));
+    }
+
+    [Fact]
+    public void CustomNamedPseudoClassMatchesOnlyWhileActive()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("PseudoHost:loading { opacity: 0.4; }")]);
+        var node = new PseudoHost();
+
+        Assert.Empty(resolver.Resolve(node).GetSources(UiNode.OpacityProperty));
+
+        node.Activate(UiPseudoClass.Get("loading"), true);
+        Assert.Equal(0.4, resolver.Resolve(node).GetValue(UiNode.OpacityProperty));
+
+        node.Activate(UiPseudoClass.Get("loading"), false);
+        Assert.Empty(resolver.Resolve(node).GetSources(UiNode.OpacityProperty));
+    }
+
+    [Fact]
+    public void MultiDeclarationRuleRechecksConditionsForEachNodeAndResolve()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""
+            Button.primary#target:hover { opacity: 0.5; background: #070707; opacity: 0.4; }
+            """)]);
+        var node = new Button { StyleId = "target" };
+        node.Classes.Add("primary");
+        AssertNoMatch(node);
+
+        node.SetHovered(true);
+        AssertMatch(node);
+
+        var other = new Button { StyleId = "target" };
+        other.Classes.Add("primary");
+        AssertNoMatch(other);
+        other.SetHovered(true);
+        AssertMatch(other);
+
+        node.StyleId = "other";
+        AssertNoMatch(node);
+        node.StyleId = "target";
+        node.Classes.Remove("primary");
+        AssertNoMatch(node);
+        node.Classes.Add("primary");
+        AssertMatch(node);
+        node.SetHovered(false);
+        AssertNoMatch(node);
+        AssertMatch(other);
+
+        void AssertNoMatch(Button button)
+        {
+            var snapshot = resolver.Resolve(button);
+            Assert.Equal(1d, snapshot.GetValue(UiNode.OpacityProperty));
+            Assert.Empty(snapshot.GetSources(UiNode.OpacityProperty));
+            Assert.Empty(snapshot.GetSources(Region.BackgroundProperty));
+        }
+
+        void AssertMatch(Button button)
+        {
+            var snapshot = resolver.Resolve(button);
+            Assert.Equal(0.4, snapshot.GetValue(UiNode.OpacityProperty));
+            Assert.Equal(Brush(7), snapshot.GetValue(Region.BackgroundProperty));
+            Assert.Equal(2, Assert.Single(snapshot.GetSources(UiNode.OpacityProperty)).DeclarationIndex);
+            Assert.Equal(1, Assert.Single(snapshot.GetSources(Region.BackgroundProperty)).DeclarationIndex);
+        }
+    }
+
+    [Fact]
+    public void MixedDeclarationsPreserveEdgeCascadeAndSourceOrderAcrossRules()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""
+            Button.absent { opacity: 0.1; }
+            Button.primary { padding: 1px 2px; opacity: 0.4; padding-left: 9px; }
+            Button.primary { padding-top: 7px; opacity: 0.6; }
+            """, "grouped.css")]);
+        var node = new Button();
+        node.Classes.Add("primary");
+
+        var snapshot = resolver.Resolve(node);
+
+        Assert.Equal(new Thickness(9, 7, 2, 1), snapshot.GetValue(Region.PaddingProperty));
+        Assert.Equal(0.6, snapshot.GetValue(UiNode.OpacityProperty));
+        var sources = snapshot.GetSources(Region.PaddingProperty);
+        Assert.Equal(4, sources.Count);
+        foreach (var source in sources)
+        {
+            Assert.Equal(UiStyleOrigin.Author, source.Origin);
+            Assert.Equal("grouped.css", source.SheetSourceName);
+            Assert.NotNull(source.SourceLocation);
+            Assert.Equal(source.Component == UiStyleEdge.Top ? 2 : 1, source.RuleIndex);
+            Assert.Equal(source.Component switch
+            {
+                UiStyleEdge.Top => 4,
+                UiStyleEdge.Left => 3,
+                _ => 1
+            }, source.DeclarationIndex);
+            Assert.Equal(source.Component switch
+            {
+                UiStyleEdge.Top => "padding-top",
+                UiStyleEdge.Left => "padding-left",
+                _ => "padding"
+            }, source.CssPropertyName);
+        }
+        var opacitySource = Assert.Single(snapshot.GetSources(UiNode.OpacityProperty));
+        Assert.Equal(2, opacitySource.RuleIndex);
+        Assert.Equal(5, opacitySource.DeclarationIndex);
+    }
+
+    [Fact]
+    public void ReusedRuleRetainsEachOccurrenceInCascadeAndSources()
+    {
+        var rule = Rule(UiStyleSelector.For<Button>(),
+            UiStyleSetter.Create(UiNode.OpacityProperty, 0.4),
+            UiStyleSetter.Create(Region.BackgroundProperty, Brush(7)));
+        var sheet = Sheet(rule, rule);
+        var resolver = new UiStyleResolver([sheet], [sheet, sheet]);
+
+        var snapshot = resolver.Resolve(new Button());
+
+        Assert.Equal(0.4, snapshot.GetValue(UiNode.OpacityProperty));
+        Assert.Equal(Brush(7), snapshot.GetValue(Region.BackgroundProperty));
+        var opacitySource = Assert.Single(snapshot.GetSources(UiNode.OpacityProperty));
+        var backgroundSource = Assert.Single(snapshot.GetSources(Region.BackgroundProperty));
+        Assert.Equal(2, opacitySource.DeclarationIndex);
+        Assert.Equal(3, backgroundSource.DeclarationIndex);
+        foreach (var source in new[] { opacitySource, backgroundSource })
+        {
+            Assert.Equal(UiStyleOrigin.Author, source.Origin);
+            Assert.Equal(1, source.SheetIndex);
+            Assert.Equal(1, source.RuleIndex);
+        }
+    }
+
+    private sealed class PseudoHost : UiNode
+    {
+        internal void Activate(UiPseudoClass pseudoClass, bool active) => SetPseudoClass(pseudoClass, active);
     }
 
     private static UiStyleSheet Sheet(params UiStyleRule[] rules) => new(rules);

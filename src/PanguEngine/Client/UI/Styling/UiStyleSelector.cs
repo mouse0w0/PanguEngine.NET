@@ -12,7 +12,7 @@ public sealed class UiStyleSelector
         string typeName,
         IReadOnlyList<string> classes,
         string? id,
-        UiPseudoStates states,
+        IReadOnlyList<UiPseudoClass> pseudoClasses,
         int idCount,
         int classAndPseudoCount,
         int targetTypeDepth)
@@ -21,7 +21,7 @@ public sealed class UiStyleSelector
         TypeName = typeName;
         Classes = classes;
         Id = id;
-        States = states;
+        PseudoClasses = pseudoClasses;
         IdCount = idCount;
         ClassAndPseudoCount = classAndPseudoCount;
         TargetTypeDepth = targetTypeDepth;
@@ -42,13 +42,16 @@ public sealed class UiStyleSelector
     /// <summary>Gets the required id, or null when no id is required.</summary>
     public string? Id { get; }
 
-    /// <summary>Gets the required pseudo states; every bit must be active to match.</summary>
-    public UiPseudoStates States { get; }
+    /// <summary>
+    /// Gets the required pseudo-class identifiers, deduplicated and sorted by ordinal name;
+    /// every identifier must be active on the node to match.
+    /// </summary>
+    public IReadOnlyList<UiPseudoClass> PseudoClasses { get; }
 
     /// <summary>Gets the id contribution to specificity: 0 or 1.</summary>
     public int IdCount { get; }
 
-    /// <summary>Gets the combined class and pseudo-state contribution to specificity.</summary>
+    /// <summary>Gets the combined class and pseudo-class contribution to specificity.</summary>
     public int ClassAndPseudoCount { get; }
 
     /// <summary>
@@ -64,30 +67,32 @@ public sealed class UiStyleSelector
     /// <typeparam name="TNode">The target node type.</typeparam>
     /// <param name="classes">The optional required classes; duplicates are removed and invalid identifiers rejected.</param>
     /// <param name="id">The optional required id; must be an ASCII identifier.</param>
-    /// <param name="states">The optional required pseudo states.</param>
+    /// <param name="pseudoClasses">
+    /// The optional required pseudo-class identifiers; the input is copied, deduplicated and sorted by name.
+    /// </param>
     /// <returns>A new immutable selector.</returns>
     /// <exception cref="ArgumentException">Thrown when a class or id is not a valid ASCII identifier.</exception>
     public static UiStyleSelector For<TNode>(
         IEnumerable<string>? classes = null,
         string? id = null,
-        UiPseudoStates states = UiPseudoStates.None)
+        IEnumerable<UiPseudoClass>? pseudoClasses = null)
         where TNode : UiNode
-        => Create(typeof(TNode), typeof(TNode).Name, classes, id, states);
+        => Create(typeof(TNode), typeof(TNode).Name, classes, id, pseudoClasses);
 
     /// <summary>Creates a CSS selector with an element name or <c>*</c> for any element type.</summary>
     internal static UiStyleSelector Create(
         string typeName,
         IEnumerable<string>? classes,
         string? id,
-        UiPseudoStates states) =>
-        Create(null, typeName, classes, id, states);
+        IEnumerable<UiPseudoClass>? pseudoClasses) =>
+        Create(null, typeName, classes, id, pseudoClasses);
 
     private static UiStyleSelector Create(
         Type? targetType,
         string typeName,
         IEnumerable<string>? classes,
         string? id,
-        UiPseudoStates states)
+        IEnumerable<UiPseudoClass>? pseudoClasses)
     {
         if (id is not null)
             UiStyleIdentifier.ThrowIfInvalid(id, nameof(id));
@@ -103,20 +108,31 @@ public sealed class UiStyleSelector
             }
         }
 
+        var orderedPseudoClasses = new List<UiPseudoClass>();
+        if (pseudoClasses is not null)
+        {
+            foreach (var pseudoClass in pseudoClasses)
+            {
+                if (!orderedPseudoClasses.Contains(pseudoClass))
+                    orderedPseudoClasses.Add(pseudoClass);
+            }
+        }
+
+        orderedPseudoClasses.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Name, right.Name));
         return new UiStyleSelector(
             targetType,
             typeName,
             normalizedClasses.AsReadOnly(),
             id,
-            states,
+            orderedPseudoClasses.AsReadOnly(),
             id is null ? 0 : 1,
-            normalizedClasses.Count + CountBits(states),
+            normalizedClasses.Count + orderedPseudoClasses.Count,
             targetType is null ? 0 : ComputeTargetTypeDepth(targetType));
     }
 
     /// <summary>Determines whether the supplied node matches this selector.</summary>
     /// <param name="node">The node to test.</param>
-    /// <returns>true when the node type, classes, id and pseudo states all satisfy the selector.</returns>
+    /// <returns>true when the node type, classes, id and pseudo classes all satisfy the selector.</returns>
     public bool Matches(UiNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -142,10 +158,9 @@ public sealed class UiStyleSelector
                 return false;
         }
 
-        if (States != UiPseudoStates.None)
+        foreach (var pseudoClass in PseudoClasses)
         {
-            var active = node.GetStylePseudoStatesForMatching();
-            if ((States & active) != States)
+            if (!node.HasPseudoClass(pseudoClass))
                 return false;
         }
 
@@ -158,35 +173,17 @@ public sealed class UiStyleSelector
         get
         {
             var builder = new StringBuilder();
-            if (HasTypeConstraint || (Classes.Count == 0 && Id is null && States == UiPseudoStates.None))
+            if (HasTypeConstraint || (Classes.Count == 0 && Id is null && PseudoClasses.Count == 0))
                 builder.Append(TypeName);
             foreach (var className in Classes)
                 builder.Append('.').Append(className);
             if (Id is not null)
                 builder.Append('#').Append(Id);
-            if (States != UiPseudoStates.None)
-            {
-                if (States.HasFlag(UiPseudoStates.Hovered)) builder.Append(":hover");
-                if (States.HasFlag(UiPseudoStates.Focused)) builder.Append(":focus");
-                if (States.HasFlag(UiPseudoStates.Pressed)) builder.Append(":pressed");
-                if (States.HasFlag(UiPseudoStates.Disabled)) builder.Append(":disabled");
-            }
+            foreach (var pseudoClass in PseudoClasses)
+                builder.Append(':').Append(pseudoClass.Name);
 
             return builder.ToString();
         }
-    }
-
-    private static int CountBits(UiPseudoStates states)
-    {
-        var value = (int)states;
-        var count = 0;
-        while (value != 0)
-        {
-            count += value & 1;
-            value >>= 1;
-        }
-
-        return count;
     }
 
     internal static int ComputeTargetTypeDepth(Type type)

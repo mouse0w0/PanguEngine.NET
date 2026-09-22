@@ -350,7 +350,7 @@ public sealed class UiCssBindingTests
     }
 
     [Fact]
-    public void NestedPseudoStateBindingReusesAlreadyPublishedCache()
+    public void PreparatoryPseudoClassWriteIsRejectedWithoutRollingBackEnabledOrPollutingPseudoSet()
     {
         var screen = new UiScreen();
         screen.SetStyleSheets([UiStyleSheet.Parse("PseudoMutationNode { mutating-value: 2; }")]);
@@ -359,13 +359,21 @@ public sealed class UiCssBindingTests
         PseudoMutationNode.Conversions = 0;
         try
         {
-            screen.Root = node;
+            var error = Assert.Throws<UiStyleParseException>(() => screen.Root = node);
 
+            Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
             Assert.False(node.IsEnabled);
+            Assert.False(node.HasPseudoClass(UiPseudoClass.Disabled));
+            Assert.Equal(1, PseudoMutationNode.Conversions);
+
             Assert.Equal(2d, node.GetValue(PseudoMutationNode.ValueProperty));
             Assert.Equal(2, PseudoMutationNode.Conversions);
             Assert.Equal(2d, screen.StyleResolver.Resolve(node).GetValue(PseudoMutationNode.ValueProperty));
             Assert.Equal(2, PseudoMutationNode.Conversions);
+
+            node.IsEnabled = true;
+            node.IsEnabled = false;
+            Assert.True(node.HasPseudoClass(UiPseudoClass.Disabled));
         }
         finally
         {

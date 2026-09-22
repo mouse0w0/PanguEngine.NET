@@ -8,6 +8,9 @@ namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiNodeStylingTests
 {
+    private static readonly UiPseudoClass Loading = UiPseudoClass.Get("loading");
+    private static readonly UiPseudoClass Phantom = UiPseudoClass.Get("phantom");
+
     [Fact]
     public void LocalValueMasksStyleAndClearRestoresStyle()
     {
@@ -96,11 +99,11 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void PseudoStateChangeTriggersStyleRefresh()
+    public void PseudoClassChangeTriggersStyleRefresh()
     {
         var button = new Button();
         ApplyTheme(button, Rule(
-            UiStyleSelector.For<Button>(states: UiPseudoStates.Hovered),
+            UiStyleSelector.For<Button>(pseudoClasses: [UiPseudoClass.Hover]),
             Setter(Region.BackgroundProperty, Brush(9))));
 
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
@@ -308,18 +311,24 @@ public sealed class UiNodeStylingTests
     [Fact]
     public void StyleSelectorInputsRollbackWhenResolutionFails()
     {
-        var node = new FailingStyleNode { StyleId = "old" };
+        var node = new GuardedStyleNode { StyleId = "old" };
         var sheet = new UiStyleSheet([
             Rule(
-                UiStyleSelector.For<FailingStyleNode>(states: UiPseudoStates.Disabled),
-                Setter(UiNode.OpacityProperty, 0.5))
+                UiStyleSelector.For<GuardedStyleNode>(),
+                Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
         ]);
         var screen = new UiScreen(node);
         screen.SetStyleSheets([sheet]);
-        node.ThrowOnStyleStateRead = true;
-
-        Assert.Throws<InvalidOperationException>(() => node.StyleId = "new");
-        Assert.Throws<InvalidOperationException>(() => node.Classes.Add("primary"));
+        GuardedValue.ThrowOnCompare = true;
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => node.StyleId = "new");
+            Assert.Throws<InvalidOperationException>(() => node.Classes.Add("primary"));
+        }
+        finally
+        {
+            GuardedValue.ThrowOnCompare = false;
+        }
 
         Assert.Equal("old", node.StyleId);
         Assert.Empty(node.Classes);
@@ -335,8 +344,8 @@ public sealed class UiNodeStylingTests
         var screen = new UiScreen(node);
         screen.SetStyleSheets([new UiStyleSheet([
             Rule(
-                UiStyleSelector.For<ReentrantPreparationNode>(states: UiPseudoStates.Hovered),
-                Setter(UiNode.OpacityProperty, 0.5))
+                UiStyleSelector.For<ReentrantPreparationNode>(),
+                Setter(ReentrantPreparationNode.ValueProperty, new GuardedValue(0.5)))
         ])]);
         node.OnRead = () =>
         {
@@ -345,8 +354,15 @@ public sealed class UiNodeStylingTests
             else
                 node.Classes.Add("nested");
         };
-
-        Assert.Throws<InvalidOperationException>(() => node.Classes.Add("outer"));
+        GuardedValue.OnCompare = () => node.OnRead?.Invoke();
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => node.Classes.Add("outer"));
+        }
+        finally
+        {
+            GuardedValue.OnCompare = null;
+        }
 
         Assert.Empty(node.Classes);
         Assert.Equal("original", node.StyleId);
@@ -381,11 +397,11 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void PseudoStateHandlerExceptionStillUpdatesStyle()
+    public void PseudoClassHandlerExceptionStillUpdatesStyle()
     {
         var button = new Button();
         ApplyTheme(button, Rule(
-            UiStyleSelector.For<Button>(states: UiPseudoStates.Hovered),
+            UiStyleSelector.For<Button>(pseudoClasses: [UiPseudoClass.Hover]),
             Setter(Region.BackgroundProperty, Brush(9))));
         button.PropertyChanged += (_, e) =>
         {
@@ -399,34 +415,199 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void PseudoStateResolutionFailureClearsSnapshotForRetry()
+    public void PseudoClassPreparationFailureKeepsOldSnapshotAndRetriesOnlyOnRealChange()
     {
-        var node = new FailOncePseudoNode();
+        var node = new GuardedStyleNode();
         ApplyTheme(
             node,
             Rule(
-                UiStyleSelector.For<FailOncePseudoNode>(states: UiPseudoStates.Hovered),
-                Setter(UiNode.OpacityProperty, 0.5)));
-        node.FailNextStyleStateRead = true;
+                UiStyleSelector.For<GuardedStyleNode>(),
+                Setter(UiNode.OpacityProperty, 0.25)),
+            Rule(
+                UiStyleSelector.For<GuardedStyleNode>(),
+                Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5))),
+            Rule(
+                UiStyleSelector.For<GuardedStyleNode>(pseudoClasses: [UiPseudoClass.Hover]),
+                Setter(UiNode.OpacityProperty, 0.75)));
 
-        Assert.Throws<InvalidOperationException>(() => node.SetHovered(true));
+        Assert.Equal(0.25, node.Opacity);
+        var hoverEvents = 0;
+        var hoverSubscriptions = 0;
+        node.PropertyChanged += (_, args) =>
+        {
+            if (ReferenceEquals(args.Property, UiNode.IsHoveredProperty))
+                hoverEvents++;
+        };
+        using var subscription = node.Subscribe(UiNode.IsHoveredProperty, (_, _) => hoverSubscriptions++);
+        GuardedValue.ThrowOnCompare = true;
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => node.SetHovered(true));
+        }
+        finally
+        {
+            GuardedValue.ThrowOnCompare = false;
+        }
 
-        Assert.Equal(0.5, node.Opacity);
+        Assert.True(node.HasPseudoClass(UiPseudoClass.Hover));
+        Assert.Equal(0.25, node.Opacity);
+        Assert.Equal(0, hoverEvents);
+        Assert.Equal(0, hoverSubscriptions);
+
+        node.SetHovered(true);
+        Assert.Equal(0.25, node.Opacity);
+
+        node.SetHovered(false);
+        Assert.Equal(0.25, node.Opacity);
+        node.SetHovered(true);
+        Assert.Equal(0.75, node.Opacity);
     }
 
     [Fact]
-    public void CustomControlCanRefreshExtendedPseudoState()
+    public void CustomControlCanActivateNamedPseudoClass()
     {
         var control = new CustomStateControl();
         ApplyTheme(
             control,
             Rule(
-                UiStyleSelector.For<CustomStateControl>(states: UiPseudoStates.Pressed),
+                UiStyleSelector.For<CustomStateControl>(pseudoClasses: [Loading]),
                 Setter(Region.BackgroundProperty, Brush(6))));
 
-        control.SetCustomPressed(true);
+        control.SetLoading(true);
 
+        Assert.True(control.HasPseudoClass(Loading));
         Assert.Equal(Brush(6), control.Background);
+
+        control.SetLoading(false);
+
+        Assert.False(control.HasPseudoClass(Loading));
+        Assert.NotEqual(Brush(6), control.Background);
+    }
+
+    [Fact]
+    public void NamedPseudoClassChangeTriggersStyleRefresh()
+    {
+        var host = new PseudoClassHost();
+        ApplyTheme(
+            host,
+            Rule(
+                UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                Setter(UiNode.OpacityProperty, 0.4)));
+
+        Assert.Equal(1d, host.Opacity);
+
+        host.Set(Loading, true);
+        Assert.Equal(0.4, host.Opacity);
+
+        host.Set(Loading, false);
+        Assert.Equal(1d, host.Opacity);
+    }
+
+    [Fact]
+    public void NamedPseudoClassCombinationRequiresAllNamesAndSupportsWithdrawal()
+    {
+        var host = new PseudoClassHost();
+        ApplyTheme(
+            host,
+            Rule(
+                UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [UiPseudoClass.Hover, Loading]),
+                Setter(UiNode.OpacityProperty, 0.4)));
+
+        host.Set(UiPseudoClass.Hover, true);
+        Assert.Equal(1d, host.Opacity);
+
+        host.Set(Loading, true);
+        Assert.Equal(0.4, host.Opacity);
+
+        host.Set(UiPseudoClass.Hover, false);
+        Assert.Equal(1d, host.Opacity);
+    }
+
+    [Fact]
+    public void PseudoClassStyleNotificationFailureKeepsCommittedSnapshot()
+    {
+        var host = new PseudoClassHost();
+        ApplyTheme(host, Rule(
+            UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+            Setter(UiNode.OpacityProperty, 0.4)));
+        var expected = new InvalidOperationException("style notification failed");
+        var notifications = 0;
+        host.PropertyChanged += (_, e) =>
+        {
+            if (!ReferenceEquals(e.Property, UiNode.OpacityProperty))
+                return;
+            notifications++;
+            throw expected;
+        };
+
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => host.Set(Loading, true)));
+        Assert.True(host.IsActive(Loading));
+        Assert.Equal(0.4, host.Opacity);
+        Assert.Single(host.GetStyleValueSources(UiNode.OpacityProperty));
+
+        host.Set(Loading, true);
+        Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void NamedPseudoClassIsCaseInsensitiveAndDeduplicated()
+    {
+        var host = new PseudoClassHost();
+        ApplyTheme(
+            host,
+            Rule(
+                UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                Setter(UiNode.OpacityProperty, 0.4)));
+
+        var refreshes = 0;
+        host.PropertyChanged += (_, e) =>
+            refreshes += ReferenceEquals(e.Property, UiNode.OpacityProperty) ? 1 : 0;
+
+        host.Set(UiPseudoClass.Get("LOADING"), true);
+        Assert.Equal(0.4, host.Opacity);
+
+        host.Set(Loading, true);
+        Assert.Equal(1, refreshes);
+    }
+
+    [Fact]
+    public void SameNamedPseudoClassValueIsANoOp()
+    {
+        var host = new PseudoClassHost();
+        ApplyTheme(
+            host,
+            Rule(
+                UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                Setter(UiNode.OpacityProperty, 0.4)));
+
+        var refreshes = 0;
+        host.PropertyChanged += (_, e) =>
+            refreshes += ReferenceEquals(e.Property, UiNode.OpacityProperty) ? 1 : 0;
+
+        host.Set(Loading, false);
+        Assert.Equal(0, refreshes);
+
+        host.Set(Loading, true);
+        Assert.Equal(1, refreshes);
+
+        host.Set(Loading, true);
+        Assert.Equal(1, refreshes);
+    }
+
+    [Fact]
+    public void UnknownNamedPseudoClassIsLegalAndMatchesOnlyWhenActive()
+    {
+        var host = new PseudoClassHost();
+        ApplyTheme(
+            host,
+            Rule(
+                UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [Phantom]),
+                Setter(UiNode.OpacityProperty, 0.4)));
+
+        Assert.Equal(1d, host.Opacity);
+
+        host.Set(Phantom, true);
+        Assert.Equal(0.4, host.Opacity);
     }
 
     [Fact]
@@ -459,6 +640,72 @@ public sealed class UiNodeStylingTests
         Assert.Equal("save", button.StyleId);
         Assert.DoesNotContain("wide", button.Classes);
         screen.Close();
+    }
+
+    [Fact]
+    public void OpenScreenPseudoClassInputsRejectWrongThreadButAllowNoOps()
+    {
+        var host = new PseudoClassHost();
+        var screen = new UiScreen(host);
+        screen.Open();
+        Exception? wrongThreadError = null;
+        Exception? noOpError = null;
+        var thread = new Thread(() =>
+        {
+            wrongThreadError = Record.Exception(() => host.Set(Loading, true));
+            noOpError = Record.Exception(() => host.Set(Loading, false));
+        });
+
+        thread.Start();
+        thread.Join();
+
+        Assert.IsType<InvalidOperationException>(wrongThreadError);
+        Assert.Null(noOpError);
+        Assert.False(host.IsActive(Loading));
+        screen.Close();
+    }
+
+    [Fact]
+    public void PseudoClassInputsCannotChangeDuringLayoutOrDrawing()
+    {
+        var node = new StyleMutationNode();
+        var screen = new UiScreen(node);
+        Exception? layoutError = null;
+        Exception? drawingError = null;
+        node.MeasureAction = () => layoutError = Record.Exception(() => node.Set(Loading, true));
+        node.DrawAction = () => drawingError = Record.Exception(() => node.Set(Loading, true));
+        screen.Open();
+
+        screen.PrepareFrame(new Size(20, 20), 0);
+        _ = screen.CreateDrawCommandList();
+
+        Assert.IsType<InvalidOperationException>(layoutError);
+        Assert.IsType<InvalidOperationException>(drawingError);
+        Assert.False(node.IsActive(Loading));
+        screen.Close();
+    }
+
+    [Fact]
+    public void PseudoClassInputsAreRejectedDuringStyleSheetApplicationNotification()
+    {
+        var host = new PseudoClassHost();
+        var screen = new UiScreen(host);
+        screen.SetStyleSheets([new UiStyleSheet([
+            Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.3))
+        ])]);
+        Exception? error = null;
+        host.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Property, UiNode.OpacityProperty))
+                error = Record.Exception(() => host.Set(Loading, true));
+        };
+
+        screen.SetStyleSheets([new UiStyleSheet([
+            Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.8))
+        ])]);
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.False(host.IsActive(Loading));
     }
 
     [Fact]
@@ -542,29 +789,6 @@ public sealed class UiNodeStylingTests
 
     private static Brush Brush(byte r, byte g, byte b) => new SolidColorBrush(r, g, b);
 
-    private sealed class FailingStyleNode : UiNode
-    {
-        internal bool ThrowOnStyleStateRead { get; set; }
-
-        protected override UiPseudoStates GetStylePseudoStates()
-        {
-            if (ThrowOnStyleStateRead)
-                throw new InvalidOperationException("style state failed");
-            return base.GetStylePseudoStates();
-        }
-    }
-
-    private sealed class ReentrantPreparationNode : UiNode
-    {
-        internal Action? OnRead { get; set; }
-
-        protected override UiPseudoStates GetStylePseudoStates()
-        {
-            OnRead?.Invoke();
-            return base.GetStylePseudoStates();
-        }
-    }
-
     private sealed class EquatableNode : UiNode
     {
         internal static readonly UiProperty<EquatableValue> ValueProperty =
@@ -581,42 +805,53 @@ public sealed class UiNodeStylingTests
         private int Value => value;
     }
 
-    private sealed class FailOncePseudoNode : UiNode
+    private class PseudoClassHost : UiNode
     {
-        internal bool FailNextStyleStateRead { get; set; }
+        internal void Set(UiPseudoClass pseudoClass, bool active) => SetPseudoClass(pseudoClass, active);
 
-        protected override UiPseudoStates GetStylePseudoStates()
+        internal bool IsActive(UiPseudoClass pseudoClass) => HasPseudoClass(pseudoClass);
+    }
+
+    private sealed class GuardedValue(double number) : IEquatable<GuardedValue>
+    {
+        internal static bool ThrowOnCompare;
+        internal static Action? OnCompare;
+
+        internal double Number => number;
+
+        public bool Equals(GuardedValue? other)
         {
-            if (FailNextStyleStateRead)
-            {
-                FailNextStyleStateRead = false;
-                throw new InvalidOperationException("style state failed once");
-            }
-
-            return base.GetStylePseudoStates();
+            OnCompare?.Invoke();
+            if (ThrowOnCompare)
+                throw new InvalidOperationException("guarded value comparison failed");
+            return other is not null && number.Equals(other.Number);
         }
+
+        public override bool Equals(object? obj) => obj is GuardedValue other && Equals(other);
+
+        public override int GetHashCode() => number.GetHashCode();
+    }
+
+    private sealed class GuardedStyleNode : UiNode
+    {
+        internal static readonly UiProperty<GuardedValue> ValueProperty =
+            UiProperty.Register<GuardedStyleNode, GuardedValue>("Value", new GuardedValue(0));
+    }
+
+    private sealed class ReentrantPreparationNode : UiNode
+    {
+        internal static readonly UiProperty<GuardedValue> ValueProperty =
+            UiProperty.Register<ReentrantPreparationNode, GuardedValue>("Value", new GuardedValue(0));
+
+        internal Action? OnRead { get; set; }
     }
 
     private sealed class CustomStateControl : Control
     {
-        private bool _customPressed;
-
-        internal void SetCustomPressed(bool value)
-        {
-            _customPressed = value;
-            RefreshStylePseudoStates();
-        }
-
-        protected override UiPseudoStates GetStylePseudoStates()
-        {
-            var states = base.GetStylePseudoStates();
-            if (_customPressed)
-                states |= UiPseudoStates.Pressed;
-            return states;
-        }
+        internal void SetLoading(bool value) => SetPseudoClass(Loading, value);
     }
 
-    private sealed class StyleMutationNode : UiNode
+    private sealed class StyleMutationNode : PseudoClassHost
     {
         internal Action? MeasureAction { get; set; }
         internal Action? DrawAction { get; set; }

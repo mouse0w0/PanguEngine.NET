@@ -1302,12 +1302,18 @@ public sealed class UiScreenTests
         var screen = new UiScreen(node);
         var sheets = new[] { new UiStyleSheet([
             new UiStyleRule(
-                UiStyleSelector.For<UiNode>(states: UiPseudoStates.Disabled),
-                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])
+                UiStyleSelector.For<ThrowingStyleNode>(),
+                [UiStyleSetter.Create(ThrowingStyleNode.ValueProperty, new GuardedValue(0.5))])
         ]) };
-        node.ThrowOnStyleStateRead = true;
-
-        Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets(sheets));
+        GuardedValue.FailNextComparison = true;
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets(sheets));
+        }
+        finally
+        {
+            GuardedValue.FailNextComparison = false;
+        }
 
         Assert.Same(UiStyleResolver.Default, screen.StyleResolver);
         Assert.Equal(1, node.Opacity);
@@ -1376,14 +1382,14 @@ public sealed class UiScreenTests
         var sourceSheets = new[] { new UiStyleSheet([
             new UiStyleRule(
                 UiStyleSelector.For<FailOnceStyleNode>(),
-                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, 1)])
+                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(1))])
         ]) };
         var targetSheets = new[] { new UiStyleSheet([
             new UiStyleRule(
                 UiStyleSelector.For<FailOnceStyleNode>(),
-                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, 2)]),
+                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(2))]),
             new UiStyleRule(
-                UiStyleSelector.For<FailOnceStyleNode>(states: UiPseudoStates.Disabled),
+                UiStyleSelector.For<FailOnceStyleNode>(pseudoClasses: [UiPseudoClass.Disabled]),
                 [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])
         ]) };
         var source = new UiScreen(node);
@@ -1394,15 +1400,21 @@ public sealed class UiScreenTests
         target.Open();
         source.PrepareFrame(new Size(20, 20), 0);
         Assert.True(node.Focus());
-        Assert.Equal(1, node.Value);
-        node.FailNextStyleStateRead = true;
-
-        Assert.Throws<InvalidOperationException>(() => target.Root = node);
+        Assert.Equal(1d, node.Value);
+        GuardedValue.FailNextComparison = true;
+        try
+        {
+            Assert.Throws<InvalidOperationException>(() => target.Root = node);
+        }
+        finally
+        {
+            GuardedValue.FailNextComparison = false;
+        }
 
         Assert.Null(source.Root);
         Assert.Same(target, node.Screen);
         Assert.False(node.IsFocused);
-        Assert.Equal(2, node.Value);
+        Assert.Equal(2d, node.Value);
         target.Close();
         source.Close();
     }
@@ -1473,34 +1485,36 @@ public sealed class UiScreenTests
 
     private sealed class ThrowingStyleNode : UiNode
     {
-        internal bool ThrowOnStyleStateRead { get; set; }
-
-        protected override UiPseudoStates GetStylePseudoStates()
-        {
-            if (ThrowOnStyleStateRead)
-                throw new InvalidOperationException("style state failed");
-            return base.GetStylePseudoStates();
-        }
+        internal static readonly UiProperty<GuardedValue> ValueProperty =
+            UiProperty.Register<ThrowingStyleNode, GuardedValue>("Value", new GuardedValue(0));
     }
 
     private sealed class FailOnceStyleNode : UiNode
     {
-        internal static readonly UiProperty<int> ValueProperty =
-            UiProperty.Register<FailOnceStyleNode, int>("Value");
+        internal static readonly UiProperty<GuardedValue> ValueProperty =
+            UiProperty.Register<FailOnceStyleNode, GuardedValue>("Value", new GuardedValue(0));
 
-        internal bool FailNextStyleStateRead { get; set; }
+        internal double Value => GetValue(ValueProperty).Number;
+    }
 
-        internal int Value => GetValue(ValueProperty);
+    private sealed class GuardedValue(double number) : IEquatable<GuardedValue>
+    {
+        internal static bool FailNextComparison;
 
-        protected override UiPseudoStates GetStylePseudoStates()
+        internal double Number => number;
+
+        public bool Equals(GuardedValue? other)
         {
-            if (FailNextStyleStateRead)
+            if (FailNextComparison)
             {
-                FailNextStyleStateRead = false;
-                throw new InvalidOperationException("style state failed once");
+                FailNextComparison = false;
+                throw new InvalidOperationException("guarded value comparison failed");
             }
-
-            return base.GetStylePseudoStates();
+            return other is not null && number.Equals(other.Number);
         }
+
+        public override bool Equals(object? obj) => obj is GuardedValue other && Equals(other);
+
+        public override int GetHashCode() => number.GetHashCode();
     }
 }

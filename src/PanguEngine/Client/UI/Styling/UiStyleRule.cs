@@ -13,7 +13,7 @@ public sealed class UiStyleRule
     /// <param name="sourceLocation">The optional source location for parsed rules.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="selector"/> or <paramref name="setters"/> is null.</exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when a setter targets an incompatible or input-invalidating property, or a pseudo-state rule sets a layout property.
+    /// Thrown when a setter targets an incompatible or input-invalidating property, or a pseudo-class rule sets a layout property.
     /// </exception>
     public UiStyleRule(UiStyleSelector selector, IEnumerable<UiStyleSetter> setters, UiStyleSourceLocation? sourceLocation = null)
     {
@@ -26,7 +26,7 @@ public sealed class UiStyleRule
         var ordered = new List<UiStyleSetter>();
         foreach (var setter in setters)
         {
-            ValidateSetter(selector.TargetType, selector.States, setter);
+            ValidateSetter(selector.TargetType, selector.PseudoClasses.Count != 0, setter);
             for (var i = 0; i < ordered.Count; i++)
             {
                 if (ReferenceEquals(ordered[i].Property, setter.Property) && ordered[i].Component == setter.Component)
@@ -106,7 +106,7 @@ public sealed class UiStyleRule
             {
                 try
                 {
-                    ValidateSetter(targetType, Selector.States, setter);
+                    ValidateSetter(targetType, Selector.PseudoClasses.Count != 0, setter);
                     foreach (var component in setter.Expand())
                     {
                         if (!components.Add((component.Property, component.Component)))
@@ -131,7 +131,7 @@ public sealed class UiStyleRule
         Exception? innerException = null) =>
         new(error, location.SourceName, location.Line, location.Column, location.Length, innerException);
 
-    private static void ValidateSetter(Type? targetType, UiPseudoStates states, UiStyleSetter setter)
+    private static void ValidateSetter(Type? targetType, bool hasPseudoClasses, UiStyleSetter setter)
     {
         if (setter.Property.IsReadOnly)
             throw new ArgumentException(
@@ -141,12 +141,12 @@ public sealed class UiStyleRule
         if (setter.Property.Invalidation.HasFlag(UiPropertyInvalidation.Input))
             throw new ArgumentException(
                 $"Property '{setter.Property.Name}' invalidates input and cannot be styled.", nameof(setter));
-        if (states != UiPseudoStates.None &&
+        if (hasPseudoClasses &&
             (setter.Property.Invalidation.HasFlag(UiPropertyInvalidation.Measure) ||
              setter.Property.Invalidation.HasFlag(UiPropertyInvalidation.Arrange)))
         {
             throw new ArgumentException(
-                $"Property '{setter.Property.Name}' invalidates layout and cannot be set by a pseudo-state rule.",
+                $"Property '{setter.Property.Name}' invalidates layout and cannot be set by a pseudo-class rule.",
                 nameof(setter));
         }
     }

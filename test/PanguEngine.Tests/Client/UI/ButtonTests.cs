@@ -471,7 +471,7 @@ public sealed class ButtonTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void DisabledStyleWinsWhenOtherPseudoStatesRemainActive(bool danger)
+    public void DisabledStyleWinsWhenOtherPseudoClassesRemainActive(bool danger)
     {
         var button = new Button();
         if (danger)

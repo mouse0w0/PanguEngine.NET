@@ -90,7 +90,7 @@ internal static class UiStyleParser
             var classes = new List<string>();
             string? id = null;
             var idCount = 0;
-            var states = UiPseudoStates.None;
+            var pseudoClasses = new List<UiPseudoClass>();
 
             while (true)
             {
@@ -115,12 +115,7 @@ internal static class UiStyleParser
                 else if (c == ':')
                 {
                     Advance();
-                    var pseudoStart = GetMark();
-                    var pseudoName = ReadIdentifier();
-                    var mapped = MapPseudoState(pseudoName);
-                    if (mapped is null)
-                        throw Error(UiStyleParseError.UnknownPseudoState, pseudoStart, pseudoName.Length);
-                    states |= mapped.Value;
+                    pseudoClasses.Add(UiPseudoClass.Get(ReadIdentifier()));
                 }
                 else
                 {
@@ -135,7 +130,7 @@ internal static class UiStyleParser
                 throw Error(UiStyleParseError.InvalidSyntax, braceStart, 1);
             Advance();
 
-            var selector = UiStyleSelector.Create(typeName, classes, id, states);
+            var selector = UiStyleSelector.Create(typeName, classes, id, pseudoClasses);
             var declarations = new List<UiStyleRule.CssDeclaration>();
             while (true)
             {
@@ -323,15 +318,5 @@ internal static class UiStyleParser
 
         private static bool IsIdentifierPart(char c) =>
             char.IsAsciiLetterOrDigit(c) || c == '_' || c == '-';
-
-        private static UiPseudoStates? MapPseudoState(string name)
-        {
-            if (string.Equals(name, "hover", StringComparison.OrdinalIgnoreCase)) return UiPseudoStates.Hovered;
-            if (string.Equals(name, "focus", StringComparison.OrdinalIgnoreCase)) return UiPseudoStates.Focused;
-            if (string.Equals(name, "pressed", StringComparison.OrdinalIgnoreCase)) return UiPseudoStates.Pressed;
-            if (string.Equals(name, "disabled", StringComparison.OrdinalIgnoreCase)) return UiPseudoStates.Disabled;
-            return null;
-        }
-
     }
 }

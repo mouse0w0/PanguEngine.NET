@@ -10,7 +10,8 @@ public abstract class Control : Region
     private static readonly UiPropertyKey<bool> IsPressedPropertyKey =
         UiProperty.RegisterReadOnly<Control, bool>(
             nameof(IsPressed),
-            invalidation: UiPropertyInvalidation.Render);
+            invalidation: UiPropertyInvalidation.Render,
+            onChanged: static (node, _, _) => ((Control)node).RefreshPressedPseudoClass());
 
     /// <summary>
     /// Identifies the <see cref="IsPressed"/> property.
@@ -42,11 +43,16 @@ public abstract class Control : Region
             ClearValue(IsPressedPropertyKey);
     }
 
-    /// <inheritdoc />
-    protected override UiPseudoStates GetStylePseudoStates()
+    /// <summary>
+    /// Gets whether any input source currently activates the built-in pressed pseudo class.
+    /// </summary>
+    protected virtual bool IsPressedPseudoClassActive => IsPressed;
+
+    /// <summary>
+    /// Refreshes the built-in pressed pseudo class from <see cref="IsPressedPseudoClassActive"/>.
+    /// </summary>
+    protected void RefreshPressedPseudoClass()
     {
-        var states = base.GetStylePseudoStates();
-        if (IsPressed) states |= UiPseudoStates.Pressed;
-        return states;
+        SetPseudoClass(UiPseudoClass.Pressed, IsPressedPseudoClassActive);
     }
 }

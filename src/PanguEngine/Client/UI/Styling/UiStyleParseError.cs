@@ -14,9 +14,6 @@ public enum UiStyleParseError
     /// <summary>A block comment was not terminated before the end of input.</summary>
     UnterminatedComment,
 
-    /// <summary>A selector referenced a pseudo state that is not built in.</summary>
-    UnknownPseudoState,
-
     /// <summary>A selector specified more than one id.</summary>
     DuplicateId,
 

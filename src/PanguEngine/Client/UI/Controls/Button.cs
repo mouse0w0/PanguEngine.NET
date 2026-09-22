@@ -334,13 +334,7 @@ public sealed class Button : Control
     }
 
     /// <inheritdoc />
-    protected override UiPseudoStates GetStylePseudoStates()
-    {
-        var states = base.GetStylePseudoStates();
-        if (_spaceKeyDown)
-            states |= UiPseudoStates.Pressed;
-        return states;
-    }
+    protected override bool IsPressedPseudoClassActive => IsPressed || _spaceKeyDown;
 
     private void SynchronizeText()
     {
@@ -431,7 +425,7 @@ public sealed class Button : Control
         if (_spaceKeyDown == value)
             return;
         _spaceKeyDown = value;
-        RefreshStylePseudoStates();
+        RefreshPressedPseudoClass();
     }
 
     private static void ArrangeCentered(UiNode child, Rect contentBounds)

@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI.Input;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
 
@@ -7,12 +8,14 @@ public abstract partial class UiNode
     private static readonly UiPropertyKey<bool> IsHoveredPropertyKey =
         UiProperty.RegisterReadOnly<UiNode, bool>(
             nameof(IsHovered),
-            invalidation: UiPropertyInvalidation.Render);
+            invalidation: UiPropertyInvalidation.Render,
+            onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.Hover, node.IsHovered));
 
     private static readonly UiPropertyKey<bool> IsFocusedPropertyKey =
         UiProperty.RegisterReadOnly<UiNode, bool>(
             nameof(IsFocused),
-            invalidation: UiPropertyInvalidation.Render);
+            invalidation: UiPropertyInvalidation.Render,
+            onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.Focus, node.IsFocused));
 
     /// <summary>
     /// Identifies the <see cref="Focusable"/> property.
@@ -38,7 +41,8 @@ public abstract partial class UiNode
         UiProperty.Register<UiNode, bool>(
             nameof(IsEnabled),
             true,
-            UiPropertyInvalidation.Input | UiPropertyInvalidation.Render);
+            UiPropertyInvalidation.Input | UiPropertyInvalidation.Render,
+            onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.Disabled, !node.IsEnabled));
 
     /// <summary>
     /// Identifies the <see cref="IsHovered"/> property.

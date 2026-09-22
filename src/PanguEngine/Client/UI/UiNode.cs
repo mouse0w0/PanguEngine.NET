@@ -144,63 +144,62 @@ public abstract partial class UiNode
     }
 
     /// <summary>
-    /// Raises a property change through the node notification pipeline.
+    /// Raises node notifications after the property's internal callback has completed.
     /// </summary>
     /// <param name="eventArgs">The property change data.</param>
     protected virtual void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs)
     {
         ArgumentNullException.ThrowIfNull(eventArgs);
+        ApplyPropertyInvalidation(eventArgs.Property);
+
+        var globalHandler = PropertyChanged;
+        var propertySubscriptions = BeginSubscriptionNotification(eventArgs.Property);
+        try
+        {
+            globalHandler?.Invoke(this, eventArgs);
+            NotifySubscriptions(eventArgs, propertySubscriptions);
+        }
+        finally
+        {
+            EndSubscriptionNotification(propertySubscriptions);
+        }
+    }
+
+    private void RaisePropertyChanged<T>(UiProperty<T> property, T oldValue, T newValue)
+    {
+        var eventArgs = new UiPropertyChangedEventArgs<T>(property, oldValue, newValue);
         List<Exception>? errors = null;
-        var isPseudoState = IsPseudoStateProperty(eventArgs.Property);
-        if (isPseudoState)
-            errors = [];
         if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) &&
             eventArgs is UiPropertyChangedEventArgs<bool> { NewValue: false })
         {
-            errors ??= [];
             try
             {
                 Screen?.CommitAndNotifyInputStateAfterNodeDisabled(this);
             }
             catch (Exception exception)
             {
+                errors = [];
                 AddErrors(errors, exception);
             }
         }
 
         try
         {
-            ApplyPropertyInvalidation(eventArgs.Property);
-
-            var globalHandler = PropertyChanged;
-            var propertySubscriptions = BeginSubscriptionNotification(eventArgs.Property);
-
-            try
-            {
-                globalHandler?.Invoke(this, eventArgs);
-                NotifySubscriptions(eventArgs, propertySubscriptions);
-            }
-            finally
-            {
-                EndSubscriptionNotification(propertySubscriptions);
-            }
+            property.RaiseChanged(this, oldValue, newValue);
         }
         catch (Exception exception) when (errors is not null)
         {
             AddErrors(errors, exception);
+            throw new AggregateException(errors);
         }
 
-        if (isPseudoState)
+        try
         {
-            try
-            {
-                RecomputeStyle();
-            }
-            catch (Exception exception)
-            {
-                errors ??= [];
-                AddErrors(errors, exception);
-            }
+            OnPropertyChanged(eventArgs);
+        }
+        catch (Exception exception) when (errors is not null)
+        {
+            AddErrors(errors, exception);
         }
 
         if (errors is null || errors.Count == 0)
@@ -229,7 +228,7 @@ public abstract partial class UiNode
         if (EqualityComparer<T>.Default.Equals(oldValue, value))
             return;
 
-        OnPropertyChanged(new UiPropertyChangedEventArgs<T>(property, oldValue, value));
+        RaisePropertyChanged(property, oldValue, value);
     }
 
     private void ClearValueCore<T>(UiProperty<T> property)
@@ -242,7 +241,7 @@ public abstract partial class UiNode
         if (EqualityComparer<T>.Default.Equals(oldValue, newValue))
             return;
 
-        OnPropertyChanged(new UiPropertyChangedEventArgs<T>(property, oldValue, newValue));
+        RaisePropertyChanged(property, oldValue, newValue);
     }
 
     private static void AddErrors(List<Exception> errors, Exception exception)

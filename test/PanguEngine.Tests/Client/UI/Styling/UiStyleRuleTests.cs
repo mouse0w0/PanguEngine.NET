@@ -14,18 +14,33 @@ public sealed class UiStyleRuleTests
         var selector = UiStyleSelector.For<Button>(
             classes,
             "save",
-            UiPseudoStates.Hovered | UiPseudoStates.Focused);
+            new[] { UiPseudoClass.Get("Hover"), UiPseudoClass.Focus, UiPseudoClass.Get("hover") });
 
         Assert.Equal(new[] { "primary", "wide" }, selector.Classes);
         Assert.Equal("save", selector.Id);
-        Assert.Equal(UiPseudoStates.Hovered | UiPseudoStates.Focused, selector.States);
+        Assert.Equal(new[] { "focus", "hover" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Same(UiPseudoClass.Focus, selector.PseudoClasses[0]);
+        Assert.Same(UiPseudoClass.Hover, selector.PseudoClasses[1]);
         Assert.Equal((1, 4), (selector.IdCount, selector.ClassAndPseudoCount));
+    }
+
+    [Fact]
+    public void SelectorCopiesPseudoClassesAndDoesNotExposeCallerCollection()
+    {
+        var pseudoClasses = new List<UiPseudoClass> { UiPseudoClass.Get("Hover") };
+        var selector = UiStyleSelector.For<Button>(pseudoClasses: pseudoClasses);
+
+        pseudoClasses.Add(UiPseudoClass.Focus);
+
+        Assert.Same(UiPseudoClass.Hover, Assert.Single(selector.PseudoClasses));
+        Assert.Throws<NotSupportedException>(() =>
+            ((IList<UiPseudoClass>)selector.PseudoClasses).Add(UiPseudoClass.Get("loading")));
     }
 
     [Fact]
     public void StatefulRuleRejectsLayoutSetter()
     {
-        var selector = UiStyleSelector.For<Button>(states: UiPseudoStates.Hovered);
+        var selector = UiStyleSelector.For<Button>(pseudoClasses: [UiPseudoClass.Hover]);
         var setter = UiStyleSetter.Create(Region.PaddingProperty, new Thickness(8));
 
         Assert.Throws<ArgumentException>(() => new UiStyleRule(selector, [setter]));

@@ -1,5 +1,4 @@
 using System.Runtime.ExceptionServices;
-using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
@@ -7,6 +6,7 @@ namespace PanguEngine.Client.UI;
 public abstract partial class UiNode
 {
     private UiStyleSnapshot? _styleSnapshot;
+    private List<UiPseudoClass>? _pseudoClasses;
     private bool _isStyleRecomputing;
     private bool _hasPendingStyleRecompute;
     private bool _isResolvingStyle;
@@ -33,21 +33,42 @@ public abstract partial class UiNode
     /// <summary>Gets the read-only collection of style classes applied to this node.</summary>
     public UiStyleClassCollection Classes { get; }
 
-    /// <summary>Reports the currently active framework pseudo states used for style matching.</summary>
-    /// <returns>The composable pseudo states active on this node.</returns>
-    /// <remarks>Custom controls may override this to expose additional built-in states while preserving framework semantics.</remarks>
-    protected virtual UiPseudoStates GetStylePseudoStates()
+    /// <summary>Adds or removes an active built-in or custom pseudo class used for style matching.</summary>
+    /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
+    /// <param name="active">Whether the pseudo class should be active on this node.</param>
+    /// <remarks>
+    /// The collection only changes when the requested membership differs,
+    /// and a no-op does not request a style recompute. A pseudo class
+    /// mirrors real control state, so a style preparation failure does not roll back the updated collection.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the node resolves its styles or the owning screen does not allow style input changes.
+    /// </exception>
+    protected void SetPseudoClass(UiPseudoClass pseudoClass, bool active)
     {
-        var states = UiPseudoStates.None;
-        if (IsHovered) states |= UiPseudoStates.Hovered;
-        if (IsFocused) states |= UiPseudoStates.Focused;
-        if (!IsEnabled) states |= UiPseudoStates.Disabled;
-        return states;
+        if (active)
+        {
+            if (_pseudoClasses is not null && _pseudoClasses.Contains(pseudoClass))
+                return;
+        }
+        else if (_pseudoClasses is null || !_pseudoClasses.Contains(pseudoClass))
+        {
+            return;
+        }
+
+        VerifyStyleInputAccess();
+        if (active)
+            (_pseudoClasses ??= []).Add(pseudoClass);
+        else
+            _pseudoClasses!.Remove(pseudoClass);
+
+        RecomputeStyle();
     }
 
-    /// <summary>Resolves the pseudo states for selector matching without exposing the protected extension point.</summary>
-    /// <returns>The composable pseudo states active on this node.</returns>
-    internal UiPseudoStates GetStylePseudoStatesForMatching() => GetStylePseudoStates();
+    /// <summary>Determines whether the supplied pseudo class is active on this node.</summary>
+    /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
+    /// <returns>true when the pseudo class is active; otherwise false.</returns>
+    internal bool HasPseudoClass(UiPseudoClass pseudoClass) => _pseudoClasses?.Contains(pseudoClass) == true;
 
     internal void ChangeStyleInput(Action apply, Action rollback)
     {
@@ -64,16 +85,6 @@ public abstract partial class UiNode
         }
 
         RecomputeStyle(prepared);
-    }
-
-    /// <summary>
-    /// Refreshes style matching after a custom control changes pseudo-state information returned by
-    /// <see cref="GetStylePseudoStates"/>.
-    /// </summary>
-    protected void RefreshStylePseudoStates()
-    {
-        VerifyStyleInputAccess();
-        RecomputeStyle();
     }
 
     private UiStyleResolver GetStyleResolver() =>
@@ -211,17 +222,7 @@ public abstract partial class UiNode
 
     private void RecomputeStyleCore(PreparedStyle? prepared)
     {
-        PreparedStyle entry;
-        try
-        {
-            entry = prepared ?? PrepareStyle(GetStyleResolver());
-        }
-        catch
-        {
-            _styleSnapshot = null;
-            throw;
-        }
-
+        var entry = prepared ?? PrepareStyle(GetStyleResolver());
         _styleSnapshot = entry.Snapshot;
 
         if (entry.Changes.Count == 0)
@@ -278,17 +279,11 @@ public abstract partial class UiNode
         return property.AreEqual(currentValue, expectedValue);
     }
 
-    private static bool IsPseudoStateProperty(UiProperty property) =>
-        ReferenceEquals(property, IsHoveredProperty) ||
-        ReferenceEquals(property, IsFocusedProperty) ||
-        ReferenceEquals(property, IsEnabledProperty) ||
-        ReferenceEquals(property, Control.IsPressedProperty);
-
     internal void RaiseStyleEffectiveValueChanged<T>(UiProperty<T> property, object? oldValue, object? newValue) =>
-        OnPropertyChanged(new UiPropertyChangedEventArgs<T>(
+        RaisePropertyChanged(
             property,
             oldValue is null ? default! : (T)oldValue,
-            newValue is null ? default! : (T)newValue));
+            newValue is null ? default! : (T)newValue);
 
     internal static void RecomputeStyleSubtreeBatch(
         IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries,

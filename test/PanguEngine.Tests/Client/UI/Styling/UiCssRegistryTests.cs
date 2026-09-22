@@ -367,7 +367,7 @@ public sealed class UiCssRegistryTests
     }
 
     [Fact]
-    public void PseudoStateRuleRejectsExpandedLayoutOutputAtBind()
+    public void PseudoClassRuleRejectsExpandedLayoutOutputAtBind()
     {
         var rule = Assert.Single(UiStyleSheet.Parse("Panel:hover { padding-top: 4; }").Rules);
 

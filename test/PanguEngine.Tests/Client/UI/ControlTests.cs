@@ -1,6 +1,7 @@
 using System.Reflection;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
+using PanguEngine.Client.UI.Styling;
 using PanguEngine.Input;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -493,6 +494,53 @@ public sealed class ControlTests
         Assert.False(control.IsPressed);
         Assert.False(control.IsFocused);
         Assert.Null(screen.FocusedNode);
+        manager.Close();
+    }
+
+    [Fact]
+    public void DisableCleanupAndInternalCallbackErrorsAggregateBeforeEnabledNotifications()
+    {
+        var root = new Canvas();
+        var control = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        screen.SetStyleSheets([new UiStyleSheet([
+            new UiStyleRule(UiStyleSelector.For<TestControl>(pseudoClasses: [UiPseudoClass.Disabled]), [
+                UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])])]);
+        var cleanupError = new InvalidOperationException("cleanup");
+        var internalError = new InvalidOperationException("internal");
+        var enabledNotifications = 0;
+        using var pressedSubscription = control.Subscribe(Control.IsPressedProperty, (_, args) =>
+        {
+            if (!args.NewValue)
+                throw cleanupError;
+        });
+        control.PropertyChanged += (_, args) =>
+        {
+            if (ReferenceEquals(args.Property, UiNode.IsEnabledProperty))
+                enabledNotifications++;
+            if (ReferenceEquals(args.Property, UiNode.OpacityProperty))
+            {
+                Assert.False(control.IsFocused);
+                Assert.False(control.IsPressed);
+                Assert.False(control.IsHovered);
+                Assert.Null(screen.FocusedNode);
+                throw internalError;
+            }
+        };
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.ProcessPointerMoved(new Point(5, 5));
+        Assert.True(control.Focus());
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+
+        var aggregate = Assert.Throws<AggregateException>(() => control.IsEnabled = false);
+
+        Assert.Equal([cleanupError, internalError], aggregate.InnerExceptions);
+        Assert.Equal(0, enabledNotifications);
+        Assert.False(control.IsEnabled);
+        Assert.True(control.HasPseudoClass(UiPseudoClass.Disabled));
+        Assert.Equal(0.5, control.Opacity);
         manager.Close();
     }
 

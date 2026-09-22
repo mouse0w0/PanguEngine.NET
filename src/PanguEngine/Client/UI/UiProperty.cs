@@ -67,6 +67,8 @@ public abstract class UiProperty
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
     /// <param name="invalidation">The UI work that the property may invalidate.</param>
+    /// <param name="onChanged">The internal callback receiving the target node and the old and new effective values before node notifications. Defaults and unchanged effective values do not invoke it.</param>
+    /// <remarks>A callback failure preserves the committed value and skips that change's node notifications.</remarks>
     /// <returns>The registered property descriptor.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
@@ -74,7 +76,8 @@ public abstract class UiProperty
     public static UiProperty<TValue> Register<TOwner, TValue>(
         string name,
         TValue defaultValue = default!,
-        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
+        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None,
+        Action<UiNode, TValue, TValue>? onChanged = null)
         where TOwner : UiNode =>
         new(
             name,
@@ -82,7 +85,8 @@ public abstract class UiProperty
             typeof(TOwner),
             defaultValue,
             invalidation,
-            isReadOnly: false);
+            isReadOnly: false,
+            onChanged: onChanged);
 
     /// <summary>
     /// Registers a strongly typed read-only property for an owner node type.
@@ -92,6 +96,8 @@ public abstract class UiProperty
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
     /// <param name="invalidation">The UI work that the property may invalidate.</param>
+    /// <param name="onChanged">The internal callback receiving the target node and the old and new effective values before node notifications. Defaults and unchanged effective values do not invoke it.</param>
+    /// <remarks>A callback failure preserves the committed value and skips that change's node notifications.</remarks>
     /// <returns>The key that grants owner access to the registered property.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
@@ -99,7 +105,8 @@ public abstract class UiProperty
     public static UiPropertyKey<TValue> RegisterReadOnly<TOwner, TValue>(
         string name,
         TValue defaultValue = default!,
-        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
+        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None,
+        Action<UiNode, TValue, TValue>? onChanged = null)
         where TOwner : UiNode
     {
         var property = new UiProperty<TValue>(
@@ -108,7 +115,8 @@ public abstract class UiProperty
             typeof(TOwner),
             defaultValue,
             invalidation,
-            isReadOnly: true);
+            isReadOnly: true,
+            onChanged: onChanged);
         return new UiPropertyKey<TValue>(property);
     }
 
@@ -183,21 +191,28 @@ public abstract class UiProperty
 /// <typeparam name="T">The property value type.</typeparam>
 public sealed class UiProperty<T> : UiProperty
 {
+    private readonly Action<UiNode, T, T>? _onChanged;
+
     internal UiProperty(
         string name,
         Type ownerType,
         Type targetType,
         T defaultValue,
         UiPropertyInvalidation invalidation,
-        bool isReadOnly)
+        bool isReadOnly,
+        Action<UiNode, T, T>? onChanged = null)
         : base(name, ownerType, targetType, typeof(T), defaultValue, invalidation, isReadOnly)
     {
         DefaultValue = defaultValue;
+        _onChanged = onChanged;
         PublishDescriptor();
     }
 
     /// <summary>Gets the strongly typed default value.</summary>
     public new T DefaultValue { get; }
+
+    internal void RaiseChanged(UiNode node, T oldValue, T newValue) =>
+        _onChanged?.Invoke(node, oldValue, newValue);
 
     internal override void RaiseEffectiveValueChanged(UiNode node, object? oldValue, object? newValue) =>
         node.RaiseStyleEffectiveValueChanged(this, oldValue, newValue);
