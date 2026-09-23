@@ -12,6 +12,7 @@ namespace PanguEngine.Client.UI;
 /// </remarks>
 public partial class UiScreen
 {
+    private const int MaxLayoutPasses = 16;
     private readonly Lock _stateSync = new();
     private readonly Queue<Action> _pendingActions = [];
     private UiNode? _root;
@@ -211,29 +212,43 @@ public partial class UiScreen
     private void UpdateLayout(Size viewportSize)
     {
         SynchronizeDefaultScale();
-        var scale = Scale;
-        var logicalViewportSize = new Size(
-            viewportSize.Width / scale,
-            viewportSize.Height / scale);
-        var viewportBounds = CreateViewportBounds(logicalViewportSize);
-        var root = Root;
-        if (root is null)
-            return;
-
-        IsUpdatingLayout = true;
-        try
+        for (var pass = 0; pass < MaxLayoutPasses; pass++)
         {
-            root.Measure(logicalViewportSize);
-            if (root.IsMeasureValid)
-                root.Arrange(viewportBounds);
-        }
-        finally
-        {
-            IsUpdatingLayout = false;
-        }
+            if (!IsScreenActive() || Root is not { } root)
+                return;
 
-        if (IsScreenActive())
+            var scale = Scale;
+            var logicalViewportSize = new Size(viewportSize.Width / scale, viewportSize.Height / scale);
+            var viewportBounds = CreateViewportBounds(logicalViewportSize);
+
+            IsUpdatingLayout = true;
+            try
+            {
+                root.Measure(logicalViewportSize);
+                if (root.IsMeasureValid)
+                    root.Arrange(viewportBounds);
+            }
+            finally
+            {
+                IsUpdatingLayout = false;
+            }
+
+            if (!root.IsMeasureValid || !root.IsArrangeValid)
+                continue;
+
             RefreshPointerAfterLayout();
+            if (!IsScreenActive() || Root is null)
+                return;
+
+            if (ReferenceEquals(Root, root) && root.IsMeasureValid && root.IsArrangeValid)
+                return;
+        }
+
+        var stage = Root is { IsMeasureValid: false } ? "Measure"
+            : Root is { IsArrangeValid: false } ? "Arrange"
+            : "Root/Scale coordination";
+        throw new InvalidOperationException(
+            $"UI layout did not stabilize for {GetType().FullName} after {MaxLayoutPasses} passes ({stage}).");
     }
 
     internal void VerifyOwnerThread()
