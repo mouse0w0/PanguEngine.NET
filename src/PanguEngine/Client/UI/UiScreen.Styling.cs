@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
@@ -86,7 +85,6 @@ public partial class UiScreen
             _isPreparingStyleSheets = true;
         }
 
-        var errors = new List<Exception>();
         try
         {
             var snapshot = Array.AsReadOnly(styleSheets.ToArray());
@@ -103,7 +101,7 @@ public partial class UiScreen
             prepared.Commit();
             lock (_stateSync)
                 _isPreparingStyleSheets = false;
-            prepared.Notify(errors);
+            prepared.Notify();
         }
         finally
         {
@@ -113,16 +111,12 @@ public partial class UiScreen
                 _isApplyingStyleSheets = false;
             }
         }
-
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
     }
 
     private void VerifyNotPreparingStyleSheets()
     {
         if (_isPreparingStyleSheets)
-            throw new InvalidOperationException("The UI screen tree and lifecycle cannot change while style sheets are being prepared.");
+            throw new InvalidOperationException(
+                "The UI screen tree and lifecycle cannot change while style sheets are being prepared.");
     }
 }

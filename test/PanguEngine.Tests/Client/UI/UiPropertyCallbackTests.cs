@@ -27,8 +27,10 @@ public sealed class UiPropertyCallbackTests
         node.ClearValue(CallbackNode.ValueProperty);
 
         Assert.Equal([(0, 7), (7, 0)], node.Changes);
-        Assert.Equal(["internal", "virtual", "event", "subscription",
-            "internal", "virtual", "event", "subscription"], node.Trace);
+        Assert.Equal([
+            "internal", "virtual", "event", "subscription",
+            "internal", "virtual", "event", "subscription"
+        ], node.Trace);
     }
 
     [Fact]
@@ -76,7 +78,8 @@ public sealed class UiPropertyCallbackTests
         node.PropertyChanged += (_, _) => node.Trace.Add("event");
         using var subscription = node.Subscribe(CallbackNode.ValueProperty, (_, _) => node.Trace.Add("subscription"));
 
-        Assert.Same(error, Assert.Throws<InvalidOperationException>(() => node.SetValue(CallbackNode.ValueProperty, 1)));
+        Assert.Same(error,
+            Assert.Throws<InvalidOperationException>(() => node.SetValue(CallbackNode.ValueProperty, 1)));
         Assert.Equal(1, node.GetValue(CallbackNode.ValueProperty));
         node.SetValue(CallbackNode.ValueProperty, 1);
         Assert.Equal(["internal"], node.Trace);
@@ -90,14 +93,15 @@ public sealed class UiPropertyCallbackTests
         node.Changed = (oldValue, newValue) => node.Changes.Add((oldValue, newValue));
         node.PropertyChanged += (_, _) => throw error;
 
-        Assert.Same(error, Assert.Throws<InvalidOperationException>(() => node.SetValue(CallbackNode.ValueProperty, 1)));
+        Assert.Same(error,
+            Assert.Throws<InvalidOperationException>(() => node.SetValue(CallbackNode.ValueProperty, 1)));
 
         Assert.Equal([(0, 1)], node.Changes);
         Assert.Equal(1, node.GetValue(CallbackNode.ValueProperty));
     }
 
     [Fact]
-    public void StyleBatchCommitsAllValuesBeforeCallbacksAndContinuesAfterFailure()
+    public void StyleBatchCommitsAllValuesBeforeCallbacksAndStopsAfterFailure()
     {
         var error = new InvalidOperationException("internal");
         var node = new CallbackNode();
@@ -111,13 +115,17 @@ public sealed class UiPropertyCallbackTests
         node.PropertyChanged += (_, args) => notified.Add(args.Property);
 
         Assert.Same(error, Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets([
-            new UiStyleSheet([new UiStyleRule(UiStyleSelector.For<CallbackNode>(), [
-                UiStyleSetter.Create(CallbackNode.ValueProperty, 7),
-                UiStyleSetter.Create(CallbackNode.OtherProperty, 8)])])])));
+            new UiStyleSheet([
+                new UiStyleRule(UiStyleSelector.For<CallbackNode>(), [
+                    UiStyleSetter.Create(CallbackNode.ValueProperty, 7),
+                    UiStyleSetter.Create(CallbackNode.OtherProperty, 8)
+                ])
+            ])
+        ])));
 
         Assert.Equal(7, node.GetValue(CallbackNode.ValueProperty));
-        Assert.Equal([CallbackNode.OtherProperty], notified);
-        Assert.Equal(["internal", "other", "virtual"], node.Trace);
+        Assert.Empty(notified);
+        Assert.Equal(["internal"], node.Trace);
     }
 
     [Fact]
@@ -125,9 +133,13 @@ public sealed class UiPropertyCallbackTests
     {
         var node = new CallbackNode();
         var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<CallbackNode>(classes: ["active"]), [
-                UiStyleSetter.Create(CallbackNode.ValueProperty, 7)])])]);
+        screen.SetStyleSheets([
+            new UiStyleSheet([
+                new UiStyleRule(UiStyleSelector.For<CallbackNode>(classes: ["active"]), [
+                    UiStyleSetter.Create(CallbackNode.ValueProperty, 7)
+                ])
+            ])
+        ]);
         node.Changed = (oldValue, newValue) => node.Changes.Add((oldValue, newValue));
 
         node.Classes.Add("active");
@@ -149,7 +161,8 @@ public sealed class UiPropertyCallbackTests
             });
 
         internal static readonly UiProperty<int> OtherProperty =
-            UiProperty.Register<CallbackNode, int>("Other", onChanged: static (node, _, _) => ((CallbackNode)node).Trace.Add("other"));
+            UiProperty.Register<CallbackNode, int>("Other",
+                onChanged: static (node, _, _) => ((CallbackNode)node).Trace.Add("other"));
 
         private static readonly UiPropertyKey<int> ReadOnlyKey =
             UiProperty.RegisterReadOnly<CallbackNode, int>("ReadOnly", onChanged: static (node, oldValue, newValue) =>

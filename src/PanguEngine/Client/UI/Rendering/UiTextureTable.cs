@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 
@@ -27,54 +26,32 @@ internal sealed class UiTextureTable : IGlyphTextureSlotRegistry
         DescriptorSetLayout descriptorSetLayout,
         uint frameSlotCount)
     {
-        Texture? fallbackTexture = null;
-        TextureView? fallbackView = null;
-        Sampler? linearSampler = null;
-        Sampler? nearestSampler = null;
-        var descriptorSets = new List<DescriptorSet>();
-        try
+        _fallbackTexture = graphicsDevice.CreateTexture(new TextureDescription
         {
-            fallbackTexture = graphicsDevice.CreateTexture(new TextureDescription
-            {
-                Dimension = TextureDimension.Type2D,
-                Format = TextureFormat.R8G8B8A8Srgb,
-                Width = 1,
-                Height = 1,
-                Depth = 1,
-                MipLevels = 1,
-                ArrayLayers = 1,
-                Usage = TextureUsage.Sampled | TextureUsage.TransferDestination
-            });
-            fallbackView = graphicsDevice.CreateTextureView(
-                fallbackTexture,
-                new TextureViewDescription(TextureViewDimension.Type2D, 0, 1, 0, 1));
-            _ = graphicsDevice.UploadTexture(fallbackTexture, [255, 255, 255, 255]);
-            linearSampler = graphicsDevice.CreateSampler(CreateSamplerDescription(FilterMode.Linear));
-            nearestSampler = graphicsDevice.CreateSampler(CreateSamplerDescription(FilterMode.Nearest));
+            Dimension = TextureDimension.Type2D,
+            Format = TextureFormat.R8G8B8A8Srgb,
+            Width = 1,
+            Height = 1,
+            Depth = 1,
+            MipLevels = 1,
+            ArrayLayers = 1,
+            Usage = TextureUsage.Sampled | TextureUsage.TransferDestination
+        });
+        _fallbackView = graphicsDevice.CreateTextureView(
+            _fallbackTexture,
+            new TextureViewDescription(TextureViewDimension.Type2D, 0, 1, 0, 1));
+        _ = graphicsDevice.UploadTexture(_fallbackTexture, [255, 255, 255, 255]);
+        _linearSampler = graphicsDevice.CreateSampler(CreateSamplerDescription(FilterMode.Linear));
+        _nearestSampler = graphicsDevice.CreateSampler(CreateSamplerDescription(FilterMode.Nearest));
 
-            for (var frameIndex = 0; frameIndex < checked((int)frameSlotCount); frameIndex++)
-            {
-                descriptorSets.Add(graphicsDevice.CreateDescriptorSet(new DescriptorSetDescription(
-                    descriptorSetLayout,
-                    CreateInitialBindings(fallbackView, linearSampler, nearestSampler))));
-            }
-        }
-        catch
+        _frames = new FrameState[checked((int)frameSlotCount)];
+        for (var frameIndex = 0; frameIndex < _frames.Length; frameIndex++)
         {
-            for (var index = descriptorSets.Count - 1; index >= 0; index--)
-                descriptorSets[index].Destroy();
-            nearestSampler?.Destroy();
-            linearSampler?.Destroy();
-            fallbackView?.Destroy();
-            fallbackTexture?.Destroy();
-            throw;
+            _frames[frameIndex] = new FrameState(graphicsDevice.CreateDescriptorSet(new DescriptorSetDescription(
+                descriptorSetLayout,
+                CreateInitialBindings(_fallbackView, _linearSampler, _nearestSampler))));
         }
 
-        _fallbackTexture = fallbackTexture;
-        _fallbackView = fallbackView;
-        _linearSampler = linearSampler;
-        _nearestSampler = nearestSampler;
-        _frames = descriptorSets.Select(descriptorSet => new FrameState(descriptorSet)).ToArray();
         _slots = new SlotState[checked((int)SlotCount)];
         for (var index = 0; index < _slots.Length; index++)
             _slots[index] = new SlotState(_fallbackView, _frames.Length);
@@ -147,6 +124,7 @@ internal sealed class UiTextureTable : IGlyphTextureSlotRegistry
             state.View = _fallbackView;
             state.DescriptorGeneration++;
         }
+
         Array.Fill(state.PendingFrames, true);
         state.Release = release;
     }
@@ -193,10 +171,8 @@ internal sealed class UiTextureTable : IGlyphTextureSlotRegistry
             return;
         _descriptorSetsDestroyed = true;
 
-        var errors = new List<Exception>();
         for (var index = _frames.Length - 1; index >= 0; index--)
-            TryDestroy(_frames[index].DescriptorSet, errors);
-        ThrowFirst(errors);
+            _frames[index].DescriptorSet.Destroy();
     }
 
     internal void DestroyOwnedResources()
@@ -205,32 +181,23 @@ internal sealed class UiTextureTable : IGlyphTextureSlotRegistry
             return;
         _ownedResourcesDestroyed = true;
 
-        var errors = new List<Exception>();
         foreach (var slot in _slots)
         {
             if (slot.Status != SlotStatus.Retiring || slot.Release is null)
                 continue;
-            try
-            {
-                slot.Release();
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
+            slot.Release();
             slot.Release = null;
         }
-        TryDestroy(_nearestSampler, errors);
-        TryDestroy(_linearSampler, errors);
-        TryDestroy(_fallbackView, errors);
-        TryDestroy(_fallbackTexture, errors);
+
+        _nearestSampler.Destroy();
+        _linearSampler.Destroy();
+        _fallbackView.Destroy();
+        _fallbackTexture.Destroy();
         _freeSlots.Clear();
-        ThrowFirst(errors);
     }
 
     private void CompleteRetirements()
     {
-        var errors = new List<Exception>();
         for (uint slotIndex = 0; slotIndex < SlotCount; slotIndex++)
         {
             var slot = _slots[slotIndex];
@@ -239,22 +206,10 @@ internal sealed class UiTextureTable : IGlyphTextureSlotRegistry
 
             var release = slot.Release!;
             slot.Release = null;
-            try
-            {
-                release();
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-            finally
-            {
-                slot.Status = SlotStatus.Free;
-                _freeSlots.Add(slotIndex);
-            }
+            release();
+            slot.Status = SlotStatus.Free;
+            _freeSlots.Add(slotIndex);
         }
-
-        ThrowFirst(errors);
     }
 
     private static void Publish(SlotState state)
@@ -290,24 +245,6 @@ internal sealed class UiTextureTable : IGlyphTextureSlotRegistry
             0,
             0,
             0);
-
-    private static void TryDestroy(GraphicsResource resource, List<Exception> errors)
-    {
-        try
-        {
-            resource.Destroy();
-        }
-        catch (Exception exception)
-        {
-            errors.Add(exception);
-        }
-    }
-
-    private static void ThrowFirst(List<Exception> errors)
-    {
-        if (errors.Count != 0)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-    }
 
     private enum SlotStatus
     {

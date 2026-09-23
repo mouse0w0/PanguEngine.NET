@@ -189,7 +189,7 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void StyleChangeExceptionContinuesRemainingNotifications()
+    public void StyleChangeExceptionStopsRemainingNotifications()
     {
         var button = new Button();
         var order = new List<string>();
@@ -211,7 +211,7 @@ public sealed class UiNodeStylingTests
             Rule(Selector<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))));
 
         Assert.Equal("bg-fail", exception.Message);
-        Assert.Equal(new[] { "Background", "BorderBrush" }, order);
+        Assert.Equal(new[] { "Background" }, order);
         Assert.Equal(Brush(2), button.BorderBrush);
     }
 
@@ -241,7 +241,7 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void NotificationFailureStillProcessesPendingRecompute()
+    public void NotificationFailureStopsPendingRecompute()
     {
         var expected = new InvalidOperationException("first notification failed");
         var button = new Button();
@@ -265,8 +265,9 @@ public sealed class UiNodeStylingTests
         var actual = Assert.Throws<InvalidOperationException>(() => button.Classes.Add("x"));
 
         Assert.Same(expected, actual);
-        Assert.Equal(Brush(9), button.Background);
-        Assert.Equal(2, notifications);
+        Assert.Equal(Brush(5), button.Background);
+        Assert.True(button.Classes.Contains("extra"));
+        Assert.Equal(1, notifications);
     }
 
     [Fact]
@@ -342,11 +343,13 @@ public sealed class UiNodeStylingTests
     {
         var node = new ReentrantPreparationNode { StyleId = "original" };
         var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            Rule(
-                UiStyleSelector.For<ReentrantPreparationNode>(),
-                Setter(ReentrantPreparationNode.ValueProperty, new GuardedValue(0.5)))
-        ])]);
+        screen.SetStyleSheets([
+            new UiStyleSheet([
+                Rule(
+                    UiStyleSelector.For<ReentrantPreparationNode>(),
+                    Setter(ReentrantPreparationNode.ValueProperty, new GuardedValue(0.5)))
+            ])
+        ]);
         node.OnRead = () =>
         {
             if (changeId)
@@ -690,9 +693,11 @@ public sealed class UiNodeStylingTests
     {
         var host = new PseudoClassHost();
         var screen = new UiScreen(host);
-        screen.SetStyleSheets([new UiStyleSheet([
-            Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.3))
-        ])]);
+        screen.SetStyleSheets([
+            new UiStyleSheet([
+                Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.3))
+            ])
+        ]);
         Exception? error = null;
         host.PropertyChanged += (_, e) =>
         {
@@ -700,9 +705,11 @@ public sealed class UiNodeStylingTests
                 error = Record.Exception(() => host.Set(Loading, true));
         };
 
-        screen.SetStyleSheets([new UiStyleSheet([
-            Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.8))
-        ])]);
+        screen.SetStyleSheets([
+            new UiStyleSheet([
+                Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.8))
+            ])
+        ]);
 
         Assert.IsType<InvalidOperationException>(error);
         Assert.False(host.IsActive(Loading));

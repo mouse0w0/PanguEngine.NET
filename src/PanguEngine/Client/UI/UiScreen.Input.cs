@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Input;
 using PanguEngine.Input;
@@ -156,9 +155,7 @@ public partial class UiScreen
                 var newPressedControls = controls.Length == 0 ? null : controls;
                 _leftPressedControls = newPressedControls;
 
-                var errors = new List<Exception>();
-                ProjectPressedDifference(oldPressedControls, newPressedControls, errors);
-                ThrowInputErrors(errors);
+                ProjectPressedDifference(oldPressedControls, newPressedControls);
             }
 
             UiNode? focusCandidate = null;
@@ -213,9 +210,7 @@ public partial class UiScreen
             {
                 var pressedControls = _leftPressedControls;
                 _leftPressedControls = null;
-                var errors = new List<Exception>();
-                ClearPressedControls(pressedControls, errors);
-                ThrowInputErrors(errors);
+                ClearPressedControls(pressedControls);
             }
 
             if (target is null || !IsActive(target))
@@ -353,42 +348,13 @@ public partial class UiScreen
 
     internal void NotifyInputStateLoss(InputStateCleanupSnapshot snapshot)
     {
-        var errors = new List<Exception>();
-        if (snapshot.FocusedNode is { } focusedNode)
-        {
-            try
-            {
-                focusedNode.SetFocused(false);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-        }
+        snapshot.FocusedNode?.SetFocused(false);
 
         for (var index = snapshot.PressedControls.Length - 1; index >= 0; index--)
-        {
-            try
-            {
-                snapshot.PressedControls[index].SetPressed(false);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-        }
+            snapshot.PressedControls[index].SetPressed(false);
 
         for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
-        {
-            try
-            {
-                snapshot.ExitedNodes[index].SetHovered(false);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-        }
+            snapshot.ExitedNodes[index].SetHovered(false);
 
         if (snapshot.FocusedNode is { } focused)
         {
@@ -399,10 +365,6 @@ public partial class UiScreen
             try
             {
                 focused.RaiseLostFocus(focusArgs);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
             }
             finally
             {
@@ -416,19 +378,8 @@ public partial class UiScreen
             var path = snapshot.HoverPath;
             var args = new UiPointerEventArgs(snapshot.ExitedNodes[^1], snapshot.PointerPosition, path);
             for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
-            {
-                try
-                {
-                    snapshot.ExitedNodes[index].RaisePointerExited(args);
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-            }
+                snapshot.ExitedNodes[index].RaisePointerExited(args);
         }
-
-        ThrowInputErrors(errors);
     }
 
     private InputStateCleanupSnapshot? CommitInputStateForClose()
@@ -587,6 +538,7 @@ public partial class UiScreen
                 if (args.Handled)
                     break;
             }
+
             return args.Handled;
         }
         finally
@@ -620,18 +572,8 @@ public partial class UiScreen
             commonLength++;
         }
 
-        var errors = new List<Exception>();
         for (var index = oldPath.Length - 1; index >= commonLength; index--)
-        {
-            try
-            {
-                oldPath[index].Node.SetHovered(false);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-        }
+            oldPath[index].Node.SetHovered(false);
 
         for (var index = commonLength; index < newPath.Length; index++)
         {
@@ -639,14 +581,7 @@ public partial class UiScreen
             if (!CanSetHovered(node))
                 continue;
 
-            try
-            {
-                node.SetHovered(true);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
+            node.SetHovered(true);
         }
 
         if (oldPath.Length != 0)
@@ -658,14 +593,7 @@ public partial class UiScreen
                     break;
                 if (!IsActive(oldPath[index].Node))
                     continue;
-                try
-                {
-                    oldPath[index].Node.RaisePointerExited(args);
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
+                oldPath[index].Node.RaisePointerExited(args);
             }
         }
 
@@ -678,18 +606,9 @@ public partial class UiScreen
                     break;
                 if (!IsActive(newPath[index].Node))
                     continue;
-                try
-                {
-                    newPath[index].Node.RaisePointerEntered(args);
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
+                newPath[index].Node.RaisePointerEntered(args);
             }
         }
-
-        ThrowInputErrors(errors);
     }
 
     private Point UpdatePointerPosition(Point outputPosition)
@@ -713,21 +632,10 @@ public partial class UiScreen
             var old = FocusedNode;
             FocusedNode = next;
             var eventArgs = new UiFocusChangedEventArgs(old, next);
-            var errors = new List<Exception>();
             _isChangingFocus = true;
             try
             {
-                if (old is not null)
-                {
-                    try
-                    {
-                        old.SetFocused(false);
-                    }
-                    catch (Exception exception)
-                    {
-                        errors.Add(exception);
-                    }
-                }
+                old?.SetFocused(false);
 
                 if (next is not null &&
                     IsScreenActive() &&
@@ -735,41 +643,17 @@ public partial class UiScreen
                     ReferenceEquals(next.Screen, this) &&
                     CanFocus(next))
                 {
-                    try
-                    {
-                        next.SetFocused(true);
-                    }
-                    catch (Exception exception)
-                    {
-                        errors.Add(exception);
-                    }
+                    next.SetFocused(true);
                 }
 
-                if (old is not null)
-                {
-                    try
-                    {
-                        old.RaiseLostFocus(eventArgs);
-                    }
-                    catch (Exception exception)
-                    {
-                        errors.Add(exception);
-                    }
-                }
+                old?.RaiseLostFocus(eventArgs);
 
                 if (next is not null &&
                     IsScreenActive() &&
                     ReferenceEquals(FocusedNode, next) &&
                     IsActive(next))
                 {
-                    try
-                    {
-                        next.RaiseGotFocus(eventArgs);
-                    }
-                    catch (Exception exception)
-                    {
-                        errors.Add(exception);
-                    }
+                    next.RaiseGotFocus(eventArgs);
                 }
             }
             finally
@@ -777,7 +661,6 @@ public partial class UiScreen
                 _isChangingFocus = false;
             }
 
-            ThrowInputErrors(errors);
             return true;
         }
         finally
@@ -838,8 +721,7 @@ public partial class UiScreen
 
     private void ProjectPressedDifference(
         Control[]? oldControls,
-        Control[]? newControls,
-        List<Exception> errors)
+        Control[]? newControls)
     {
         if (oldControls is not null)
         {
@@ -849,14 +731,7 @@ public partial class UiScreen
                 if (newControls is not null && ContainsControlReference(newControls, control))
                     continue;
 
-                try
-                {
-                    control.SetPressed(false);
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
+                control.SetPressed(false);
             }
         }
 
@@ -871,35 +746,17 @@ public partial class UiScreen
                 continue;
             }
 
-            try
-            {
-                control.SetPressed(true);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
+            control.SetPressed(true);
         }
     }
 
-    private static void ClearPressedControls(
-        Control[]? controls,
-        List<Exception> errors)
+    private static void ClearPressedControls(Control[]? controls)
     {
         if (controls is null)
             return;
 
         for (var index = controls.Length - 1; index >= 0; index--)
-        {
-            try
-            {
-                controls[index].SetPressed(false);
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-        }
+            controls[index].SetPressed(false);
     }
 
     private static Control[] GetControls(IReadOnlyList<UiHitPathEntry> path)
@@ -1045,13 +902,5 @@ public partial class UiScreen
     {
         if (!double.IsFinite(value))
             throw new ArgumentOutOfRangeException(parameterName, "A wheel delta must be finite.");
-    }
-
-    private static void ThrowInputErrors(List<Exception> errors)
-    {
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
     }
 }

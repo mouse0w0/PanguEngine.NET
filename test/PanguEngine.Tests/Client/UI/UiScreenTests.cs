@@ -441,6 +441,7 @@ public sealed class UiScreenTests
     {
         var screen = new RecordingUiScreen();
         var calls = 0;
+
         void Check()
         {
             calls++;
@@ -449,6 +450,7 @@ public sealed class UiScreenTests
             Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
             Assert.Throws<InvalidOperationException>(() => new UiDrawCommandList().Append(screen));
         }
+
         screen.FixedAction = Check;
         screen.FrameAction = _ => Check();
         screen.Open();
@@ -469,11 +471,13 @@ public sealed class UiScreenTests
     public void ClosingDuringCallbackCannotReopenSameScreenUntilCallbackReturns(bool fixedUpdate)
     {
         var screen = new RecordingUiScreen();
+
         void CloseAndReopen()
         {
             screen.Close();
             Assert.Throws<InvalidOperationException>(screen.Open);
         }
+
         screen.FixedAction = CloseAndReopen;
         screen.FrameAction = _ => CloseAndReopen();
         screen.Open();
@@ -976,9 +980,10 @@ public sealed class UiScreenTests
     }
 
     [Fact]
-    public void OpeningFailureClearsPostsAndCanBeRetried()
+    public void OpeningFailurePreservesStateAndStopsLifecycleCallbacks()
     {
         var postedCalls = 0;
+        var callbacks = new List<string>();
         var expected = new InvalidOperationException("opening failed");
         RecordingUiScreen screen = null!;
         screen = new RecordingUiScreen(new LayoutNode())
@@ -987,24 +992,29 @@ public sealed class UiScreenTests
             {
                 screen.Post(() => postedCalls++);
                 throw expected;
-            }
+            },
+            Opened = () => callbacks.Add("opened"),
+            Closing = () => callbacks.Add("closing"),
+            Closed = () => callbacks.Add("closed")
         };
 
         var actual = Assert.Throws<InvalidOperationException>(screen.Open);
 
         Assert.Same(expected, actual);
         Assert.Same(screen, screen.Root!.Screen);
-        screen.Opening = null;
-        screen.Open();
+        Assert.True(screen.IsOpen());
+        Assert.Empty(callbacks);
+        Assert.Throws<InvalidOperationException>(screen.Open);
         screen.PrepareFrame(new Size(20, 20), 0);
-        Assert.Equal(0, postedCalls);
+        Assert.Equal(1, postedCalls);
         screen.Close();
     }
 
     [Fact]
-    public void OpenedFailureClearsPostsAndCompletesClose()
+    public void OpenedFailurePreservesStateWithoutAutomaticClose()
     {
         var postedCalls = 0;
+        var callbacks = new List<string>();
         var expected = new InvalidOperationException("opened failed");
         RecordingUiScreen screen = null!;
         screen = new RecordingUiScreen(new LayoutNode())
@@ -1013,18 +1023,53 @@ public sealed class UiScreenTests
             {
                 screen.Post(() => postedCalls++);
                 throw expected;
-            }
+            },
+            Closing = () => callbacks.Add("closing"),
+            Closed = () => callbacks.Add("closed")
         };
 
         var actual = Assert.Throws<InvalidOperationException>(screen.Open);
 
         Assert.Same(expected, actual);
         Assert.Same(screen, screen.Root!.Screen);
-        screen.Opened = null;
-        screen.Open();
+        Assert.True(screen.IsOpen());
+        Assert.Empty(callbacks);
+        Assert.Throws<InvalidOperationException>(screen.Open);
         screen.PrepareFrame(new Size(20, 20), 0);
-        Assert.Equal(0, postedCalls);
+        Assert.Equal(1, postedCalls);
         screen.Close();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CloseFailurePreservesOriginalExceptionAndStopsLifecycle(bool failOnClosed)
+    {
+        var expected = new InvalidOperationException("close failed");
+        var callbacks = new List<string>();
+        var screen = new RecordingUiScreen(new LayoutNode())
+        {
+            Closing = () =>
+            {
+                callbacks.Add("closing");
+                if (!failOnClosed)
+                    throw expected;
+            },
+            Closed = () =>
+            {
+                callbacks.Add("closed");
+                throw expected;
+            }
+        };
+        screen.Open();
+
+        var actual = Assert.Throws<InvalidOperationException>(screen.Close);
+
+        Assert.Same(expected, actual);
+        string[] expectedCallbacks = failOnClosed ? ["closing", "closed"] : ["closing"];
+        Assert.Equal(expectedCallbacks, callbacks);
+        Assert.True(screen.IsOpen());
+        Assert.Throws<InvalidOperationException>(() => screen.Post(() => { }));
     }
 
     [Fact]
@@ -1130,7 +1175,7 @@ public sealed class UiScreenTests
     }
 
     [Fact]
-    public void StyleSheetChangeContinuesNotificationsAndKeepsCommitted()
+    public void StyleSheetChangeFailureKeepsCommittedSnapshots()
     {
         var first = new ProbeNode { ValueUnderNewStyles = 2 };
         var second = new ProbeNode { ValueUnderNewStyles = 2 };
@@ -1152,7 +1197,7 @@ public sealed class UiScreenTests
     }
 
     [Fact]
-    public void StyleSheetChangeAggregatesErrorsAndNotifiesRemainingNodes()
+    public void StyleSheetChangeStopsAtFirstNotificationFailure()
     {
         var first = new ProbeNode();
         var second = new ProbeNode();
@@ -1164,6 +1209,7 @@ public sealed class UiScreenTests
         var screen = new UiScreen(root);
         var firstError = new InvalidOperationException("first");
         var secondError = new InvalidOperationException("second");
+        var secondNotified = false;
         var thirdNotified = false;
         first.PropertyChanged += (_, e) =>
         {
@@ -1173,20 +1219,40 @@ public sealed class UiScreenTests
         second.PropertyChanged += (_, e) =>
         {
             if (ReferenceEquals(e.Property, ProbeNode.ValueProperty))
+            {
+                secondNotified = true;
                 throw secondError;
+            }
         };
         third.PropertyChanged += (_, e) =>
             thirdNotified |= ReferenceEquals(e.Property, ProbeNode.ValueProperty);
 
-        var error = Assert.Throws<AggregateException>(() => screen.SetStyleSheets(NewStyleSheets));
+        var error = Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets(NewStyleSheets));
 
-        Assert.Equal(2, error.InnerExceptions.Count);
-        Assert.Same(firstError, error.InnerExceptions[0]);
-        Assert.Same(secondError, error.InnerExceptions[1]);
-        Assert.True(thirdNotified);
+        Assert.Same(firstError, error);
+        Assert.False(secondNotified);
+        Assert.False(thirdNotified);
         Assert.Equal(2, first.Value);
         Assert.Equal(2, second.Value);
         Assert.Equal(2, third.Value);
+    }
+
+    [Fact]
+    public void StyleNotificationPropagatesCallbackAggregateWithoutUnwrapping()
+    {
+        var node = new ProbeNode();
+        var screen = new UiScreen(node);
+        var expected = new AggregateException(new InvalidOperationException("callback failed"));
+        node.PropertyChanged += (_, args) =>
+        {
+            if (ReferenceEquals(args.Property, ProbeNode.ValueProperty))
+                throw expected;
+        };
+
+        var actual = Assert.Throws<AggregateException>(() => screen.SetStyleSheets(NewStyleSheets));
+
+        Assert.Same(expected, actual);
+        Assert.Equal(2, node.Value);
     }
 
     [Fact]
@@ -1300,11 +1366,14 @@ public sealed class UiScreenTests
     {
         var node = new ThrowingStyleNode();
         var screen = new UiScreen(node);
-        var sheets = new[] { new UiStyleSheet([
-            new UiStyleRule(
-                UiStyleSelector.For<ThrowingStyleNode>(),
-                [UiStyleSetter.Create(ThrowingStyleNode.ValueProperty, new GuardedValue(0.5))])
-        ]) };
+        var sheets = new[]
+        {
+            new UiStyleSheet([
+                new UiStyleRule(
+                    UiStyleSelector.For<ThrowingStyleNode>(),
+                    [UiStyleSetter.Create(ThrowingStyleNode.ValueProperty, new GuardedValue(0.5))])
+            ])
+        };
         GuardedValue.FailNextComparison = true;
         try
         {
@@ -1376,22 +1445,28 @@ public sealed class UiScreenTests
     }
 
     [Fact]
-    public void FailedCrossScreenStyleRefreshDoesNotKeepSourceSnapshot()
+    public void FailedCrossScreenStyleRefreshStopsBeforeInputCleanup()
     {
         var node = new FailOnceStyleNode { Focusable = true };
-        var sourceSheets = new[] { new UiStyleSheet([
-            new UiStyleRule(
-                UiStyleSelector.For<FailOnceStyleNode>(),
-                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(1))])
-        ]) };
-        var targetSheets = new[] { new UiStyleSheet([
-            new UiStyleRule(
-                UiStyleSelector.For<FailOnceStyleNode>(),
-                [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(2))]),
-            new UiStyleRule(
-                UiStyleSelector.For<FailOnceStyleNode>(pseudoClasses: [UiPseudoClass.Disabled]),
-                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])
-        ]) };
+        var sourceSheets = new[]
+        {
+            new UiStyleSheet([
+                new UiStyleRule(
+                    UiStyleSelector.For<FailOnceStyleNode>(),
+                    [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(1))])
+            ])
+        };
+        var targetSheets = new[]
+        {
+            new UiStyleSheet([
+                new UiStyleRule(
+                    UiStyleSelector.For<FailOnceStyleNode>(),
+                    [UiStyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(2))]),
+                new UiStyleRule(
+                    UiStyleSelector.For<FailOnceStyleNode>(pseudoClasses: [UiPseudoClass.Disabled]),
+                    [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])
+            ])
+        };
         var source = new UiScreen(node);
         source.SetStyleSheets(sourceSheets);
         var target = new UiScreen();
@@ -1413,10 +1488,9 @@ public sealed class UiScreenTests
 
         Assert.Null(source.Root);
         Assert.Same(target, node.Screen);
-        Assert.False(node.IsFocused);
-        Assert.Equal(2d, node.Value);
-        target.Close();
-        source.Close();
+        Assert.True(node.IsFocused);
+        Assert.Same(node, source.FocusedNode);
+        Assert.Equal(1d, node.Value);
     }
 
     private sealed class ProbeNode : UiNode
@@ -1433,23 +1507,32 @@ public sealed class UiScreenTests
         public int ValueUnderNewStyles { get; set; }
     }
 
-    private static UiStyleSheet[] NewStyleSheets => [new UiStyleSheet([
-        new UiStyleRule(
-            UiStyleSelector.For<ProbeNode>(),
-            [UiStyleSetter.Create(ProbeNode.ValueProperty, 2)])
-    ])];
+    private static UiStyleSheet[] NewStyleSheets =>
+    [
+        new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<ProbeNode>(),
+                [UiStyleSetter.Create(ProbeNode.ValueProperty, 2)])
+        ])
+    ];
 
-    private static UiStyleSheet[] SourceStyleSheets => [new UiStyleSheet([
-        new UiStyleRule(
-            UiStyleSelector.For<ProbeNode>(),
-            [UiStyleSetter.Create(ProbeNode.ValueProperty, 1)])
-    ])];
+    private static UiStyleSheet[] SourceStyleSheets =>
+    [
+        new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<ProbeNode>(),
+                [UiStyleSetter.Create(ProbeNode.ValueProperty, 1)])
+        ])
+    ];
 
-    private static UiStyleSheet[] TargetStyleSheets => [new UiStyleSheet([
-        new UiStyleRule(
-            UiStyleSelector.For<ProbeNode>(),
-            [UiStyleSetter.Create(ProbeNode.ValueProperty, 2)])
-    ])];
+    private static UiStyleSheet[] TargetStyleSheets =>
+    [
+        new UiStyleSheet([
+            new UiStyleRule(
+                UiStyleSelector.For<ProbeNode>(),
+                [UiStyleSetter.Create(ProbeNode.ValueProperty, 2)])
+        ])
+    ];
 
     private sealed class LayoutNode : UiNode
     {
@@ -1510,6 +1593,7 @@ public sealed class UiScreenTests
                 FailNextComparison = false;
                 throw new InvalidOperationException("guarded value comparison failed");
             }
+
             return other is not null && number.Equals(other.Number);
         }
 

@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
@@ -168,45 +167,14 @@ public abstract partial class UiNode
     private void RaisePropertyChanged<T>(UiProperty<T> property, T oldValue, T newValue)
     {
         var eventArgs = new UiPropertyChangedEventArgs<T>(property, oldValue, newValue);
-        List<Exception>? errors = null;
         if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) &&
             eventArgs is UiPropertyChangedEventArgs<bool> { NewValue: false })
         {
-            try
-            {
-                Screen?.CommitAndNotifyInputStateAfterNodeDisabled(this);
-            }
-            catch (Exception exception)
-            {
-                errors = [];
-                AddErrors(errors, exception);
-            }
+            Screen?.CommitAndNotifyInputStateAfterNodeDisabled(this);
         }
 
-        try
-        {
-            property.RaiseChanged(this, oldValue, newValue);
-        }
-        catch (Exception exception) when (errors is not null)
-        {
-            AddErrors(errors, exception);
-            throw new AggregateException(errors);
-        }
-
-        try
-        {
-            OnPropertyChanged(eventArgs);
-        }
-        catch (Exception exception) when (errors is not null)
-        {
-            AddErrors(errors, exception);
-        }
-
-        if (errors is null || errors.Count == 0)
-            return;
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        throw new AggregateException(errors);
+        property.RaiseChanged(this, oldValue, newValue);
+        OnPropertyChanged(eventArgs);
     }
 
     private T GetValueCore<T>(UiProperty<T> property)
@@ -242,16 +210,5 @@ public abstract partial class UiNode
             return;
 
         RaisePropertyChanged(property, oldValue, newValue);
-    }
-
-    private static void AddErrors(List<Exception> errors, Exception exception)
-    {
-        if (exception is AggregateException aggregate)
-        {
-            foreach (var innerException in aggregate.InnerExceptions)
-                AddErrors(errors, innerException);
-        }
-        else
-            errors.Add(exception);
     }
 }

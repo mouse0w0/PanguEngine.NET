@@ -1,8 +1,8 @@
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Huds;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Huds;
 using PanguEngine.Registries;
 using PanguEngine.Threading;
 
@@ -459,11 +459,12 @@ public sealed class UiManagerTests
     }
 
     [Fact]
-    public void CloseAndNotificationFailuresArePreserved()
+    public void CloseFailureStopsScreenChangeNotifications()
     {
         var manager = new UiManager();
         var closeError = new InvalidOperationException("close");
         var notifyError = new InvalidOperationException("notify");
+        var failedChangeNotified = false;
         var oldScreen = new RecordingUiScreen(new TestNode())
         {
             Closing = () => throw closeError
@@ -484,13 +485,14 @@ public sealed class UiManagerTests
                 return;
             }
 
+            failedChangeNotified = true;
             throw notifyError;
         };
 
-        var actual = Assert.Throws<AggregateException>(() => manager.Open(oldScreen));
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.Open(oldScreen));
 
-        Assert.Contains(closeError, actual.InnerExceptions);
-        Assert.Contains(notifyError, actual.InnerExceptions);
+        Assert.Same(closeError, actual);
+        Assert.False(failedChangeNotified);
         Assert.Null(manager.CurrentScreen);
         Assert.Equal(0, openedCalls);
         manager.Destroy();
@@ -736,6 +738,7 @@ public sealed class UiManagerTests
         }) { FrameAction = _ => events.Add("frame") };
         Task change = Task.CompletedTask;
         manager.Open(oldScreen);
+
         void Replace()
         {
             change = dispatcher.InvokeAsync(() =>
@@ -744,6 +747,7 @@ public sealed class UiManagerTests
                 replacement.Post(() => events.Add("post"));
             });
         }
+
         if (fromFrameCallback)
             oldScreen.FrameAction = _ => Replace();
         else
@@ -866,7 +870,7 @@ public sealed class UiManagerTests
     }
 
     [Fact]
-    public void FailedReplacementPublishesOldToNull()
+    public void FailedReplacementStopsBeforePublishingScreenChange()
     {
         var manager = new UiManager();
         var expected = new InvalidOperationException("closing");
@@ -884,9 +888,7 @@ public sealed class UiManagerTests
 
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
-        var change = Assert.Single(changes);
-        Assert.Same(oldScreen, change.Old);
-        Assert.Null(change.New);
+        Assert.Empty(changes);
     }
 
     [Fact]
@@ -1075,6 +1077,7 @@ public sealed class UiManagerTests
             DrawAction = DrawRectangle
         }) { FrameAction = _ => events.Add("screen-frame") };
         Task change = Task.CompletedTask;
+
         void OpenScreen()
         {
             hud.FrameAction = null;
@@ -1085,6 +1088,7 @@ public sealed class UiManagerTests
                 screen.Post(() => events.Add("screen-post"));
             });
         }
+
         if (fromFrameCallback)
             hud.FrameAction = _ => OpenScreen();
         else
@@ -1225,6 +1229,7 @@ public sealed class UiManagerTests
         var root = new TestNode();
         var replacement = new UiScreen();
         var calls = 0;
+
         void Check()
         {
             calls++;
@@ -1232,6 +1237,7 @@ public sealed class UiManagerTests
             Assert.Throws<InvalidOperationException>(manager.Close);
             Assert.Throws<InvalidOperationException>(manager.Destroy);
         }
+
         var screen = new RecordingUiScreen(root)
         {
             FixedAction = Check,

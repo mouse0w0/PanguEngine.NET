@@ -94,6 +94,25 @@ public sealed class UiImageAtlasTests
         Assert.NotNull(context.Atlas.TryCreate(Image(4, 4)));
     }
 
+    [Fact]
+    public void DestroyFailureStopsBeforeBackingTextureAndRemainingPages()
+    {
+        var device = new UiTestGraphicsDevice();
+        var table = new UiTextureTable(device, new UiTestDescriptorSetLayout(default), 1);
+        var atlas = new UiImageAtlas(device, table);
+        var first = Assert.IsType<UiImageAtlasEntry>(atlas.TryCreate(Image(1024, 1024)));
+        var second = Assert.IsType<UiImageAtlasEntry>(atlas.TryCreate(Image(1024, 1024)));
+        var expected = new InvalidOperationException("view destroy failed");
+        Assert.IsType<UiTestTextureView>(second.Page.TextureView).DestroyException = expected;
+
+        var actual = Assert.Throws<InvalidOperationException>(atlas.Destroy);
+
+        Assert.Same(expected, actual);
+        Assert.False(second.Page.Texture.IsDestroyed);
+        Assert.False(first.Page.TextureView.IsDestroyed);
+        Assert.False(first.Page.Texture.IsDestroyed);
+    }
+
     private static UiImage Image(int width, int height) =>
         UiImage.FromRgba(new byte[checked(width * height * 4)], width, height);
 

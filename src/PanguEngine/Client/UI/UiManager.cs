@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
@@ -65,6 +64,7 @@ public sealed class UiManager
     /// </summary>
     /// <remarks>
     /// Reentrant requests execute in order after the current screen change and its notifications complete.
+    /// A lifecycle failure propagates immediately and prevents subsequent screen change notifications.
     /// Deferred failures are reported by the outermost Open or Close call, and remaining requests are discarded.
     /// Screen changes from update callbacks must be scheduled through the engine dispatcher.
     /// </remarks>
@@ -87,6 +87,7 @@ public sealed class UiManager
     /// <remarks>
     /// Reentrant requests execute after the current screen change and its notifications complete.
     /// A deferred close applies to the screen current when the request executes.
+    /// A lifecycle failure propagates immediately and prevents subsequent screen change notifications.
     /// Deferred failures are reported by the outermost Open or Close call, and remaining requests are discarded.
     /// Screen changes from update callbacks must be scheduled through the engine dispatcher.
     /// </remarks>
@@ -117,30 +118,15 @@ public sealed class UiManager
                 nextScreen?.VerifyCanOpen();
                 var oldScreen = CurrentScreen;
                 oldScreen?.VerifyCanClose();
-                var errors = new List<Exception>();
-                try
+                if (oldScreen is not null)
                 {
-                    if (oldScreen is not null)
-                    {
-                        CurrentScreen = null;
-                        oldScreen.Close();
-                    }
-                    nextScreen?.Open();
-                    CurrentScreen = nextScreen;
+                    CurrentScreen = null;
+                    oldScreen.Close();
                 }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-                try
-                {
-                    NotifyCurrentScreenChanged(oldScreen);
-                }
-                catch (Exception exception)
-                {
-                    errors.Add(exception);
-                }
-                ThrowLifecycleErrors(errors);
+
+                nextScreen?.Open();
+                CurrentScreen = nextScreen;
+                NotifyCurrentScreenChanged(oldScreen);
             }
         }
         finally
@@ -299,6 +285,7 @@ public sealed class UiManager
             throw new InvalidOperationException(
                 "The UI manager cannot change screens while the HUD is updating or drawing.");
         }
+
         if (CurrentScreen?.IsUpdatingLayout == true)
             throw new InvalidOperationException("The UI manager cannot change screens during layout.");
         if (CurrentScreen?.IsDrawing == true)
@@ -312,13 +299,5 @@ public sealed class UiManager
     {
         if (_isUpdating || Hud.Screen.IsUpdating || CurrentScreen?.IsUpdating == true)
             throw new InvalidOperationException("The UI manager cannot perform this operation during an update.");
-    }
-
-    private static void ThrowLifecycleErrors(List<Exception> errors)
-    {
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
     }
 }

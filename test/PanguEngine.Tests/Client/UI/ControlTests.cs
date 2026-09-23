@@ -331,7 +331,7 @@ public sealed class ControlTests
     }
 
     [Fact]
-    public void PressedClearErrorsCompleteSnapshotAndSuppressReleaseAndClick()
+    public void PressedClearFailureStopsRemainingStatesAndSuppressesReleaseAndClick()
     {
         var root = new Canvas();
         var outer = Place(root, new TestControl(), 0, 0, 40, 40);
@@ -363,12 +363,12 @@ public sealed class ControlTests
         manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
-        var aggregate = Assert.Throws<AggregateException>(() =>
+        var actual = Assert.Throws<InvalidOperationException>(() =>
             manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None));
 
-        Assert.Equal([innerError, outerError], aggregate.InnerExceptions);
+        Assert.Same(innerError, actual);
         Assert.False(inner.IsPressed);
-        Assert.False(outer.IsPressed);
+        Assert.True(outer.IsPressed);
         Assert.Equal(0, releaseCalls);
         Assert.Equal(0, clickCalls);
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -377,7 +377,7 @@ public sealed class ControlTests
     }
 
     [Fact]
-    public void CleanupCompletesAllStatesAndEventsBeforeAggregatingErrors()
+    public void CleanupFailureStopsRemainingStatesAndEvents()
     {
         var root = new Canvas();
         var outer = Place(root, new TestControl(), 0, 0, 40, 40);
@@ -437,32 +437,22 @@ public sealed class ControlTests
         Assert.True(inner.IsPressed);
         Assert.True(outer.IsPressed);
 
-        var aggregate = Assert.Throws<AggregateException>(() => root.Children.Remove(outer));
+        var actual = Assert.Throws<InvalidOperationException>(() => root.Children.Remove(outer));
 
-        Assert.Equal(
-            [
-                focusedError,
-                innerPressedError,
-                outerPressedError,
-                innerHoveredError,
-                outerHoveredError,
-                lostError,
-                exitError
-            ],
-            aggregate.InnerExceptions);
+        Assert.Same(focusedError, actual);
         Assert.False(inner.IsFocused);
-        Assert.False(inner.IsPressed);
-        Assert.False(outer.IsPressed);
-        Assert.False(inner.IsHovered);
-        Assert.False(outer.IsHovered);
+        Assert.True(inner.IsPressed);
+        Assert.True(outer.IsPressed);
+        Assert.True(inner.IsHovered);
+        Assert.True(outer.IsHovered);
         Assert.Null(screen.FocusedNode);
-        Assert.Equal(["lost", "inner-exit", "outer-exit"], events);
+        Assert.Empty(events);
         Assert.Null(outer.Screen);
         manager.Close();
     }
 
     [Fact]
-    public void DisableCleanupAndEnabledNotificationErrorsAggregateInOrder()
+    public void DisableCleanupFailureStopsEnabledNotifications()
     {
         var root = new Canvas();
         var control = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
@@ -486,11 +476,11 @@ public sealed class ControlTests
         Assert.True(control.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
-        var aggregate = Assert.Throws<AggregateException>(() => control.IsEnabled = false);
+        var actual = Assert.Throws<InvalidOperationException>(() => control.IsEnabled = false);
 
-        Assert.Equal([cleanupError, enabledError], aggregate.InnerExceptions);
+        Assert.Same(cleanupError, actual);
         Assert.False(control.IsEnabled);
-        Assert.False(control.IsHovered);
+        Assert.True(control.IsHovered);
         Assert.False(control.IsPressed);
         Assert.False(control.IsFocused);
         Assert.Null(screen.FocusedNode);
@@ -498,18 +488,23 @@ public sealed class ControlTests
     }
 
     [Fact]
-    public void DisableCleanupAndInternalCallbackErrorsAggregateBeforeEnabledNotifications()
+    public void DisableCleanupFailureStopsInternalCallbackAndEnabledNotifications()
     {
         var root = new Canvas();
         var control = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
         var manager = new UiManager();
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<TestControl>(pseudoClasses: [UiPseudoClass.Disabled]), [
-                UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)])])]);
+        screen.SetStyleSheets([
+            new UiStyleSheet([
+                new UiStyleRule(UiStyleSelector.For<TestControl>(pseudoClasses: [UiPseudoClass.Disabled]), [
+                    UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)
+                ])
+            ])
+        ]);
         var cleanupError = new InvalidOperationException("cleanup");
         var internalError = new InvalidOperationException("internal");
         var enabledNotifications = 0;
+        var opacityNotifications = 0;
         using var pressedSubscription = control.Subscribe(Control.IsPressedProperty, (_, args) =>
         {
             if (!args.NewValue)
@@ -521,10 +516,7 @@ public sealed class ControlTests
                 enabledNotifications++;
             if (ReferenceEquals(args.Property, UiNode.OpacityProperty))
             {
-                Assert.False(control.IsFocused);
-                Assert.False(control.IsPressed);
-                Assert.False(control.IsHovered);
-                Assert.Null(screen.FocusedNode);
+                opacityNotifications++;
                 throw internalError;
             }
         };
@@ -534,13 +526,14 @@ public sealed class ControlTests
         Assert.True(control.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
-        var aggregate = Assert.Throws<AggregateException>(() => control.IsEnabled = false);
+        var actual = Assert.Throws<InvalidOperationException>(() => control.IsEnabled = false);
 
-        Assert.Equal([cleanupError, internalError], aggregate.InnerExceptions);
+        Assert.Same(cleanupError, actual);
         Assert.Equal(0, enabledNotifications);
+        Assert.Equal(0, opacityNotifications);
         Assert.False(control.IsEnabled);
-        Assert.True(control.HasPseudoClass(UiPseudoClass.Disabled));
-        Assert.Equal(0.5, control.Opacity);
+        Assert.False(control.HasPseudoClass(UiPseudoClass.Disabled));
+        Assert.Equal(1, control.Opacity);
         manager.Close();
     }
 

@@ -443,7 +443,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void FocusLossAggregatesNotificationFailuresAfterStateCommit()
+    public void FocusLossStopsAtFirstNotificationFailureAfterStateCommit()
     {
         var (manager, screen, root) = OpenScene();
         var control = Place(root, new TestControl { Focusable = true }, 0, 0, 20, 20);
@@ -472,14 +472,12 @@ public sealed class UiInputRoutingTests
         manager.ProcessPointerMoved(new Point(5, 5));
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
-        var aggregate = Assert.Throws<AggregateException>(() => manager.ProcessFocusChanged(false));
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.ProcessFocusChanged(false));
 
-        Assert.Equal(
-            [focusedError, pressedError, hoveredError, lostError, exitError],
-            aggregate.InnerExceptions);
+        Assert.Same(focusedError, actual);
         Assert.False(control.IsFocused);
-        Assert.False(control.IsHovered);
-        Assert.False(control.IsPressed);
+        Assert.True(control.IsHovered);
+        Assert.True(control.IsPressed);
         Assert.Null(screen.FocusedNode);
     }
 
@@ -715,21 +713,27 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void FocusNotificationErrorsCompleteAndAggregateInOrder()
+    public void FocusNotificationFailureStopsLaterNotifications()
     {
         var (_, screen, root) = OpenScene();
         var first = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
         var second = Place(root, new TestNode { Focusable = true }, 30, 0, 20, 20);
         var lostError = new InvalidOperationException("lost");
         var gotError = new InvalidOperationException("got");
+        var gotCalls = 0;
         Assert.True(first.Focus());
         first.LostFocus += (_, _) => throw lostError;
-        second.GotFocus += (_, _) => throw gotError;
+        second.GotFocus += (_, _) =>
+        {
+            gotCalls++;
+            throw gotError;
+        };
 
-        var aggregate = Assert.Throws<AggregateException>(() => second.Focus());
+        var actual = Assert.Throws<InvalidOperationException>(() => second.Focus());
 
         Assert.Same(second, screen.FocusedNode);
-        Assert.Equal([lostError, gotError], aggregate.InnerExceptions);
+        Assert.Same(lostError, actual);
+        Assert.Equal(0, gotCalls);
     }
 
     [Fact]
@@ -885,7 +889,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void CleanupErrorsCompleteAllNotificationsAndLeaveCommittedState()
+    public void CleanupFailureStopsLaterNotificationsAndLeavesCommittedState()
     {
         var (manager, screen, root) = OpenScene();
         var branch = Place(root, new Canvas(), 10, 10, 30, 30);
@@ -908,10 +912,10 @@ public sealed class UiInputRoutingTests
         Assert.True(leaf.Focus());
         notifications.Clear();
 
-        var aggregate = Assert.Throws<AggregateException>(() => { root.Children.Remove(branch); });
+        var actual = Assert.Throws<InvalidOperationException>(() => { root.Children.Remove(branch); });
 
-        Assert.Equal([lostError, exitError], aggregate.InnerExceptions);
-        Assert.Equal(["lost", "exit", "branch-exit"], notifications);
+        Assert.Same(lostError, actual);
+        Assert.Equal(["lost"], notifications);
         Assert.DoesNotContain(branch, root.Children);
         Assert.Null(branch.Screen);
         Assert.Null(leaf.Screen);
@@ -1216,7 +1220,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void OpenedFailureRollsBackInputStateAndReleasesScreen()
+    public void OpenedFailurePreservesInputStateAndScreenOwnership()
     {
         var manager = new UiManager();
         var root = new TestNode { Focusable = true };
@@ -1237,15 +1241,16 @@ public sealed class UiInputRoutingTests
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScreen);
         Assert.Same(screen, root.Screen);
-        Assert.Null(screen.FocusedNode);
-        screen.Opened = null;
+        Assert.Same(root, screen.FocusedNode);
+        Assert.True(root.IsFocused);
+        Assert.True(screen.IsOpen());
         var otherManager = new UiManager();
-        otherManager.Open(screen);
-        Assert.Same(screen, otherManager.CurrentScreen);
+        Assert.Throws<InvalidOperationException>(() => otherManager.Open(screen));
+        Assert.Null(otherManager.CurrentScreen);
     }
 
     [Fact]
-    public void ReplacementCleanupFailureStopsCandidateOpeningAndReleasesCandidate()
+    public void ReplacementCleanupFailureLeavesCandidateUnopened()
     {
         var manager = new UiManager();
         var oldRoot = new TestNode { Focusable = true };
@@ -1312,7 +1317,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void CloseCompletesAfterCommittedCleanupFailureAndReleasesScreen()
+    public void CloseStopsAfterCommittedCleanupFailureWithoutReleasingScreen()
     {
         var manager = new UiManager();
         var root = new Canvas();
@@ -1331,12 +1336,14 @@ public sealed class UiInputRoutingTests
         var actual = Assert.Throws<InvalidOperationException>(manager.Close);
 
         Assert.Same(expected, actual);
-        Assert.Equal(1, closedCalls);
+        Assert.Equal(0, closedCalls);
         Assert.Null(manager.CurrentScreen);
         Assert.Same(screen, root.Screen);
+        Assert.Null(screen.FocusedNode);
+        Assert.True(screen.IsOpen());
         var otherManager = new UiManager();
-        otherManager.Open(screen);
-        Assert.Same(screen, otherManager.CurrentScreen);
+        Assert.Throws<InvalidOperationException>(() => otherManager.Open(screen));
+        Assert.Null(otherManager.CurrentScreen);
     }
 
     [Fact]
@@ -1683,7 +1690,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void RootTransferAggregatesNotificationsFromTargetAndSourceScreens()
+    public void RootTransferTargetNotificationFailureStopsSourceNotifications()
     {
         var targetRoot = new Canvas();
         var targetLeaf = Place(targetRoot, new TestNode { Focusable = true }, 0, 0, 20, 20);
@@ -1693,8 +1700,13 @@ public sealed class UiInputRoutingTests
         var source = new UiScreen(sourceRoot);
         var targetError = new InvalidOperationException("target lost focus");
         var sourceError = new InvalidOperationException("source lost focus");
+        var sourceNotified = false;
         targetLeaf.LostFocus += (_, _) => throw targetError;
-        sourceLeaf.LostFocus += (_, _) => throw sourceError;
+        sourceLeaf.LostFocus += (_, _) =>
+        {
+            sourceNotified = true;
+            throw sourceError;
+        };
         target.Open();
         source.Open();
         target.PrepareFrame(new Size(100, 100), 0);
@@ -1702,9 +1714,11 @@ public sealed class UiInputRoutingTests
         Assert.True(targetLeaf.Focus());
         Assert.True(sourceLeaf.Focus());
 
-        var actual = Assert.Throws<AggregateException>(() => target.Root = sourceRoot);
+        var actual = Assert.Throws<InvalidOperationException>(() => target.Root = sourceRoot);
 
-        Assert.Equal([targetError, sourceError], actual.InnerExceptions);
+        Assert.Same(targetError, actual);
+        Assert.False(sourceNotified);
+        Assert.True(sourceLeaf.IsFocused);
         Assert.Null(source.Root);
         Assert.Same(sourceRoot, target.Root);
         Assert.Null(targetLeaf.Screen);

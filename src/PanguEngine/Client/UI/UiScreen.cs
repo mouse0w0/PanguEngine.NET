@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Styling;
 using PanguEngine.Input;
 
@@ -9,6 +8,7 @@ namespace PanguEngine.Client.UI;
 /// </summary>
 /// <remarks>
 /// The root and its owned tree cannot change while this screen is generating drawing commands.
+/// Callback failures propagate immediately without rolling back completed changes or invoking later callbacks.
 /// </remarks>
 public partial class UiScreen
 {
@@ -132,29 +132,10 @@ public partial class UiScreen
         BindOwnerForOpen();
         try
         {
-            try
-            {
-                SynchronizeDefaultScale();
-                OnOpening();
-                ActivateInteraction();
-            }
-            catch
-            {
-                ResetOpenState();
-                throw;
-            }
-
-            try
-            {
-                OnOpened();
-            }
-            catch (Exception exception)
-            {
-                var errors = new List<Exception> { exception };
-                BeginClosing();
-                CloseCore(errors);
-                ThrowLifecycleErrors(errors);
-            }
+            SynchronizeDefaultScale();
+            OnOpening();
+            ActivateInteraction();
+            OnOpened();
         }
         finally
         {
@@ -171,9 +152,7 @@ public partial class UiScreen
         BeginClosing();
         try
         {
-            var errors = new List<Exception>();
-            CloseCore(errors);
-            ThrowLifecycleErrors(errors);
+            CloseCore();
         }
         finally
         {
@@ -311,7 +290,6 @@ public partial class UiScreen
         var sourceOperation = false;
         InputStateCleanupSnapshot? targetSnapshot = null;
         InputStateCleanupSnapshot? sourceSnapshot = null;
-        var errors = new List<Exception>();
         try
         {
             targetOperation = BeginRootTransferOperation();
@@ -343,15 +321,7 @@ public partial class UiScreen
                 (oldRoot, UiStyleResolver.Default),
                 (root, _styleResolver)
             };
-            try
-            {
-                UiNode.RecomputeStyleSubtreeBatch(styleEntries, errors);
-            }
-            catch (Exception exception)
-            {
-                UiNode.ClearStyleSubtreeBatch(styleEntries);
-                AddLifecycleErrors(errors, exception);
-            }
+            UiNode.RecomputeStyleSubtreeBatch(styleEntries);
 
             if (targetOperation)
                 targetSnapshot = CommitInputStateAfterTreeChange();
@@ -359,28 +329,10 @@ public partial class UiScreen
                 sourceSnapshot = sourceScreen!.CommitInputStateAfterTreeChange();
 
             if (targetSnapshot is not null)
-            {
-                try
-                {
-                    NotifyInputStateLoss(targetSnapshot);
-                }
-                catch (Exception exception)
-                {
-                    AddLifecycleErrors(errors, exception);
-                }
-            }
+                NotifyInputStateLoss(targetSnapshot);
 
             if (sourceSnapshot is not null)
-            {
-                try
-                {
-                    sourceScreen!.NotifyInputStateLoss(sourceSnapshot);
-                }
-                catch (Exception exception)
-                {
-                    AddLifecycleErrors(errors, exception);
-                }
-            }
+                sourceScreen!.NotifyInputStateLoss(sourceSnapshot);
         }
         finally
         {
@@ -389,8 +341,6 @@ public partial class UiScreen
             if (targetOperation)
                 EndRuntimeOperation();
         }
-
-        ThrowLifecycleErrors(errors);
     }
 
     private bool BeginRootTransferOperation()
@@ -405,6 +355,7 @@ public partial class UiScreen
                 throw new InvalidOperationException(
                     "The UI screen root cannot change while drawing commands are generated.");
             }
+
             if (_ownerThreadId is null)
                 return false;
 
@@ -547,40 +498,14 @@ public partial class UiScreen
         }
     }
 
-    private void CloseCore(List<Exception> errors)
+    private void CloseCore()
     {
-        try
-        {
-            OnClosing();
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-
-        try
-        {
-            var snapshot = CommitInputStateForClose();
-            if (snapshot is not null)
-                NotifyInputStateLoss(snapshot);
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-
-        try
-        {
-            OnClosed();
-        }
-        catch (Exception exception)
-        {
-            AddLifecycleErrors(errors, exception);
-        }
-        finally
-        {
-            ResetOpenState();
-        }
+        OnClosing();
+        var snapshot = CommitInputStateForClose();
+        if (snapshot is not null)
+            NotifyInputStateLoss(snapshot);
+        OnClosed();
+        ResetOpenState();
     }
 
     private void ResetOpenState()
@@ -613,21 +538,4 @@ public partial class UiScreen
 
     internal static Rect CreateViewportBounds(Size viewportSize) =>
         new(0, 0, viewportSize);
-
-    private static void ThrowLifecycleErrors(List<Exception> errors)
-    {
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
-    }
-
-    private static void AddLifecycleErrors(List<Exception> errors, Exception exception)
-    {
-        errors.AddRange(exception switch
-        {
-            AggregateException aggregate => aggregate.InnerExceptions,
-            _ => [exception]
-        });
-    }
 }

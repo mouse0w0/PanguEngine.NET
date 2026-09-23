@@ -6,6 +6,53 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiTextureTableTests
 {
     [Fact]
+    public void ConstructorFailurePreservesExceptionWithoutDestroyingCreatedResources()
+    {
+        var expected = new InvalidOperationException("fallback upload failed");
+        var device = new UiTestGraphicsDevice { UploadException = expected };
+
+        var actual = Assert.Throws<InvalidOperationException>(() =>
+            new UiTextureTable(device, new UiTestDescriptorSetLayout(default), 1));
+
+        Assert.Same(expected, actual);
+        Assert.False(Assert.Single(device.Textures).IsDestroyed);
+        Assert.False(Assert.Single(device.TextureViews).IsDestroyed);
+        Assert.Empty(device.Samplers);
+        Assert.Empty(device.DescriptorSets);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ReleaseFailureStopsLaterRetirementsAndResourceDestruction(bool destroy)
+    {
+        var device = new UiTestGraphicsDevice();
+        var table = new UiTextureTable(device, new UiTestDescriptorSetLayout(default), 1);
+        Assert.True(table.TryRegister(device.CreateSampledView(), out var first));
+        Assert.True(table.TryRegister(device.CreateSampledView(), out var second));
+        var expected = new InvalidOperationException("release failed");
+        var laterCalls = 0;
+        table.Retire(first, () => throw expected);
+        table.Retire(second, () => laterCalls++);
+
+        var actual = Assert.Throws<InvalidOperationException>(() =>
+        {
+            if (destroy)
+                table.DestroyOwnedResources();
+            else
+                table.SynchronizeFrame(0);
+        });
+
+        Assert.Same(expected, actual);
+        Assert.Equal(0, laterCalls);
+        Assert.All(device.Samplers, sampler => Assert.False(sampler.IsDestroyed));
+        Assert.False(device.TextureViews[0].IsDestroyed);
+        Assert.False(device.Textures[0].IsDestroyed);
+        Assert.True(table.TryRegister(device.CreateSampledView(), out var next));
+        Assert.Equal(2u, next.Index);
+    }
+
+    [Fact]
     public void ConstructorFullyInitializesEveryFrameDescriptorSet()
     {
         var device = new UiTestGraphicsDevice();
@@ -23,8 +70,8 @@ public sealed class UiTextureTableTests
             Assert.Equal(Enumerable.Range(0, 256).Select(index => (uint)index),
                 images.Select(binding => binding.ArrayElement));
             Assert.Single(images.Select(binding => binding.TextureView).Distinct());
-            Assert.Equal(2, descriptorSet.Description.Bindings.Count(
-                binding => binding.Type == DescriptorType.Sampler));
+            Assert.Equal(2,
+                descriptorSet.Description.Bindings.Count(binding => binding.Type == DescriptorType.Sampler));
         });
 
         table.DestroyDescriptorSets();
@@ -119,6 +166,21 @@ public sealed class UiTextureTableTests
         Assert.False(table.TryRegister(device.CreateSampledView(), out _));
         table.DestroyDescriptorSets();
         table.DestroyOwnedResources();
+    }
+
+    [Fact]
+    public void DescriptorDestructionStopsAtFirstFailure()
+    {
+        var device = new UiTestGraphicsDevice();
+        var table = new UiTextureTable(device, new UiTestDescriptorSetLayout(default), 2);
+        var expected = new InvalidOperationException("descriptor destroy failed");
+        device.DescriptorSets[1].DestroyException = expected;
+
+        var actual = Assert.Throws<InvalidOperationException>(table.DestroyDescriptorSets);
+
+        Assert.Same(expected, actual);
+        Assert.False(device.DescriptorSets[0].IsDestroyed);
+        Assert.False(device.DescriptorSets[1].IsDestroyed);
     }
 
     [Fact]

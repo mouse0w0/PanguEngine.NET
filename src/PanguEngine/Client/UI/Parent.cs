@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
@@ -196,6 +195,7 @@ public abstract class Parent : UiNode
                 if (!ReferenceEquals(oldScreen, child.Screen))
                     child.InvalidateMeasureSubtree();
             }
+
             InvalidateTreeStructure();
 
             var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
@@ -399,41 +399,10 @@ public abstract class Parent : UiNode
                 snapshots.Add((screen, snapshot));
         }
 
-        var errors = new List<Exception>();
-        try
-        {
-            RecomputeStyleSubtreeBatch(styleEntries, errors);
-        }
-        catch (Exception exception)
-        {
-            ClearStyleSubtreeBatch(styleEntries);
-            errors.AddRange(exception switch
-            {
-                AggregateException aggregate => aggregate.InnerExceptions,
-                _ => [exception]
-            });
-        }
+        RecomputeStyleSubtreeBatch(styleEntries);
 
         foreach (var (screen, snapshot) in snapshots)
-        {
-            try
-            {
-                screen.NotifyInputStateLoss(snapshot);
-            }
-            catch (Exception exception)
-            {
-                errors.AddRange(exception switch
-                {
-                    AggregateException aggregate => aggregate.InnerExceptions,
-                    _ => [exception]
-                });
-            }
-        }
-
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
+            screen.NotifyInputStateLoss(snapshot);
     }
 
     private int GetChildIndex(UiNode child)

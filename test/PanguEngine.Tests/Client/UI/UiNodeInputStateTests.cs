@@ -357,7 +357,7 @@ public sealed class UiNodeInputStateTests
     }
 
     [Fact]
-    public void HoverStateErrorsCompleteProjectionAndEnteredEventsBeforeThrowing()
+    public void HoverStateFailureStopsRemainingProjectionAndEnteredEvents()
     {
         var root = new Canvas();
         var outer = Place(root, new Canvas(), 0, 0, 40, 40);
@@ -386,13 +386,13 @@ public sealed class UiNodeInputStateTests
         manager.Open(screen);
         manager.PrepareFrame(new Size(100, 100), 0);
 
-        var aggregate = Assert.Throws<AggregateException>(() =>
+        var actual = Assert.Throws<InvalidOperationException>(() =>
             manager.ProcessPointerMoved(new Point(5, 5)));
 
-        Assert.Equal([outerError, innerError], aggregate.InnerExceptions);
+        Assert.Same(outerError, actual);
         Assert.True(outer.IsHovered);
-        Assert.True(inner.IsHovered);
-        Assert.Equal(["outer-enter", "inner-enter"], events);
+        Assert.False(inner.IsHovered);
+        Assert.Empty(events);
         manager.Close();
     }
 

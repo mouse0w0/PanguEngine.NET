@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics;
 
@@ -84,23 +83,11 @@ internal sealed class UiImageAtlas
             return;
         _destroyed = true;
 
-        var errors = new List<Exception>();
         for (var index = _pages.Count - 1; index >= 0; index--)
-        {
-            try
-            {
-                _pages[index].Destroy();
-            }
-            catch (Exception exception)
-            {
-                errors.Add(exception);
-            }
-        }
+            _pages[index].Destroy();
 
         _pages.Clear();
         _retiringRegions.Clear();
-        if (errors.Count != 0)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
     }
 
     private UiImageAtlasPage? CreatePage()
@@ -213,27 +200,8 @@ internal sealed class UiImageAtlasPage(
             return;
         _destroyed = true;
 
-        Exception? firstFailure = null;
-        try
-        {
-            TextureView.Destroy();
-        }
-        catch (Exception exception)
-        {
-            firstFailure = exception;
-        }
-
-        try
-        {
-            Texture.Destroy();
-        }
-        catch (Exception exception)
-        {
-            firstFailure ??= exception;
-        }
-
-        if (firstFailure is not null)
-            ExceptionDispatchInfo.Capture(firstFailure).Throw();
+        TextureView.Destroy();
+        Texture.Destroy();
     }
 }
 

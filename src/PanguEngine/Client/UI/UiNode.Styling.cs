@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
@@ -147,6 +146,7 @@ public abstract partial class UiNode
             foreach (var property in oldSnapshot.StyledProperties)
                 keys.Add(property);
         }
+
         foreach (var property in newSnapshot.StyledProperties)
             keys.Add(property);
 
@@ -169,15 +169,18 @@ public abstract partial class UiNode
     internal void VerifyStyleInputAccess()
     {
         if (_isResolvingStyle)
-            throw new InvalidOperationException("A style selector input cannot change while the node resolves its styles.");
+            throw new InvalidOperationException(
+                "A style selector input cannot change while the node resolves its styles.");
         var screen = Screen;
         if (screen is null)
             return;
         screen.VerifyTreeMutationAccess();
         if (screen.IsUpdatingLayout)
-            throw new InvalidOperationException("A style selector input cannot change while the UI screen updates layout.");
+            throw new InvalidOperationException(
+                "A style selector input cannot change while the UI screen updates layout.");
         if (screen.IsApplyingStyleSheets)
-            throw new InvalidOperationException("A style selector input cannot change while the UI screen applies style sheets.");
+            throw new InvalidOperationException(
+                "A style selector input cannot change while the UI screen applies style sheets.");
     }
 
     private void RecomputeStyle(PreparedStyle? firstPrepared = null)
@@ -189,35 +192,21 @@ public abstract partial class UiNode
         }
 
         _isStyleRecomputing = true;
-        var errors = new List<Exception>();
         var prepared = firstPrepared;
         try
         {
             do
             {
                 _hasPendingStyleRecompute = false;
-                try
-                {
-                    var currentPrepared = prepared;
-                    prepared = null;
-                    RecomputeStyleCore(currentPrepared);
-                }
-                catch (Exception exception)
-                {
-                    AddErrors(errors, exception);
-                }
-            }
-            while (_hasPendingStyleRecompute);
+                var currentPrepared = prepared;
+                prepared = null;
+                RecomputeStyleCore(currentPrepared);
+            } while (_hasPendingStyleRecompute);
         }
         finally
         {
             _isStyleRecomputing = false;
         }
-
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
     }
 
     private void RecomputeStyleCore(PreparedStyle? prepared)
@@ -228,25 +217,12 @@ public abstract partial class UiNode
         if (entry.Changes.Count == 0)
             return;
 
-        var errors = new List<Exception>();
         foreach (var (property, oldValue, newValue) in entry.Changes)
         {
             if (!IsPreparedValueCurrent(property, newValue))
                 continue;
-            try
-            {
-                property.RaiseEffectiveValueChanged(this, oldValue, newValue);
-            }
-            catch (Exception exception)
-            {
-                AddErrors(errors, exception);
-            }
+            property.RaiseEffectiveValueChanged(this, oldValue, newValue);
         }
-
-        if (errors.Count == 1)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
-        if (errors.Count > 1)
-            throw new AggregateException(errors);
     }
 
     private PreparedStyle PrepareStyle(UiStyleResolver resolver)
@@ -286,12 +262,11 @@ public abstract partial class UiNode
             newValue is null ? default! : (T)newValue);
 
     internal static void RecomputeStyleSubtreeBatch(
-        IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries,
-        List<Exception> errors)
+        IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries)
     {
         var prepared = PrepareStyleSubtreeBatch(entries);
         prepared.Commit();
-        prepared.Notify(errors);
+        prepared.Notify();
     }
 
     internal static PreparedStyleBatch PrepareStyleSubtreeBatch(
@@ -324,18 +299,6 @@ public abstract partial class UiNode
         }
     }
 
-    internal static void ClearStyleSubtreeBatch(
-        IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries)
-    {
-        foreach (var (root, _) in entries)
-        {
-            if (root is null)
-                continue;
-            foreach (var node in PreOrderTraversal(root))
-                node._styleSnapshot = null;
-        }
-    }
-
     private static IEnumerable<UiNode> PreOrderTraversal(UiNode root)
     {
         yield return root;
@@ -357,7 +320,7 @@ public abstract partial class UiNode
                 entry.Node.CommitStyleSnapshot(entry.Snapshot);
         }
 
-        internal void Notify(List<Exception> errors)
+        internal void Notify()
         {
             foreach (var entry in entries)
             {
@@ -365,14 +328,7 @@ public abstract partial class UiNode
                 {
                     if (!entry.Node.IsPreparedValueCurrent(property, newValue))
                         continue;
-                    try
-                    {
-                        property.RaiseEffectiveValueChanged(entry.Node, oldValue, newValue);
-                    }
-                    catch (Exception exception)
-                    {
-                        AddErrors(errors, exception);
-                    }
+                    property.RaiseEffectiveValueChanged(entry.Node, oldValue, newValue);
                 }
             }
         }

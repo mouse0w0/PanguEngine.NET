@@ -132,6 +132,8 @@ internal sealed class UiTestTextureView(
     Texture texture,
     TextureViewDescription description) : TextureView
 {
+    internal Exception? DestroyException { get; set; }
+
     public override Texture Texture => texture;
     public override TextureViewDimension Dimension => description.Dimension;
     public override TextureFormat Format => texture.Format;
@@ -145,6 +147,8 @@ internal sealed class UiTestTextureView(
 
     public override void Destroy()
     {
+        if (DestroyException is not null)
+            throw DestroyException;
         if (!IsDestroyed)
             MarkDestroyed();
     }
@@ -180,6 +184,7 @@ internal sealed class UiTestDescriptorSet(
         description.Bindings.ToDictionary(binding => (binding.Binding, binding.ArrayElement));
 
     internal DescriptorSetDescription Description => description;
+    internal Exception? DestroyException { get; set; }
     internal List<DescriptorSetBinding[]> Updates { get; } = [];
     internal IReadOnlyDictionary<(uint Binding, uint ArrayElement), DescriptorSetBinding> Bindings => _bindings;
 
@@ -194,6 +199,8 @@ internal sealed class UiTestDescriptorSet(
 
     public override void Destroy()
     {
+        if (DestroyException is not null)
+            throw DestroyException;
         if (!IsDestroyed)
             MarkDestroyed();
     }

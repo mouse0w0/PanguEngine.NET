@@ -1,6 +1,5 @@
 using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
-using System.Runtime.ExceptionServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PanguEngine.Client.UI.Drawing;
@@ -200,7 +199,7 @@ internal sealed class UiResourceManager
     {
         VerifyOwnerThread();
         ObjectDisposedException.ThrowIf(_destroyed, this);
-        DrainFinalizedResourcesCore(null);
+        DrainFinalizedResourcesCore();
         _imageAtlas!.AdvanceFrame(frameSlot);
         _textureTable!.SynchronizeFrame(frameSlot);
     }
@@ -224,7 +223,7 @@ internal sealed class UiResourceManager
     {
         VerifyOwnerThread();
         ObjectDisposedException.ThrowIf(_destroyed, this);
-        DrainFinalizedResourcesCore(null);
+        DrainFinalizedResourcesCore();
     }
 
     internal void Destroy()
@@ -240,21 +239,17 @@ internal sealed class UiResourceManager
 
         _destroyed = true;
         _imageRegistrations.Clear();
-        var errors = new List<Exception>();
-        TryInvoke(() => _textureTable?.DestroyDescriptorSets(), errors);
+        _textureTable?.DestroyDescriptorSets();
         foreach (var state in _states.Values)
-            TryInvoke(state.Destroy, errors);
+            state.Destroy();
         _states.Clear();
-        TryInvoke(() => _imageAtlas?.Destroy(), errors);
-        TryInvoke(() => _glyphAtlas?.Destroy(), errors);
+        _imageAtlas?.Destroy();
+        _glyphAtlas?.Destroy();
         _glyphAtlas = null;
-        TryInvoke(() => _textureTable?.DestroyOwnedResources(), errors);
+        _textureTable?.DestroyOwnedResources();
         while (_finalizedIds.TryDequeue(out _))
         {
         }
-
-        if (errors.Count != 0)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
     }
 
     private IUiImageGpuResourceState? ResolveImageState(UiImage image)
@@ -372,22 +367,13 @@ internal sealed class UiResourceManager
         return _glyphAtlas;
     }
 
-    private void DrainFinalizedResourcesCore(Action<Exception>? onException)
+    private void DrainFinalizedResourcesCore()
     {
         while (_finalizedIds.TryDequeue(out var id))
         {
             if (!_states.Remove(id, out var state))
                 continue;
-            try
-            {
-                state.Retire();
-            }
-            catch (Exception exception)
-            {
-                if (onException is null)
-                    ExceptionDispatchInfo.Capture(exception).Throw();
-                onException(exception);
-            }
+            state.Retire();
         }
     }
 
@@ -395,18 +381,6 @@ internal sealed class UiResourceManager
     {
         if (!ReferenceEquals(Thread.CurrentThread, _ownerThread))
             throw new InvalidOperationException("UI resource manager access must occur on its owner thread.");
-    }
-
-    private static void TryInvoke(Action action, List<Exception> errors)
-    {
-        try
-        {
-            action();
-        }
-        catch (Exception exception)
-        {
-            errors.Add(exception);
-        }
     }
 }
 
@@ -523,26 +497,7 @@ internal sealed class StandaloneImageState : IUiImageGpuResourceState
             return;
         _destroyed = true;
 
-        Exception? firstFailure = null;
-        try
-        {
-            _view.Destroy();
-        }
-        catch (Exception exception)
-        {
-            firstFailure = exception;
-        }
-
-        try
-        {
-            _texture.Destroy();
-        }
-        catch (Exception exception)
-        {
-            firstFailure ??= exception;
-        }
-
-        if (firstFailure is not null)
-            ExceptionDispatchInfo.Capture(firstFailure).Throw();
+        _view.Destroy();
+        _texture.Destroy();
     }
 }

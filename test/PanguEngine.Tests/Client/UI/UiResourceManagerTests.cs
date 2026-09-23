@@ -87,7 +87,7 @@ public sealed class UiResourceManagerTests
     }
 
     [Fact]
-    public void DestroyContinuesAfterAStateFails()
+    public void DestroyStopsAfterFirstStateFailure()
     {
         var expected = new InvalidOperationException("destroy failed");
         var manager = new UiResourceManager();
@@ -102,7 +102,7 @@ public sealed class UiResourceManagerTests
 
         Assert.Same(expected, exception);
         Assert.Equal(1, failing.DestroyCount);
-        Assert.Equal(1, surviving.DestroyCount);
+        Assert.Equal(0, surviving.DestroyCount);
         GC.KeepAlive(failingImage);
         GC.KeepAlive(survivingImage);
         GC.KeepAlive(failingRegistration);
@@ -212,6 +212,26 @@ public sealed class UiResourceManagerTests
         Assert.Equal(new UiImageAtlasRegion(0, 0, 1025, 1), binding.Region);
         Assert.Single(device.Uploads.Where(upload => upload.Region is null).Skip(1));
         manager.Destroy();
+    }
+
+    [Fact]
+    public void StandaloneViewDestructionFailureStopsBackingTextureAndOwnedResources()
+    {
+        var device = new UiTestGraphicsDevice();
+        var manager = CreateManager(device);
+        var image = UiImage.FromRgba(new byte[1025 * 4], 1025, 1);
+        Assert.NotNull(manager.ResolveImageBinding(Command(image)));
+        var expected = new InvalidOperationException("standalone view destroy failed");
+        device.TextureViews[1].DestroyException = expected;
+
+        var actual = Assert.Throws<InvalidOperationException>(manager.Destroy);
+
+        Assert.Same(expected, actual);
+        Assert.False(device.Textures[1].IsDestroyed);
+        Assert.False(device.TextureViews[0].IsDestroyed);
+        Assert.False(device.Textures[0].IsDestroyed);
+        Assert.All(device.Samplers, sampler => Assert.False(sampler.IsDestroyed));
+        GC.KeepAlive(image);
     }
 
     [Fact]

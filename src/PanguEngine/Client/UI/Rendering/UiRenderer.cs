@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics;
@@ -9,8 +8,6 @@ namespace PanguEngine.Client.UI.Rendering;
 
 internal sealed class UiRenderer
 {
-    private const string CleanupFailuresDataKey = "UiRenderer.CleanupFailures";
-
     private readonly GraphicsDevice _device;
     private readonly bool _convertSrgbToLinear;
     private readonly UiDrawBuilder _builder = new();
@@ -38,7 +35,7 @@ internal sealed class UiRenderer
         for (var index = 0; index < _frameResources.Length; index++)
             _frameResources[index] = new FrameResources();
 
-        var descriptorSetLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
+        _descriptorSetLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
         [
             new DescriptorSetLayoutBinding(
                 0,
@@ -48,40 +45,21 @@ internal sealed class UiRenderer
             new DescriptorSetLayoutBinding(1, DescriptorType.Sampler, ShaderStageFlags.Fragment),
             new DescriptorSetLayoutBinding(2, DescriptorType.Sampler, ShaderStageFlags.Fragment)
         ]));
-        UiResourceManager? resourceManager = null;
-        GraphicsPipeline? pipeline = null;
-        try
-        {
-            resourceManager = new UiResourceManager(
-                device,
-                fontManager,
-                descriptorSetLayout,
-                frameSlotCount,
-                Log.CreateLogger("UI"));
-            pipeline = CreatePipeline(
-                device,
-                colorFormat,
-                depthStencilFormat,
-                "pangu/shaders/ui.vert",
-                "pangu/shaders/ui.frag",
-                "ui.vert",
-                "ui.frag",
-                descriptorSetLayout);
-        }
-        catch (Exception exception)
-        {
-            var cleanupFailures = new List<Exception>();
-            Destroy(pipeline, cleanupFailures);
-            Destroy(resourceManager, cleanupFailures);
-            Destroy(descriptorSetLayout, cleanupFailures);
-            if (cleanupFailures.Count > 0)
-                exception.Data[CleanupFailuresDataKey] = cleanupFailures.ToArray();
-            throw;
-        }
-
-        _pipeline = pipeline;
-        _resourceManager = resourceManager;
-        _descriptorSetLayout = descriptorSetLayout;
+        _resourceManager = new UiResourceManager(
+            device,
+            fontManager,
+            _descriptorSetLayout,
+            frameSlotCount,
+            Log.CreateLogger("UI"));
+        _pipeline = CreatePipeline(
+            device,
+            colorFormat,
+            depthStencilFormat,
+            "pangu/shaders/ui.vert",
+            "pangu/shaders/ui.frag",
+            "ui.vert",
+            "ui.frag",
+            _descriptorSetLayout);
     }
 
     internal void PrepareFrame(Frame frame)
@@ -143,19 +121,15 @@ internal sealed class UiRenderer
             return;
         _destroyed = true;
 
-        var errors = new List<Exception>();
-        Destroy(_resourceManager, errors);
+        _resourceManager.Destroy();
         foreach (var frame in _frameResources)
         {
-            Destroy(frame.IndexBuffer, errors);
-            Destroy(frame.VertexBuffer, errors);
+            frame.IndexBuffer?.Destroy();
+            frame.VertexBuffer?.Destroy();
         }
 
-        Destroy(_pipeline, errors);
-        Destroy(_descriptorSetLayout, errors);
-
-        if (errors.Count > 0)
-            ExceptionDispatchInfo.Capture(errors[0]).Throw();
+        _pipeline.Destroy();
+        _descriptorSetLayout.Destroy();
     }
 
     private static GraphicsPipeline CreatePipeline(
@@ -240,30 +214,6 @@ internal sealed class UiRenderer
         frame.Capacity = newCapacity;
         oldIndexBuffer?.Destroy();
         oldVertexBuffer?.Destroy();
-    }
-
-    private static void Destroy(GraphicsResource? resource, List<Exception> errors)
-    {
-        try
-        {
-            resource?.Destroy();
-        }
-        catch (Exception exception)
-        {
-            errors.Add(exception);
-        }
-    }
-
-    private static void Destroy(UiResourceManager? manager, List<Exception> errors)
-    {
-        try
-        {
-            manager?.Destroy();
-        }
-        catch (Exception exception)
-        {
-            errors.Add(exception);
-        }
     }
 
     [StructLayout(LayoutKind.Sequential)]
