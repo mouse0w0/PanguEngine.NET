@@ -109,20 +109,22 @@ public sealed class TextBoxTests
     {
         var node = new TextBox();
         var screen = new UiScreen(node);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            TextBox {
-                min-width: 90px;
-                padding: 2px;
-                background-color: #010203;
-                border-brush: #040506;
-                border-thickness: 2px;
-                font-size: 20px;
-                foreground: #070809;
-                placeholder-foreground: #101112;
-                selection-background: #131415;
-                caret-color: #161718;
-            }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               TextBox {
+                                   min-width: 90px;
+                                   padding: 2px;
+                                   background-color: #010203;
+                                   border-color: #040506;
+                                   border-thickness: 2px;
+                                   font-size: 20px;
+                                   foreground: #070809;
+                                   placeholder-foreground: #101112;
+                                   selection-background: #131415;
+                                   caret-color: #161718;
+                               }
+                               """)
+        ]);
         node.SetHovered(true);
         node.SetFocused(true);
         node.IsEnabled = false;

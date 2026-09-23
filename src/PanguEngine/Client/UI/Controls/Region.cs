@@ -51,21 +51,36 @@ public abstract class Region : Parent
     static Region()
     {
         UiCssRegistry.RegisterElement<Region>("Region");
-        UiCssRegistry.RegisterProperty<Region, Thickness>("padding", PaddingProperty, UiCssValueConverters.ParseThickness);
+        UiCssRegistry.RegisterProperty<Region, Thickness>("padding", PaddingProperty,
+            UiCssValueConverters.ParseThickness);
         UiCssRegistry.RegisterProperty<Region>("padding-top", value =>
-            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Top, UiCssValueConverters.ParseLength(value)) });
+            new[]
+            {
+                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Top, UiCssValueConverters.ParseLength(value))
+            });
         UiCssRegistry.RegisterProperty<Region>("padding-right", value =>
-            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Right, UiCssValueConverters.ParseLength(value)) });
+            new[]
+            {
+                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Right, UiCssValueConverters.ParseLength(value))
+            });
         UiCssRegistry.RegisterProperty<Region>("padding-bottom", value =>
-            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Bottom, UiCssValueConverters.ParseLength(value)) });
+            new[]
+            {
+                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Bottom, UiCssValueConverters.ParseLength(value))
+            });
         UiCssRegistry.RegisterProperty<Region>("padding-left", value =>
-            new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value)) });
-        UiCssRegistry.RegisterProperty<Region, Brush?>("background", BackgroundProperty, UiCssValueConverters.ParseBrush);
+            new[]
+            {
+                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value))
+            });
+        UiCssRegistry.RegisterProperty<Region, Brush?>("background", BackgroundProperty,
+            UiCssValueConverters.ParseBrush);
         UiCssRegistry.RegisterProperty<Region, Brush?>(
             "background-color",
             BackgroundProperty,
             UiCssValueConverters.ParseBrush);
-        UiCssRegistry.RegisterProperty<Region, Brush?>("border-brush", BorderBrushProperty, UiCssValueConverters.ParseBrush);
+        UiCssRegistry.RegisterProperty<Region, Brush?>("border-color", BorderBrushProperty,
+            UiCssValueConverters.ParseBrush);
         UiCssRegistry.RegisterProperty<Region, Thickness>(
             "border-thickness",
             BorderThicknessProperty,

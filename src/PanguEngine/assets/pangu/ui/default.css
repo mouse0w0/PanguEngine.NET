@@ -1,7 +1,7 @@
 Button {
     padding: 7px 12px;
     background-color: #30363e;
-    border-brush: #5c6774;
+    border-color: #5c6774;
     border-thickness: 1px;
     foreground: #f2f4f7;
 }
@@ -15,18 +15,18 @@ Button:pressed {
 }
 
 Button:focus {
-    border-brush: #54a9ff;
+    border-color: #54a9ff;
 }
 
 Button:disabled {
     background-color: #1b1e23;
-    border-brush: #343a41;
+    border-color: #343a41;
     foreground: #8b94a0;
 }
 
 Button.danger {
     background-color: #682b2d;
-    border-brush: #9d494d;
+    border-color: #9d494d;
 }
 
 Button.danger:hover {
@@ -38,19 +38,19 @@ Button.danger:pressed {
 }
 
 Button.danger:focus {
-    border-brush: #54a9ff;
+    border-color: #54a9ff;
 }
 
 Button.danger:disabled {
     background-color: #3a1819;
-    border-brush: #58292b;
+    border-color: #58292b;
 }
 
 TextBox {
     min-width: 160px;
     padding: 6px 8px;
     background-color: #1f2329;
-    border-brush: #5c6774;
+    border-color: #5c6774;
     border-thickness: 1px;
     font-size: 16px;
     foreground: #f2f4f7;
@@ -60,16 +60,16 @@ TextBox {
 }
 
 TextBox:hover {
-    border-brush: #8b94a0;
+    border-color: #8b94a0;
 }
 
 TextBox:focus {
-    border-brush: #54a9ff;
+    border-color: #54a9ff;
 }
 
 TextBox:disabled {
     background-color: #1b1e23;
-    border-brush: #343a41;
+    border-color: #343a41;
     foreground: #8b94a0;
     placeholder-foreground: #5c6774;
     selection-background: #343a41;
