@@ -77,60 +77,52 @@ internal static class UiStyleParser
         private UiStyleRule ParseRule()
         {
             var selectorStart = GetMark();
-            var typeName = "*";
-            if (Peek() == '*')
-            {
-                Advance();
-            }
-            else if (IsIdentifierStart(Peek()))
-            {
-                typeName = ReadIdentifier();
-            }
-
-            var classes = new List<string>();
-            string? id = null;
-            var idCount = 0;
-            var pseudoClasses = new List<UiPseudoClass>();
+            var segments = new List<UiStyleSelectorSegment>();
+            var combinators = new List<UiStyleCombinator>();
+            var selectorEnd = ParseCompoundSegment(segments);
 
             while (true)
             {
+                var sawWhitespace = SkipTrivia();
                 if (_pos >= text.Length)
-                    break;
+                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+
                 var c = text[_pos];
-                if (c == '.')
-                {
-                    Advance();
-                    classes.Add(ReadIdentifier());
-                }
-                else if (c == '#')
-                {
-                    Advance();
-                    var idStart = GetMark();
-                    var idValue = ReadIdentifier();
-                    if (idCount > 0)
-                        throw Error(UiStyleParseError.DuplicateId, idStart, idValue.Length);
-                    id = idValue;
-                    idCount = 1;
-                }
-                else if (c == ':')
-                {
-                    Advance();
-                    pseudoClasses.Add(UiPseudoClass.Get(ReadIdentifier()));
-                }
-                else
-                {
+                if (c == '{')
                     break;
+
+                var explicitCombinator = c switch
+                {
+                    '>' => UiStyleCombinator.Child,
+                    '+' => UiStyleCombinator.AdjacentSibling,
+                    '~' => UiStyleCombinator.SubsequentSibling,
+                    _ => (UiStyleCombinator?)null,
+                };
+
+                if (explicitCombinator is { } combinator)
+                {
+                    Advance();
+                    SkipTrivia();
+                    selectorEnd = ParseCompoundSegment(segments);
+                    combinators.Add(combinator);
+                    continue;
                 }
+
+                if (!sawWhitespace)
+                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+
+                if (!IsIdentifierStart(c) && c is not ('*' or '.' or '#' or ':'))
+                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+
+                selectorEnd = ParseCompoundSegment(segments);
+                combinators.Add(UiStyleCombinator.Descendant);
             }
 
-            var selectorEnd = GetMark();
-            SkipTrivia();
-            var braceStart = GetMark();
-            if (_pos >= text.Length || text[_pos] != '{')
-                throw Error(UiStyleParseError.InvalidSyntax, braceStart, 1);
-            Advance();
+            var selector = UiStyleSelector.Create(segments, combinators);
+            var selectorLength = selectorEnd.Pos - selectorStart.Pos;
+            var sourceLocation = new UiStyleSourceLocation(sourceName, selectorStart.Line, selectorStart.Column, selectorLength);
 
-            var selector = UiStyleSelector.Create(typeName, classes, id, pseudoClasses);
+            Advance();
             var declarations = new List<UiStyleRule.CssDeclaration>();
             while (true)
             {
@@ -146,9 +138,69 @@ internal static class UiStyleParser
                 declarations.Add(ParseDeclaration());
             }
 
-            var selectorLength = selectorEnd.Pos - selectorStart.Pos;
-            var sourceLocation = new UiStyleSourceLocation(sourceName, selectorStart.Line, selectorStart.Column, selectorLength);
             return UiStyleRule.FromCss(selector, declarations, sourceLocation);
+        }
+
+        private Mark ParseCompoundSegment(List<UiStyleSelectorSegment> segments)
+        {
+            var start = GetMark();
+            var typeName = "*";
+            var hasType = false;
+            if (_pos < text.Length && text[_pos] == '*')
+            {
+                Advance();
+                hasType = true;
+            }
+            else if (_pos < text.Length && IsIdentifierStart(text[_pos]))
+            {
+                typeName = ReadIdentifier();
+                hasType = true;
+            }
+
+            var classes = new List<string>();
+            string? id = null;
+            var pseudoClasses = new List<UiPseudoClass>();
+            var end = GetMark();
+
+            while (true)
+            {
+                SkipComments();
+                if (_pos >= text.Length)
+                    break;
+
+                var c = text[_pos];
+                if (c == '.')
+                {
+                    Advance();
+                    classes.Add(ReadIdentifier());
+                }
+                else if (c == '#')
+                {
+                    Advance();
+                    var idStart = GetMark();
+                    var idValue = ReadIdentifier();
+                    if (id is not null)
+                        throw Error(UiStyleParseError.DuplicateId, idStart, idValue.Length);
+                    id = idValue;
+                }
+                else if (c == ':')
+                {
+                    Advance();
+                    pseudoClasses.Add(UiPseudoClass.Get(ReadIdentifier()));
+                }
+                else
+                {
+                    break;
+                }
+
+                end = GetMark();
+            }
+
+            if (!hasType && classes.Count == 0 && id is null && pseudoClasses.Count == 0)
+                throw Error(UiStyleParseError.InvalidSyntax, start, 1);
+
+            segments.Add(UiStyleSelectorSegment.Create(null, typeName, classes, id, pseudoClasses));
+            return end;
         }
 
         private UiStyleRule.CssDeclaration ParseDeclaration()
@@ -242,13 +294,41 @@ internal static class UiStyleParser
             return builder.ToString();
         }
 
-        private void SkipTrivia()
+        private void SkipComments()
         {
+            while (_pos + 1 < text.Length && text[_pos] == '/' && text[_pos + 1] == '*')
+            {
+                var start = GetMark();
+                Advance();
+                Advance();
+                var closed = false;
+                while (_pos < text.Length)
+                {
+                    if (text[_pos] == '*' && _pos + 1 < text.Length && text[_pos + 1] == '/')
+                    {
+                        Advance();
+                        Advance();
+                        closed = true;
+                        break;
+                    }
+
+                    Advance();
+                }
+
+                if (!closed)
+                    throw Error(UiStyleParseError.UnterminatedComment, start, 2);
+            }
+        }
+
+        private bool SkipTrivia()
+        {
+            var sawWhitespace = false;
             while (_pos < text.Length)
             {
                 var c = text[_pos];
                 if (IsAsciiWhitespace(c))
                 {
+                    sawWhitespace = true;
                     Advance();
                     continue;
                 }
@@ -279,6 +359,8 @@ internal static class UiStyleParser
 
                 break;
             }
+
+            return sawWhitespace;
         }
 
         private void Advance()

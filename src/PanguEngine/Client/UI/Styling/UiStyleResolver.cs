@@ -29,6 +29,12 @@ internal sealed class UiStyleResolver
 
     internal IReadOnlyList<UiStyleSheet> StyleSheets { get; }
 
+    /// <summary>Gets a value indicating whether any input rule contains a relationship combinator.</summary>
+    internal bool HasRelationships { get; private set; }
+
+    /// <summary>Gets a value indicating whether any input rule contains an adjacent or subsequent sibling combinator.</summary>
+    internal bool HasSiblingRelationships { get; private set; }
+
     private void AddRules(IReadOnlyList<UiStyleSheet> sheets, UiStyleOrigin origin)
     {
         for (var sheetIndex = 0; sheetIndex < sheets.Count; sheetIndex++)
@@ -38,6 +44,8 @@ internal sealed class UiStyleResolver
             for (var ruleIndex = 0; ruleIndex < rules.Count; ruleIndex++)
             {
                 var rule = rules[ruleIndex];
+                HasRelationships |= rule.Selector.HasRelationships;
+                HasSiblingRelationships |= rule.Selector.HasSiblingRelationships;
                 _rules.Add(new RuleEntry(origin, sheetIndex, ruleIndex, rule, declarationIndex));
                 declarationIndex += rule.DeclarationCount;
             }
@@ -54,7 +62,7 @@ internal sealed class UiStyleResolver
         var winners = new Dictionary<(UiProperty Property, UiStyleEdge? Component), (CascadeKey Key, DeclarationEntry Entry)>();
         foreach (var rule in GetBoundRules(node))
         {
-            if (!rule.Selector.MatchesConditions(node))
+            if (!rule.Selector.TryMatch(node, out var typeDepth))
                 continue;
             foreach (var entry in rule.Declarations)
             {
@@ -62,7 +70,7 @@ internal sealed class UiStyleResolver
                     entry.Origin,
                     entry.Rule.Selector.IdCount,
                     entry.Rule.Selector.ClassAndPseudoCount,
-                    entry.TargetTypeDepth,
+                    typeDepth,
                     entry.SheetIndex,
                     entry.DeclarationIndex);
                 var component = (entry.Setter.Property, entry.Setter.Component);
@@ -136,9 +144,6 @@ internal sealed class UiStyleResolver
                     continue;
 
                 var bound = entry.Rule.Bind(targetType);
-                var typeDepth = entry.Rule.Selector.HasTypeConstraint
-                    ? UiStyleSelector.ComputeTargetTypeDepth(targetType)
-                    : 0;
                 var declarations = new List<DeclarationEntry>();
                 foreach (var declaration in bound)
                 {
@@ -151,7 +156,6 @@ internal sealed class UiStyleResolver
                             entry.Rule,
                             setter,
                             entry.DeclarationIndex + declaration.DeclarationIndex,
-                            typeDepth,
                             declaration.CssPropertyName,
                             declaration.SourceLocation));
                     }
@@ -193,7 +197,6 @@ internal sealed class UiStyleResolver
         UiStyleRule Rule,
         UiStyleSetter Setter,
         int DeclarationIndex,
-        int TargetTypeDepth,
         string? CssPropertyName,
         UiStyleSourceLocation? SourceLocation);
 

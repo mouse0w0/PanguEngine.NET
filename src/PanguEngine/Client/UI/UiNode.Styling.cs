@@ -10,6 +10,18 @@ public abstract partial class UiNode
     private bool _hasPendingStyleRecompute;
     private bool _isResolvingStyle;
 
+    /// <summary>
+    /// Throws when this node or an ancestor is preparing styles.
+    /// </summary>
+    internal void VerifyStylePreparationIdle()
+    {
+        for (UiNode? node = this; node is not null; node = node.Parent)
+        {
+            if (node._isResolvingStyle)
+                throw new InvalidOperationException("The node cannot change while its styles are being prepared.");
+        }
+    }
+
     /// <summary>Gets or sets the optional ASCII identifier used by style selectors, or null for no id.</summary>
     /// <remarks>The value must be a valid ASCII identifier; selectors match by Ordinal equality. Assigning the same value is a no-op.</remarks>
     public string? StyleId
@@ -72,10 +84,10 @@ public abstract partial class UiNode
     internal void ChangeStyleInput(Action apply, Action rollback)
     {
         apply();
-        PreparedStyle prepared;
+        PreparedStyleBatch prepared;
         try
         {
-            prepared = PrepareStyle(GetStyleResolver());
+            prepared = PrepareStyleChange();
         }
         catch
         {
@@ -118,19 +130,8 @@ public abstract partial class UiNode
     private UiStyleSnapshot ComputeStyleSnapshot() =>
         ComputeStyleSnapshot(GetStyleResolver());
 
-    internal UiStyleSnapshot ComputeStyleSnapshot(UiStyleResolver resolver)
-    {
-        var wasResolvingStyle = _isResolvingStyle;
-        _isResolvingStyle = true;
-        try
-        {
-            return resolver.Resolve(this);
-        }
-        finally
-        {
-            _isResolvingStyle = wasResolvingStyle;
-        }
-    }
+    internal UiStyleSnapshot ComputeStyleSnapshot(UiStyleResolver resolver) =>
+        PrepareStyle(resolver, trackChanges: false).Snapshot;
 
     internal void CommitStyleSnapshot(UiStyleSnapshot snapshot) =>
         _styleSnapshot = snapshot;
@@ -168,9 +169,7 @@ public abstract partial class UiNode
 
     internal void VerifyStyleInputAccess()
     {
-        if (_isResolvingStyle)
-            throw new InvalidOperationException(
-                "A style selector input cannot change while the node resolves its styles.");
+        VerifyStylePreparationIdle();
         var screen = Screen;
         if (screen is null)
             return;
@@ -183,7 +182,7 @@ public abstract partial class UiNode
                 "A style selector input cannot change while the UI screen applies style sheets.");
     }
 
-    private void RecomputeStyle(PreparedStyle? firstPrepared = null)
+    private void RecomputeStyle(PreparedStyleBatch? firstPrepared = null)
     {
         if (_isStyleRecomputing)
         {
@@ -209,36 +208,71 @@ public abstract partial class UiNode
         }
     }
 
-    private void RecomputeStyleCore(PreparedStyle? prepared)
+    private void RecomputeStyleCore(PreparedStyleBatch? prepared)
     {
-        var entry = prepared ?? PrepareStyle(GetStyleResolver());
-        _styleSnapshot = entry.Snapshot;
+        var entry = prepared ?? PrepareStyleChange();
+        entry.Commit();
+        entry.Notify();
+    }
 
-        if (entry.Changes.Count == 0)
-            return;
+    private PreparedStyleBatch PrepareStyleChange()
+    {
+        var resolver = GetStyleResolver();
+        if (!resolver.HasRelationships)
+            return new PreparedStyleBatch([PrepareStyle(resolver)]);
 
-        foreach (var (property, oldValue, newValue) in entry.Changes)
+        var root = resolver.HasSiblingRelationships ? Parent ?? this : this;
+        return PrepareStyleSubtreeBatch([(root, resolver)]);
+    }
+
+    internal static void AddRelationshipRefreshEntry(
+        List<(UiNode? Root, UiStyleResolver Resolver)> entries,
+        UiNode? root,
+        UiStyleResolver resolver)
+    {
+        if (root is not null && resolver.HasRelationships)
+            entries.Add((root, resolver));
+    }
+
+    internal static void AddSubtreeRefreshEntry(
+        List<(UiNode? Root, UiStyleResolver Resolver)> entries,
+        UiNode? node,
+        UiStyleResolver previousResolver,
+        UiStyleResolver currentResolver,
+        bool screenChanged = false)
+    {
+        if (node is not null && (screenChanged || !ReferenceEquals(previousResolver, currentResolver) ||
+            previousResolver.HasRelationships ||
+            currentResolver.HasRelationships))
         {
-            if (!IsPreparedValueCurrent(property, newValue))
-                continue;
-            property.RaiseEffectiveValueChanged(this, oldValue, newValue);
+            entries.Add((node, currentResolver));
         }
     }
 
-    private PreparedStyle PrepareStyle(UiStyleResolver resolver)
+    private PreparedStyle PrepareStyle(UiStyleResolver resolver, bool trackChanges = true)
     {
+        var scope = this;
+        if (resolver.HasRelationships)
+        {
+            while (scope.Parent is { } parent)
+                scope = parent;
+        }
+
         var wasResolvingStyle = _isResolvingStyle;
+        var wasScopeResolvingStyle = scope._isResolvingStyle;
         _isResolvingStyle = true;
+        scope._isResolvingStyle = true;
         try
         {
-            var newSnapshot = ComputeStyleSnapshot(resolver);
-            var changes = ComputeStyleChanges(_styleSnapshot, newSnapshot);
+            var newSnapshot = resolver.Resolve(this);
+            var changes = trackChanges ? ComputeStyleChanges(_styleSnapshot, newSnapshot) : [];
             changes.Sort((a, b) => a.Property.RegistrationOrder.CompareTo(b.Property.RegistrationOrder));
             return new PreparedStyle(this, newSnapshot, changes);
         }
         finally
         {
             _isResolvingStyle = wasResolvingStyle;
+            scope._isResolvingStyle = wasScopeResolvingStyle;
         }
     }
 
@@ -273,13 +307,18 @@ public abstract partial class UiNode
         IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries)
     {
         var nodes = new List<(UiNode Node, UiStyleResolver Resolver, bool WasResolvingStyle)>();
+        var seen = new HashSet<UiNode>(ReferenceEqualityComparer.Instance);
         foreach (var (root, resolver) in entries)
         {
             if (root is null)
                 continue;
 
             foreach (var node in PreOrderTraversal(root))
+            {
+                if (!seen.Add(node))
+                    continue;
                 nodes.Add((node, resolver, node._isResolvingStyle));
+            }
         }
 
         foreach (var (node, _, _) in nodes)

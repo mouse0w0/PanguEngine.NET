@@ -26,7 +26,7 @@ public sealed class UiStyleRule
         var ordered = new List<UiStyleSetter>();
         foreach (var setter in setters)
         {
-            ValidateSetter(selector.TargetType, selector.PseudoClasses.Count != 0, setter);
+            ValidateSetter(selector.TargetType, selector.HasPseudoClasses, setter);
             for (var i = 0; i < ordered.Count; i++)
             {
                 if (ReferenceEquals(ordered[i].Property, setter.Property) && ordered[i].Component == setter.Component)
@@ -106,7 +106,7 @@ public sealed class UiStyleRule
             {
                 try
                 {
-                    ValidateSetter(targetType, Selector.PseudoClasses.Count != 0, setter);
+                    ValidateSetter(targetType, Selector.HasPseudoClasses, setter);
                     foreach (var component in setter.Expand())
                     {
                         if (!components.Add((component.Property, component.Component)))

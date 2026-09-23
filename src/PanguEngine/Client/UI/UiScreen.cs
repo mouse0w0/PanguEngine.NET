@@ -300,7 +300,11 @@ public partial class UiScreen
         if (ReferenceEquals(_root, root))
             return;
 
+        _root?.VerifyStylePreparationIdle();
+        root?.VerifyStylePreparationIdle();
         var sourceScreen = root?.Screen;
+        var rootOriginalParent = root?.Parent;
+        var rootOriginalResolver = root?.Screen?.StyleResolver ?? UiStyleResolver.Default;
         var targetOperation = false;
         var sourceOperation = false;
         InputStateCleanupSnapshot? targetSnapshot = null;
@@ -331,11 +335,14 @@ public partial class UiScreen
             oldRoot?.InvalidateTreeStructure();
             root?.InvalidateTreeStructure();
 
-            var styleEntries = new (UiNode? Root, UiStyleResolver Resolver)[]
-            {
-                (oldRoot, UiStyleResolver.Default),
-                (root, _styleResolver)
-            };
+            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
+            UiNode.AddSubtreeRefreshEntry(
+                styleEntries,
+                rootOriginalParent,
+                rootOriginalResolver,
+                rootOriginalParent?.Screen?.StyleResolver ?? UiStyleResolver.Default);
+            styleEntries.Add((oldRoot, UiStyleResolver.Default));
+            styleEntries.Add((root, _styleResolver));
             UiNode.RecomputeStyleSubtreeBatch(styleEntries);
 
             if (targetOperation)

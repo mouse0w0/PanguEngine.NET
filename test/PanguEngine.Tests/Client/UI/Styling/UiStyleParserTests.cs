@@ -200,11 +200,14 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void WhitespaceCannotCreateACompoundOrTreeSelector()
+    public void WhitespaceCreatesADescendantRelationship()
     {
-        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button .primary { }"));
+        var selector = SingleRule("Button .primary { }").Selector;
 
-        Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
+        Assert.Equal("*", selector.TypeName);
+        Assert.Equal(new[] { "primary" }, selector.Classes);
+        Assert.Equal(1, selector.ClassAndPseudoCount);
+        Assert.Equal("Button .primary", selector.SelectorText);
     }
 
     [Fact]
@@ -290,8 +293,7 @@ public sealed class UiStyleParserTests
     [InlineData("** { }", 2)]
     [InlineData("Button* { }", 7)]
     [InlineData("*.danger* { }", 9)]
-    [InlineData("Button ** { }", 8)]
-    [InlineData("* .danger { }", 3)]
+    [InlineData("Button ** { }", 9)]
     public void RepeatedOrMisplacedWildcardReportsInvalidSyntax(string css, int column)
     {
         var error = Assert.Throws<UiStyleParseException>(() => ParseCss(css));

@@ -84,6 +84,8 @@ public abstract class Parent : UiNode
         if ((uint)index > (uint)_children.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
 
+        VerifyStylePreparationIdle();
+        child.VerifyStylePreparationIdle();
         ValidateInsertion(child);
         var oldParent = child.Parent;
         var oldScreen = child.Screen;
@@ -109,8 +111,20 @@ public abstract class Parent : UiNode
             InvalidateTreeStructure();
 
             var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
-            if (!ReferenceEquals(oldScreen, newScreen))
-                styleEntries.Add((child, newScreen?.StyleResolver ?? UiStyleResolver.Default));
+            AddRelationshipRefreshEntry(
+                styleEntries,
+                oldParent,
+                oldParent?.Screen?.StyleResolver ?? UiStyleResolver.Default);
+            AddRelationshipRefreshEntry(
+                styleEntries,
+                this,
+                newScreen?.StyleResolver ?? UiStyleResolver.Default);
+            AddSubtreeRefreshEntry(
+                styleEntries,
+                child,
+                oldScreen?.StyleResolver ?? UiStyleResolver.Default,
+                child.Screen?.StyleResolver ?? UiStyleResolver.Default,
+                screenChanged: !ReferenceEquals(oldScreen, child.Screen));
 
             CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
@@ -171,6 +185,7 @@ public abstract class Parent : UiNode
         if (_children.Count == 0)
             return;
 
+        VerifyStylePreparationIdle();
         var screen = Screen;
         screen?.VerifyTreeMutationAccess();
         var oldScreens = _children
@@ -199,10 +214,18 @@ public abstract class Parent : UiNode
             InvalidateTreeStructure();
 
             var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
+            AddRelationshipRefreshEntry(
+                styleEntries,
+                this,
+                screen?.StyleResolver ?? UiStyleResolver.Default);
             foreach (var (child, oldScreen) in oldScreens)
             {
-                if (oldScreen is not null)
-                    styleEntries.Add((child, UiStyleResolver.Default));
+                AddSubtreeRefreshEntry(
+                    styleEntries,
+                    child,
+                    oldScreen?.StyleResolver ?? UiStyleResolver.Default,
+                    child.Screen?.StyleResolver ?? UiStyleResolver.Default,
+                    screenChanged: !ReferenceEquals(oldScreen, child.Screen));
             }
 
             CommitAndNotifyWithStyle(activeScreens, styleEntries);
@@ -224,6 +247,8 @@ public abstract class Parent : UiNode
         if (ReferenceEquals(replacedChild, child))
             return;
 
+        VerifyStylePreparationIdle();
+        child.VerifyStylePreparationIdle();
         ValidateInsertion(child);
         var oldParent = child.Parent;
         var oldScreen = child.Screen;
@@ -257,10 +282,26 @@ public abstract class Parent : UiNode
             InvalidateTreeStructure();
 
             var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
-            if (replacedScreen is not null)
-                styleEntries.Add((replacedChild, UiStyleResolver.Default));
-            if (!ReferenceEquals(oldScreen, newScreen))
-                styleEntries.Add((child, newScreen?.StyleResolver ?? UiStyleResolver.Default));
+            AddRelationshipRefreshEntry(
+                styleEntries,
+                oldParent,
+                oldParent?.Screen?.StyleResolver ?? UiStyleResolver.Default);
+            AddRelationshipRefreshEntry(
+                styleEntries,
+                this,
+                newScreen?.StyleResolver ?? UiStyleResolver.Default);
+            AddSubtreeRefreshEntry(
+                styleEntries,
+                replacedChild,
+                replacedScreen?.StyleResolver ?? UiStyleResolver.Default,
+                replacedChild.Screen?.StyleResolver ?? UiStyleResolver.Default,
+                screenChanged: !ReferenceEquals(replacedScreen, replacedChild.Screen));
+            AddSubtreeRefreshEntry(
+                styleEntries,
+                child,
+                oldScreen?.StyleResolver ?? UiStyleResolver.Default,
+                child.Screen?.StyleResolver ?? UiStyleResolver.Default,
+                screenChanged: !ReferenceEquals(oldScreen, child.Screen));
 
             CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
@@ -291,6 +332,7 @@ public abstract class Parent : UiNode
 
     private void RemoveChildAt(int index)
     {
+        VerifyStylePreparationIdle();
         var child = _children[index];
         var screen = child.Screen;
         Screen?.VerifyTreeMutationAccess();
@@ -308,8 +350,16 @@ public abstract class Parent : UiNode
             InvalidateTreeStructure();
 
             var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
-            if (screen is not null)
-                styleEntries.Add((child, UiStyleResolver.Default));
+            AddRelationshipRefreshEntry(
+                styleEntries,
+                this,
+                screen?.StyleResolver ?? UiStyleResolver.Default);
+            AddSubtreeRefreshEntry(
+                styleEntries,
+                child,
+                screen?.StyleResolver ?? UiStyleResolver.Default,
+                child.Screen?.StyleResolver ?? UiStyleResolver.Default,
+                screenChanged: !ReferenceEquals(screen, child.Screen));
 
             CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
@@ -324,14 +374,41 @@ public abstract class Parent : UiNode
         if (oldIndex == newIndex)
             return;
 
+        VerifyStylePreparationIdle();
         Screen?.VerifyTreeMutationAccess();
-        var preserveHitTestLayout = CanPreserveHitTestLayoutAfterChildOrderChange();
-        var child = _children[oldIndex];
-        _children.RemoveAt(oldIndex);
-        _children.Insert(newIndex, child);
-        InvalidateTreeStructure();
-        if (preserveHitTestLayout)
-            RestoreHitTestLayoutAfterChildOrderChange();
+        var resolver = Screen?.StyleResolver ?? UiStyleResolver.Default;
+        if (!resolver.HasSiblingRelationships)
+        {
+            var preserveHitTestLayout = CanPreserveHitTestLayoutAfterChildOrderChange();
+            var reorderedChild = _children[oldIndex];
+            _children.RemoveAt(oldIndex);
+            _children.Insert(newIndex, reorderedChild);
+            InvalidateTreeStructure();
+            if (preserveHitTestLayout)
+                RestoreHitTestLayoutAfterChildOrderChange();
+            return;
+        }
+
+        var affectedScreens = new List<UiScreen>();
+        AddAffectedScreen(affectedScreens, Screen);
+        var activeScreens = BeginRuntimeOperations(affectedScreens);
+        try
+        {
+            var preserveHitTestLayout = CanPreserveHitTestLayoutAfterChildOrderChange();
+            var reorderedChild = _children[oldIndex];
+            _children.RemoveAt(oldIndex);
+            _children.Insert(newIndex, reorderedChild);
+            InvalidateTreeStructure();
+            if (preserveHitTestLayout)
+                RestoreHitTestLayoutAfterChildOrderChange();
+
+            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)> { (this, resolver) };
+            CommitAndNotifyWithStyle(activeScreens, styleEntries);
+        }
+        finally
+        {
+            EndRuntimeOperations(activeScreens);
+        }
     }
 
     private void ValidateInsertion(UiNode child)
