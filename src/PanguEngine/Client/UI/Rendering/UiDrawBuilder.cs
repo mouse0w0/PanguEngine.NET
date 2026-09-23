@@ -119,11 +119,15 @@ internal sealed class UiDrawBuilder
     private readonly List<uint> _indices = [];
     private readonly List<UiBatch> _batches = [];
     private readonly List<DrawingState> _states = [];
+    private readonly UiGeometryRasterizer _geometryRasterizer = new();
+    private int _legacyQuadCount;
 
     internal ReadOnlySpan<UiVertex> Vertices => CollectionsMarshal.AsSpan(_vertices);
     internal ReadOnlySpan<uint> Indices => CollectionsMarshal.AsSpan(_indices);
     internal ReadOnlySpan<UiBatch> Batches => CollectionsMarshal.AsSpan(_batches);
-    internal int RectangleCount => _vertices.Count / 4;
+    internal int RectangleCount => _legacyQuadCount;
+    internal int VertexCount => _vertices.Count;
+    internal int IndexCount => _indices.Count;
 
     internal void Build(
         UiDrawCommandList commands,
@@ -137,6 +141,7 @@ internal sealed class UiDrawBuilder
         _vertices.Clear();
         _indices.Clear();
         _batches.Clear();
+        _legacyQuadCount = 0;
         if (framebufferWidth == 0 || framebufferHeight == 0)
             return;
 
@@ -223,6 +228,13 @@ internal sealed class UiDrawBuilder
                             scissor,
                             convertSrgbToLinear);
                         break;
+                    case UiDrawGeometryCommand geometry:
+                        AppendGeometryCommand(
+                            geometry,
+                            state,
+                            scissor,
+                            convertSrgbToLinear);
+                        break;
                     case UiDrawImageCommand image:
                         if (!TryGetPhysicalBounds(image.Bounds, framebufferWidth, framebufferHeight, state, out var imageBounds) ||
                             !Intersects(imageBounds, scissor))
@@ -257,6 +269,7 @@ internal sealed class UiDrawBuilder
             _vertices.Clear();
             _indices.Clear();
             _batches.Clear();
+            _legacyQuadCount = 0;
             throw;
         }
         finally
@@ -433,7 +446,92 @@ internal sealed class UiDrawBuilder
         }
     }
 
+    private void AppendGeometryCommand(
+        UiDrawGeometryCommand command,
+        DrawingState state,
+        UiScissor scissor,
+        bool convertSrgbToLinear)
+    {
+        var color = command.Color;
+        var baseAlpha = color.A / 255.0 * state.Opacity;
+        if (baseAlpha <= 0)
+            return;
+
+        var quads = _geometryRasterizer.Rasterize(
+            command.Mesh,
+            state.Scale,
+            state.X,
+            state.Y,
+            scissor);
+        if (quads.Count == 0)
+            return;
+
+        var r = ToColorChannel(color.R, convertSrgbToLinear);
+        var g = ToColorChannel(color.G, convertSrgbToLinear);
+        var b = ToColorChannel(color.B, convertSrgbToLinear);
+        foreach (var quad in quads)
+        {
+            AppendQuad(
+                new PhysicalBounds(
+                    quad.X,
+                    quad.Y,
+                    quad.X + (double)quad.Width,
+                    quad.Y + (double)quad.Height),
+                scissor,
+                UiMaterialKind.Solid,
+                0,
+                r,
+                g,
+                b,
+                (float)(baseAlpha * quad.Coverage),
+                0,
+                0,
+                0,
+                0,
+                0,
+                0);
+        }
+    }
+
     private void AppendGeometry(
+        PhysicalBounds bounds,
+        UiScissor scissor,
+        UiMaterialKind materialKind,
+        uint textureIndex,
+        float r,
+        float g,
+        float b,
+        float a,
+        float u0,
+        float v0,
+        float clampMinU,
+        float clampMinV,
+        float clampMaxU,
+        float clampMaxV,
+        float u1 = 0,
+        float v1 = 0)
+    {
+        _legacyQuadCount++;
+        AppendQuad(
+            bounds,
+            scissor,
+            materialKind,
+            textureIndex,
+            r,
+            g,
+            b,
+            a,
+            u0,
+            v0,
+            clampMinU,
+            clampMinV,
+            clampMaxU,
+            clampMaxV,
+            u1,
+            v1);
+    }
+
+    private void AppendQuad(
         PhysicalBounds bounds,
         UiScissor scissor,
         UiMaterialKind materialKind,

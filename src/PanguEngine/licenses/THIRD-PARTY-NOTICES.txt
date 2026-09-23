@@ -64,3 +64,8 @@ FreeType 2.13.2
 Source: https://github.com/freetype/freetype/tree/VER-2-13-2
 License: FreeType Project License
 License file: FreeType-2.13.2-FTL.txt
+
+LibTessDotNet 1.1.15
+Source: https://github.com/speps/LibTessDotNet
+License: SGI Free Software License B 2.0
+License file: LibTessDotNet.txt

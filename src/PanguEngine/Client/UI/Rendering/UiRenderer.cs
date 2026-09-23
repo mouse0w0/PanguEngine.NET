@@ -86,11 +86,11 @@ internal sealed class UiRenderer
             _resourceManager.ResolveImageBinding,
             _resourceManager.ResolveGlyphBinding);
         _resourceManager.SynchronizeAfterBuild(frame.FrameSlot);
-        if (_builder.RectangleCount == 0)
+        if (_builder.IndexCount == 0)
             return;
 
         var resources = _frameResources[checked((int)frame.FrameSlot)];
-        EnsureCapacity(resources, _builder.RectangleCount);
+        EnsureCapacity(resources, _builder.VertexCount, _builder.IndexCount);
         var vertexBuffer = resources.VertexBuffer!;
         var indexBuffer = resources.IndexBuffer!;
         vertexBuffer.Write(_builder.Vertices);
@@ -183,37 +183,33 @@ internal sealed class UiRenderer
         }
     }
 
-    private void EnsureCapacity(FrameResources frame, int requiredCapacity)
+    private void EnsureCapacity(FrameResources frame, int requiredVertexCount, int requiredIndexCount)
     {
-        if (frame.Capacity >= requiredCapacity)
-            return;
-
-        var newCapacity = UiDrawBuilder.GrowCapacity(frame.Capacity, requiredCapacity);
-        var vertexBuffer = _device.CreateBuffer(new BufferDescription(
-            checked((ulong)newCapacity * 4 * UiVertex.SizeInBytes),
-            BufferUsage.Vertex,
-            MemoryUsage.CpuToGpu));
-        GraphicsBuffer indexBuffer;
-        try
+        if (frame.VertexCapacity < requiredVertexCount)
         {
-            indexBuffer = _device.CreateBuffer(new BufferDescription(
-                checked((ulong)newCapacity * 6 * sizeof(uint)),
+            var capacity = UiDrawBuilder.GrowCapacity(frame.VertexCapacity, requiredVertexCount);
+            var vertexBuffer = _device.CreateBuffer(new BufferDescription(
+                checked((ulong)capacity * UiVertex.SizeInBytes),
+                BufferUsage.Vertex,
+                MemoryUsage.CpuToGpu));
+            var previous = frame.VertexBuffer;
+            frame.VertexBuffer = vertexBuffer;
+            frame.VertexCapacity = capacity;
+            previous?.Destroy();
+        }
+
+        if (frame.IndexCapacity < requiredIndexCount)
+        {
+            var capacity = UiDrawBuilder.GrowCapacity(frame.IndexCapacity, requiredIndexCount);
+            var indexBuffer = _device.CreateBuffer(new BufferDescription(
+                checked((ulong)capacity * sizeof(uint)),
                 BufferUsage.Index,
                 MemoryUsage.CpuToGpu));
+            var previous = frame.IndexBuffer;
+            frame.IndexBuffer = indexBuffer;
+            frame.IndexCapacity = capacity;
+            previous?.Destroy();
         }
-        catch
-        {
-            vertexBuffer.Destroy();
-            throw;
-        }
-
-        var oldVertexBuffer = frame.VertexBuffer;
-        var oldIndexBuffer = frame.IndexBuffer;
-        frame.VertexBuffer = vertexBuffer;
-        frame.IndexBuffer = indexBuffer;
-        frame.Capacity = newCapacity;
-        oldIndexBuffer?.Destroy();
-        oldVertexBuffer?.Destroy();
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -228,6 +224,7 @@ internal sealed class UiRenderer
     {
         internal GraphicsBuffer? VertexBuffer { get; set; }
         internal GraphicsBuffer? IndexBuffer { get; set; }
-        internal int Capacity { get; set; }
+        internal int VertexCapacity { get; set; }
+        internal int IndexCapacity { get; set; }
     }
 }

@@ -22,6 +22,7 @@
         <PackageReference Include="GpuMemoryAllocator.Vulkan" Version="3.3.0-0.2.0" />
         <PackageReference Include="HarfBuzzSharp" Version="14.2.1.2" />
         <PackageReference Include="HarfBuzzSharp.NativeAssets.Linux" Version="14.2.1.2" />
+        <PackageReference Include="LibTessDotNet" Version="1.1.15" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.7" />
         <PackageReference Include="NLog" Version="6.1.3" />
         <PackageReference Include="NLog.Extensions.Logging" Version="6.1.3" />
@@ -38,29 +39,15 @@
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="assets\**\*"
-                 Link="assets\%(RecursiveDir)%(Filename)%(Extension)"
-                 Pack="true"
-                 PackagePath="assets\%(RecursiveDir)%(Filename)%(Extension)">
+        <Content Include="assets\**\*" Link="assets\%(RecursiveDir)%(Filename)%(Extension)" Pack="true" PackagePath="assets\%(RecursiveDir)%(Filename)%(Extension)">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </Content>
 
-        <None Update="native\win-x64\OpenAL32.dll"
-              Condition="Exists('native\win-x64\OpenAL32.dll')"
-              CopyToOutputDirectory="Always"
-              Link="OpenAL32.dll"
-              Pack="true"
-              PackagePath="runtimes\win-x64\native\OpenAL32.dll" />
+        <None Update="native\win-x64\OpenAL32.dll" Condition="Exists('native\win-x64\OpenAL32.dll')" CopyToOutputDirectory="Always" Link="OpenAL32.dll" Pack="true" PackagePath="runtimes\win-x64\native\OpenAL32.dll" />
 
-        <None Update="licenses\**\*.txt"
-              CopyToOutputDirectory="Always"
-              Link="licenses\%(RecursiveDir)%(Filename)%(Extension)"
-              Pack="true"
-              PackagePath="licenses\%(RecursiveDir)%(Filename)%(Extension)" />
+        <None Update="licenses\**\*.txt" CopyToOutputDirectory="Always" Link="licenses\%(RecursiveDir)%(Filename)%(Extension)" Pack="true" PackagePath="licenses\%(RecursiveDir)%(Filename)%(Extension)" />
 
-        <None Update="buildTransitive\PanguEngine.targets"
-              Pack="true"
-              PackagePath="buildTransitive\PanguEngine.targets" />
+        <None Update="buildTransitive\PanguEngine.targets" Pack="true" PackagePath="buildTransitive\PanguEngine.targets" />
     </ItemGroup>
 
 </Project>

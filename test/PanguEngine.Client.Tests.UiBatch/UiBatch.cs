@@ -6,6 +6,7 @@ using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 using PanguEngine.Windowing;
+using VectorPath = PanguEngine.Client.UI.Controls.Path;
 
 namespace PanguEngine.Client.Tests.UiBatch;
 
@@ -229,6 +230,7 @@ internal sealed class UiBatchScene : IClientTestScene
         private readonly DecorationPanel _decorationPanel;
         private readonly Panel[] _brushPanels;
         private readonly ButtonPanel _buttonPanel;
+        private readonly Shape[] _shapes;
 
         internal UiBatchNode(
             UiImage firstImage,
@@ -339,6 +341,17 @@ internal sealed class UiBatchScene : IClientTestScene
 
             _buttonPanel = new ButtonPanel(_firstImage);
             Children.Add(_buttonPanel);
+            _shapes =
+            [
+                new VectorPath { Data = CreateSolidArrowGeometry(), Fill = new SolidColorBrush(245, 210, 70) },
+                new VectorPath { Data = PathGeometry.Parse("M0 0 L12 12 L0 24"), Fill = null, Stroke = new SolidColorBrush(90, 210, 240), StrokeThickness = 3, StrokeLineJoin = StrokeLineJoin.Round },
+                new VectorPath { Data = PathGeometry.Parse("M0 20 C10 -15 30 55 40 20 A10 10 0 0 1 60 20"), Fill = null, Stroke = new SolidColorBrush(240, 150, 80), StrokeThickness = 2 },
+                new VectorPath { Data = PathGeometry.Parse("M0 0 H30 V30 H0 Z M8 8 H22 V22 H8 Z"), FillRule = ShapeFillRule.EvenOdd, Fill = new SolidColorBrush(160, 100, 230) },
+                new VectorPath { Data = PathGeometry.Parse("M0 0 L30 30 M30 0 L0 30"), Fill = null, Stroke = new SolidColorBrush(240, 90, 100, 128), StrokeThickness = 6, StrokeLineCap = StrokeLineCap.Round },
+                new Ellipse { Fill = new SolidColorBrush(80, 210, 130, 180), Stroke = new SolidColorBrush(230, 245, 235), StrokeThickness = 2 }
+            ];
+            foreach (var shape in _shapes)
+                Children.Add(shape);
         }
 
         internal bool Dense { get; set; }
@@ -357,6 +370,8 @@ internal sealed class UiBatchScene : IClientTestScene
             foreach (var brushPanel in _brushPanels)
                 brushPanel.Measure(Size.Infinite);
             _buttonPanel.Measure(new Size(560, 150));
+            foreach (var shape in _shapes)
+                shape.Measure(new Size(70, 42));
 
             return Size.Zero;
         }
@@ -398,6 +413,8 @@ internal sealed class UiBatchScene : IClientTestScene
                     Scale(brushBounds[index], layoutScale, offsetX, offsetY));
             _buttonPanel.Arrange(
                 Scale(new Rect(40, 720, 560, 150), layoutScale, offsetX, offsetY));
+            for (var index = 0; index < _shapes.Length; index++)
+                _shapes[index].Arrange(Scale(new Rect(40 + index * 94, 660, 70, 42), layoutScale, offsetX, offsetY));
         }
 
         protected override void DrawCore(UiDrawingContext context)
@@ -570,6 +587,14 @@ internal sealed class UiBatchScene : IClientTestScene
                 return new Point(logicalCenter.X * scale, logicalCenter.Y * scale);
             }
         }
+
+        private static PathGeometry CreateSolidArrowGeometry() =>
+            new PathBuilder()
+                .MoveTo(new Point(0, 0))
+                .LineTo(new Point(12, 12))
+                .LineTo(new Point(0, 24))
+                .Close()
+                .Build();
 
         private static Rect Scale(Rect rect, double layoutScale, double offsetX, double offsetY) =>
             new(

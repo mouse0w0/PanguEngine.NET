@@ -2,6 +2,7 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
+using Path = PanguEngine.Client.UI.Controls.Path;
 
 namespace PanguEngine.Tests.Client.UI.Styling;
 
@@ -53,6 +54,35 @@ public sealed class UiCssBindingTests
         var theme = new UiStyleResolver([], [UiStyleSheet.Parse("CustomConvNode { custom-conv-value: abcd; }")]);
 
         Assert.Equal(4d, theme.Resolve(new CustomConvNode()).GetValue(CustomConvNode.ValueProperty));
+    }
+
+    [Fact]
+    public void PathDataCssValueUsesThePathDataProperty()
+    {
+        var path = new Path { Data = PathGeometry.Parse("M0 0 L2 2") };
+        var theme = new UiStyleResolver([], [UiStyleSheet.Parse(
+            "Path { data: \"M0 0 L10 0 L0 10 Z\"; }")]);
+
+        var snapshot = theme.Resolve(path);
+        var data = snapshot.GetValue(Path.DataProperty);
+
+        Assert.Equal(new Rect(0, 0, 10, 10), data!.Bounds);
+        Assert.Same(Path.DataProperty, UiCssRegistry.FindProperty(typeof(Path), "data")!.Convert(
+            "M0 0 L1 1").Single().Property);
+        Assert.Null(UiCssRegistry.FindProperty(typeof(Path), "path-data"));
+        Assert.Null(UiCssRegistry.FindProperty(typeof(Path), "CssData"));
+    }
+
+    [Fact]
+    public void InvalidPathDataCssValueReportsThePathFormatError()
+    {
+        var theme = new UiStyleResolver([], [UiStyleSheet.Parse("Path { data: \"M0 0 L\"; }")]);
+
+        var error = Assert.Throws<UiStyleParseException>(() => theme.Resolve(new Path()));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        var formatError = Assert.IsType<FormatException>(error.InnerException);
+        Assert.Contains("offset", formatError.Message);
     }
 
     [Fact]

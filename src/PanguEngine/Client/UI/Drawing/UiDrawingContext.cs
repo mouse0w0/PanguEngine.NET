@@ -1,3 +1,4 @@
+using PanguEngine.Client.UI.Drawing.Geometry;
 using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI.Drawing;
@@ -153,6 +154,25 @@ public sealed class UiDrawingContext
             layout,
             fontSize,
             color));
+    }
+
+    /// <summary>
+    /// Appends a solid-color triangle mesh using local drawing coordinates.
+    /// </summary>
+    /// <param name="mesh">The immutable triangle mesh in the current local drawing coordinates.</param>
+    /// <param name="color">The non-premultiplied fill color.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="mesh"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when this context is inactive or on the wrong thread.
+    /// </exception>
+    internal void DrawGeometry(UiTriangleMesh mesh, Color color)
+    {
+        VerifyActive();
+        ArgumentNullException.ThrowIfNull(mesh);
+        if (color.A == 0 || mesh.Indices.Length == 0)
+            return;
+
+        _commands.Add(new UiDrawGeometryCommand(mesh, color));
     }
 
     /// <summary>

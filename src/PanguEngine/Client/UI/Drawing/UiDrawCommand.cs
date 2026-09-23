@@ -1,3 +1,4 @@
+using PanguEngine.Client.UI.Drawing.Geometry;
 using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI.Drawing;
@@ -153,6 +154,22 @@ public sealed class UiFillRectangleCommand : UiDrawCommand
     /// Gets the non-premultiplied fill color.
     /// </summary>
     public Color Color { get; }
+}
+
+/// <summary>
+/// Represents a solid-color triangle mesh draw in local drawing coordinates.
+/// </summary>
+internal sealed class UiDrawGeometryCommand : UiDrawCommand
+{
+    internal UiDrawGeometryCommand(UiTriangleMesh mesh, Color color)
+    {
+        Mesh = mesh;
+        Color = color;
+    }
+
+    internal UiTriangleMesh Mesh { get; }
+
+    internal Color Color { get; }
 }
 
 /// <summary>
