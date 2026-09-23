@@ -44,15 +44,30 @@ public sealed class UiScreenTests
         var panel = Assert.IsType<StackPanel>(Assert.Single(root.Children));
         var buttons = panel.Children.OfType<Button>().ToArray();
 
-        Assert.Equal(2, buttons.Length);
-        Assert.DoesNotContain("danger", buttons[0].Classes);
-        var exit = buttons[1];
+        Assert.Equal(3, buttons.Length);
+        Assert.DoesNotContain("danger", buttons.Single(button => button.Text == "回到游戏").Classes);
+        var exit = buttons.Single(button => button.Text == "退出游戏");
         Assert.Contains("danger", exit.Classes);
         Assert.Equal(new SolidColorBrush(104, 43, 45), exit.Background);
         Assert.Equal(new SolidColorBrush(157, 73, 77), exit.BorderBrush);
         Assert.Equal("Button.danger", Assert.Single(exit.GetStyleValueSources(Region.BackgroundProperty)).SelectorText);
         Assert.False(Assert.Single(exit.GetStyleValueSources(Region.BackgroundProperty)).IsMaskedByLocalValue);
         Assert.False(Assert.Single(exit.GetStyleValueSources(Region.BorderBrushProperty)).IsMaskedByLocalValue);
+    }
+
+    [Fact]
+    public void PauseScreenShowsUiShowcaseEntryBetweenResumeAndExit()
+    {
+        var screen = new PauseScreen();
+        var root = Assert.IsType<Panel>(screen.Root);
+        var panel = Assert.IsType<StackPanel>(Assert.Single(root.Children));
+        var buttons = panel.Children.OfType<Button>().ToArray();
+
+        Assert.Equal(
+            new[] { "回到游戏", "UI 展示", "退出游戏" },
+            buttons.Select(button => button.Text).ToArray());
+        var showcase = buttons.Single(button => button.Text == "UI 展示");
+        Assert.DoesNotContain("danger", showcase.Classes);
     }
 
     [Fact]

@@ -1,0 +1,83 @@
+.showcase-nav {
+    padding: 6px 10px;
+    background-color: #23272e;
+    border-brush: #3c434c;
+    border-thickness: 1px;
+    foreground: #d7dde5;
+}
+
+.showcase-nav:hover {
+    background-color: #2c3138;
+}
+
+.showcase-nav.selected {
+    background-color: #2f64a0;
+    border-brush: #54a9ff;
+    foreground: #ffffff;
+}
+
+.showcase-nav.selected:hover {
+    background-color: #356ea8;
+}
+
+.showcase-example-switch.selected {
+    background-color: #2f64a0;
+    border-brush: #54a9ff;
+}
+
+.showcase-example-switch.selected:hover {
+    background-color: #356ea8;
+}
+
+Text.showcase-heading {
+    font-size: 20px;
+    color: #f2f4f7;
+}
+
+Text.showcase-feedback {
+    font-size: 13px;
+    color: #b8c0cb;
+}
+
+Text.showcase-warning {
+    font-size: 13px;
+    color: #ffb454;
+}
+
+/* Style example: Author override and local value target. */
+.showcase-author-target {
+    background-color: #2f5b7a;
+    border-brush: #6fa8dc;
+}
+
+/* Style example: selector kinds. The default target keeps the base Button rule. */
+Button.showcase-typed {
+    background-color: #2b4a6f;
+    border-brush: #6fa8dc;
+}
+
+.showcase-classonly {
+    background-color: #4a3b6b;
+    border-brush: #b39ddb;
+}
+
+#showcase-id-target {
+    background-color: #6b3b2b;
+    border-brush: #e0a060;
+}
+
+*.showcase-wildcard {
+    background-color: #2f5b3a;
+    border-brush: #7fc08f;
+}
+
+/* Style example: combined pseudo classes only change render properties. */
+Button.showcase-combo {
+    background-color: #3a3f47;
+    border-brush: #6b7480;
+}
+
+Button.showcase-combo:hover:focus {
+    background-color: #7a4a1f;
+    border-brush: #ffd479;
+}

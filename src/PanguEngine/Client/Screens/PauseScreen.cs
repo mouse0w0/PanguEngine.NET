@@ -22,6 +22,7 @@ internal sealed class PauseScreen : UiScreen
             HorizontalAlignment = HorizontalAlignment.Center
         };
         var resumeButton = new Button { Text = "回到游戏", MinWidth = 220, MinHeight = 42 };
+        var showcaseButton = new Button { Text = "UI 展示", MinWidth = 220, MinHeight = 42 };
         var exitButton = new Button
         {
             Text = "退出游戏",
@@ -30,6 +31,7 @@ internal sealed class PauseScreen : UiScreen
         };
         exitButton.Classes.Add("danger");
         resumeButton.Click += (_, _) => ClientEngine.Current.Ui.Close();
+        showcaseButton.Click += (_, _) => ClientEngine.Current.Ui.Open(UiShowcaseScreen.CreateForClient());
         exitButton.Click += (_, _) => ClientEngine.Current.RequestShutdown();
 
         var panel = new StackPanel
@@ -47,6 +49,7 @@ internal sealed class PauseScreen : UiScreen
         };
         panel.Children.Add(title);
         panel.Children.Add(resumeButton);
+        panel.Children.Add(showcaseButton);
         panel.Children.Add(exitButton);
 
         var mask = new Panel
