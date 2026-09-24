@@ -17,7 +17,7 @@ public sealed class UiShowcaseStyleTests
         var showcase = ShowcaseTestSupport.LoadSheet("pangu/ui/showcase.css", "showcase");
         var overrides = ShowcaseTestSupport.LoadSheet("pangu/ui/showcase-overrides.css", "showcase-overrides");
 
-        var selectors = showcase.Rules.Select(rule => rule.Selector.SelectorText).ToArray();
+        var selectors = showcase.Rules.SelectMany(rule => rule.Selectors).Select(selector => selector.SelectorText).ToArray();
 
         Assert.Contains(".showcase-nav", selectors);
         Assert.Contains(".showcase-nav.selected", selectors);
@@ -33,7 +33,7 @@ public sealed class UiShowcaseStyleTests
 
         Assert.Equal(
             new[] { ".showcase-author-target" },
-            overrides.Rules.Select(rule => rule.Selector.SelectorText).ToArray());
+            overrides.Rules.SelectMany(rule => rule.Selectors).Select(selector => selector.SelectorText).ToArray());
     }
 
     [Fact]

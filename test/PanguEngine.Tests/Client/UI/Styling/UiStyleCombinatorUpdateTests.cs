@@ -14,14 +14,16 @@ public sealed class UiStyleCombinatorUpdateTests
         return panel;
     }
 
-    [Fact]
-    public void AncestorClassChangeRefreshesDescendantStyles()
+    [Theory]
+    [InlineData(".host .target")]
+    [InlineData(".unused, .host .target")]
+    public void AncestorClassChangeRefreshesDescendantStyles(string selector)
     {
         var host = MakePanel();
         var target = MakePanel("target");
         host.Children.Add(target);
         var screen = new UiScreen(host);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(selector + " { opacity: 0.4; }")]);
 
         Assert.Equal(1d, target.Opacity);
 
@@ -30,6 +32,23 @@ public sealed class UiStyleCombinatorUpdateTests
 
         host.Classes.Remove("host");
         Assert.Equal(1d, target.Opacity);
+    }
+
+    [Fact]
+    public void SelectorListAggregatesSiblingRefreshRange()
+    {
+        var first = MakePanel();
+        var second = MakePanel("target");
+        var root = MakePanel();
+        root.Children.Add(first);
+        root.Children.Add(second);
+        var screen = new UiScreen(root);
+        screen.SetStyleSheets([UiStyleSheet.Parse(
+            ".unused, .leader + .target { opacity: 0.4; }")]);
+
+        first.Classes.Add("leader");
+
+        Assert.Equal(0.4, second.Opacity);
     }
 
     [Fact]
@@ -52,14 +71,16 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, second.Opacity);
     }
 
-    [Fact]
-    public void AncestorIdChangeRefreshesDescendants()
+    [Theory]
+    [InlineData("#menu .target")]
+    [InlineData(".unused, #menu .target")]
+    public void AncestorIdChangeRefreshesDescendants(string selector)
     {
         var host = MakePanel();
         var target = MakePanel("target");
         host.Children.Add(target);
         var screen = new UiScreen(host);
-        screen.SetStyleSheets([UiStyleSheet.Parse("#menu .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(selector + " { opacity: 0.4; }")]);
 
         Assert.Equal(1d, target.Opacity);
 
@@ -67,14 +88,16 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(0.4, target.Opacity);
     }
 
-    [Fact]
-    public void AncestorPseudoClassChangeRefreshesDescendants()
+    [Theory]
+    [InlineData(".host:loading .target")]
+    [InlineData(".unused, .host:loading .target")]
+    public void AncestorPseudoClassChangeRefreshesDescendants(string selector)
     {
         var host = new PseudoPanel("host");
         var target = MakePanel("target");
         host.Children.Add(target);
         var screen = new UiScreen(host);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".host:loading .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(selector + " { opacity: 0.4; }")]);
 
         Assert.Equal(1d, target.Opacity);
 
@@ -85,8 +108,10 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
     }
 
-    [Fact]
-    public void SameScreenReparentRefreshesBothParents()
+    [Theory]
+    [InlineData("")]
+    [InlineData(".unused, ")]
+    public void SameScreenReparentRefreshesBothParents(string prefix)
     {
         var source = MakePanel("source");
         var destination = MakePanel("destination");
@@ -96,10 +121,9 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(source);
         root.Children.Add(destination);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            .source > .target { opacity: 0.4; }
-            .destination > .target { opacity: 0.7; }
-            """)]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(
+            prefix + ".source > .target { opacity: 0.4; }" +
+            prefix + ".destination > .target { opacity: 0.7; }")]);
 
         Assert.Equal(0.4, target.Opacity);
 
@@ -129,8 +153,10 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(0.7, target.Opacity);
     }
 
-    [Fact]
-    public void PromotingAChildToAnotherScreenRootRefreshesTheOldParent()
+    [Theory]
+    [InlineData("")]
+    [InlineData(".unused, ")]
+    public void PromotingAChildToAnotherScreenRootRefreshesTheOldParent(string prefix)
     {
         var leader = MakePanel("leader");
         var target = MakePanel("target");
@@ -138,7 +164,7 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(leader);
         root.Children.Add(target);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
         Assert.Equal(0.4, target.Opacity);
 
         var other = new UiScreen();
@@ -149,14 +175,16 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
     }
 
-    [Fact]
-    public void InsertingAPrecedingSiblingRefreshesFollowingSibling()
+    [Theory]
+    [InlineData("")]
+    [InlineData(".unused, ")]
+    public void InsertingAPrecedingSiblingRefreshesFollowingSibling(string prefix)
     {
         var target = MakePanel("target");
         var root = MakePanel();
         root.Children.Add(target);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
         Assert.Equal(1d, target.Opacity);
 
         var leader = MakePanel("leader");
@@ -165,8 +193,10 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(0.4, target.Opacity);
     }
 
-    [Fact]
-    public void RemovingAPrecedingSiblingRefreshesTheRemainingSibling()
+    [Theory]
+    [InlineData("")]
+    [InlineData(".unused, ")]
+    public void RemovingAPrecedingSiblingRefreshesTheRemainingSibling(string prefix)
     {
         var leader = MakePanel("leader");
         var target = MakePanel("target");
@@ -174,7 +204,7 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(leader);
         root.Children.Add(target);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
         Assert.Equal(0.4, target.Opacity);
 
         root.Children.Remove(leader);
@@ -182,8 +212,10 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
     }
 
-    [Fact]
-    public void ReplacingAPrecedingSiblingRefreshesTheFollowingSibling()
+    [Theory]
+    [InlineData("")]
+    [InlineData(".unused, ")]
+    public void ReplacingAPrecedingSiblingRefreshesTheFollowingSibling(string prefix)
     {
         var old = MakePanel();
         var target = MakePanel("target");
@@ -191,7 +223,7 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(old);
         root.Children.Add(target);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
         Assert.Equal(1d, target.Opacity);
 
         root.Children[0] = MakePanel("leader");
@@ -199,8 +231,10 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(0.4, target.Opacity);
     }
 
-    [Fact]
-    public void ClearingChildrenResolvesMovedOutSubtreesWithTheDefaultResolver()
+    [Theory]
+    [InlineData("")]
+    [InlineData(".unused, ")]
+    public void ClearingChildrenResolvesMovedOutSubtreesWithTheDefaultResolver(string prefix)
     {
         var host = MakePanel("host");
         var child = MakePanel("target");
@@ -208,7 +242,7 @@ public sealed class UiStyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(host);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".host .target { opacity: 0.4; }")]);
         Assert.Equal(0.4, child.Opacity);
 
         host.Children.Clear();
@@ -218,8 +252,10 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, child.Opacity);
     }
 
-    [Fact]
-    public void ReorderingSiblingsRefreshesSiblingRules()
+    [Theory]
+    [InlineData("")]
+    [InlineData(".unused, ")]
+    public void ReorderingSiblingsRefreshesSiblingRules(string prefix)
     {
         var leader = MakePanel("leader");
         var target = MakePanel("target");
@@ -227,7 +263,7 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(leader);
         root.Children.Add(target);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
         Assert.Equal(0.4, target.Opacity);
 
         root.Children.Move(1, 0);

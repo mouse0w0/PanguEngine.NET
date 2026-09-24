@@ -245,6 +245,37 @@ public sealed class UiCssBindingTests
     }
 
     [Fact]
+    public void SelectorListWithSameBindingTargetConvertsOncePerNodeType()
+    {
+        CountingNode.Conversions = 0;
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            ".first, .second { counted-value: abc; }")]);
+        var node = new CountingNode();
+        node.Classes.Add("first");
+        node.Classes.Add("second");
+
+        Assert.Equal(3d, resolver.Resolve(node).GetValue(CountingNode.ValueProperty));
+        Assert.Equal(1, CountingNode.Conversions);
+        node.Classes.Remove("first");
+        Assert.Equal(".second", Assert.Single(resolver.Resolve(node).GetSources(CountingNode.ValueProperty)).SelectorText);
+        node.Classes.Remove("second");
+        Assert.Empty(resolver.Resolve(node).GetSources(CountingNode.ValueProperty));
+        node.Classes.Add("first");
+        Assert.Equal(3d, resolver.Resolve(node).GetValue(CountingNode.ValueProperty));
+        Assert.Equal(1, CountingNode.Conversions);
+    }
+
+    [Fact]
+    public void SelectorListPseudoClassStillRejectsLayoutProperty()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() =>
+            new UiStyleResolver([], [UiStyleSheet.Parse(
+                ".plain, :hover { padding: 4px; }")]).Resolve(new Button()));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
+    [Fact]
     public void StyleSheetApplicationFailureLeavesPreviousSourcesAndValue()
     {
         var button = new Button();

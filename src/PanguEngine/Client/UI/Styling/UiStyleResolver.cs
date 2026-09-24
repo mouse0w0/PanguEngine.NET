@@ -44,8 +44,8 @@ internal sealed class UiStyleResolver
             for (var ruleIndex = 0; ruleIndex < rules.Count; ruleIndex++)
             {
                 var rule = rules[ruleIndex];
-                HasRelationships |= rule.Selector.HasRelationships;
-                HasSiblingRelationships |= rule.Selector.HasSiblingRelationships;
+                HasRelationships |= rule.HasRelationships;
+                HasSiblingRelationships |= rule.HasSiblingRelationships;
                 _rules.Add(new RuleEntry(origin, sheetIndex, ruleIndex, rule, declarationIndex));
                 declarationIndex += rule.DeclarationCount;
             }
@@ -68,8 +68,8 @@ internal sealed class UiStyleResolver
             {
                 var key = new CascadeKey(
                     entry.Origin,
-                    entry.Rule.Selector.IdCount,
-                    entry.Rule.Selector.ClassAndPseudoCount,
+                    rule.Selector.IdCount,
+                    rule.Selector.ClassAndPseudoCount,
                     typeDepth,
                     entry.SheetIndex,
                     entry.DeclarationIndex);
@@ -99,7 +99,7 @@ internal sealed class UiStyleResolver
             }
 
             propertySources.Add(new UiStyleValueSource(
-                entry.Rule.Selector,
+                entry.Selector,
                 (entry.Origin == UiStyleOrigin.Base ? BaseStyleSheets : StyleSheets)[entry.SheetIndex].SourceName,
                 entry.Origin,
                 entry.SheetIndex,
@@ -139,29 +139,40 @@ internal sealed class UiStyleResolver
             var rules = new List<BoundRuleEntry>();
             foreach (var entry in _rules)
             {
-                var targetType = entry.Rule.Selector.MatchTargetType(nodeType);
-                if (targetType is null)
-                    continue;
-
-                var bound = entry.Rule.Bind(targetType);
-                var declarations = new List<DeclarationEntry>();
-                foreach (var declaration in bound)
+                var bindings = new Dictionary<Type, IReadOnlyList<UiStyleRule.BoundDeclaration>>();
+                for (var branchIndex = 0; branchIndex < entry.Rule.Selectors.Count; branchIndex++)
                 {
-                    foreach (var setter in declaration.Setter.Expand())
+                    var selector = entry.Rule.Selectors[branchIndex];
+                    var targetType = selector.MatchTargetType(nodeType);
+                    if (targetType is null)
+                        continue;
+
+                    if (!bindings.TryGetValue(targetType, out var bound))
                     {
-                        declarations.Add(new DeclarationEntry(
-                            entry.Origin,
-                            entry.SheetIndex,
-                            entry.RuleIndex,
-                            entry.Rule,
-                            setter,
-                            entry.DeclarationIndex + declaration.DeclarationIndex,
-                            declaration.CssPropertyName,
-                            declaration.SourceLocation));
+                        bound = entry.Rule.Bind(targetType);
+                        bindings.Add(targetType, bound);
                     }
+
+                    var declarations = new List<DeclarationEntry>();
+                    foreach (var declaration in bound)
+                    {
+                        foreach (var setter in declaration.Setter.Expand())
+                        {
+                            declarations.Add(new DeclarationEntry(
+                                entry.Origin,
+                                entry.SheetIndex,
+                                entry.RuleIndex,
+                                selector,
+                                setter,
+                                entry.DeclarationIndex + declaration.DeclarationIndex,
+                                declaration.CssPropertyName,
+                                declaration.SourceLocation));
+                        }
+                    }
+
+                    if (declarations.Count > 0)
+                        rules.Add(new BoundRuleEntry(branchIndex, selector, declarations.ToArray()));
                 }
-                if (declarations.Count > 0)
-                    rules.Add(new BoundRuleEntry(entry.Rule.Selector, declarations.ToArray()));
             }
 
             if (_boundRules.TryGetValue(nodeType, out var published))
@@ -187,6 +198,7 @@ internal sealed class UiStyleResolver
         int DeclarationIndex);
 
     private readonly record struct BoundRuleEntry(
+        int BranchIndex,
         UiStyleSelector Selector,
         DeclarationEntry[] Declarations);
 
@@ -194,7 +206,7 @@ internal sealed class UiStyleResolver
         UiStyleOrigin Origin,
         int SheetIndex,
         int RuleIndex,
-        UiStyleRule Rule,
+        UiStyleSelector Selector,
         UiStyleSetter Setter,
         int DeclarationIndex,
         string? CssPropertyName,

@@ -129,10 +129,60 @@ public sealed class UiStyleRuleTests
     {
         var rule = Assert.Single(UiStyleSheet.Parse("Button.primary { }").Rules);
 
-        Assert.Null(rule.Selector.TargetType);
-        Assert.Equal("Button", rule.Selector.TypeName);
-        Assert.Equal("Button.primary", rule.Selector.SelectorText);
+        Assert.Single(rule.Selectors);
+        Assert.Null(rule.Selectors[0].TargetType);
+        Assert.Equal("Button", rule.Selectors[0].TypeName);
+        Assert.Equal("Button.primary", rule.Selectors[0].SelectorText);
         Assert.Empty(rule.Setters);
+    }
+
+    [Fact]
+    public void RuleCopiesSelectorsAndKeepsDuplicateBranches()
+    {
+        var selectors = new List<UiStyleSelector>
+        {
+            UiStyleSelector.For<Button>(),
+            UiStyleSelector.For<Panel>(),
+            UiStyleSelector.For<Button>(),
+        };
+        var rule = new UiStyleRule(selectors, []);
+
+        selectors.Clear();
+
+        Assert.Equal(3, rule.Selectors.Count);
+        Assert.Equal(typeof(Button), rule.Selectors[0].TargetType);
+        Assert.Equal(typeof(Panel), rule.Selectors[1].TargetType);
+        Assert.Equal(typeof(Button), rule.Selectors[2].TargetType);
+        Assert.Throws<NotSupportedException>(() => ((IList<UiStyleSelector>)rule.Selectors).Clear());
+    }
+
+    [Fact]
+    public void RuleRejectsEmptyOrNullSelectorList()
+    {
+        Assert.Throws<ArgumentException>(() => new UiStyleRule([], []));
+        Assert.Throws<ArgumentException>(() => new UiStyleRule(new UiStyleSelector[] { null! }, []));
+    }
+
+    [Fact]
+    public void MultiSelectorRuleValidatesSetterAgainstEveryClrTarget()
+    {
+        var selectors = new[] { UiStyleSelector.For<Button>(), UiStyleSelector.For<UiNode>() };
+        var setter = UiStyleSetter.Create(Region.BackgroundProperty, new SolidColorBrush(1, 2, 3));
+
+        Assert.Throws<ArgumentException>(() => new UiStyleRule(selectors, [setter]));
+    }
+
+    [Fact]
+    public void MultiSelectorRuleRejectsLayoutSetterWhenAnyBranchHasPseudoClass()
+    {
+        var selectors = new[]
+        {
+            UiStyleSelector.For<Button>(),
+            UiStyleSelector.For<Button>(pseudoClasses: [UiPseudoClass.Hover]),
+        };
+        var setter = UiStyleSetter.Create(Region.PaddingProperty, new Thickness(8));
+
+        Assert.Throws<ArgumentException>(() => new UiStyleRule(selectors, [setter]));
     }
 
     [Fact]
@@ -181,7 +231,7 @@ public sealed class UiStyleRuleTests
     [InlineData("Button")]
     public void ParsedSelectorHasNoClrTargetAndZeroDepth(string text)
     {
-        var selector = Assert.Single(UiStyleSheet.Parse(text + " { }").Rules).Selector;
+        var selector = Assert.Single(UiStyleSheet.Parse(text + " { }").Rules).Selectors[0];
 
         Assert.Null(selector.TargetType);
         Assert.Equal(0, selector.TargetTypeDepth);

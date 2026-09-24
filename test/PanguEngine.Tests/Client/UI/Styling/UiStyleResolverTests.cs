@@ -145,6 +145,85 @@ public sealed class UiStyleResolverTests
     }
 
     [Fact]
+    public void SelectorListAppliesOneDeclarationWhenAnyBranchMatches()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            ".missing, .active { opacity: 0.4; }")]);
+        var button = new Button();
+        button.Classes.Add("active");
+
+        Assert.Equal(0.4, resolver.Resolve(button).GetValue(UiNode.OpacityProperty));
+    }
+
+    [Fact]
+    public void SelectorListUsesHighestMatchingBranchSpecificity()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            ".active, #target { opacity: 0.4; } Button.active { opacity: 0.8; }")]);
+        var button = new Button { StyleId = "target" };
+        button.Classes.Add("active");
+
+        var result = resolver.Resolve(button);
+        var source = Assert.Single(result.GetSources(UiNode.OpacityProperty));
+
+        Assert.Equal(0.4, result.GetValue(UiNode.OpacityProperty));
+        Assert.Equal("#target", source.SelectorText);
+    }
+
+    [Fact]
+    public void EqualMatchingBranchSpecificityKeepsFirstBranchSource()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            ".first, .second { opacity: 0.4; }")]);
+        var button = new Button();
+        button.Classes.Add("first");
+        button.Classes.Add("second");
+
+        var source = Assert.Single(resolver.Resolve(button).GetSources(UiNode.OpacityProperty));
+
+        Assert.Equal(".first", source.SelectorText);
+    }
+
+    [Fact]
+    public void DuplicateMatchingBranchesApplyOneDeclaration()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            ".active, .active { opacity: 0.4; }")]);
+        var button = new Button();
+        button.Classes.Add("active");
+
+        var result = resolver.Resolve(button);
+
+        Assert.Equal(0.4, result.GetValue(UiNode.OpacityProperty));
+        Assert.Single(result.GetSources(UiNode.OpacityProperty));
+    }
+
+    [Fact]
+    public void UnmatchedHighSpecificityBranchDoesNotAffectMatchingBranch()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            "#absent, .active { opacity: 0.4; }\nButton.active { opacity: 0.8; }")]);
+        var button = new Button();
+        button.Classes.Add("active");
+
+        var result = resolver.Resolve(button);
+
+        Assert.Equal(0.8, result.GetValue(UiNode.OpacityProperty));
+        Assert.Equal("Button.active", Assert.Single(result.GetSources(UiNode.OpacityProperty)).SelectorText);
+    }
+
+    [Fact]
+    public void SelectorListCanBindDifferentTargetTypesWithoutDroppingAvailableProperties()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            "Region#target, Button.active { font-size: 12px; }")]);
+        var button = new Button { StyleId = "target" };
+        button.Classes.Add("active");
+
+        Assert.Equal(12, resolver.Resolve(button).GetValue(Button.FontSizeProperty));
+    }
+
+    [Fact]
     public void CssTargetDepthWinsBeforeRuleOrder()
     {
         var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""

@@ -8,7 +8,7 @@ namespace PanguEngine.Tests.Client.UI.Styling;
 public sealed class UiStyleCombinatorTests
 {
     private static UiStyleSelector Selector(string css) =>
-        Assert.Single(UiStyleSheet.Parse(css + " { }").Rules).Selector;
+        Assert.Single(UiStyleSheet.Parse(css + " { }").Rules).Selectors[0];
 
     private static UiStyleRule SingleRule(string css) =>
         Assert.Single(UiStyleSheet.Parse(css).Rules);
@@ -40,6 +40,16 @@ public sealed class UiStyleCombinatorTests
     public void NormalizesCombinatorSelectors(string text, string normalized)
     {
         Assert.Equal(normalized, Selector(text).SelectorText);
+    }
+
+    [Fact]
+    public void SelectorListPreservesIndependentCombinatorBranches()
+    {
+        var rule = SingleRule(".a > .b, .c ~ .d { }");
+
+        Assert.Equal([".a > .b", ".c ~ .d"], rule.Selectors.Select(selector => selector.SelectorText));
+        Assert.True(rule.Selectors[0].HasRelationships);
+        Assert.True(rule.Selectors[1].HasSiblingRelationships);
     }
 
     [Theory]
@@ -122,7 +132,7 @@ public sealed class UiStyleCombinatorTests
     {
         var rule = Assert.Single(UiStyleSheet.Parse("Button/*x*/.primary { }", "comments.css").Rules);
 
-        Assert.Equal("Button.primary", rule.Selector.SelectorText);
+        Assert.Equal("Button.primary", rule.Selectors[0].SelectorText);
         Assert.Equal("Button/*x*/.primary".Length, rule.SourceLocation!.Length);
     }
 
@@ -138,7 +148,6 @@ public sealed class UiStyleCombinatorTests
     [InlineData("A >", 4)]
     [InlineData("A/**/B", 6)]
     [InlineData("But/**/ton", 8)]
-    [InlineData(".a, .b", 3)]
     public void InvalidCombinatorSyntaxReportsPosition(string css, int column)
     {
         var error = Assert.Throws<UiStyleParseException>(() => UiStyleSheet.Parse(css));
@@ -177,14 +186,11 @@ public sealed class UiStyleCombinatorTests
     }
 
     [Fact]
-    public void FunctionAndCommaSyntaxRemainUnsupported()
+    public void FunctionSyntaxRemainsUnsupported()
     {
         Assert.Equal(
             UiStyleParseError.InvalidSyntax,
             Assert.Throws<UiStyleParseException>(() => UiStyleSheet.Parse("Button:not(.primary) { }")).Error);
-        Assert.Equal(
-            UiStyleParseError.InvalidSyntax,
-            Assert.Throws<UiStyleParseException>(() => UiStyleSheet.Parse("Button, Button { }")).Error);
     }
 
     [Fact]

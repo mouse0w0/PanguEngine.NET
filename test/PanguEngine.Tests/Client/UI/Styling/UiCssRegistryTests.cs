@@ -442,7 +442,7 @@ public sealed class UiCssRegistryTests
     }
 
     private static UiStyleSelector SingleSelector(string name) =>
-        Assert.Single(UiStyleSheet.Parse($"{name} {{ }}").Rules).Selector;
+        Assert.Single(UiStyleSheet.Parse($"{name} {{ }}").Rules).Selectors[0];
 
     private static void AssertBindInvalid(string css)
     {

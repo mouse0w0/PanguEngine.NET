@@ -29,7 +29,7 @@ public sealed class UiStyleValueSource
         IsMaskedByLocalValue = isMaskedByLocalValue;
     }
 
-    /// <summary>Gets the selector whose declaration won.</summary>
+    /// <summary>Gets the matching selector branch whose declaration won for this component.</summary>
     public UiStyleSelector Selector { get; }
 
     /// <summary>Gets the source name of the sheet that owns the winning declaration.</summary>

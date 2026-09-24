@@ -77,48 +77,18 @@ internal static class UiStyleParser
         private UiStyleRule ParseRule()
         {
             var selectorStart = GetMark();
-            var segments = new List<UiStyleSelectorSegment>();
-            var combinators = new List<UiStyleCombinator>();
-            var selectorEnd = ParseCompoundSegment(segments);
-
-            while (true)
+            var selectors = new List<UiStyleSelector>
             {
-                var sawWhitespace = SkipTrivia();
-                if (_pos >= text.Length)
-                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+                ParseSelectorChain(out var selectorEnd)
+            };
 
-                var c = text[_pos];
-                if (c == '{')
-                    break;
-
-                var explicitCombinator = c switch
-                {
-                    '>' => UiStyleCombinator.Child,
-                    '+' => UiStyleCombinator.AdjacentSibling,
-                    '~' => UiStyleCombinator.SubsequentSibling,
-                    _ => (UiStyleCombinator?)null,
-                };
-
-                if (explicitCombinator is { } combinator)
-                {
-                    Advance();
-                    SkipTrivia();
-                    selectorEnd = ParseCompoundSegment(segments);
-                    combinators.Add(combinator);
-                    continue;
-                }
-
-                if (!sawWhitespace)
-                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
-
-                if (!IsIdentifierStart(c) && c is not ('*' or '.' or '#' or ':'))
-                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
-
-                selectorEnd = ParseCompoundSegment(segments);
-                combinators.Add(UiStyleCombinator.Descendant);
+            while (text[_pos] == ',')
+            {
+                Advance();
+                SkipTrivia();
+                selectors.Add(ParseSelectorChain(out selectorEnd));
             }
 
-            var selector = UiStyleSelector.Create(segments, combinators);
             var selectorLength = selectorEnd.Pos - selectorStart.Pos;
             var sourceLocation = new UiStyleSourceLocation(sourceName, selectorStart.Line, selectorStart.Column, selectorLength);
 
@@ -138,7 +108,50 @@ internal static class UiStyleParser
                 declarations.Add(ParseDeclaration());
             }
 
-            return UiStyleRule.FromCss(selector, declarations, sourceLocation);
+            return UiStyleRule.FromCss(selectors, declarations, sourceLocation);
+        }
+
+        private UiStyleSelector ParseSelectorChain(out Mark selectorEnd)
+        {
+            var segments = new List<UiStyleSelectorSegment>();
+            var combinators = new List<UiStyleCombinator>();
+            selectorEnd = ParseCompoundSegment(segments);
+
+            while (true)
+            {
+                var sawWhitespace = SkipTrivia();
+                if (_pos >= text.Length)
+                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+
+                var c = text[_pos];
+                if (c is '{' or ',')
+                    break;
+
+                var explicitCombinator = c switch
+                {
+                    '>' => UiStyleCombinator.Child,
+                    '+' => UiStyleCombinator.AdjacentSibling,
+                    '~' => UiStyleCombinator.SubsequentSibling,
+                    _ => (UiStyleCombinator?)null
+                };
+
+                if (explicitCombinator is { } combinator)
+                {
+                    Advance();
+                    SkipTrivia();
+                    selectorEnd = ParseCompoundSegment(segments);
+                    combinators.Add(combinator);
+                    continue;
+                }
+
+                if (!sawWhitespace || (!IsIdentifierStart(c) && c is not ('*' or '.' or '#' or ':')))
+                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+
+                selectorEnd = ParseCompoundSegment(segments);
+                combinators.Add(UiStyleCombinator.Descendant);
+            }
+
+            return UiStyleSelector.Create(segments, combinators);
         }
 
         private Mark ParseCompoundSegment(List<UiStyleSelectorSegment> segments)

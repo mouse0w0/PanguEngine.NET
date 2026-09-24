@@ -1,32 +1,38 @@
+using System.Collections.ObjectModel;
+
 namespace PanguEngine.Client.UI.Styling;
 
 /// <summary>
-/// Provides an immutable style rule with strongly typed setters or CSS declarations awaiting a matching node type.
+/// Provides an immutable style rule with one or more selectors sharing strongly typed setters or CSS declarations.
+/// Cascade specificity is calculated from the matching selector branch without combining contributions across branches.
 /// </summary>
 public sealed class UiStyleRule
 {
-    private readonly IReadOnlyList<CssDeclaration>? _cssDeclarations;
+    private readonly ReadOnlyCollection<CssDeclaration>? _cssDeclarations;
 
     /// <summary>Initializes a style rule.</summary>
-    /// <param name="selector">The selector that matches target nodes.</param>
+    /// <param name="selectors">The selectors that match target nodes.</param>
     /// <param name="setters">The setters; duplicate property and component pairs keep the last declaration.</param>
     /// <param name="sourceLocation">The optional source location for parsed rules.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="selector"/> or <paramref name="setters"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="selectors"/> or <paramref name="setters"/> is null.</exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when a setter targets an incompatible or input-invalidating property, or a pseudo-class rule sets a layout property.
+    /// Thrown when the selector list is empty or contains null, when a setter targets an incompatible or input-invalidating
+    /// property, or when a pseudo-class rule sets a layout property.
     /// </exception>
-    public UiStyleRule(UiStyleSelector selector, IEnumerable<UiStyleSetter> setters, UiStyleSourceLocation? sourceLocation = null)
+    public UiStyleRule(IEnumerable<UiStyleSelector> selectors, IEnumerable<UiStyleSetter> setters, UiStyleSourceLocation? sourceLocation = null)
     {
-        ArgumentNullException.ThrowIfNull(selector);
+        ArgumentNullException.ThrowIfNull(selectors);
         ArgumentNullException.ThrowIfNull(setters);
 
-        Selector = selector;
+        Selectors = CopySelectors(selectors);
         SourceLocation = sourceLocation;
+        var hasPseudoClasses = HasPseudoClasses;
 
         var ordered = new List<UiStyleSetter>();
         foreach (var setter in setters)
         {
-            ValidateSetter(selector.TargetType, selector.HasPseudoClasses, setter);
+            foreach (var selector in Selectors)
+                ValidateSetter(selector.TargetType, hasPseudoClasses, setter);
             for (var i = 0; i < ordered.Count; i++)
             {
                 if (ReferenceEquals(ordered[i].Property, setter.Property) && ordered[i].Component == setter.Component)
@@ -42,19 +48,28 @@ public sealed class UiStyleRule
         Setters = ordered.AsReadOnly();
     }
 
+    /// <summary>Initializes a style rule with one selector.</summary>
+    /// <param name="selector">The selector that matches target nodes.</param>
+    /// <param name="setters">The setters; duplicate property and component pairs keep the last declaration.</param>
+    /// <param name="sourceLocation">The optional source location for parsed rules.</param>
+    public UiStyleRule(UiStyleSelector selector, IEnumerable<UiStyleSetter> setters, UiStyleSourceLocation? sourceLocation = null)
+        : this([selector], setters, sourceLocation)
+    {
+    }
+
     private UiStyleRule(
-        UiStyleSelector selector,
+        IReadOnlyList<UiStyleSelector> selectors,
         UiStyleSourceLocation sourceLocation,
         IReadOnlyList<CssDeclaration> declarations)
     {
-        Selector = selector;
+        Selectors = CopySelectors(selectors);
         SourceLocation = sourceLocation;
         Setters = Array.Empty<UiStyleSetter>();
         _cssDeclarations = Array.AsReadOnly(declarations.ToArray());
     }
 
-    /// <summary>Gets the selector that matches target nodes.</summary>
-    public UiStyleSelector Selector { get; }
+    /// <summary>Gets the selectors that share this rule's declarations, in source order.</summary>
+    public IReadOnlyList<UiStyleSelector> Selectors { get; }
 
     /// <summary>Gets the ordered, de-duplicated C# setters; parsed CSS rules expose no setters before binding.</summary>
     public IReadOnlyList<UiStyleSetter> Setters { get; }
@@ -62,19 +77,28 @@ public sealed class UiStyleRule
     /// <summary>Gets the optional source location of the parsed rule.</summary>
     public UiStyleSourceLocation? SourceLocation { get; }
 
+    /// <summary>Gets whether any selector in this rule contains a relationship combinator.</summary>
+    internal bool HasRelationships => Selectors.Any(static selector => selector.HasRelationships);
+
+    /// <summary>Gets whether any selector in this rule contains a sibling combinator.</summary>
+    internal bool HasSiblingRelationships => Selectors.Any(static selector => selector.HasSiblingRelationships);
+
+    /// <summary>Gets whether any selector in this rule requires a pseudo class.</summary>
+    internal bool HasPseudoClasses => Selectors.Any(static selector => selector.HasPseudoClasses);
+
     internal int DeclarationCount => _cssDeclarations?.Count ?? Setters.Count;
 
     internal static UiStyleRule FromCss(
-        UiStyleSelector selector,
+        IReadOnlyList<UiStyleSelector> selectors,
         IReadOnlyList<CssDeclaration> declarations,
         UiStyleSourceLocation sourceLocation) =>
-        new(selector, sourceLocation, declarations);
+        new(selectors, sourceLocation, declarations);
 
     internal IReadOnlyList<BoundDeclaration> Bind(Type targetType)
     {
         if (_cssDeclarations is null)
         {
-            if (Selector.TargetType is null)
+            if (Selectors.Any(static selector => selector.TargetType is null))
             {
                 foreach (var setter in Setters)
                     ValidateSetterTarget(targetType, setter);
@@ -106,7 +130,7 @@ public sealed class UiStyleRule
             {
                 try
                 {
-                    ValidateSetter(targetType, Selector.HasPseudoClasses, setter);
+                    ValidateSetter(targetType, HasPseudoClasses, setter);
                     foreach (var component in setter.Expand())
                     {
                         if (!components.Add((component.Property, component.Component)))
@@ -123,6 +147,16 @@ public sealed class UiStyleRule
         }
 
         return declarations.AsReadOnly();
+    }
+
+    private static ReadOnlyCollection<UiStyleSelector> CopySelectors(IEnumerable<UiStyleSelector> selectors)
+    {
+        var copied = selectors.ToArray();
+        if (copied.Length == 0)
+            throw new ArgumentException("A style rule must contain at least one selector.", nameof(selectors));
+        if (copied.Any(static (UiStyleSelector? selector) => selector is null))
+            throw new ArgumentException("A style rule cannot contain a null selector.", nameof(selectors));
+        return Array.AsReadOnly(copied);
     }
 
     private static UiStyleParseException CreateError(

@@ -39,14 +39,15 @@ public sealed class UiStyleParserTests
             """, "menu.css");
 
         var rule = Assert.Single(sheet.Rules);
-        Assert.Null(rule.Selector.TargetType);
-        Assert.Equal("Button", rule.Selector.TypeName);
-        Assert.Equal(new[] { "primary" }, rule.Selector.Classes);
-        Assert.Equal("save", rule.Selector.Id);
-        Assert.Equal(new[] { "focus", "hover" }, rule.Selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Same(UiPseudoClass.Focus, rule.Selector.PseudoClasses[0]);
-        Assert.Same(UiPseudoClass.Hover, rule.Selector.PseudoClasses[1]);
-        Assert.Equal("Button.primary#save:focus:hover", rule.Selector.SelectorText);
+        var selector = rule.Selectors[0];
+        Assert.Null(selector.TargetType);
+        Assert.Equal("Button", selector.TypeName);
+        Assert.Equal(new[] { "primary" }, selector.Classes);
+        Assert.Equal("save", selector.Id);
+        Assert.Equal(new[] { "focus", "hover" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Same(UiPseudoClass.Focus, selector.PseudoClasses[0]);
+        Assert.Same(UiPseudoClass.Hover, selector.PseudoClasses[1]);
+        Assert.Equal("Button.primary#save:focus:hover", selector.SelectorText);
         Assert.Equal("menu.css", sheet.SourceName);
 
         var setters = rule.Bind(typeof(Button));
@@ -66,7 +67,7 @@ public sealed class UiStyleParserTests
     [InlineData("Button.danger:hover#save", "Button", "Button.danger#save:hover")]
     public void ParsesUnqualifiedSelector(string text, string typeName, string normalized)
     {
-        var selector = Assert.Single(ParseCss(text + " { }").Rules).Selector;
+        var selector = Assert.Single(ParseCss(text + " { }").Rules).Selectors[0];
 
         Assert.Null(selector.TargetType);
         Assert.Equal(typeName, selector.TypeName);
@@ -80,8 +81,8 @@ public sealed class UiStyleParserTests
     [InlineData(".danger#save:hover")]
     public void ExplicitAndOmittedWildcardHaveSameNormalizedRepresentation(string conditions)
     {
-        var omitted = SingleRule(conditions + " { }").Selector;
-        var explicitWildcard = SingleRule("*" + conditions + " { }").Selector;
+        var omitted = SingleRule(conditions + " { }").Selectors[0];
+        var explicitWildcard = SingleRule("*" + conditions + " { }").Selectors[0];
 
         Assert.Equal("*", omitted.TypeName);
         Assert.Equal(omitted.TypeName, explicitWildcard.TypeName);
@@ -92,7 +93,7 @@ public sealed class UiStyleParserTests
     [Fact]
     public void UnqualifiedSelectorDeduplicatesClassesAndPseudoClasses()
     {
-        var selector = SingleRule(".danger.danger:hover:hover { }").Selector;
+        var selector = SingleRule(".danger.danger:hover:hover { }").Selectors[0];
 
         Assert.Equal(".danger:hover", selector.SelectorText);
         Assert.Equal(new[] { "danger" }, selector.Classes);
@@ -169,7 +170,7 @@ public sealed class UiStyleParserTests
     {
         var css = "Button {\r\n\twidth: 1;\r\n}\r\nCanvas {\r\n\theight: bad;\r\n}\r\n";
 
-        var rule = Assert.Single(ParseCss(css, "crlf.css").Rules.Where(r => r.Selector.TypeName == "Canvas"));
+        var rule = Assert.Single(ParseCss(css, "crlf.css").Rules.Where(r => r.Selectors[0].TypeName == "Canvas"));
         var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Canvas)));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
@@ -193,16 +194,16 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("Button.a.b.c:hover:focus:disabled { }");
 
-        Assert.Equal(new[] { "a", "b", "c" }, rule.Selector.Classes);
-        Assert.Equal(new[] { "disabled", "focus", "hover" }, rule.Selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Null(rule.Selector.Id);
+        Assert.Equal(new[] { "a", "b", "c" }, rule.Selectors[0].Classes);
+        Assert.Equal(new[] { "disabled", "focus", "hover" }, rule.Selectors[0].PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Null(rule.Selectors[0].Id);
         Assert.Empty(rule.Setters);
     }
 
     [Fact]
     public void WhitespaceCreatesADescendantRelationship()
     {
-        var selector = SingleRule("Button .primary { }").Selector;
+        var selector = SingleRule("Button .primary { }").Selectors[0];
 
         Assert.Equal("*", selector.TypeName);
         Assert.Equal(new[] { "primary" }, selector.Classes);
@@ -304,13 +305,61 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void CommaGroupingReportsInvalidSyntax()
+    public void CommaGroupingPreservesDuplicateBranchesInOneRule()
     {
-        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("Button, Button { }"));
+        var rule = Assert.Single(ParseCss("Button, Button { }").Rules);
+        Assert.Equal(["Button", "Button"], rule.Selectors.Select(selector => selector.SelectorText));
+    }
+
+    [Fact]
+    public void CommaSelectorsShareOneRuleAndSourceSpan()
+    {
+        const string css = ".a,\n.b /*between*/, .c   { opacity: 0.5; }";
+
+        var sheet = ParseCss(css, "list.css");
+        var rule = Assert.Single(sheet.Rules);
+
+        Assert.Equal([".a", ".b", ".c"], rule.Selectors.Select(selector => selector.SelectorText));
+        Assert.Equal(css.IndexOf(".c") + ".c".Length, rule.SourceLocation!.Length);
+        Assert.Equal(1, rule.SourceLocation.Line);
+        Assert.Equal(1, rule.SourceLocation.Column);
+        Assert.Equal("list.css", rule.SourceLocation.SourceName);
+    }
+
+    [Theory]
+    [InlineData(".a,", 4)]
+    [InlineData(".a,,.b", 4)]
+    [InlineData(".a, { }", 5)]
+    [InlineData(".a, ,.b", 5)]
+    [InlineData(".a, }", 5)]
+    [InlineData(".a, ;", 5)]
+    [InlineData(".a > , .b { }", 6)]
+    public void EmptyCommaBranchReportsInvalidSyntax(string css, int column)
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss(css));
 
         Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
         Assert.Equal(1, error.Line);
-        Assert.Equal(7, error.Column);
+        Assert.Equal(column, error.Column);
+    }
+
+    [Fact]
+    public void LeadingCommaKeepsTopLevelTrailingTokenDiagnostic()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss(", .a { }"));
+
+        Assert.Equal(UiStyleParseError.TrailingToken, error.Error);
+        Assert.Equal(1, error.Column);
+    }
+
+    [Theory]
+    [InlineData(".a/**/,/**/.b", ".a|.b")]
+    [InlineData(".a/*,*/.b,/*,*/.c", ".a.b|.c")]
+    public void CommasInsideCommentsDoNotCreateUnexpectedBranches(string css, string normalized)
+    {
+        var rule = Assert.Single(ParseCss(css + " { }").Rules);
+
+        Assert.Equal(normalized.Split('|'), rule.Selectors.Select(selector => selector.SelectorText));
     }
 
     [Fact]
@@ -318,14 +367,14 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("Ghost { }");
 
-        Assert.Equal("Ghost", rule.Selector.TypeName);
-        Assert.Null(rule.Selector.TargetType);
+        Assert.Equal("Ghost", rule.Selectors[0].TypeName);
+        Assert.Null(rule.Selectors[0].TargetType);
     }
 
     [Fact]
     public void UnknownPseudoClassIsAcceptedAsNamedCondition()
     {
-        var selector = SingleRule("Button:phantom { }").Selector;
+        var selector = SingleRule("Button:phantom { }").Selectors[0];
 
         Assert.Equal(new[] { "phantom" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
         Assert.Same(UiPseudoClass.Get("phantom"), Assert.Single(selector.PseudoClasses));
@@ -335,7 +384,7 @@ public sealed class UiStyleParserTests
     [Fact]
     public void PseudoClassNamesAreNormalizedDeduplicatedAndSortedByOrdinal()
     {
-        var selector = SingleRule("Button:LOADING:Hover:loading:hover { }").Selector;
+        var selector = SingleRule("Button:LOADING:Hover:loading:hover { }").Selectors[0];
 
         Assert.Equal(new[] { "hover", "loading" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
         Assert.Same(UiPseudoClass.Hover, selector.PseudoClasses[0]);
@@ -455,7 +504,7 @@ public sealed class UiStyleParserTests
     [Fact]
     public void BindingInitializesCanvasAttachedProperties()
     {
-        Assert.Equal("Panel", SingleRule("Panel { }").Selector.TypeName);
+        Assert.Equal("Panel", SingleRule("Panel { }").Selectors[0].TypeName);
 
         var expected = Canvas.LeftProperty;
         var setter = Assert.Single(BoundSetters("Button { left: 4; }", typeof(Button)));
@@ -526,6 +575,24 @@ public sealed class UiStyleParserTests
         var setter = Assert.Single(rule.Bind(typeof(DerivedStyleNode)));
 
         Assert.Same(DerivedStyleNode.ToneProperty, setter.Setter.Property);
+    }
+
+    [Fact]
+    public void SelectorListBindsSameCssNameToDistinctPropertiesOnlyForMatchingBranches()
+    {
+        var resolver = new UiStyleResolver([], [ParseCss(
+            "BaseStyleNode.base, DerivedStyleNode.derived { tone: bright; }")]);
+        var node = new DerivedStyleNode();
+        node.Classes.Add("derived");
+        var initial = resolver.Resolve(node);
+        Assert.Empty(initial.GetSources(BaseStyleNode.ToneProperty));
+        Assert.Equal("bright", initial.GetValue(DerivedStyleNode.ToneProperty));
+        node.Classes.Add("base");
+        var both = resolver.Resolve(node);
+        Assert.Equal("bright", both.GetValue(BaseStyleNode.ToneProperty));
+        Assert.Equal("bright", both.GetValue(DerivedStyleNode.ToneProperty));
+        Assert.Equal("BaseStyleNode.base", Assert.Single(both.GetSources(BaseStyleNode.ToneProperty)).SelectorText);
+        Assert.Equal("DerivedStyleNode.derived", Assert.Single(both.GetSources(DerivedStyleNode.ToneProperty)).SelectorText);
     }
 
     [Fact]

@@ -300,6 +300,27 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
+    public void SourceReportsWinningBranchFromSelectorList()
+    {
+        var button = new Button();
+        var screen = new UiScreen(button);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".plain, #target { opacity: 0.4; }")]);
+        button.Classes.Add("plain");
+        Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(UiNode.OpacityProperty)).SelectorText);
+        button.StyleId = "target";
+        button.Opacity = 0.9;
+        var source = Assert.Single(button.GetStyleValueSources(UiNode.OpacityProperty));
+        Assert.Equal("#target", source.SelectorText);
+        Assert.True(source.IsMaskedByLocalValue);
+        button.StyleId = null;
+        Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(UiNode.OpacityProperty)).SelectorText);
+        button.ClearValue(UiNode.OpacityProperty);
+        Assert.Equal(0.4, button.Opacity);
+        button.Classes.Remove("plain");
+        Assert.Equal(1d, button.Opacity);
+    }
+
+    [Fact]
     public void SourceQueryReturnsEmptyWithoutDeclarationAndRejectsWrongTarget()
     {
         var node = new Canvas();

@@ -121,7 +121,7 @@ public sealed class UiPseudoClassTests
     [Fact]
     public void CssParsingUsesTheSameIdentifiersAsTheFactory()
     {
-        var selector = Assert.Single(UiStyleSheet.Parse("Button:LOADING:Hover { }").Rules).Selector;
+        var selector = Assert.Single(UiStyleSheet.Parse("Button:LOADING:Hover { }").Rules).Selectors[0];
 
         Assert.Equal(2, selector.PseudoClasses.Count);
         Assert.Same(UiPseudoClass.Hover, selector.PseudoClasses[0]);
