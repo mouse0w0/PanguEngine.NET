@@ -617,6 +617,91 @@ public sealed class UiStyleParserTests
         Assert.Throws<ArgumentNullException>(() => UiStyleSheet.Parse((Stream)null!));
     }
 
+    [Theory]
+    [InlineData("0.5 !important")]
+    [InlineData("0.5!important")]
+    [InlineData("0.5 !ImPoRtAnT \t")]
+    [InlineData("0.5/* comment */!important")]
+    [InlineData("0.5 /*!important*/ !important /* tail */")]
+    public void ImportantSuffixIsRemovedBeforeConversion(string value)
+    {
+        var declaration = Assert.Single(BoundDeclarations($"UiNode {{ opacity: {value}; }}", typeof(UiNode)));
+
+        Assert.Equal(0.5, (double)declaration.Setter.BoxedValue!);
+        Assert.True(declaration.IsImportant);
+    }
+
+    [Theory]
+    [InlineData("!important")]
+    [InlineData("alpha !important !important")]
+    [InlineData("alpha !important beta")]
+    [InlineData("alpha !importantx")]
+    public void MalformedImportantIsRejectedBeforeCustomConversion(string value)
+    {
+        TrimNode.Received = null;
+        var rule = Assert.Single(ParseCss($"TrimNode {{\n  raw: {value};\n}}", "important.css").Rules);
+
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(TrimNode)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        Assert.Equal("important.css", error.SourceName);
+        Assert.Equal(2, error.Line);
+        Assert.Equal(8, error.Column);
+        Assert.Equal(value.Length, error.Length);
+        Assert.IsType<FormatException>(error.InnerException);
+        Assert.Null(TrimNode.Received);
+    }
+
+    [Fact]
+    public void ImportantSuffixPreservesInternalWhitespaceAndTrimsSuffixWhitespace()
+    {
+        var declaration = Assert.Single(BoundDeclarations(
+            "TrimNode { raw: alpha\t beta \t\r\n\f\v!important; }", typeof(TrimNode)));
+
+        Assert.Equal("alpha\t beta", declaration.Setter.BoxedValue);
+        Assert.Equal("alpha\t beta", TrimNode.Received);
+        Assert.True(declaration.IsImportant);
+    }
+
+    [Theory]
+    [InlineData("alpha ! important", "alpha ! important")]
+    [InlineData("alpha !/* comment */important", "alpha ! important")]
+    [InlineData("alpha !", "alpha !")]
+    [InlineData("alpha !foo", "alpha !foo")]
+    [InlineData("important", "important")]
+    [InlineData("alpha /*!important*/", "alpha")]
+    public void ValuesWithoutContinuousImportantMarkerKeepConverterSemantics(string value, string expected)
+    {
+        var declaration = Assert.Single(BoundDeclarations($"TrimNode {{ raw: {value}; }}", typeof(TrimNode)));
+
+        Assert.Equal(expected, declaration.Setter.BoxedValue);
+        Assert.False(declaration.IsImportant);
+    }
+
+    [Fact]
+    public void UnknownPropertyWithMalformedImportantIsIgnored()
+    {
+        Assert.Empty(BoundDeclarations("UiNode { ghost: !important !important; }", typeof(UiNode)));
+    }
+
+    [Fact]
+    public void EmptyValueStillFailsDuringParsing()
+    {
+        var error = Assert.Throws<UiStyleParseException>(() => ParseCss("UiNode { opacity: ; }"));
+
+        Assert.Equal(UiStyleParseError.InvalidSyntax, error.Error);
+    }
+
+    [Fact]
+    public void ImportantDoesNotBypassPseudoClassLayoutRestriction()
+    {
+        var rule = SingleRule("Button:hover { padding: 4 !important; }");
+
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
+
+        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+    }
+
     private sealed class FlagConvNode : UiNode
     {
         static FlagConvNode()

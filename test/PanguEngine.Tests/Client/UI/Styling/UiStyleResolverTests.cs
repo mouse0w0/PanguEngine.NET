@@ -532,6 +532,197 @@ public sealed class UiStyleResolverTests
         }
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ImportantBeatsMoreSpecificNormalRegardlessOfOrder(bool importantFirst)
+    {
+        const string important = "Button { opacity: 0.8 !important; }";
+        const string normal = "#save.primary { opacity: 0.1; }";
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            importantFirst ? important + normal : normal + important)]);
+        var button = new Button { StyleId = "save" };
+        button.Classes.Add("primary");
+
+        Assert.Equal(0.8, resolver.Resolve(button).GetValue(UiNode.OpacityProperty));
+    }
+
+    [Theory]
+    [InlineData(false, false, 0.6)]
+    [InlineData(false, true, 0.6)]
+    [InlineData(true, false, 0.2)]
+    [InlineData(true, true, 0.6)]
+    public void ImportancePrecedesOrigin(bool baseImportant, bool authorImportant, double expected)
+    {
+        var baseSheet = UiStyleSheet.Parse($"#save {{ opacity: 0.2{(baseImportant ? " !important" : "")}; }}");
+        var authorSheet = UiStyleSheet.Parse($"Button {{ opacity: 0.6{(authorImportant ? " !important" : "")}; }}");
+        var button = new Button { StyleId = "save" };
+
+        Assert.Equal(expected, new UiStyleResolver([baseSheet], [authorSheet])
+            .Resolve(button).GetValue(UiNode.OpacityProperty));
+    }
+
+    [Theory]
+    [InlineData("opacity: 0.8 !important; opacity: 0.1;", 0)]
+    [InlineData("opacity: 0.1; opacity: 0.8 !important;", 1)]
+    [InlineData("opacity: 0.1 !important; opacity: 0.8 !important;", 1)]
+    public void SameRuleImportanceAndOrderSelectOriginalSource(string declarations, int expectedIndex)
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse($"Button {{ {declarations} }}", "important.css")]);
+
+        var snapshot = resolver.Resolve(new Button());
+
+        Assert.Equal(0.8, snapshot.GetValue(UiNode.OpacityProperty));
+        var source = Assert.Single(snapshot.GetSources(UiNode.OpacityProperty));
+        Assert.Equal(expectedIndex, source.DeclarationIndex);
+        Assert.Equal("important.css", source.SheetSourceName);
+        Assert.Equal("opacity", source.CssPropertyName);
+        Assert.NotNull(source.SourceLocation);
+    }
+
+    [Theory]
+    [InlineData("#save", "Button", 0.2)]
+    [InlineData(".primary", "Button", 0.2)]
+    [InlineData("Button", "Control", 0.2)]
+    [InlineData("Button", "Button", 0.8)]
+    public void ImportantDeclarationsRetainSpecificityAndRuleOrder(string first, string second, double expected)
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            $"{first} {{ opacity: 0.2 !important; }} {second} {{ opacity: 0.8 !important; }}")]);
+        var button = new Button { StyleId = "save" };
+        button.Classes.Add("primary");
+
+        Assert.Equal(expected, resolver.Resolve(button).GetValue(UiNode.OpacityProperty));
+    }
+
+    [Fact]
+    public void ImportantDeclarationsRetainSheetOrder()
+    {
+        var first = UiStyleSheet.Parse("Button { opacity: 0.2 !important; }");
+        var second = UiStyleSheet.Parse("Button { opacity: 0.8 !important; }");
+        var snapshot = new UiStyleResolver([], [first, second]).Resolve(new Button());
+
+        Assert.Equal(0.8, snapshot.GetValue(UiNode.OpacityProperty));
+        Assert.Equal(1, Assert.Single(snapshot.GetSources(UiNode.OpacityProperty)).SheetIndex);
+    }
+
+    [Theory]
+    [InlineData("padding: 1px 2px !important;", "padding-left: 9px;", 2, 0)]
+    [InlineData("padding-left: 9px !important;", "padding: 1px 2px;", 9, 0)]
+    [InlineData("padding: 1px 2px !important;", "padding-left: 9px !important;", 9, 1)]
+    public void ImportantThicknessDeclarationsCascadePerEdge(string first, string second, double left, int leftIndex)
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse($"Button {{ {first} }} Button {{ {second} }}")]);
+        var snapshot = resolver.Resolve(new Button());
+
+        Assert.Equal(new Thickness(left, 1, 2, 1), snapshot.GetValue(Region.PaddingProperty));
+        var sources = snapshot.GetSources(Region.PaddingProperty);
+        Assert.Equal(4, sources.Count);
+        Assert.Equal(leftIndex, Assert.Single(sources.Where(source => source.Component == UiStyleEdge.Left)).DeclarationIndex);
+    }
+
+    [Fact]
+    public void ImportantCssBeatsProgrammaticSetter()
+    {
+        var css = UiStyleSheet.Parse("Button { opacity: 0.8 !important; }");
+        var code = Sheet(Rule(UiStyleSelector.For<Button>(id: "save"), UiStyleSetter.Create(UiNode.OpacityProperty, 0.1)));
+        var resolver = new UiStyleResolver([], [css, code]);
+
+        Assert.Equal(0.8, resolver.Resolve(new Button { StyleId = "save" }).GetValue(UiNode.OpacityProperty));
+        Assert.False(Assert.Single(code.Rules[0].Bind(typeof(Button))).IsImportant);
+    }
+
+    [Fact]
+    public void ImportantMetadataSurvivesBindingCacheAcrossNodeTypesAndStates()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            ".primary { opacity: 0.8 !important; } UiNode { opacity: 0.1; }")]);
+        foreach (var node in new UiNode[] { new Button(), new Panel(), new Button() })
+        {
+            Assert.Equal(0.1, resolver.Resolve(node).GetValue(UiNode.OpacityProperty));
+            node.Classes.Add("primary");
+            Assert.Equal(0.8, resolver.Resolve(node).GetValue(UiNode.OpacityProperty));
+            node.Classes.Remove("primary");
+            Assert.Equal(0.1, resolver.Resolve(node).GetValue(UiNode.OpacityProperty));
+        }
+    }
+
+    [Theory]
+    [InlineData("Button, .primary")]
+    [InlineData(".primary, Button")]
+    public void ImportantSelectorListBeatsNormalRuleAcrossNodeTypes(string selectors)
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            $"{selectors} {{ opacity: 0.8 !important; }} #save.primary {{ opacity: 0.1; }}")]);
+
+        foreach (var node in new UiNode[] { new Button(), new Panel(), new Button() })
+        {
+            node.StyleId = "save";
+            node.Classes.Add("primary");
+
+            var snapshot = resolver.Resolve(node);
+
+            Assert.Equal(0.8, snapshot.GetValue(UiNode.OpacityProperty));
+            var source = Assert.Single(snapshot.GetSources(UiNode.OpacityProperty));
+            Assert.Equal(".primary", source.SelectorText);
+            Assert.Equal(0, source.RuleIndex);
+            Assert.Equal(0, source.DeclarationIndex);
+        }
+    }
+
+    [Theory]
+    [InlineData("Button, #save")]
+    [InlineData("#save, Button")]
+    public void ImportantSelectorListUsesOnlyMatchingBranchSpecificity(string selectors)
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
+            $"{selectors} {{ opacity: 0.8 !important; }} .primary {{ opacity: 0.4 !important; }}")]);
+        var button = new Button { StyleId = "save" };
+        button.Classes.Add("primary");
+
+        foreach (var matchesId in new[] { true, false, true })
+        {
+            button.StyleId = matchesId ? "save" : "other";
+            var snapshot = resolver.Resolve(button);
+
+            Assert.Equal(matchesId ? 0.8 : 0.4, snapshot.GetValue(UiNode.OpacityProperty));
+            var source = Assert.Single(snapshot.GetSources(UiNode.OpacityProperty));
+            Assert.Equal(matchesId ? "#save" : ".primary", source.SelectorText);
+            Assert.Equal(matchesId ? 0 : 1, source.RuleIndex);
+            Assert.Equal(matchesId ? 0 : 1, source.DeclarationIndex);
+        }
+    }
+
+    [Fact]
+    public void ImportantSelectorListPreservesEdgePriorityWhenCachedBranchChanges()
+    {
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""
+            .primary, .secondary { padding: 1px 2px !important; }
+            #save { padding-left: 9px; padding-top: 7px !important; }
+            """)]);
+        var button = new Button { StyleId = "save" };
+
+        foreach (var className in new[] { "primary", "secondary", "primary" })
+        {
+            button.Classes.Add(className);
+            var snapshot = resolver.Resolve(button);
+
+            Assert.Equal(new Thickness(2, 7, 2, 1), snapshot.GetValue(Region.PaddingProperty));
+            var sources = snapshot.GetSources(Region.PaddingProperty);
+            Assert.Equal(4, sources.Count);
+            foreach (var source in sources)
+            {
+                var isTop = source.Component == UiStyleEdge.Top;
+                Assert.Equal(isTop ? "#save" : $".{className}", source.SelectorText);
+                Assert.Equal(isTop ? 1 : 0, source.RuleIndex);
+                Assert.Equal(isTop ? 2 : 0, source.DeclarationIndex);
+                Assert.Equal(isTop ? "padding-top" : "padding", source.CssPropertyName);
+            }
+
+            button.Classes.Remove(className);
+        }
+    }
+
     private sealed class PseudoHost : UiNode
     {
         internal void Activate(UiPseudoClass pseudoClass, bool active) => SetPseudoClass(pseudoClass, active);

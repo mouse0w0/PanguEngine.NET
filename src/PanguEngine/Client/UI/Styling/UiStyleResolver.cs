@@ -67,6 +67,7 @@ internal sealed class UiStyleResolver
             foreach (var entry in rule.Declarations)
             {
                 var key = new CascadeKey(
+                    entry.IsImportant,
                     entry.Origin,
                     rule.Selector.IdCount,
                     rule.Selector.ClassAndPseudoCount,
@@ -166,7 +167,8 @@ internal sealed class UiStyleResolver
                                 setter,
                                 entry.DeclarationIndex + declaration.DeclarationIndex,
                                 declaration.CssPropertyName,
-                                declaration.SourceLocation));
+                                declaration.SourceLocation,
+                                declaration.IsImportant));
                         }
                     }
 
@@ -210,9 +212,11 @@ internal sealed class UiStyleResolver
         UiStyleSetter Setter,
         int DeclarationIndex,
         string? CssPropertyName,
-        UiStyleSourceLocation? SourceLocation);
+        UiStyleSourceLocation? SourceLocation,
+        bool IsImportant);
 
     private readonly struct CascadeKey(
+        bool isImportant,
         UiStyleOrigin origin,
         int idCount,
         int classAndPseudoCount,
@@ -220,6 +224,8 @@ internal sealed class UiStyleResolver
         int sheetIndex,
         int declarationOrder) : IComparable<CascadeKey>
     {
+        private bool IsImportant { get; } = isImportant;
+
         private UiStyleOrigin Origin { get; } = origin;
 
         private int IdCount { get; } = idCount;
@@ -234,7 +240,9 @@ internal sealed class UiStyleResolver
 
         public int CompareTo(CascadeKey other)
         {
-            var comparison = Origin.CompareTo(other.Origin);
+            var comparison = IsImportant.CompareTo(other.IsImportant);
+            if (comparison != 0) return comparison;
+            comparison = Origin.CompareTo(other.Origin);
             if (comparison != 0) return comparison;
             comparison = IdCount.CompareTo(other.IdCount);
             if (comparison != 0) return comparison;

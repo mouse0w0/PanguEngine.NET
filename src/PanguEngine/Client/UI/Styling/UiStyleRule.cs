@@ -104,7 +104,7 @@ public sealed class UiStyleRule
                     ValidateSetterTarget(targetType, setter);
             }
             return Array.AsReadOnly(Setters.Select((setter, index) =>
-                new BoundDeclaration(setter, index, null, SourceLocation)).ToArray());
+                new BoundDeclaration(setter, index, null, SourceLocation, false)).ToArray());
         }
 
         var declarations = new List<BoundDeclaration>(_cssDeclarations.Count);
@@ -116,9 +116,12 @@ public sealed class UiStyleRule
                 continue;
 
             IReadOnlyList<UiStyleSetter> setters;
+            bool isImportant;
             try
             {
-                setters = definition.Convert(declaration.Value);
+                var parsedValue = ParseImportantValue(declaration.Value);
+                isImportant = parsedValue.IsImportant;
+                setters = definition.Convert(parsedValue.Value);
             }
             catch (Exception exception)
             {
@@ -142,7 +145,12 @@ public sealed class UiStyleRule
                     throw CreateError(UiStyleParseError.InvalidValue, declaration.PropertyLocation, exception);
                 }
 
-                declarations.Add(new BoundDeclaration(setter, index, declaration.PropertyName, declaration.PropertyLocation));
+                declarations.Add(new BoundDeclaration(
+                    setter,
+                    index,
+                    declaration.PropertyName,
+                    declaration.PropertyLocation,
+                    isImportant));
             }
         }
 
@@ -164,6 +172,29 @@ public sealed class UiStyleRule
         UiStyleSourceLocation location,
         Exception? innerException = null) =>
         new(error, location.SourceName, location.Line, location.Column, location.Length, innerException);
+
+    private static (string Value, bool IsImportant) ParseImportantValue(string value)
+    {
+        var end = value.Length;
+        while (end > 0 && IsAsciiWhitespace(value[end - 1]))
+            end--;
+
+        const string important = "!important";
+        var markerStart = value.IndexOf(important, StringComparison.OrdinalIgnoreCase);
+        if (markerStart < 0)
+            return (value, false);
+
+        if (markerStart + important.Length != end || markerStart == 0)
+            throw new FormatException("The !important marker must appear exactly once at the end of a non-empty CSS value.");
+
+        var contentEnd = markerStart;
+        while (contentEnd > 0 && IsAsciiWhitespace(value[contentEnd - 1]))
+            contentEnd--;
+        return (value[..contentEnd], true);
+    }
+
+    private static bool IsAsciiWhitespace(char c) =>
+        c is ' ' or '\t' or '\n' or '\r' or '\f' or '\v';
 
     private static void ValidateSetter(Type? targetType, bool hasPseudoClasses, UiStyleSetter setter)
     {
@@ -203,5 +234,6 @@ public sealed class UiStyleRule
         UiStyleSetter Setter,
         int DeclarationIndex,
         string? CssPropertyName,
-        UiStyleSourceLocation? SourceLocation);
+        UiStyleSourceLocation? SourceLocation,
+        bool IsImportant);
 }

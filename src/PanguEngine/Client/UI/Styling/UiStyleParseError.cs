@@ -17,7 +17,7 @@ public enum UiStyleParseError
     /// <summary>A selector specified more than one id.</summary>
     DuplicateId,
 
-    /// <summary>A declaration value could not be converted to the property type.</summary>
+    /// <summary>A declaration value could not be converted or contained an invalid CSS important marker.</summary>
     InvalidValue,
 
     /// <summary>A declaration value was not terminated by a semicolon.</summary>
