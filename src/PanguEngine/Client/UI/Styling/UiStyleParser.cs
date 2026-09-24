@@ -220,13 +220,17 @@ internal static class UiStyleParser
         {
             var propertyStart = GetMark();
             var propertyName = ReadIdentifier();
+            if (propertyName == "--")
+                throw Error(UiStyleParseError.InvalidSyntax, propertyStart, propertyName.Length);
             SkipTrivia();
             if (_pos >= text.Length || text[_pos] != ':')
                 throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
             Advance();
 
             var rawValue = ReadValue(out var valueStart, out var valueLength);
-            if (rawValue.Length == 0)
+            var valueLocation = new UiStyleSourceLocation(sourceName, valueStart.Line, valueStart.Column, valueLength);
+            var expression = UiCssValue.Parse(rawValue, valueLocation);
+            if (expression.Text.Length == 0 && !propertyName.StartsWith("--", StringComparison.Ordinal))
                 throw Error(UiStyleParseError.InvalidSyntax, valueStart, 0);
 
             if (_pos >= text.Length || text[_pos] != ';')
@@ -235,9 +239,9 @@ internal static class UiStyleParser
 
             return new UiStyleRule.CssDeclaration(
                 propertyName,
-                rawValue,
+                expression,
                 new UiStyleSourceLocation(sourceName, propertyStart.Line, propertyStart.Column, propertyName.Length),
-                new UiStyleSourceLocation(sourceName, valueStart.Line, valueStart.Column, valueLength));
+                valueLocation);
         }
 
         private string ReadValue(out Mark start, out int sourceLength)
@@ -246,11 +250,29 @@ internal static class UiStyleParser
             start = GetMark();
             var startPosition = _pos;
             var sourceEndPosition = startPosition;
-            var builder = new StringBuilder();
+            var depth = 0;
+            char quote = '\0';
             while (_pos < text.Length)
             {
                 var c = text[_pos];
-                if (c is ';' or '}' or '{')
+                if (quote != '\0')
+                {
+                    Advance();
+                    if (c == '\\' && _pos < text.Length)
+                        Advance();
+                    else if (c == quote)
+                        quote = '\0';
+                    sourceEndPosition = _pos;
+                    continue;
+                }
+                if (c is '\'' or '"')
+                {
+                    quote = c;
+                    Advance();
+                    sourceEndPosition = _pos;
+                    continue;
+                }
+                if (c is '}' or '{' || (c == ';' && depth == 0))
                     break;
 
                 if (c == '/' && _pos + 1 < text.Length && text[_pos + 1] == '*')
@@ -274,21 +296,21 @@ internal static class UiStyleParser
 
                     if (!closed)
                         throw Error(UiStyleParseError.UnterminatedComment, commentStart, 2);
-                    if (builder.Length > 0 && !IsAsciiWhitespace(builder[^1]))
-                        builder.Append(' ');
+                    sourceEndPosition = _pos;
                     continue;
                 }
 
-                builder.Append(c);
+                if (c == '(')
+                    depth++;
+                else if (c == ')')
+                    depth--;
                 Advance();
                 if (!IsAsciiWhitespace(c))
                     sourceEndPosition = _pos;
             }
 
-            while (builder.Length > 0 && IsAsciiWhitespace(builder[^1]))
-                builder.Length--;
             sourceLength = sourceEndPosition - startPosition;
-            return builder.ToString();
+            return text[startPosition..sourceEndPosition];
         }
 
         private string ReadIdentifier()

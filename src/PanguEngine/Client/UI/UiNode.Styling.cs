@@ -15,7 +15,7 @@ public abstract partial class UiNode
     /// </summary>
     internal void VerifyStylePreparationIdle()
     {
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (var node = this; node is not null; node = node.Parent)
         {
             if (node._isResolvingStyle)
                 throw new InvalidOperationException("The node cannot change while its styles are being prepared.");
@@ -218,7 +218,7 @@ public abstract partial class UiNode
     private PreparedStyleBatch PrepareStyleChange()
     {
         var resolver = GetStyleResolver();
-        if (!resolver.HasRelationships)
+        if (!resolver.HasRelationships && !resolver.HasVariables)
             return new PreparedStyleBatch([PrepareStyle(resolver)]);
 
         var root = resolver.HasSiblingRelationships ? Parent ?? this : this;
@@ -243,16 +243,17 @@ public abstract partial class UiNode
     {
         if (node is not null && (screenChanged || !ReferenceEquals(previousResolver, currentResolver) ||
             previousResolver.HasRelationships ||
-            currentResolver.HasRelationships))
+            currentResolver.HasRelationships || previousResolver.HasVariables || currentResolver.HasVariables))
         {
             entries.Add((node, currentResolver));
         }
     }
 
-    private PreparedStyle PrepareStyle(UiStyleResolver resolver, bool trackChanges = true)
+    private PreparedStyle PrepareStyle(UiStyleResolver resolver, bool trackChanges = true,
+        UiStyleResolver.VariableContext? variableContext = null)
     {
         var scope = this;
-        if (resolver.HasRelationships)
+        if (resolver.HasRelationships || resolver.HasVariables)
         {
             while (scope.Parent is { } parent)
                 scope = parent;
@@ -264,7 +265,7 @@ public abstract partial class UiNode
         scope._isResolvingStyle = true;
         try
         {
-            var newSnapshot = resolver.Resolve(this);
+            var newSnapshot = resolver.Resolve(this, variableContext);
             var changes = trackChanges ? ComputeStyleChanges(_styleSnapshot, newSnapshot) : [];
             changes.Sort((a, b) => a.Property.RegistrationOrder.CompareTo(b.Property.RegistrationOrder));
             return new PreparedStyle(this, newSnapshot, changes);
@@ -327,8 +328,9 @@ public abstract partial class UiNode
         try
         {
             var prepared = new List<PreparedStyle>(nodes.Count);
+            var variableContext = new UiStyleResolver.VariableContext();
             foreach (var (node, resolver, _) in nodes)
-                prepared.Add(node.PrepareStyle(resolver));
+                prepared.Add(node.PrepareStyle(resolver, variableContext: variableContext));
             return new PreparedStyleBatch(prepared);
         }
         finally

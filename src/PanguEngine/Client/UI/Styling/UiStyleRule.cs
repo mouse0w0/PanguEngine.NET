@@ -66,6 +66,7 @@ public sealed class UiStyleRule
         SourceLocation = sourceLocation;
         Setters = Array.Empty<UiStyleSetter>();
         _cssDeclarations = Array.AsReadOnly(declarations.ToArray());
+        HasVariables = _cssDeclarations.Any(declaration => declaration.IsCustomProperty || declaration.Expression.HasVariables);
     }
 
     /// <summary>Gets the selectors that share this rule's declarations, in source order.</summary>
@@ -87,6 +88,10 @@ public sealed class UiStyleRule
     internal bool HasPseudoClasses => Selectors.Any(static selector => selector.HasPseudoClasses);
 
     internal int DeclarationCount => _cssDeclarations?.Count ?? Setters.Count;
+
+    internal IReadOnlyList<CssDeclaration> CssDeclarations => (IReadOnlyList<CssDeclaration>?)_cssDeclarations ?? Array.Empty<CssDeclaration>();
+
+    internal bool HasVariables { get; }
 
     internal static UiStyleRule FromCss(
         IReadOnlyList<UiStyleSelector> selectors,
@@ -111,47 +116,14 @@ public sealed class UiStyleRule
         for (var index = 0; index < _cssDeclarations.Count; index++)
         {
             var declaration = _cssDeclarations[index];
+            if (declaration.IsCustomProperty || declaration.Expression.HasVariables)
+                continue;
             var definition = UiCssRegistry.FindProperty(targetType, declaration.PropertyName);
             if (definition is null)
                 continue;
-
-            IReadOnlyList<UiStyleSetter> setters;
-            bool isImportant;
-            try
-            {
-                var parsedValue = ParseImportantValue(declaration.Value);
-                isImportant = parsedValue.IsImportant;
-                setters = definition.Convert(parsedValue.Value);
-            }
-            catch (Exception exception)
-            {
-                throw CreateError(UiStyleParseError.InvalidValue, declaration.ValueLocation, exception);
-            }
-
-            var components = new HashSet<(UiProperty, UiStyleEdge?)>();
-            foreach (var setter in setters)
-            {
-                try
-                {
-                    ValidateSetter(targetType, HasPseudoClasses, setter);
-                    foreach (var component in setter.Expand())
-                    {
-                        if (!components.Add((component.Property, component.Component)))
-                            throw new ArgumentException("A CSS declaration cannot assign the same style component twice.");
-                    }
-                }
-                catch (Exception exception)
-                {
-                    throw CreateError(UiStyleParseError.InvalidValue, declaration.PropertyLocation, exception);
-                }
-
-                declarations.Add(new BoundDeclaration(
-                    setter,
-                    index,
-                    declaration.PropertyName,
-                    declaration.PropertyLocation,
-                    isImportant));
-            }
+            declaration = PrepareImportant(declaration);
+            declarations.AddRange(ConvertDeclaration(targetType, declaration, index, definition,
+                () => declaration.Expression.Text, null));
         }
 
         return declarations.AsReadOnly();
@@ -162,9 +134,67 @@ public sealed class UiStyleRule
         var copied = selectors.ToArray();
         if (copied.Length == 0)
             throw new ArgumentException("A style rule must contain at least one selector.", nameof(selectors));
-        if (copied.Any(static (UiStyleSelector? selector) => selector is null))
+        if (copied.Any(static selector => selector is null))
             throw new ArgumentException("A style rule cannot contain a null selector.", nameof(selectors));
         return Array.AsReadOnly(copied);
+    }
+
+    internal IReadOnlyList<BoundVariableDeclaration> BindVariables(Type targetType)
+    {
+        var result = new List<BoundVariableDeclaration>();
+        for (var index = 0; index < CssDeclarations.Count; index++)
+        {
+            var declaration = CssDeclarations[index];
+            if (declaration.IsCustomProperty || !declaration.Expression.HasVariables)
+                continue;
+            if (UiCssRegistry.FindProperty(targetType, declaration.PropertyName) is { } definition)
+                result.Add(new BoundVariableDeclaration(PrepareImportant(declaration), index, definition, targetType));
+        }
+        return result.AsReadOnly();
+    }
+
+    internal IReadOnlyList<BoundDeclaration> BindVariable(
+        BoundVariableDeclaration declaration, UiCssVariableEnvironment variables, string? pseudoSource) =>
+        ConvertDeclaration(declaration.TargetType, declaration.Declaration, declaration.DeclarationIndex,
+            declaration.Definition, () => variables.Substitute(declaration.Declaration.Expression), pseudoSource);
+
+    private ReadOnlyCollection<BoundDeclaration> ConvertDeclaration(
+        Type targetType, CssDeclaration declaration, int index, UiCssRegistry.PropertyDefinition definition,
+        Func<string> getValue, string? pseudoSource)
+    {
+        IReadOnlyList<UiStyleSetter> setters;
+        try
+        {
+            setters = definition.Convert(getValue());
+        }
+        catch (Exception exception)
+        {
+            throw CreateError(UiStyleParseError.InvalidValue, declaration.ValueLocation, exception);
+        }
+
+        var result = new List<BoundDeclaration>(setters.Count);
+        var components = new HashSet<(UiProperty, UiStyleEdge?)>();
+        foreach (var setter in setters)
+        {
+            try
+            {
+                ValidateSetter(targetType, HasPseudoClasses, setter);
+                if (pseudoSource is not null &&
+                    (setter.Property.Invalidation & (UiPropertyInvalidation.Measure | UiPropertyInvalidation.Arrange)) != 0)
+                    throw new ArgumentException($"Property '{setter.Property.Name}' invalidates layout and depends on {pseudoSource}.");
+                foreach (var component in setter.Expand())
+                {
+                    if (!components.Add((component.Property, component.Component)))
+                        throw new ArgumentException("A CSS declaration cannot assign the same style component twice.");
+                }
+            }
+            catch (Exception exception)
+            {
+                throw CreateError(UiStyleParseError.InvalidValue, declaration.PropertyLocation, exception);
+            }
+            result.Add(new BoundDeclaration(setter, index, declaration.PropertyName, declaration.PropertyLocation, declaration.IsImportant));
+        }
+        return result.AsReadOnly();
     }
 
     private static UiStyleParseException CreateError(
@@ -173,28 +203,18 @@ public sealed class UiStyleRule
         Exception? innerException = null) =>
         new(error, location.SourceName, location.Line, location.Column, location.Length, innerException);
 
-    private static (string Value, bool IsImportant) ParseImportantValue(string value)
+    internal static CssDeclaration PrepareImportant(CssDeclaration declaration)
     {
-        var end = value.Length;
-        while (end > 0 && IsAsciiWhitespace(value[end - 1]))
-            end--;
-
-        const string important = "!important";
-        var markerStart = value.IndexOf(important, StringComparison.OrdinalIgnoreCase);
-        if (markerStart < 0)
-            return (value, false);
-
-        if (markerStart + important.Length != end || markerStart == 0)
-            throw new FormatException("The !important marker must appear exactly once at the end of a non-empty CSS value.");
-
-        var contentEnd = markerStart;
-        while (contentEnd > 0 && IsAsciiWhitespace(value[contentEnd - 1]))
-            contentEnd--;
-        return (value[..contentEnd], true);
+        try
+        {
+            var (expression, important) = declaration.Expression.ExtractImportant(declaration.IsCustomProperty);
+            return declaration with { Expression = expression, IsImportant = important };
+        }
+        catch (FormatException exception)
+        {
+            throw CreateError(UiStyleParseError.InvalidValue, declaration.ValueLocation, exception);
+        }
     }
-
-    private static bool IsAsciiWhitespace(char c) =>
-        c is ' ' or '\t' or '\n' or '\r' or '\f' or '\v';
 
     private static void ValidateSetter(Type? targetType, bool hasPseudoClasses, UiStyleSetter setter)
     {
@@ -226,9 +246,19 @@ public sealed class UiStyleRule
 
     internal readonly record struct CssDeclaration(
         string PropertyName,
-        string Value,
+        UiCssValue Expression,
         UiStyleSourceLocation PropertyLocation,
-        UiStyleSourceLocation ValueLocation);
+        UiStyleSourceLocation ValueLocation,
+        bool IsImportant = false)
+    {
+        internal bool IsCustomProperty => PropertyName.StartsWith("--", StringComparison.Ordinal);
+    }
+
+    internal readonly record struct BoundVariableDeclaration(
+        CssDeclaration Declaration,
+        int DeclarationIndex,
+        UiCssRegistry.PropertyDefinition Definition,
+        Type TargetType);
 
     internal readonly record struct BoundDeclaration(
         UiStyleSetter Setter,
