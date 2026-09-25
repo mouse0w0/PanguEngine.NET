@@ -154,12 +154,12 @@ public sealed class UiStyleRule
         return result.AsReadOnly();
     }
 
-    internal IReadOnlyList<BoundDeclaration> BindVariable(
+    internal static IReadOnlyList<BoundDeclaration> BindVariable(
         BoundVariableDeclaration declaration, UiCssVariableEnvironment variables) =>
         ConvertDeclaration(declaration.TargetType, declaration.Declaration, declaration.DeclarationIndex,
             declaration.Definition, () => variables.Substitute(declaration.Declaration.Expression));
 
-    private ReadOnlyCollection<BoundDeclaration> ConvertDeclaration(
+    private static ReadOnlyCollection<BoundDeclaration> ConvertDeclaration(
         Type targetType, CssDeclaration declaration, int index, UiCssRegistry.PropertyDefinition definition,
         Func<string> getValue)
     {

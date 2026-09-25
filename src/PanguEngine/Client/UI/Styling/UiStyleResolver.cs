@@ -85,7 +85,7 @@ internal sealed partial class UiStyleResolver
                 var bindingKey = (rule.Entry.Rule, declaration);
                 if (!variableBindings.TryGetValue(bindingKey, out var boundDeclarations))
                 {
-                    boundDeclarations = rule.Entry.Rule.BindVariable(declaration, variables);
+                    boundDeclarations = UiStyleRule.BindVariable(declaration, variables);
                     variableBindings.Add(bindingKey, boundDeclarations);
                 }
 

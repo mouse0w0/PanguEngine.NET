@@ -15,7 +15,7 @@ internal enum UiStyleCombinator
     AdjacentSibling,
 
     /// <summary>Matches any preceding sibling, written as <c>A ~ B</c>.</summary>
-    SubsequentSibling,
+    SubsequentSibling
 }
 
 /// <summary>
@@ -143,13 +143,7 @@ internal sealed class UiStyleSelectorSegment
     internal bool TryMatch(UiNode node, out int elementDepth)
     {
         var matched = MatchTargetType(node.GetType());
-        if (matched is null)
-        {
-            elementDepth = 0;
-            return false;
-        }
-
-        if (!MatchesConditions(node))
+        if (matched is null || !MatchesConditions(node))
         {
             elementDepth = 0;
             return false;
@@ -193,7 +187,7 @@ public sealed class UiStyleSelector
         _combinators = combinators;
         TargetTypeDepth = targetTypeDepth;
 
-        var target = segments[segments.Count - 1];
+        var target = segments[^1];
         TargetType = target.TargetType;
         TypeName = target.TypeName;
         Classes = target.Classes;
@@ -265,9 +259,6 @@ public sealed class UiStyleSelector
     /// <summary>Gets the normalized text of the whole chain, omitting an unrestricted wildcard when other conditions exist.</summary>
     public string SelectorText { get; }
 
-    /// <summary>Gets a value indicating whether the rightmost segment constrains the node element type.</summary>
-    internal bool HasTypeConstraint => _segments[_segments.Count - 1].HasTypeConstraint;
-
     /// <summary>Gets a value indicating whether the chain contains any relationship combinator.</summary>
     internal bool HasRelationships { get; }
 
@@ -322,7 +313,7 @@ public sealed class UiStyleSelector
     }
 
     /// <summary>Resolves the rightmost segment's matched CLR type for the supplied node type, or null when unmatched.</summary>
-    internal Type? MatchTargetType(Type nodeType) => _segments[_segments.Count - 1].MatchTargetType(nodeType);
+    internal Type? MatchTargetType(Type nodeType) => _segments[^1].MatchTargetType(nodeType);
 
     /// <summary>
     /// Matches the whole chain from the rightmost segment and reports the maximum element contribution
@@ -415,7 +406,7 @@ public sealed class UiStyleSelector
                 UiStyleCombinator.Descendant => " ",
                 UiStyleCombinator.Child => " > ",
                 UiStyleCombinator.AdjacentSibling => " + ",
-                _ => " ~ ",
+                _ => " ~ "
             });
             builder.Append(_segments[index].Text);
         }
