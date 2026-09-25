@@ -2,10 +2,30 @@ namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
+    private static readonly UiPropertyKey<Parent?> ParentPropertyKey =
+        UiProperty.RegisterReadOnly<UiNode, Parent?>(nameof(Parent));
+
+    private static readonly UiPropertyKey<UiScreen?> ScreenPropertyKey =
+        UiProperty.RegisterReadOnly<UiNode, UiScreen?>(nameof(Screen));
+
+    /// <summary>
+    /// Identifies the <see cref="Parent"/> property.
+    /// </summary>
+    public static readonly UiProperty<Parent?> ParentProperty = ParentPropertyKey.Property;
+
+    /// <summary>
+    /// Identifies the <see cref="Screen"/> property.
+    /// </summary>
+    public static readonly UiProperty<UiScreen?> ScreenProperty = ScreenPropertyKey.Property;
+
     /// <summary>
     /// Gets the framework-maintained direct parent of this node.
     /// </summary>
-    public Parent? Parent { get; private set; }
+    /// <remarks>
+    /// The value is null when this node has no parent. Property change notifications occur after
+    /// this value changes, before any resulting screen ownership change.
+    /// </remarks>
+    public Parent? Parent => GetValue(ParentProperty);
 
     /// <summary>
     /// Moves this node to the visual front of its siblings.
@@ -36,14 +56,18 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets the UI screen that owns this node.
     /// </summary>
-    public UiScreen? Screen { get; private set; }
+    /// <remarks>
+    /// The value is null when this node has no owning screen. Property change notifications occur
+    /// after this node's value changes and before its descendants are updated.
+    /// </remarks>
+    public UiScreen? Screen => GetValue(ScreenProperty);
 
     internal void SetParent(Parent? parent) =>
-        Parent = parent;
+        SetValue(ParentPropertyKey, parent);
 
     internal void SetScreenRecursive(UiScreen? screen)
     {
-        Screen = screen;
+        SetValue(ScreenPropertyKey, screen);
         if (this is not Parent parent)
             return;
 

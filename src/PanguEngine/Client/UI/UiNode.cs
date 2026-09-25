@@ -181,6 +181,8 @@ public abstract partial class UiNode
     {
         if (_localValues is not null && _localValues.TryGetValue(property, out var local))
             return local is null ? default! : (T)local;
+        if (property.IsReadOnly)
+            return property.DefaultValue;
         EnsureStyleSnapshot();
         if (_styleSnapshot is not null && _styleSnapshot.TryGetBoxedValue(property, out var style))
             return style is null ? default! : (T)style;

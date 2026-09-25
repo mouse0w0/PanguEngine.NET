@@ -1,10 +1,27 @@
 using System.ComponentModel;
+using System.Reflection;
 using PanguEngine.Client.UI;
 
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class UiPropertyKeyTests
 {
+    [Fact]
+    public void ReadOnlyDefaultsAndOwnerWritesDoNotResolveStyles()
+    {
+        var node = new ReadOnlyNode();
+        var snapshotField = typeof(UiNode).GetField("_styleSnapshot", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        Assert.Equal(5, node.Value);
+        Assert.Null(snapshotField.GetValue(node));
+
+        node.SetValueFromOwner(9);
+        node.ClearValueFromOwner();
+
+        Assert.Equal(5, node.Value);
+        Assert.Null(snapshotField.GetValue(node));
+    }
+
     [Fact]
     public void ReadOnlyRegistrationPreservesMetadataAndKeyIdentity()
     {
@@ -279,8 +296,10 @@ public sealed class UiPropertyKeyTests
         internal int Value => GetValue(ValueProperty);
         internal void SetValueFromOwner(int value) => SetValue(ValuePropertyKey, value);
         internal void ClearValueFromOwner() => ClearValue(ValuePropertyKey);
+
         internal void SetArbitraryKey(UiPropertyKey<int> propertyKey, int value) =>
             SetValue(propertyKey, value);
+
         internal void ClearArbitraryKey(UiPropertyKey<int> propertyKey) =>
             ClearValue(propertyKey);
     }

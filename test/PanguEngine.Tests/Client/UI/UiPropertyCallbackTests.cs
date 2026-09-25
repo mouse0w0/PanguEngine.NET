@@ -106,6 +106,7 @@ public sealed class UiPropertyCallbackTests
         var error = new InvalidOperationException("internal");
         var node = new CallbackNode();
         var screen = new UiScreen(node);
+        node.Trace.Clear();
         node.Changed = (_, _) =>
         {
             Assert.Equal(8, node.GetValue(CallbackNode.OtherProperty));
