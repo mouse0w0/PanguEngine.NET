@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 using Silk.NET.Maths;
@@ -195,36 +194,15 @@ internal sealed class InputRouter
     {
         ObjectDisposedException.ThrowIf(_destroyed, this);
         BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            var maintenance = _stateStore.CancelAll();
-            _pressed.Clear();
-            _suppressed.Clear();
-            _currentModifiers = KeyModifiers.None;
-            _modifiersChanged = false;
-            _recordedPressIsNew = false;
-            StateInvalidated?.Invoke();
-            DispatchRequiredEvents(maintenance);
-        }
-        catch (Exception exception)
-        {
-            error = exception;
-        }
-        finally
-        {
-            try
-            {
-                EndInputEvent();
-            }
-            catch (Exception exception)
-            {
-                error = error is null ? exception : new AggregateException(error, exception);
-            }
-        }
-
-        if (error is not null)
-            ExceptionDispatchInfo.Capture(error).Throw();
+        var maintenance = _stateStore.CancelAll();
+        _pressed.Clear();
+        _suppressed.Clear();
+        _currentModifiers = KeyModifiers.None;
+        _modifiersChanged = false;
+        _recordedPressIsNew = false;
+        StateInvalidated?.Invoke();
+        DispatchRequiredEvents(maintenance);
+        EndInputEvent();
     }
 
     internal void Destroy()

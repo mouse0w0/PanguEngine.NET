@@ -1,4 +1,3 @@
-using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 using PanguEngine.Input;
 using PanguEngine.Windowing;
@@ -200,60 +199,23 @@ public sealed class InputManager
     {
         var source = InputSource.FromKey(args.Key);
         _router.BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            _router.RecordPress(source, args.Modifiers);
-            var topologyVersion = _uiTopologyVersion;
-            var handled = true;
-            try
-            {
-                handled = _uiManager.CurrentScreen is not null
-                          && _uiManager.ProcessKeyDown(args.Key, args.Modifiers, args.IsRepeat);
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            _router.RoutePress(source, args.IsRepeat || handled || topologyVersion != _uiTopologyVersion);
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-        finally
-        {
-            EndInputEvent(error);
-        }
+        _router.RecordPress(source, args.Modifiers);
+        var topologyVersion = _uiTopologyVersion;
+        var handled = _uiManager.CurrentScreen is not null
+                      && _uiManager.ProcessKeyDown(args.Key, args.Modifiers, args.IsRepeat);
+        _router.RoutePress(source, args.IsRepeat || handled || topologyVersion != _uiTopologyVersion);
+        _router.EndInputEvent();
     }
 
     private void OnKeyUp(Window window, KeyEventArgs args)
     {
         var source = InputSource.FromKey(args.Key);
         _router.BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            _router.RecordRelease(source, args.Modifiers);
-            try
-            {
-                if (_uiManager.CurrentScreen is not null)
-                    _ = _uiManager.ProcessKeyUp(args.Key, args.Modifiers, args.IsRepeat);
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            _router.RouteRelease(source);
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-        finally
-        {
-            EndInputEvent(error);
-        }
+        _router.RecordRelease(source, args.Modifiers);
+        if (_uiManager.CurrentScreen is not null)
+            _ = _uiManager.ProcessKeyUp(args.Key, args.Modifiers, args.IsRepeat);
+        _router.RouteRelease(source);
+        _router.EndInputEvent();
     }
 
     private void OnTextInput(Window window, string text)
@@ -265,42 +227,23 @@ public sealed class InputManager
     private void OnMouseMove(Window window, MouseMoveEventArgs args)
     {
         _router.BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            var position = new Vector2D<float>(args.X, args.Y);
-            _pointerPosition = position;
-            _hasPointerPosition = true;
-            var delta = _hasMouseBaseline ? position - _mouseBaseline : Vector2D<float>.Zero;
-            _mouseBaseline = position;
-            _hasMouseBaseline = true;
-            var topologyVersion = _uiTopologyVersion;
-            var handled = true;
-            try
-            {
-                handled = TryRoutePointer(
-                    args.X,
-                    args.Y,
-                    static (manager, point) => manager.ProcessPointerMoved(point));
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            _router.RouteSample(
-                InputSource.MouseMove,
-                new Vector2D<double>(delta.X, delta.Y),
-                _window.KeyModifiers,
-                handled || topologyVersion != _uiTopologyVersion);
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-        finally
-        {
-            EndInputEvent(error);
-        }
+        var position = new Vector2D<float>(args.X, args.Y);
+        _pointerPosition = position;
+        _hasPointerPosition = true;
+        var delta = _hasMouseBaseline ? position - _mouseBaseline : Vector2D<float>.Zero;
+        _mouseBaseline = position;
+        _hasMouseBaseline = true;
+        var topologyVersion = _uiTopologyVersion;
+        var handled = TryRoutePointer(
+            args.X,
+            args.Y,
+            static (manager, point) => manager.ProcessPointerMoved(point));
+        _router.RouteSample(
+            InputSource.MouseMove,
+            new Vector2D<double>(delta.X, delta.Y),
+            _window.KeyModifiers,
+            handled || topologyVersion != _uiTopologyVersion);
+        _router.EndInputEvent();
     }
 
     private void OnMouseDown(Window window, MouseClickEventArgs args)
@@ -308,35 +251,16 @@ public sealed class InputManager
         var source = InputSource.FromMouseButton(args.Button);
         var modifiers = _window.KeyModifiers;
         _router.BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            _pointerPosition = new Vector2D<float>(args.X, args.Y);
-            _hasPointerPosition = true;
-            _router.RecordPress(source, modifiers);
-            var topologyVersion = _uiTopologyVersion;
-            var handled = true;
-            try
-            {
-                handled = TryRoutePointer(
-                    args.X,
-                    args.Y,
-                    (manager, point) => manager.ProcessPointerPressed(point, args.Button, modifiers));
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            _router.RoutePress(source, handled || topologyVersion != _uiTopologyVersion);
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-        finally
-        {
-            EndInputEvent(error);
-        }
+        _pointerPosition = new Vector2D<float>(args.X, args.Y);
+        _hasPointerPosition = true;
+        _router.RecordPress(source, modifiers);
+        var topologyVersion = _uiTopologyVersion;
+        var handled = TryRoutePointer(
+            args.X,
+            args.Y,
+            (manager, point) => manager.ProcessPointerPressed(point, args.Button, modifiers));
+        _router.RoutePress(source, handled || topologyVersion != _uiTopologyVersion);
+        _router.EndInputEvent();
     }
 
     private void OnMouseUp(Window window, MouseClickEventArgs args)
@@ -344,164 +268,66 @@ public sealed class InputManager
         var source = InputSource.FromMouseButton(args.Button);
         var modifiers = _window.KeyModifiers;
         _router.BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            _pointerPosition = new Vector2D<float>(args.X, args.Y);
-            _hasPointerPosition = true;
-            _router.RecordRelease(source, modifiers);
-            try
-            {
-                _ = TryRoutePointer(
-                    args.X,
-                    args.Y,
-                    (manager, point) => manager.ProcessPointerReleased(point, args.Button, modifiers));
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            _router.RouteRelease(source);
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-        finally
-        {
-            EndInputEvent(error);
-        }
+        _pointerPosition = new Vector2D<float>(args.X, args.Y);
+        _hasPointerPosition = true;
+        _router.RecordRelease(source, modifiers);
+        _ = TryRoutePointer(
+            args.X,
+            args.Y,
+            (manager, point) => manager.ProcessPointerReleased(point, args.Button, modifiers));
+        _router.RouteRelease(source);
+        _router.EndInputEvent();
     }
 
     private void OnScroll(Window window, ScrollEventArgs args)
     {
         _router.BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            var topologyVersion = _uiTopologyVersion;
-            var mousePosition = _window.MousePosition;
-            var handled = true;
-            try
-            {
-                handled = TryRoutePointer(
-                    mousePosition.X,
-                    mousePosition.Y,
-                    (manager, point) => manager.ProcessPointerWheel(point, args.X, args.Y));
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-            _router.RouteSample(
-                InputSource.MouseWheel,
-                new Vector2D<double>(args.X, args.Y),
-                _window.KeyModifiers,
-                handled || topologyVersion != _uiTopologyVersion);
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-        finally
-        {
-            EndInputEvent(error);
-        }
+        var topologyVersion = _uiTopologyVersion;
+        var mousePosition = _window.MousePosition;
+        var handled = TryRoutePointer(
+            mousePosition.X,
+            mousePosition.Y,
+            (manager, point) => manager.ProcessPointerWheel(point, args.X, args.Y));
+        _router.RouteSample(
+            InputSource.MouseWheel,
+            new Vector2D<double>(args.X, args.Y),
+            _window.KeyModifiers,
+            handled || topologyVersion != _uiTopologyVersion);
+        _router.EndInputEvent();
     }
 
     private void OnFocusChanged(Window window, bool focused)
     {
-        Exception? error = null;
-        try
+        if (!focused)
         {
-            if (!focused)
-                _router.Reset();
-        }
-        catch (Exception exception)
-        {
-            error = exception;
-        }
-        try
-        {
-            if (!focused)
-            {
-                _restorePointerCapture = false;
-                ReleasePointerCore();
-            }
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-        try
-        {
-            if (_uiManager.CurrentScreen is not null)
-                _uiManager.ProcessFocusChanged(focused);
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
+            _router.Reset();
+            _restorePointerCapture = false;
+            ReleasePointerCore();
         }
 
-        if (error is not null)
-            ExceptionDispatchInfo.Capture(error).Throw();
+        if (_uiManager.CurrentScreen is not null)
+            _uiManager.ProcessFocusChanged(focused);
     }
 
     private void OnCurrentScreenChanged(UiScreen? oldScreen, UiScreen? newScreen)
     {
         _router.BeginInputEvent();
-        Exception? error = null;
-        try
-        {
-            _router.NotifyUiTopologyChanged(oldScreen?.InputContext);
-            var topologyVersion = ++_uiTopologyVersion;
-            var oldActivation = _screenActivation;
-            _screenActivation = null;
-            try
-            {
-                oldActivation?.Dispose();
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
+        _router.NotifyUiTopologyChanged(oldScreen?.InputContext);
+        var topologyVersion = ++_uiTopologyVersion;
+        var oldActivation = _screenActivation;
+        _screenActivation = null;
+        oldActivation?.Dispose();
 
-            if (topologyVersion == _uiTopologyVersion && newScreen is not null)
-            {
-                var activation = ActivateContext(newScreen.InputContext);
-                if (topologyVersion == _uiTopologyVersion)
-                    _screenActivation = activation;
-                else
-                    activation.Dispose();
-            }
-        }
-        catch (Exception exception)
+        if (topologyVersion == _uiTopologyVersion && newScreen is not null)
         {
-            AddInputError(ref error, exception);
+            var activation = ActivateContext(newScreen.InputContext);
+            if (topologyVersion == _uiTopologyVersion)
+                _screenActivation = activation;
+            else
+                activation.Dispose();
         }
-        finally
-        {
-            EndInputEvent(error);
-        }
+        _router.EndInputEvent();
     }
-
-    private void EndInputEvent(Exception? error)
-    {
-        try
-        {
-            _router.EndInputEvent();
-        }
-        catch (Exception exception)
-        {
-            AddInputError(ref error, exception);
-        }
-
-        if (error is not null)
-            ExceptionDispatchInfo.Capture(error).Throw();
-    }
-
-    private static void AddInputError(ref Exception? error, Exception exception) =>
-        error = error is null ? exception : new AggregateException(error, exception);
 
     private bool TryRoutePointer(
         float x,
