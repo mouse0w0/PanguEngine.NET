@@ -17,7 +17,7 @@ public sealed class UiStyleRule
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="selectors"/> or <paramref name="setters"/> is null.</exception>
     /// <exception cref="ArgumentException">
     /// Thrown when the selector list is empty or contains null, when a setter targets an incompatible or input-invalidating
-    /// property, or when a rule containing a state pseudo class sets a layout property.
+    /// property.
     /// </exception>
     public UiStyleRule(IEnumerable<UiStyleSelector> selectors, IEnumerable<UiStyleSetter> setters,
         UiStyleSourceLocation? sourceLocation = null)
@@ -27,13 +27,11 @@ public sealed class UiStyleRule
 
         Selectors = CopySelectors(selectors);
         SourceLocation = sourceLocation;
-        var hasStatePseudoClasses = HasStatePseudoClasses;
-
         var ordered = new List<UiStyleSetter>();
         foreach (var setter in setters)
         {
             foreach (var selector in Selectors)
-                ValidateSetter(selector.TargetType, hasStatePseudoClasses, setter);
+                ValidateSetter(selector.TargetType, setter);
             for (var i = 0; i < ordered.Count; i++)
             {
                 if (ReferenceEquals(ordered[i].Property, setter.Property) && ordered[i].Component == setter.Component)
@@ -87,12 +85,6 @@ public sealed class UiStyleRule
     /// <summary>Gets whether any selector in this rule contains a sibling combinator.</summary>
     internal bool HasSiblingRelationships => Selectors.Any(static selector => selector.HasSiblingRelationships);
 
-    /// <summary>Gets whether any selector in this rule requires a pseudo class.</summary>
-    internal bool HasPseudoClasses => Selectors.Any(static selector => selector.HasPseudoClasses);
-
-    /// <summary>Gets whether any selector in this rule requires a state pseudo class.</summary>
-    internal bool HasStatePseudoClasses => Selectors.Any(static selector => selector.HasStatePseudoClasses);
-
     internal int DeclarationCount => _cssDeclarations?.Count ?? Setters.Count;
 
     internal IReadOnlyList<CssDeclaration> CssDeclarations =>
@@ -131,7 +123,7 @@ public sealed class UiStyleRule
                 continue;
             declaration = PrepareImportant(declaration);
             declarations.AddRange(ConvertDeclaration(targetType, declaration, index, definition,
-                () => declaration.Expression.Text, null));
+                () => declaration.Expression.Text));
         }
 
         return declarations.AsReadOnly();
@@ -163,13 +155,13 @@ public sealed class UiStyleRule
     }
 
     internal IReadOnlyList<BoundDeclaration> BindVariable(
-        BoundVariableDeclaration declaration, UiCssVariableEnvironment variables, string? pseudoSource) =>
+        BoundVariableDeclaration declaration, UiCssVariableEnvironment variables) =>
         ConvertDeclaration(declaration.TargetType, declaration.Declaration, declaration.DeclarationIndex,
-            declaration.Definition, () => variables.Substitute(declaration.Declaration.Expression), pseudoSource);
+            declaration.Definition, () => variables.Substitute(declaration.Declaration.Expression));
 
     private ReadOnlyCollection<BoundDeclaration> ConvertDeclaration(
         Type targetType, CssDeclaration declaration, int index, UiCssRegistry.PropertyDefinition definition,
-        Func<string> getValue, string? pseudoSource)
+        Func<string> getValue)
     {
         IReadOnlyList<UiStyleSetter> setters;
         try
@@ -187,12 +179,7 @@ public sealed class UiStyleRule
         {
             try
             {
-                ValidateSetter(targetType, HasStatePseudoClasses, setter);
-                if (pseudoSource is not null &&
-                    (setter.Property.Invalidation &
-                     (UiPropertyInvalidation.Measure | UiPropertyInvalidation.Arrange)) != 0)
-                    throw new ArgumentException(
-                        $"Property '{setter.Property.Name}' invalidates layout and depends on {pseudoSource}.");
+                ValidateSetter(targetType, setter);
                 foreach (var component in setter.Expand())
                 {
                     if (!components.Add((component.Property, component.Component)))
@@ -230,7 +217,7 @@ public sealed class UiStyleRule
         }
     }
 
-    private static void ValidateSetter(Type? targetType, bool hasStatePseudoClasses, UiStyleSetter setter)
+    private static void ValidateSetter(Type? targetType, UiStyleSetter setter)
     {
         if (setter.Property.IsReadOnly)
             throw new ArgumentException(
@@ -240,14 +227,6 @@ public sealed class UiStyleRule
         if (setter.Property.Invalidation.HasFlag(UiPropertyInvalidation.Input))
             throw new ArgumentException(
                 $"Property '{setter.Property.Name}' invalidates input and cannot be styled.", nameof(setter));
-        if (hasStatePseudoClasses &&
-            (setter.Property.Invalidation.HasFlag(UiPropertyInvalidation.Measure) ||
-             setter.Property.Invalidation.HasFlag(UiPropertyInvalidation.Arrange)))
-        {
-            throw new ArgumentException(
-                $"Property '{setter.Property.Name}' invalidates layout and cannot be set by a pseudo-class rule.",
-                nameof(setter));
-        }
     }
 
     private static void ValidateSetterTarget(Type targetType, UiStyleSetter setter)

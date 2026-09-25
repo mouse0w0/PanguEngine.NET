@@ -38,12 +38,12 @@ public sealed class UiStyleRuleTests
     }
 
     [Fact]
-    public void StatefulRuleRejectsLayoutSetter()
+    public void StatefulRuleAcceptsLayoutSetter()
     {
         var selector = UiStyleSelector.For<Button>(pseudoClasses: [UiPseudoClass.Hover]);
         var setter = UiStyleSetter.Create(Region.PaddingProperty, new Thickness(8));
 
-        Assert.Throws<ArgumentException>(() => new UiStyleRule(selector, [setter]));
+        Assert.Same(setter, Assert.Single(new UiStyleRule(selector, [setter]).Setters));
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public sealed class UiStyleRuleTests
     }
 
     [Fact]
-    public void MultiSelectorRuleRejectsLayoutSetterWhenAnyBranchHasPseudoClass()
+    public void MultiSelectorRuleAcceptsLayoutSetterWhenAnyBranchHasPseudoClass()
     {
         var selectors = new[]
         {
@@ -182,7 +182,7 @@ public sealed class UiStyleRuleTests
         };
         var setter = UiStyleSetter.Create(Region.PaddingProperty, new Thickness(8));
 
-        Assert.Throws<ArgumentException>(() => new UiStyleRule(selectors, [setter]));
+        Assert.Same(setter, Assert.Single(new UiStyleRule(selectors, [setter]).Setters));
     }
 
     [Fact]

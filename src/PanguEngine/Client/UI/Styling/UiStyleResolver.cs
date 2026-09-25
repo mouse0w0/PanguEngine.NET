@@ -85,11 +85,7 @@ internal sealed partial class UiStyleResolver
                 var bindingKey = (rule.Entry.Rule, declaration);
                 if (!variableBindings.TryGetValue(bindingKey, out var boundDeclarations))
                 {
-                    var pseudoSource = declaration.Declaration.Expression.References
-                        .OrderBy(name => name, StringComparer.Ordinal)
-                        .Select(name => _pseudoVariableSources.GetValueOrDefault(name))
-                        .FirstOrDefault(source => source is not null);
-                    boundDeclarations = rule.Entry.Rule.BindVariable(declaration, variables, pseudoSource);
+                    boundDeclarations = rule.Entry.Rule.BindVariable(declaration, variables);
                     variableBindings.Add(bindingKey, boundDeclarations);
                 }
 

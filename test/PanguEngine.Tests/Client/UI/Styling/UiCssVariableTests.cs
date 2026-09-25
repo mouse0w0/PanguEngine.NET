@@ -75,10 +75,12 @@ public sealed class UiCssVariableTests
         child.Classes.Add("child");
         parent.Children.Add(child);
         var screen = new UiScreen(parent);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            .parent { --a: 4px; --b: var(--a); }
-            .child { --a: 8px; padding: var(--b); margin: var(--a); }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               .parent { --a: 4px; --b: var(--a); }
+                               .child { --a: 8px; padding: var(--b); margin: var(--a); }
+                               """)
+        ]);
         Assert.Equal(new Thickness(4), child.Padding);
         Assert.Equal(new Thickness(8), child.Margin);
     }
@@ -92,10 +94,12 @@ public sealed class UiCssVariableTests
         child.Classes.Add("child");
         parent.Children.Add(child);
         var screen = new UiScreen(parent);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            .parent { --a: 4px; }
-            .child { --a: var(--missing); padding: var(--a, 8px); }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               .parent { --a: 4px; }
+                               .child { --a: var(--missing); padding: var(--a, 8px); }
+                               """)
+        ]);
         Assert.Equal(new Thickness(8), child.Padding);
     }
 
@@ -104,10 +108,12 @@ public sealed class UiCssVariableTests
     {
         var panel = new Panel();
         var screen = new UiScreen(panel);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            Panel { --a: var(--a); }
-            .absent { padding: var(--missing); }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               Panel { --a: var(--a); }
+                               .absent { padding: var(--missing); }
+                               """)
+        ]);
         Assert.Equal(Thickness.Zero, panel.Padding);
     }
 
@@ -120,36 +126,45 @@ public sealed class UiCssVariableTests
         root.Children.Add(first);
         root.Children.Add(second);
         var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            #first { --n: 4px; }
-            #second { --n: 8px; }
-            Panel { padding: var(--n, 0); }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               #first { --n: 4px; }
+                               #second { --n: 8px; }
+                               Panel { padding: var(--n, 0); }
+                               """)
+        ]);
         Assert.Equal(new Thickness(4), first.Padding);
         Assert.Equal(new Thickness(8), second.Padding);
     }
 
     [Theory]
-    [InlineData("Panel:hover { --n: 4px; } Panel { padding: var(--n, 0); }")]
-    [InlineData("Panel:hover { --n: 4px; } Panel { --alias: var(--n); padding: var(--alias, 0); }")]
-    [InlineData("Panel:hover { --n: 4px; } Panel { --a: 2px; padding: var(--a, var(--n)); }")]
-    public void PseudoVariableDependenciesCannotAffectLayout(string css)
+    [InlineData("Panel:hover { --n: 4px; } Panel { padding: var(--n, 0); }", 0, 4)]
+    [InlineData("Panel:hover { --n: 4px; } Panel { --alias: var(--n); padding: var(--alias, 0); }", 0, 4)]
+    [InlineData("Panel:hover { --n: 4px; } Panel { --a: 2px; padding: var(--a, var(--n)); }", 2, 2)]
+    public void PseudoVariableDependenciesCanAffectLayout(string css, double inactive, double active)
     {
         var panel = new Panel();
         var screen = new UiScreen(panel);
-        var error = Assert.Throws<UiStyleParseException>(() => screen.SetStyleSheets([UiStyleSheet.Parse(css)]));
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-        Assert.Contains("hover", error.InnerException!.Message);
+        screen.SetStyleSheets([UiStyleSheet.Parse(css)]);
+        Assert.Equal(new Thickness(inactive), panel.Padding);
+        panel.SetHovered(true);
+        Assert.Equal(new Thickness(active), panel.Padding);
+        panel.SetHovered(false);
+        Assert.Equal(new Thickness(inactive), panel.Padding);
     }
 
     [Fact]
-    public void PseudoConsumerCannotSetLayoutThroughStaticVariable()
+    public void PseudoConsumerCanSetLayoutThroughStaticVariable()
     {
         var panel = new Panel();
         panel.SetHovered(true);
         var screen = new UiScreen(panel);
-        Assert.Throws<UiStyleParseException>(() => screen.SetStyleSheets([
-            UiStyleSheet.Parse("Panel { --n: 4px; } Panel:hover { padding: var(--n); }")]));
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("Panel { --n: 4px; } Panel:hover { padding: var(--n); }")
+        ]);
+        Assert.Equal(new Thickness(4), panel.Padding);
+        panel.SetHovered(false);
+        Assert.Equal(Thickness.Zero, panel.Padding);
     }
 
     [Fact]
@@ -157,9 +172,11 @@ public sealed class UiCssVariableTests
     {
         var node = new RawValueNode();
         var screen = new UiScreen(node);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            RawValueNode { --x: 'var(--absent); /* literal */'; raw: var(--x); }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               RawValueNode { --x: 'var(--absent); /* literal */'; raw: var(--x); }
+                               """)
+        ]);
         Assert.Equal("'var(--absent); /* literal */'", node.GetValue(RawValueNode.ValueProperty));
 
         screen.SetStyleSheets([UiStyleSheet.Parse("RawValueNode { raw: var(--missing, Arial, sans-serif); }")]);
@@ -183,7 +200,8 @@ public sealed class UiCssVariableTests
         screen.SetBaseStyleSheets([UiStyleSheet.Parse("#target { --n: 4px; }")]);
         screen.SetStyleSheets([
             UiStyleSheet.Parse("Panel { --n: 8px; padding: var(--n); }"),
-            UiStyleSheet.Parse("Panel { --n: 12px; }")]);
+            UiStyleSheet.Parse("Panel { --n: 12px; }")
+        ]);
         Assert.Equal(new Thickness(12), panel.Padding);
     }
 
@@ -192,10 +210,12 @@ public sealed class UiCssVariableTests
     {
         var panel = new Panel();
         var screen = new UiScreen(panel);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            Panel { --n: 0.4; opacity: var(--n); }
-            Panel { --n: 0.6; opacity: var(--n); }
-            """, "source.css")]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               Panel { --n: 0.4; opacity: var(--n); }
+                               Panel { --n: 0.6; opacity: var(--n); }
+                               """, "source.css")
+        ]);
         var source = Assert.Single(panel.GetStyleValueSources(UiNode.OpacityProperty));
         Assert.Equal(3, source.DeclarationIndex);
         Assert.Equal(0.6, panel.Opacity);
@@ -207,7 +227,8 @@ public sealed class UiCssVariableTests
         var panel = new Panel();
         var screen = new UiScreen(panel);
         var error = Assert.Throws<UiStyleParseException>(() => screen.SetStyleSheets([
-            UiStyleSheet.Parse("Panel {\r\n --n: var(--n);\r\n padding: var(--n);\r\n}", "diagnostic.css")]));
+            UiStyleSheet.Parse("Panel {\r\n --n: var(--n);\r\n padding: var(--n);\r\n}", "diagnostic.css")
+        ]));
         Assert.Equal(3, error.Line);
         Assert.Equal(11, error.Column);
         Assert.Contains("--n", error.InnerException!.Message);
@@ -252,27 +273,34 @@ public sealed class UiCssVariableTests
     {
         var panel = new Panel();
         var screen = new UiScreen(panel);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            Panel { unknown: var(--missing); }
-            .absent { --a: var(--missing); --cycle: var(--cycle); }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               Panel { unknown: var(--missing); }
+                               .absent { --a: var(--missing); --cycle: var(--cycle); }
+                               """)
+        ]);
         Assert.Equal(Thickness.Zero, panel.Padding);
     }
 
     [Fact]
-    public void InheritedPseudoVariableCannotAffectChildLayout()
+    public void InheritedPseudoVariableCanAffectChildLayout()
     {
         var root = new Panel { StyleId = "root" };
         var child = new Panel { StyleId = "child" };
         root.Children.Add(child);
         var screen = new UiScreen(root);
-        var error = Assert.Throws<UiStyleParseException>(() => screen.SetStyleSheets([UiStyleSheet.Parse("""
-            #root { --n: 4px; }
-            #root:hover { --n: 8px; }
-            #child { padding: var(--n); }
-            """)]));
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-        Assert.Contains("#root:hover", error.InnerException!.Message);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               #root { --n: 4px; }
+                               #root:hover { --n: 8px; }
+                               #child { padding: var(--n); }
+                               """)
+        ]);
+        Assert.Equal(new Thickness(4), child.Padding);
+        root.SetHovered(true);
+        Assert.Equal(new Thickness(8), child.Padding);
+        root.SetHovered(false);
+        Assert.Equal(new Thickness(4), child.Padding);
     }
 
     [Fact]

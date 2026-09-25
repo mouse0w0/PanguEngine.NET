@@ -71,7 +71,7 @@ Button.showcase-typed {
     border-color: #7fc08f;
 }
 
-/* Style example: combined pseudo classes only change render properties. */
+/* Style example: combined pseudo classes. */
 Button.showcase-combo {
     background-color: #3a3f47;
     border-color: #6b7480;

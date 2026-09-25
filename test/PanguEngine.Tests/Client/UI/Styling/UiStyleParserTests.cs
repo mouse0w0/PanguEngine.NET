@@ -32,11 +32,11 @@ public sealed class UiStyleParserTests
     public void ParsesCompoundSelectorAndBuiltInValues()
     {
         var sheet = UiStyleSheet.Parse("""
-            Button.primary#save:hover:focus {
-                background: #112233cc;
-                opacity: 0.8;
-            }
-            """, "menu.css");
+                                       Button.primary#save:hover:focus {
+                                           background: #112233cc;
+                                           opacity: 0.8;
+                                       }
+                                       """, "menu.css");
 
         var rule = Assert.Single(sheet.Rules);
         var selector = rule.Selectors[0];
@@ -51,7 +51,8 @@ public sealed class UiStyleParserTests
         Assert.Equal("menu.css", sheet.SourceName);
 
         var setters = rule.Bind(typeof(Button));
-        Assert.Equal(new Color(0x11, 0x22, 0x33, 0xcc), Assert.IsType<SolidColorBrush>(setters[0].Setter.BoxedValue).Color);
+        Assert.Equal(new Color(0x11, 0x22, 0x33, 0xcc),
+            Assert.IsType<SolidColorBrush>(setters[0].Setter.BoxedValue).Color);
         Assert.Equal(0.8, (double)setters[1].Setter.BoxedValue!);
     }
 
@@ -179,14 +180,14 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void TabCountsAsOneColumn()
+    public void TabCountsAsOneColumnForInvalidDeclarationValue()
     {
-        var rule = SingleRule("Button:hover {\n\twidth: 1;\n}");
+        var rule = SingleRule("Button:hover {\n\twidth: nope;\n}");
         var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
         Assert.Equal(2, error.Line);
-        Assert.Equal(2, error.Column);
+        Assert.Equal(9, error.Column);
     }
 
     [Fact]
@@ -195,7 +196,8 @@ public sealed class UiStyleParserTests
         var rule = SingleRule("Button.a.b.c:hover:focus:disabled { }");
 
         Assert.Equal(new[] { "a", "b", "c" }, rule.Selectors[0].Classes);
-        Assert.Equal(new[] { "disabled", "focus", "hover" }, rule.Selectors[0].PseudoClasses.Select(pseudoClass => pseudoClass.Name));
+        Assert.Equal(new[] { "disabled", "focus", "hover" },
+            rule.Selectors[0].PseudoClasses.Select(pseudoClass => pseudoClass.Name));
         Assert.Null(rule.Selectors[0].Id);
         Assert.Empty(rule.Setters);
     }
@@ -484,13 +486,18 @@ public sealed class UiStyleParserTests
     [Fact]
     public void ParsesBuiltInEnumValuesCaseInsensitively()
     {
-        Assert.Equal(Orientation.Horizontal, ParsedValue<Orientation>(typeof(StackPanel), "StackPanel { orientation: HORIZONTAL; }"));
-        Assert.Equal(Visibility.Collapsed, ParsedValue<Visibility>(typeof(UiNode), "UiNode { visibility: collapsed; }"));
-        Assert.Equal(HorizontalAlignment.Center, ParsedValue<HorizontalAlignment>(typeof(UiNode), "UiNode { horizontal-alignment: CENTER; }"));
+        Assert.Equal(Orientation.Horizontal,
+            ParsedValue<Orientation>(typeof(StackPanel), "StackPanel { orientation: HORIZONTAL; }"));
+        Assert.Equal(Visibility.Collapsed,
+            ParsedValue<Visibility>(typeof(UiNode), "UiNode { visibility: collapsed; }"));
+        Assert.Equal(HorizontalAlignment.Center,
+            ParsedValue<HorizontalAlignment>(typeof(UiNode), "UiNode { horizontal-alignment: CENTER; }"));
         Assert.Equal(TextWrapping.Wrap, ParsedValue<TextWrapping>(typeof(Text), "Text { wrapping: wrap; }"));
         Assert.Equal(TextAlignment.Right, ParsedValue<TextAlignment>(typeof(Text), "Text { text-alignment: right; }"));
-        Assert.Equal(ImageStretch.UniformToFill, ParsedValue<ImageStretch>(typeof(ImageView), "ImageView { stretch: uniformToFill; }"));
-        Assert.Equal(ImageSamplingMode.Nearest, ParsedValue<ImageSamplingMode>(typeof(ImageView), "ImageView { sampling-mode: nearest; }"));
+        Assert.Equal(ImageStretch.UniformToFill,
+            ParsedValue<ImageStretch>(typeof(ImageView), "ImageView { stretch: uniformToFill; }"));
+        Assert.Equal(ImageSamplingMode.Nearest,
+            ParsedValue<ImageSamplingMode>(typeof(ImageView), "ImageView { sampling-mode: nearest; }"));
     }
 
     [Fact]
@@ -513,13 +520,13 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void StatefulLayoutPropertyReportsDiagnosticWhenBound()
+    public void StatefulLayoutPropertyBindsSuccessfully()
     {
         var rule = SingleRule("Button:hover { padding: 4; }");
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
-
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        var declaration = Assert.Single(rule.Bind(typeof(Button)));
+        Assert.Same(Region.PaddingProperty, declaration.Setter.Property);
+        Assert.Equal(new Thickness(4), declaration.Setter.BoxedValue);
     }
 
     [Fact]
@@ -580,8 +587,10 @@ public sealed class UiStyleParserTests
     [Fact]
     public void SelectorListBindsSameCssNameToDistinctPropertiesOnlyForMatchingBranches()
     {
-        var resolver = new UiStyleResolver([], [ParseCss(
-            "BaseStyleNode.base, DerivedStyleNode.derived { tone: bright; }")]);
+        var resolver = new UiStyleResolver([], [
+            ParseCss(
+                "BaseStyleNode.base, DerivedStyleNode.derived { tone: bright; }")
+        ]);
         var node = new DerivedStyleNode();
         node.Classes.Add("derived");
         var initial = resolver.Resolve(node);
@@ -592,7 +601,8 @@ public sealed class UiStyleParserTests
         Assert.Equal("bright", both.GetValue(BaseStyleNode.ToneProperty));
         Assert.Equal("bright", both.GetValue(DerivedStyleNode.ToneProperty));
         Assert.Equal("BaseStyleNode.base", Assert.Single(both.GetSources(BaseStyleNode.ToneProperty)).SelectorText);
-        Assert.Equal("DerivedStyleNode.derived", Assert.Single(both.GetSources(DerivedStyleNode.ToneProperty)).SelectorText);
+        Assert.Equal("DerivedStyleNode.derived",
+            Assert.Single(both.GetSources(DerivedStyleNode.ToneProperty)).SelectorText);
     }
 
     [Fact]
@@ -693,13 +703,13 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void ImportantDoesNotBypassPseudoClassLayoutRestriction()
+    public void ImportantPseudoClassLayoutDeclarationBindsSuccessfully()
     {
         var rule = SingleRule("Button:hover { padding: 4 !important; }");
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
-
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        var declaration = Assert.Single(rule.Bind(typeof(Button)));
+        Assert.Equal(new Thickness(4), declaration.Setter.BoxedValue);
+        Assert.True(declaration.IsImportant);
     }
 
     private sealed class FlagConvNode : UiNode
@@ -792,7 +802,11 @@ public sealed class UiStyleParserTests
 
         public override long Length => throw new NotSupportedException();
 
-        public override long Position { get => 0; set => throw new NotSupportedException(); }
+        public override long Position
+        {
+            get => 0;
+            set => throw new NotSupportedException();
+        }
 
         public override void Flush()
         {

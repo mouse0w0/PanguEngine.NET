@@ -2,58 +2,17 @@ namespace PanguEngine.Client.UI.Styling;
 
 internal sealed partial class UiStyleResolver
 {
-    private readonly Dictionary<string, string> _pseudoVariableSources = new(StringComparer.Ordinal);
     private readonly List<RuleEntry> _variableRules = [];
 
     internal bool HasVariables { get; private set; }
 
     private void InitializeVariableRules()
     {
-        var dependencies = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         foreach (var entry in _rules)
         {
             if (entry.Rule.CssDeclarations.Any(declaration => declaration.IsCustomProperty))
                 _variableRules.Add(entry);
-            foreach (var declaration in entry.Rule.CssDeclarations)
-            {
-                if (!declaration.IsCustomProperty)
-                    continue;
-                if (!dependencies.TryGetValue(declaration.PropertyName, out var references))
-                {
-                    references = new HashSet<string>(StringComparer.Ordinal);
-                    dependencies.Add(declaration.PropertyName, references);
-                }
-
-                references.UnionWith(declaration.Expression.References);
-                if (entry.Rule.HasStatePseudoClasses)
-                {
-                    var location = declaration.PropertyLocation;
-                    var selector = entry.Rule.Selectors.First(selector => selector.HasStatePseudoClasses);
-                    _pseudoVariableSources.TryAdd(declaration.PropertyName,
-                        $"pseudo-class variable '{declaration.PropertyName}' in '{selector.SelectorText}' " +
-                        $"at {location.SourceName ?? "<stylesheet>"}:{location.Line}:{location.Column}");
-                }
-            }
         }
-
-        bool changed;
-        do
-        {
-            changed = false;
-            foreach (var (name, references) in dependencies.OrderBy(pair => pair.Key, StringComparer.Ordinal))
-            {
-                if (_pseudoVariableSources.ContainsKey(name))
-                    continue;
-                foreach (var reference in references.OrderBy(reference => reference, StringComparer.Ordinal))
-                {
-                    if (!_pseudoVariableSources.TryGetValue(reference, out var source))
-                        continue;
-                    _pseudoVariableSources.Add(name, source);
-                    changed = true;
-                    break;
-                }
-            }
-        } while (changed);
     }
 
     private UiCssVariableEnvironment ResolveVariables(UiNode node, UiCssVariableEnvironment parent)

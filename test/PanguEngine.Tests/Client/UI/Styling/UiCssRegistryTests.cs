@@ -32,7 +32,8 @@ public sealed class UiCssRegistryTests
             Assert.Single(UiCssRegistry.FindProperty(typeof(Panel), "background-color")!.Convert("#010203")).Property);
         Assert.Same(
             StackPanel.OrientationProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(StackPanel), "orientation")!.Convert("horizontal")).Property);
+            Assert.Single(UiCssRegistry.FindProperty(typeof(StackPanel), "orientation")!.Convert("horizontal"))
+                .Property);
         Assert.Same(
             Text.FontSizeProperty,
             Assert.Single(UiCssRegistry.FindProperty(typeof(Text), "font-size")!.Convert("12")).Property);
@@ -154,7 +155,8 @@ public sealed class UiCssRegistryTests
 
         UiCssRegistry.RegisterElement<DuplicateElementNode>("dup-tag");
         Assert.Throws<InvalidOperationException>(() => UiCssRegistry.RegisterElement<DuplicateElementNode>("dup-tag"));
-        Assert.Throws<InvalidOperationException>(() => UiCssRegistry.RegisterElement<DuplicateElementNode>("other-tag"));
+        Assert.Throws<InvalidOperationException>(() =>
+            UiCssRegistry.RegisterElement<DuplicateElementNode>("other-tag"));
 
         Assert.True(SingleSelector("dup-tag").Matches(new DuplicateElementNode()));
         Assert.False(SingleSelector("other-tag").Matches(new DuplicateElementNode()));
@@ -367,14 +369,13 @@ public sealed class UiCssRegistryTests
     }
 
     [Fact]
-    public void PseudoClassRuleRejectsExpandedLayoutOutputAtBind()
+    public void PseudoClassRuleAcceptsExpandedLayoutOutputAtBind()
     {
         var rule = Assert.Single(UiStyleSheet.Parse("Panel:hover { padding-top: 4; }").Rules);
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Panel)));
-
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-        Assert.IsType<ArgumentException>(error.InnerException);
+        var declaration = Assert.Single(rule.Bind(typeof(Panel)));
+        Assert.Same(Region.PaddingProperty, declaration.Setter.Property);
+        Assert.Equal<UiStyleEdge?>(UiStyleEdge.Top, declaration.Setter.Component);
     }
 
     [Fact]
@@ -527,10 +528,10 @@ public sealed class UiCssRegistryTests
             });
 
             UiCssRegistry.RegisterProperty<ExpandCssNode>("expand-duplicate", value =>
-                [
-                    UiStyleSetter.Create(PaddingProperty, new Thickness(UiCssValueConverters.ParseLength(value))),
-                    UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value))
-                ]);
+            [
+                UiStyleSetter.Create(PaddingProperty, new Thickness(UiCssValueConverters.ParseLength(value))),
+                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value))
+            ]);
         }
 
         internal static readonly UiProperty<Thickness> PaddingProperty =
@@ -597,7 +598,8 @@ public sealed class UiCssRegistryTests
         internal static readonly List<UiStyleSetter> Output = [];
 
         internal static readonly UiProperty<Thickness> PaddingProperty =
-            UiProperty.Register<ExpandMutableNode, Thickness>("Padding", Thickness.Zero, UiPropertyInvalidation.Measure);
+            UiProperty.Register<ExpandMutableNode, Thickness>("Padding", Thickness.Zero,
+                UiPropertyInvalidation.Measure);
     }
 
     private sealed class FallbackNameNode : UiNode

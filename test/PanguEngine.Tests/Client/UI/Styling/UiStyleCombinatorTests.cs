@@ -451,14 +451,18 @@ public sealed class UiStyleCombinatorTests
         Assert.Equal(sharedDepth + panelDepth, depth);
         Assert.True(sharedDepth > shallowDepth);
 
-        var sharedFirst = new UiStyleResolver([], [UiStyleSheet.Parse("""
-            shared Panel { background: #010101; }
-            FixedDepth Panel { background: #040404; }
-            """)]);
-        var shallowFirst = new UiStyleResolver([], [UiStyleSheet.Parse("""
-            FixedDepth Panel { background: #040404; }
-            shared Panel { background: #010101; }
-            """)]);
+        var sharedFirst = new UiStyleResolver([], [
+            UiStyleSheet.Parse("""
+                               shared Panel { background: #010101; }
+                               FixedDepth Panel { background: #040404; }
+                               """)
+        ]);
+        var shallowFirst = new UiStyleResolver([], [
+            UiStyleSheet.Parse("""
+                               FixedDepth Panel { background: #040404; }
+                               shared Panel { background: #010101; }
+                               """)
+        ]);
 
         Assert.Equal(Brush(1), sharedFirst.Resolve(target).GetValue(Region.BackgroundProperty));
         Assert.Equal(Brush(1), shallowFirst.Resolve(target).GetValue(Region.BackgroundProperty));
@@ -475,19 +479,23 @@ public sealed class UiStyleCombinatorTests
         root.Children.Add(high);
         root.Children.Add(target);
         var expected = UiStyleSelector.For<SharedDerived>().TargetTypeDepth
-            + UiStyleSelector.For<Panel>().TargetTypeDepth;
+                       + UiStyleSelector.For<Panel>().TargetTypeDepth;
 
         Assert.True(Selector("shared ~ Panel").TryMatch(target, out var depth));
         Assert.Equal(expected, depth);
 
-        var sharedFirst = new UiStyleResolver([], [UiStyleSheet.Parse("""
-            shared ~ Panel { background: #010101; }
-            FixedDepth > Panel { background: #040404; }
-            """)]);
-        var shallowFirst = new UiStyleResolver([], [UiStyleSheet.Parse("""
-            FixedDepth > Panel { background: #040404; }
-            shared ~ Panel { background: #010101; }
-            """)]);
+        var sharedFirst = new UiStyleResolver([], [
+            UiStyleSheet.Parse("""
+                               shared ~ Panel { background: #010101; }
+                               FixedDepth > Panel { background: #040404; }
+                               """)
+        ]);
+        var shallowFirst = new UiStyleResolver([], [
+            UiStyleSheet.Parse("""
+                               FixedDepth > Panel { background: #040404; }
+                               shared ~ Panel { background: #010101; }
+                               """)
+        ]);
 
         Assert.Equal(Brush(1), sharedFirst.Resolve(target).GetValue(Region.BackgroundProperty));
         Assert.Equal(Brush(1), shallowFirst.Resolve(target).GetValue(Region.BackgroundProperty));
@@ -496,10 +504,12 @@ public sealed class UiStyleCombinatorTests
     [Fact]
     public void ResolverRecomputesTheChainContributionForTheSameTargetType()
     {
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""
-            shared Panel { background: #010101; }
-            FixedDepth Panel { background: #040404; }
-            """)]);
+        var resolver = new UiStyleResolver([], [
+            UiStyleSheet.Parse("""
+                               shared Panel { background: #010101; }
+                               FixedDepth Panel { background: #040404; }
+                               """)
+        ]);
         var nearOnly = new SharedBase();
         var target = new Panel();
         var root = new FixedDepth();
@@ -520,10 +530,12 @@ public sealed class UiStyleCombinatorTests
     [Fact]
     public void OnlyTheTargetSegmentSelectsWhichRulesBind()
     {
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("""
-            .host Button { opacity: 0.4; }
-            .host Panel { opacity: 0.7; }
-            """)]);
+        var resolver = new UiStyleResolver([], [
+            UiStyleSheet.Parse("""
+                               .host Button { opacity: 0.4; }
+                               .host Panel { opacity: 0.7; }
+                               """)
+        ]);
         var host = MakePanel("host");
         var button = new Button();
         var panel = new Panel();
@@ -561,13 +573,13 @@ public sealed class UiStyleCombinatorTests
     }
 
     [Fact]
-    public void PseudoClassInAnySegmentForbidsLayoutProperties()
+    public void PseudoClassInAncestorSegmentAllowsLayoutProperties()
     {
         var rule = SingleRule(".panel:hover .button { width: 10; }");
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
-
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        var declaration = Assert.Single(rule.Bind(typeof(Button)));
+        Assert.Same(UiNode.WidthProperty, declaration.Setter.Property);
+        Assert.Equal(10d, declaration.Setter.BoxedValue);
     }
 
     [Fact]

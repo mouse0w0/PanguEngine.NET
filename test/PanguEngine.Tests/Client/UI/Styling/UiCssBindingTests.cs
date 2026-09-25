@@ -11,7 +11,8 @@ public sealed class UiCssBindingTests
     [Fact]
     public void AutomaticTypeNameMatchesRuntimeClassName()
     {
-        var theme = new UiStyleResolver(UiStyleResolver.Default.BaseStyleSheets, [UiStyleSheet.Parse("Button { padding: 3px; }")]);
+        var theme = new UiStyleResolver(UiStyleResolver.Default.BaseStyleSheets,
+            [UiStyleSheet.Parse("Button { padding: 3px; }")]);
 
         Assert.Equal(new Thickness(3), theme.Resolve(new Button()).GetValue(Region.PaddingProperty));
     }
@@ -40,7 +41,8 @@ public sealed class UiCssBindingTests
     public void StronglyTypedRuleUsesClrPropertyRegardlessOfCssAlias()
     {
         var csharpSheet = new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<AliasNode>(), [UiStyleSetter.Create(AliasNode.LevelProperty, 5d)])]);
+            new UiStyleRule(UiStyleSelector.For<AliasNode>(), [UiStyleSetter.Create(AliasNode.LevelProperty, 5d)])
+        ]);
         var csharpTheme = new UiStyleResolver([], [csharpSheet]);
         Assert.Equal(5d, csharpTheme.Resolve(new AliasNode()).GetValue(AliasNode.LevelProperty));
 
@@ -60,8 +62,10 @@ public sealed class UiCssBindingTests
     public void PathDataCssValueUsesThePathDataProperty()
     {
         var path = new Path { Data = PathGeometry.Parse("M0 0 L2 2") };
-        var theme = new UiStyleResolver([], [UiStyleSheet.Parse(
-            "Path { data: \"M0 0 L10 0 L0 10 Z\"; }")]);
+        var theme = new UiStyleResolver([], [
+            UiStyleSheet.Parse(
+                "Path { data: \"M0 0 L10 0 L0 10 Z\"; }")
+        ]);
 
         var snapshot = theme.Resolve(path);
         var data = snapshot.GetValue(Path.DataProperty);
@@ -91,9 +95,9 @@ public sealed class UiCssBindingTests
         CountingNode.Conversions = 0;
         var node = new CountingNode();
         var sheet = UiStyleSheet.Parse("""
-            CountingNode { counted-value: a; }
-            CountingNode.primary#save:hover { counted-value: abc; }
-            """);
+                                       CountingNode { counted-value: a; }
+                                       CountingNode.primary#save:hover { counted-value: abc; }
+                                       """);
         var root = new Panel();
         root.Children.Add(node);
         var screen = new UiScreen(root);
@@ -119,8 +123,10 @@ public sealed class UiCssBindingTests
     [Fact]
     public void CssDeclarationsUseLastValueAndKeepSourceOrder()
     {
-        var theme = new UiStyleResolver([], [UiStyleSheet.Parse(
-            "Button { ghost: bad; opacity: 0.2; other: ignored; opacity: 0.6; tail: ignored; }")]);
+        var theme = new UiStyleResolver([], [
+            UiStyleSheet.Parse(
+                "Button { ghost: bad; opacity: 0.2; other: ignored; opacity: 0.6; tail: ignored; }")
+        ]);
 
         var result = theme.Resolve(new Button());
 
@@ -178,13 +184,15 @@ public sealed class UiCssBindingTests
     }
 
     [Fact]
-    public void StatefulUnqualifiedRuleRejectsLayoutProperty()
+    public void StatefulUnqualifiedRuleAppliesLayoutPropertyWhileActive()
     {
         var theme = new UiStyleResolver([], [UiStyleSheet.Parse(":hover { padding: 4; }")]);
-
-        var error = Assert.Throws<UiStyleParseException>(() => theme.Resolve(new Button()));
-
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        var node = new Panel();
+        Assert.Equal(Thickness.Zero, theme.Resolve(node).GetValue(Region.PaddingProperty));
+        node.SetHovered(true);
+        Assert.Equal(new Thickness(4), theme.Resolve(node).GetValue(Region.PaddingProperty));
+        node.SetHovered(false);
+        Assert.Equal(Thickness.Zero, theme.Resolve(node).GetValue(Region.PaddingProperty));
     }
 
     [Fact]
@@ -192,11 +200,13 @@ public sealed class UiCssBindingTests
     {
         var node = new Panel();
         var screen = new UiScreen(node);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
-            .danger { opacity: 0.25; }
-            #save { opacity: 0.6; }
-            :hover { background: #040404; }
-            """)]);
+        screen.SetStyleSheets([
+            UiStyleSheet.Parse("""
+                               .danger { opacity: 0.25; }
+                               #save { opacity: 0.6; }
+                               :hover { background: #040404; }
+                               """)
+        ]);
 
         Assert.Equal(1d, node.Opacity);
         Assert.Empty(node.GetStyleValueSources(Region.BackgroundProperty));
@@ -248,8 +258,10 @@ public sealed class UiCssBindingTests
     public void SelectorListWithSameBindingTargetConvertsOncePerNodeType()
     {
         CountingNode.Conversions = 0;
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
-            ".first, .second { counted-value: abc; }")]);
+        var resolver = new UiStyleResolver([], [
+            UiStyleSheet.Parse(
+                ".first, .second { counted-value: abc; }")
+        ]);
         var node = new CountingNode();
         node.Classes.Add("first");
         node.Classes.Add("second");
@@ -257,7 +269,8 @@ public sealed class UiCssBindingTests
         Assert.Equal(3d, resolver.Resolve(node).GetValue(CountingNode.ValueProperty));
         Assert.Equal(1, CountingNode.Conversions);
         node.Classes.Remove("first");
-        Assert.Equal(".second", Assert.Single(resolver.Resolve(node).GetSources(CountingNode.ValueProperty)).SelectorText);
+        Assert.Equal(".second",
+            Assert.Single(resolver.Resolve(node).GetSources(CountingNode.ValueProperty)).SelectorText);
         node.Classes.Remove("second");
         Assert.Empty(resolver.Resolve(node).GetSources(CountingNode.ValueProperty));
         node.Classes.Add("first");
@@ -266,13 +279,12 @@ public sealed class UiCssBindingTests
     }
 
     [Fact]
-    public void SelectorListPseudoClassStillRejectsLayoutProperty()
+    public void SelectorListPseudoClassAllowsLayoutProperty()
     {
-        var error = Assert.Throws<UiStyleParseException>(() =>
-            new UiStyleResolver([], [UiStyleSheet.Parse(
-                ".plain, :hover { padding: 4px; }")]).Resolve(new Button()));
-
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        var node = new Panel();
+        node.Classes.Add("plain");
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(".plain, :hover { padding: 4px; }")]);
+        Assert.Equal(new Thickness(4), resolver.Resolve(node).GetValue(Region.PaddingProperty));
     }
 
     [Fact]
@@ -391,8 +403,10 @@ public sealed class UiCssBindingTests
         SourceQueryNode.Conversions = 0;
         try
         {
-            screen.SetStyleSheets([UiStyleSheet.Parse(
-                "SourceQueryNode { query-value: 2; opacity: 0.6; }", "new.css")]);
+            screen.SetStyleSheets([
+                UiStyleSheet.Parse(
+                    "SourceQueryNode { query-value: 2; opacity: 0.6; }", "new.css")
+            ]);
 
             Assert.NotEmpty(previousSource);
             Assert.NotNull(node.SourceDuringBinding);
@@ -532,7 +546,7 @@ public sealed class UiCssBindingTests
                     throw new InvalidOperationException("Unexpected recursive binding.");
                 var node = Current!;
                 var target = QueryTarget ?? node;
-                node.SourceDuringBinding = target.GetStyleValueSources(UiNode.OpacityProperty);
+                node.SourceDuringBinding = target.GetStyleValueSources(OpacityProperty);
                 node.ValueDuringBinding = target.Opacity;
                 return 2d;
             });
@@ -634,7 +648,8 @@ public sealed class UiCssBindingTests
         static NumericNode()
         {
             UiCssRegistry.RegisterElement<NumericNode>("Shared");
-            UiCssRegistry.RegisterProperty<NumericNode, double>("level", LevelProperty, UiCssValueConverters.ParseLength);
+            UiCssRegistry.RegisterProperty<NumericNode, double>("level", LevelProperty,
+                UiCssValueConverters.ParseLength);
         }
 
         internal static readonly UiProperty<double> LevelProperty =
