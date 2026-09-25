@@ -146,18 +146,22 @@ public sealed class GlyphAtlasTests
     }
 
     [Fact]
-    public void PageCreationFailureRollsBackWithoutPublishingOrCaching()
+    public void PageCreationFailurePropagatesWithoutRollbackOrCaching()
     {
         var failure = new InvalidOperationException("view");
         using var context = new GlyphAtlasContext(viewException: failure);
         var key = context.CreateKey("A", 20);
 
         Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => context.Atlas.Resolve(key)));
-        Assert.All(context.Device.Textures, texture => Assert.True(texture.IsDestroyed));
-        Assert.All(context.Device.Views, view => Assert.True(view.IsDestroyed));
+        Assert.False(Assert.Single(context.Device.Textures).IsDestroyed);
+        Assert.Empty(context.Device.Views);
+        Assert.Equal(0, context.Device.UploadCount);
 
         Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => context.Atlas.Resolve(key)));
         Assert.Equal(2, context.Device.TextureCount);
+        Assert.All(context.Device.Textures, texture => Assert.False(texture.IsDestroyed));
+        Assert.Empty(context.Device.Views);
+        Assert.Equal(0, context.Device.UploadCount);
     }
 
     [Fact]

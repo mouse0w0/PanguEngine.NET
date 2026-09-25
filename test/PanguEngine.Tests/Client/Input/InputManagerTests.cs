@@ -540,6 +540,7 @@ public sealed class InputManagerTests
                 replaced = true;
                 ui.Open(replacement);
             }
+
             return InputHandling.Pass;
         });
         input.RegisterHandler(secondAction, _ =>
@@ -608,7 +609,7 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void FocusLossCleansPhysicalPointerAndUiStateWhenStoppedHandlerThrows()
+    public void FocusLossStopsBeforePointerAndUiCleanupWhenStoppedHandlerThrows()
     {
         var game = new InputContext(InputScope.Game);
         var action = new InputAction(InputValueType.Button,
@@ -638,11 +639,11 @@ public sealed class InputManagerTests
 
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => window.RaiseFocusChanged(false)));
 
-        Assert.False(input.IsPointerCaptured);
-        Assert.Equal(CursorState.Normal, window.CursorState);
-        Assert.False(control.IsFocused);
-        Assert.False(control.IsPressed);
-        Assert.False(control.IsHovered);
+        Assert.True(input.IsPointerCaptured);
+        Assert.Equal(CursorState.Disabled, window.CursorState);
+        Assert.True(control.IsFocused);
+        Assert.True(control.IsPressed);
+        Assert.True(control.IsHovered);
         Assert.Equal(InputActionValue.Zero, input.GetValue(action));
         Assert.Equal(1, starts);
         input.Destroy();
@@ -828,7 +829,7 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void ThrowingUiKeyUpStillReleasesGameAction()
+    public void ThrowingUiKeyUpStopsBeforeGameActionRelease()
     {
         var game = new InputContext(InputScope.Game);
         var action = new InputAction(InputValueType.Button, [InputBinding.Button("default", game, Key.E)]);
@@ -851,8 +852,8 @@ public sealed class InputManagerTests
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(() =>
             window.RaiseKeyUp(new KeyEventArgs(Key.E, KeyAction.Release, KeyModifiers.None))));
 
-        Assert.Equal(InputActionValue.Zero, input.GetValue(action));
-        Assert.Equal([InputActionPhase.Started, InputActionPhase.Stopped], phases);
+        Assert.True(input.GetValue(action).Button);
+        Assert.Equal([InputActionPhase.Started], phases);
         input.Destroy();
         ui.Destroy();
     }
@@ -860,7 +861,7 @@ public sealed class InputManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ThrowingUiMouseReleaseStillReleasesGameAction(bool clicked)
+    public void ThrowingUiMouseReleaseStopsBeforeGameActionRelease(bool clicked)
     {
         var game = new InputContext(InputScope.Game);
         var action = new InputAction(InputValueType.Button,
@@ -881,13 +882,13 @@ public sealed class InputManagerTests
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(() =>
             window.RaiseMouseUp(new MouseClickEventArgs(MouseButton.Left, 5, 5))));
 
-        Assert.Equal(InputActionValue.Zero, input.GetValue(action));
+        Assert.True(input.GetValue(action).Button);
         input.Destroy();
         ui.Destroy();
     }
 
     [Fact]
-    public void ThrowingUiModifierPressStillWithdrawsExactContribution()
+    public void ThrowingUiModifierPressStopsBeforeWithdrawingExactContribution()
     {
         var game = new InputContext(InputScope.Game);
         var action = new InputAction(InputValueType.Button,
@@ -911,7 +912,7 @@ public sealed class InputManagerTests
             window.RaiseKeyDown(new KeyEventArgs(Key.ControlLeft, KeyAction.Press,
                 KeyModifiers.Control | KeyModifiers.Shift))));
 
-        Assert.Equal(InputActionValue.Zero, input.GetValue(action));
+        Assert.True(input.GetValue(action).Button);
         input.Destroy();
         ui.Destroy();
     }
@@ -999,7 +1000,7 @@ public sealed class InputManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void UiMaintenanceAndCompletionErrorsArePreserved(bool failCompletion)
+    public void UiFailureStopsBeforeMaintenanceAndCompletion(bool failCompletion)
     {
         var game = new InputContext(InputScope.Game);
         var first = new InputAction(InputValueType.Button, [InputBinding.Button("default", game, Key.E)]);
@@ -1014,39 +1015,44 @@ public sealed class InputManagerTests
         var completionError = new InvalidOperationException("completion failed");
         leaf.KeyUp += (_, _) => throw uiError;
         IDisposable? modalToken = null;
+        var dispatching = true;
+        var stoppedActions = new List<InputAction>();
         input.RegisterHandler(first, args =>
         {
-            if (args.Phase == InputActionPhase.Stopped)
+            if (args.Phase == InputActionPhase.Stopped && dispatching)
             {
+                stoppedActions.Add(first);
                 modalToken = input.ActivateContext(BuiltinInputContexts.Ui);
                 throw actionError;
             }
+
             return InputHandling.Pass;
         });
         input.RegisterHandler(second, args =>
         {
-            if (args.Phase == InputActionPhase.Stopped && failCompletion)
-                throw completionError;
+            if (args.Phase == InputActionPhase.Stopped && dispatching)
+            {
+                stoppedActions.Add(second);
+                if (failCompletion)
+                    throw completionError;
+            }
+
             return InputHandling.Pass;
         });
         input.Start();
         window.RaiseKeyDown(new KeyEventArgs(Key.E, KeyAction.Press, KeyModifiers.None));
         window.RaiseKeyDown(new KeyEventArgs(Key.F, KeyAction.Press, KeyModifiers.None));
 
-        var error = Assert.Throws<AggregateException>(() =>
+        var error = Assert.Throws<InvalidOperationException>(() =>
             window.RaiseKeyUp(new KeyEventArgs(Key.E, KeyAction.Release, KeyModifiers.None)));
 
-        var errors = error.Flatten().InnerExceptions;
-        Assert.Equal(failCompletion ? 3 : 2, errors.Count);
-        Assert.Contains(uiError, errors);
-        Assert.Contains(actionError, errors);
-        if (failCompletion)
-            Assert.Contains(completionError, errors);
-        Assert.Equal(InputActionValue.Zero, input.GetValue(first));
-        Assert.Equal(InputActionValue.Zero, input.GetValue(second));
-        Assert.NotNull(modalToken);
+        Assert.Same(uiError, error);
+        Assert.Empty(stoppedActions);
+        Assert.True(input.GetValue(first).Button);
+        Assert.True(input.GetValue(second).Button);
+        Assert.Null(modalToken);
+        dispatching = false;
         input.Destroy();
-        modalToken.Dispose();
         ui.Destroy();
     }
 
