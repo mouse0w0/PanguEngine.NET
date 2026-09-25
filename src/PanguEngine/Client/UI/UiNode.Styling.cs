@@ -44,19 +44,23 @@ public abstract partial class UiNode
     /// <summary>Gets the read-only collection of style classes applied to this node.</summary>
     public UiStyleClassCollection Classes { get; }
 
-    /// <summary>Adds or removes an active built-in or custom pseudo class used for style matching.</summary>
+    /// <summary>Adds or removes an active built-in or custom state pseudo class used for style matching.</summary>
     /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
     /// <param name="active">Whether the pseudo class should be active on this node.</param>
     /// <remarks>
     /// The collection only changes when the requested membership differs,
     /// and a no-op does not request a style recompute. A pseudo class
     /// mirrors real control state, so a style preparation failure does not roll back the updated collection.
+    /// Requests for <see cref="UiPseudoClass.Root"/> have no effect because root matching depends on tree structure.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the node resolves its styles or the owning screen does not allow style input changes.
     /// </exception>
     protected void SetPseudoClass(UiPseudoClass pseudoClass, bool active)
     {
+        if (pseudoClass == UiPseudoClass.Root)
+            return;
+
         if (active)
         {
             if (_pseudoClasses is not null && _pseudoClasses.Contains(pseudoClass))
@@ -76,10 +80,11 @@ public abstract partial class UiNode
         RecomputeStyle();
     }
 
-    /// <summary>Determines whether the supplied pseudo class is active on this node.</summary>
+    /// <summary>Determines whether this node matches the supplied structural or state pseudo class.</summary>
     /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
-    /// <returns>true when the pseudo class is active; otherwise false.</returns>
-    internal bool HasPseudoClass(UiPseudoClass pseudoClass) => _pseudoClasses?.Contains(pseudoClass) == true;
+    /// <returns>true when the node matches the pseudo class; otherwise false.</returns>
+    internal bool HasPseudoClass(UiPseudoClass pseudoClass) =>
+        pseudoClass == UiPseudoClass.Root ? Parent is null : _pseudoClasses?.Contains(pseudoClass) == true;
 
     internal void ChangeStyleInput(Action apply, Action rollback)
     {
@@ -242,8 +247,10 @@ public abstract partial class UiNode
         bool screenChanged = false)
     {
         if (node is not null && (screenChanged || !ReferenceEquals(previousResolver, currentResolver) ||
-            previousResolver.HasRelationships ||
-            currentResolver.HasRelationships || previousResolver.HasVariables || currentResolver.HasVariables))
+                                 previousResolver.HasRelationships ||
+                                 currentResolver.HasRelationships || previousResolver.HasVariables ||
+                                 currentResolver.HasVariables ||
+                                 previousResolver.HasRootPseudoClass || currentResolver.HasRootPseudoClass))
         {
             entries.Add((node, currentResolver));
         }

@@ -23,11 +23,12 @@ internal sealed partial class UiStyleResolver
                     references = new HashSet<string>(StringComparer.Ordinal);
                     dependencies.Add(declaration.PropertyName, references);
                 }
+
                 references.UnionWith(declaration.Expression.References);
-                if (entry.Rule.HasPseudoClasses)
+                if (entry.Rule.HasStatePseudoClasses)
                 {
                     var location = declaration.PropertyLocation;
-                    var selector = entry.Rule.Selectors.First(selector => selector.HasPseudoClasses);
+                    var selector = entry.Rule.Selectors.First(selector => selector.HasStatePseudoClasses);
                     _pseudoVariableSources.TryAdd(declaration.PropertyName,
                         $"pseudo-class variable '{declaration.PropertyName}' in '{selector.SelectorText}' " +
                         $"at {location.SourceName ?? "<stylesheet>"}:{location.Line}:{location.Column}");
@@ -57,7 +58,8 @@ internal sealed partial class UiStyleResolver
 
     private UiCssVariableEnvironment ResolveVariables(UiNode node, UiCssVariableEnvironment parent)
     {
-        var winners = new Dictionary<string, (CascadeKey Key, UiStyleRule.CssDeclaration Declaration)>(StringComparer.Ordinal);
+        var winners =
+            new Dictionary<string, (CascadeKey Key, UiStyleRule.CssDeclaration Declaration)>(StringComparer.Ordinal);
         foreach (var entry in _variableRules)
         {
             foreach (var selector in entry.Rule.Selectors)
@@ -73,11 +75,13 @@ internal sealed partial class UiStyleResolver
                     var key = new CascadeKey(declaration.IsImportant, entry.Origin, selector.IdCount,
                         selector.ClassAndPseudoCount, typeDepth, entry.SheetIndex,
                         entry.DeclarationIndex + index);
-                    if (!winners.TryGetValue(declaration.PropertyName, out var current) || current.Key.CompareTo(key) < 0)
+                    if (!winners.TryGetValue(declaration.PropertyName, out var current) ||
+                        current.Key.CompareTo(key) < 0)
                         winners[declaration.PropertyName] = (key, declaration);
                 }
             }
         }
+
         return UiCssVariableEnvironment.Create(parent,
             winners.ToDictionary(pair => pair.Key, pair => pair.Value.Declaration, StringComparer.Ordinal));
     }
@@ -85,7 +89,8 @@ internal sealed partial class UiStyleResolver
     /// <summary>Provides consistent variable environments during a style preparation batch.</summary>
     internal sealed class VariableContext
     {
-        private readonly Dictionary<(UiStyleResolver Resolver, UiNode Node), UiCssVariableEnvironment> _environments = [];
+        private readonly Dictionary<(UiStyleResolver Resolver, UiNode Node), UiCssVariableEnvironment> _environments =
+            [];
 
         internal UiCssVariableEnvironment Get(UiStyleResolver resolver, UiNode node)
         {

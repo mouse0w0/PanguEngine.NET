@@ -277,6 +277,15 @@ public sealed class UiStyleSelector
     /// <summary>Gets a value indicating whether any segment in the chain requires a pseudo class.</summary>
     internal bool HasPseudoClasses { get; }
 
+    /// <summary>Gets whether any segment in the chain requires the root pseudo class.</summary>
+    internal bool HasRootPseudoClass =>
+        _segments.Any(static segment => segment.PseudoClasses.Contains(UiPseudoClass.Root));
+
+    /// <summary>Gets whether any segment in the chain requires a state pseudo class.</summary>
+    internal bool HasStatePseudoClasses =>
+        _segments.Any(static segment =>
+            segment.PseudoClasses.Any(static pseudoClass => pseudoClass != UiPseudoClass.Root));
+
     /// <summary>Creates a selector for a target node type as a single-segment chain.</summary>
     /// <typeparam name="TNode">The target node type.</typeparam>
     /// <param name="classes">The optional required classes; duplicates are removed and invalid identifiers rejected.</param>

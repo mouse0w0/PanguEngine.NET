@@ -14,6 +14,10 @@ public sealed class UiPseudoClass
     /// <summary>Gets the normalized lower-case name without a leading colon.</summary>
     public string Name { get; }
 
+    /// <summary>Gets the built-in structural pseudo class that matches nodes without a parent.</summary>
+    /// <remarks>The name <c>root</c> is reserved. Its matching state cannot be changed manually.</remarks>
+    public static UiPseudoClass Root { get; } = Get("root");
+
     /// <summary>Gets the built-in hover pseudo class.</summary>
     public static UiPseudoClass Hover { get; } = Get("hover");
 

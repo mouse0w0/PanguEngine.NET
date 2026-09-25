@@ -36,6 +36,9 @@ internal sealed partial class UiStyleResolver
     /// <summary>Gets a value indicating whether any input rule contains an adjacent or subsequent sibling combinator.</summary>
     internal bool HasSiblingRelationships { get; private set; }
 
+    /// <summary>Gets whether any input rule requires the root pseudo class.</summary>
+    internal bool HasRootPseudoClass { get; private set; }
+
     private void AddRules(IReadOnlyList<UiStyleSheet> sheets, UiStyleOrigin origin)
     {
         for (var sheetIndex = 0; sheetIndex < sheets.Count; sheetIndex++)
@@ -47,6 +50,7 @@ internal sealed partial class UiStyleResolver
                 var rule = rules[ruleIndex];
                 HasRelationships |= rule.HasRelationships;
                 HasSiblingRelationships |= rule.HasSiblingRelationships;
+                HasRootPseudoClass |= rule.Selectors.Any(static selector => selector.HasRootPseudoClass);
                 HasVariables |= rule.HasVariables;
                 _rules.Add(new RuleEntry(origin, sheetIndex, ruleIndex, rule, declarationIndex));
                 declarationIndex += rule.DeclarationCount;
@@ -65,8 +69,11 @@ internal sealed partial class UiStyleResolver
         var variables = HasVariables
             ? (context ?? new VariableContext()).Get(this, node)
             : UiCssVariableEnvironment.Empty;
-        var winners = new Dictionary<(UiProperty Property, UiStyleEdge? Component), (CascadeKey Key, DeclarationEntry Entry)>();
-        var variableBindings = new Dictionary<(UiStyleRule Rule, UiStyleRule.BoundVariableDeclaration Declaration), IReadOnlyList<UiStyleRule.BoundDeclaration>>();
+        var winners =
+            new Dictionary<(UiProperty Property, UiStyleEdge? Component), (CascadeKey Key, DeclarationEntry Entry)>();
+        var variableBindings =
+            new Dictionary<(UiStyleRule Rule, UiStyleRule.BoundVariableDeclaration Declaration),
+                IReadOnlyList<UiStyleRule.BoundDeclaration>>();
         foreach (var rule in GetBoundRules(node))
         {
             if (!rule.Selector.TryMatch(node, out var typeDepth))
@@ -85,6 +92,7 @@ internal sealed partial class UiStyleResolver
                     boundDeclarations = rule.Entry.Rule.BindVariable(declaration, variables, pseudoSource);
                     variableBindings.Add(bindingKey, boundDeclarations);
                 }
+
                 foreach (var bound in boundDeclarations)
                 {
                     foreach (var setter in bound.Setter.Expand())
@@ -128,6 +136,7 @@ internal sealed partial class UiStyleResolver
             propertySources.Sort((left, right) => Nullable.Compare(left.Component, right.Component));
             sources.Add(property, propertySources.AsReadOnly());
         }
+
         return new UiStyleSnapshot(values, sources);
 
         void Consider(DeclarationEntry entry, int typeDepth)
