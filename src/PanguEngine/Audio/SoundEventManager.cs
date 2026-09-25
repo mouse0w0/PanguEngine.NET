@@ -226,27 +226,17 @@ internal sealed class SoundEventManager
         if (_destroyed)
             return;
         _destroyed = true;
-        AudioBackendException? failure = null;
         if (_buffers is not null)
         {
             foreach (var buffer in _buffers)
             {
-                try
-                {
-                    _backend.DestroyBuffer(buffer);
-                }
-                catch (AudioBackendException exception)
-                {
-                    failure ??= exception;
-                }
+                _backend.DestroyBuffer(buffer);
             }
             _buffers.Clear();
         }
         _snapshot?.Clear();
         _warned2D.Clear();
         _warned3D.Clear();
-        if (failure is not null)
-            throw failure;
     }
 
     private static Dictionary<ResourceKey, List<SoundResourceReference>> CollectReferences(

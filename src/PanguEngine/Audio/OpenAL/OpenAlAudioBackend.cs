@@ -222,86 +222,43 @@ internal sealed unsafe class OpenAlAudioBackend : IAudioBackend
         CheckThread();
         _destroyed = true;
 
-        AudioBackendException? failure = null;
-        try
+        if (_sources.Count > 0 && _al is not null)
         {
-            if (_sources.Count > 0 && _al is not null)
-            {
-                _al.SourceStop(_sources.ToArray());
-                CheckAlError("stopping audio sources during shutdown");
-            }
-        }
-        catch (AudioBackendException exception)
-        {
-            failure ??= exception;
+            _al.SourceStop(_sources.ToArray());
+            CheckAlError("stopping audio sources during shutdown");
         }
 
-        try
+        if (_sources.Count > 0 && _al is not null)
         {
-            if (_sources.Count > 0 && _al is not null)
-            {
-                _al.DeleteSources(_sources.ToArray());
-                CheckAlError("destroying audio sources");
-            }
-        }
-        catch (AudioBackendException exception)
-        {
-            failure ??= exception;
+            _al.DeleteSources(_sources.ToArray());
+            CheckAlError("destroying audio sources");
         }
 
-        try
+        if (_buffers.Count > 0 && _al is not null)
         {
-            if (_buffers.Count > 0 && _al is not null)
-            {
-                _al.DeleteBuffers(_buffers.ToArray());
-                CheckAlError("destroying audio buffers");
-            }
-        }
-        catch (AudioBackendException exception)
-        {
-            failure ??= exception;
+            _al.DeleteBuffers(_buffers.ToArray());
+            CheckAlError("destroying audio buffers");
         }
 
-        try
+        if (_context != null && _alc is not null)
         {
-            if (_context != null && _alc is not null)
-            {
-                if (!_alc.MakeContextCurrent(null))
-                    throw CreateRuntimeAlcException("clearing the current OpenAL context");
-                CheckAlcError("clearing the current OpenAL context");
-            }
-        }
-        catch (AudioBackendException exception)
-        {
-            failure ??= exception;
+            if (!_alc.MakeContextCurrent(null))
+                throw CreateRuntimeAlcException("clearing the current OpenAL context");
+            CheckAlcError("clearing the current OpenAL context");
         }
 
-        try
+        if (_context != null && _alc is not null)
         {
-            if (_context != null && _alc is not null)
-            {
-                _alc.DestroyContext(_context);
-                _context = null;
-                CheckAlcError("destroying the OpenAL context");
-            }
-        }
-        catch (AudioBackendException exception)
-        {
-            failure ??= exception;
+            _alc.DestroyContext(_context);
+            _context = null;
+            CheckAlcError("destroying the OpenAL context");
         }
 
-        try
+        if (_device != null && _alc is not null)
         {
-            if (_device != null && _alc is not null)
-            {
-                if (!_alc.CloseDevice(_device))
-                    throw new AudioBackendException("OpenAL failed to close the output device.");
-                _device = null;
-            }
-        }
-        catch (AudioBackendException exception)
-        {
-            failure ??= exception;
+            if (!_alc.CloseDevice(_device))
+                throw new AudioBackendException("OpenAL failed to close the output device.");
+            _device = null;
         }
 
         _al?.Dispose();
@@ -312,9 +269,6 @@ internal sealed unsafe class OpenAlAudioBackend : IAudioBackend
         _availableSources.Clear();
         _rentedSources.Clear();
         _buffers.Clear();
-
-        if (failure is not null)
-            throw failure;
     }
 
     private void CreateSources()

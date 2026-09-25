@@ -17,10 +17,10 @@ public sealed class AudioSystem
         new EventId(1, nameof(LogInitialListenerFailure)),
         "Audio output failed while setting the initial listener; using null audio");
 
-    private static readonly Action<ILogger, Exception?> LogReleaseFailure = LoggerMessage.Define(
+    private static readonly Action<ILogger, Exception?> LogInitializationCleanupFailure = LoggerMessage.Define(
         LogLevel.Warning,
-        new EventId(2, nameof(LogReleaseFailure)),
-        "An audio resource could not be fully released");
+        new EventId(2, nameof(LogInitializationCleanupFailure)),
+        "An audio resource could not be fully released during initialization fallback");
 
     private readonly int _ownerThreadId = Environment.CurrentManagedThreadId;
     private readonly IRegistry<SoundCategory> _categories;
@@ -77,7 +77,14 @@ public sealed class AudioSystem
             catch (AudioBackendException exception)
             {
                 LogInitialListenerFailure(_logger, exception);
-                TryCleanup(_backend.Destroy);
+                try
+                {
+                    _backend.Destroy();
+                }
+                catch (Exception cleanupException)
+                {
+                    LogInitializationCleanupFailure(_logger, cleanupException);
+                }
                 _backend = new NullAudioBackend();
             }
         }
@@ -365,13 +372,13 @@ public sealed class AudioSystem
 
         foreach (var active in _active.ToArray())
         {
-            TryCleanup(() => _backend.Stop(active.Source));
-            TryCleanup(() => _backend.ReturnSource(active.Source));
+            _backend.Stop(active.Source);
+            _backend.ReturnSource(active.Source);
             active.Instance?.Complete(SoundInstanceState.Stopped);
         }
 
-        TryCleanup(_eventManager.Destroy);
-        TryCleanup(_backend.Destroy);
+        _eventManager.Destroy();
+        _backend.Destroy();
         _active.Clear();
         _ready = false;
         _pausedCategories.Clear();
@@ -724,18 +731,6 @@ public sealed class AudioSystem
 
     private bool IsOutOfRange(bool isSpatial, Vector3D<double> position, float maxDistance) =>
         isSpatial && Distance(_listener.Position, position) > maxDistance;
-
-    private void TryCleanup(Action action)
-    {
-        try
-        {
-            action();
-        }
-        catch (Exception exception)
-        {
-            LogReleaseFailure(_logger, exception);
-        }
-    }
 
     private ActiveSound FindActive(SoundInstance instance) =>
         _active.FirstOrDefault(active => ReferenceEquals(active.Instance, instance))
