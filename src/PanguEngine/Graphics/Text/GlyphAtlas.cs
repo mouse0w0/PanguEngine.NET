@@ -1,5 +1,3 @@
-using System.Runtime.ExceptionServices;
-
 namespace PanguEngine.Graphics.Text;
 
 internal interface IGlyphTextureSlotRegistry
@@ -11,7 +9,6 @@ internal interface IGlyphTextureSlotRegistry
 internal sealed class GlyphAtlas : GraphicsResource
 {
     private const uint PageSize = 1024;
-    private const string CleanupFailuresDataKey = "GlyphAtlas.CleanupFailures";
 
     private readonly GraphicsDevice _graphicsDevice;
     private readonly FontManager _fontManager;
@@ -90,24 +87,12 @@ internal sealed class GlyphAtlas : GraphicsResource
             return;
         MarkDestroyed();
 
-        Exception? firstFailure = null;
         for (var index = _pages.Count - 1; index >= 0; index--)
-        {
-            try
-            {
-                _pages[index].Destroy();
-            }
-            catch (Exception exception)
-            {
-                firstFailure ??= exception;
-            }
-        }
+            _pages[index].Destroy();
 
         _entries.Clear();
         _allocationPending.Clear();
         _pages.Clear();
-        if (firstFailure is not null)
-            ExceptionDispatchInfo.Capture(firstFailure).Throw();
     }
 
     private bool TryAllocatePageRegion(
@@ -152,47 +137,33 @@ internal sealed class GlyphAtlas : GraphicsResource
 
     private GlyphAtlasPage CreatePage(uint width, uint height, bool dedicated)
     {
-        Texture? texture = null;
-        TextureView? view = null;
-        try
+        var texture = _graphicsDevice.CreateTexture(new TextureDescription
         {
-            texture = _graphicsDevice.CreateTexture(new TextureDescription
-            {
-                Dimension = TextureDimension.Type2D,
-                Format = TextureFormat.R8Unorm,
-                Width = width,
-                Height = height,
-                Depth = 1,
-                MipLevels = 1,
-                ArrayLayers = 1,
-                Usage = TextureUsage.Sampled | TextureUsage.TransferDestination
-            });
-            view = _graphicsDevice.CreateTextureView(
-                texture,
-                new TextureViewDescription(TextureViewDimension.Type2D, 0, 1, 0, 1));
-            if (!_textureRegistry.TryRegister(view, out var textureIndex))
-                throw new InvalidOperationException("The UI texture table had no slot for a glyph atlas page.");
+            Dimension = TextureDimension.Type2D,
+            Format = TextureFormat.R8Unorm,
+            Width = width,
+            Height = height,
+            Depth = 1,
+            MipLevels = 1,
+            ArrayLayers = 1,
+            Usage = TextureUsage.Sampled | TextureUsage.TransferDestination
+        });
+        var view = _graphicsDevice.CreateTextureView(
+            texture,
+            new TextureViewDescription(TextureViewDimension.Type2D, 0, 1, 0, 1));
+        if (!_textureRegistry.TryRegister(view, out var textureIndex))
+            throw new InvalidOperationException("The UI texture table had no slot for a glyph atlas page.");
 
-            var page = new GlyphAtlasPage(
-                ++_nextPageId,
-                width,
-                height,
-                dedicated,
-                texture,
-                view,
-                textureIndex);
-            _pages.Add(page);
-            return page;
-        }
-        catch (Exception exception)
-        {
-            var cleanupFailures = new List<Exception>();
-            TryDestroy(view, cleanupFailures);
-            TryDestroy(texture, cleanupFailures);
-            if (cleanupFailures.Count != 0)
-                exception.Data[CleanupFailuresDataKey] = cleanupFailures.ToArray();
-            throw;
-        }
+        var page = new GlyphAtlasPage(
+            ++_nextPageId,
+            width,
+            height,
+            dedicated,
+            texture,
+            view,
+            textureIndex);
+        _pages.Add(page);
+        return page;
     }
 
     private static byte[] AddTransparentPadding(GlyphBitmap bitmap)
@@ -211,18 +182,6 @@ internal sealed class GlyphAtlas : GraphicsResource
     {
         if (Thread.CurrentThread != _ownerThread)
             throw new InvalidOperationException("Glyph atlas access must remain on its owner thread.");
-    }
-
-    private static void TryDestroy(GraphicsResource? resource, List<Exception> cleanupFailures)
-    {
-        try
-        {
-            resource?.Destroy();
-        }
-        catch (Exception exception)
-        {
-            cleanupFailures.Add(exception);
-        }
     }
 }
 
@@ -254,25 +213,8 @@ internal sealed class GlyphAtlasPage(
             return;
         MarkDestroyed();
 
-        Exception? firstFailure = null;
-        try
-        {
-            TextureView.Destroy();
-        }
-        catch (Exception exception)
-        {
-            firstFailure = exception;
-        }
-        try
-        {
-            Texture.Destroy();
-        }
-        catch (Exception exception)
-        {
-            firstFailure ??= exception;
-        }
-        if (firstFailure is not null)
-            ExceptionDispatchInfo.Capture(firstFailure).Throw();
+        TextureView.Destroy();
+        Texture.Destroy();
     }
 }
 

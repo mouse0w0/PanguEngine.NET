@@ -28,18 +28,12 @@ public static unsafe class VulkanUploader
             ReleaseHoldOnce(null);
         }
 
-        internal void SignalSubmittedFailure(Exception exception, ulong submissionValue)
-        {
-            SignalFailureHandle(exception);
-            ReleaseHoldOnce(submissionValue);
-        }
-
         internal void BindSubmission(ulong submissionValue)
         {
             ReleaseHoldOnce(submissionValue);
         }
 
-        private void SignalFailureHandle(Exception exception)
+        internal void SignalFailureHandle(Exception exception)
         {
             if (IsTerminal)
                 return;
@@ -48,7 +42,7 @@ public static unsafe class VulkanUploader
             Handle.SignalFailure(exception);
         }
 
-        private void ReleaseHoldOnce(ulong? submissionValue)
+        internal void ReleaseHoldOnce(ulong? submissionValue)
         {
             if (_holdReleased)
                 return;
@@ -209,9 +203,7 @@ public static unsafe class VulkanUploader
 
         _destroying = true;
         var disposedException = new ObjectDisposedException(nameof(VulkanUploader));
-        var pendingFailure = FailPendingOperations(disposedException);
-        if (pendingFailure != null)
-            EnterFaulted(pendingFailure);
+        FailPendingOperations(disposedException);
 
         var waitResult = VulkanContext.Vk.DeviceWaitIdle(VulkanContext.Device);
         if (waitResult == Result.ErrorDeviceLost)
@@ -499,9 +491,7 @@ public static unsafe class VulkanUploader
                 throw CreateSubmitException(submitResult);
 
             CommitTextureLayouts(textureStates);
-            var bindingFailure = BindSubmittedOperations(batch, submissionValue);
-            if (bindingFailure != null)
-                throw bindingFailure;
+            BindSubmittedOperations(batch, submissionValue);
 
             foreach (var handle in handles)
                 handle.SignalReady();
@@ -944,27 +934,17 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static Exception? BindSubmittedOperations(
+    private static void BindSubmittedOperations(
         IReadOnlyList<PendingUpload> batch,
         ulong submissionValue)
     {
-        Exception? firstFailure = null;
         foreach (var operation in batch)
         {
             if (!operation.IsPlanned || operation.IsTerminal)
                 continue;
 
-            try
-            {
-                operation.BindSubmission(submissionValue);
-            }
-            catch (Exception exception)
-            {
-                firstFailure ??= exception;
-            }
+            operation.BindSubmission(submissionValue);
         }
-
-        return firstFailure;
     }
 
     [DoesNotReturn]
@@ -976,7 +956,6 @@ public static unsafe class VulkanUploader
         EnterFaulted(exception);
         FailOperations(batch, exception, null);
         FailPendingOperations(exception);
-        _packetRing.FaultSubmittedHandles(_faultException ?? exception);
         if (lease is { IsRecycled: false })
             _stagingPages.Recycle(lease);
         ThrowFault();
@@ -991,7 +970,6 @@ public static unsafe class VulkanUploader
         EnterFaulted(exception);
         FailOperations(batch, exception, submissionValue);
         FailPendingOperations(exception);
-        _packetRing.FaultSubmittedHandles(_faultException ?? exception);
         ThrowFault();
     }
 
@@ -999,8 +977,8 @@ public static unsafe class VulkanUploader
     private static void FailPendingAndSubmitted(Exception exception)
     {
         EnterFaulted(exception);
-        FailPendingOperations(exception);
         _packetRing.FaultSubmittedHandles(_faultException ?? exception);
+        FailPendingOperations(exception);
         ThrowFault();
     }
 
@@ -1010,40 +988,24 @@ public static unsafe class VulkanUploader
         ulong? submissionValue)
     {
         foreach (var operation in operations)
-        {
-            if (operation.IsTerminal)
-                continue;
+            operation.SignalFailureHandle(exception);
 
-            try
-            {
-                if (submissionValue.HasValue)
-                    operation.SignalSubmittedFailure(exception, submissionValue.Value);
-                else
-                    operation.SignalFailure(exception);
-            }
-            catch (Exception cleanupException)
-            {
-                EnterFaulted(cleanupException);
-            }
-        }
+        foreach (var operation in PendingOperations)
+            operation.SignalFailureHandle(exception);
+
+        _packetRing.FaultSubmittedHandles(_faultException ?? exception);
+
+        foreach (var operation in operations)
+            operation.ReleaseHoldOnce(submissionValue);
     }
 
-    private static Exception? FailPendingOperations(Exception exception)
+    private static void FailPendingOperations(Exception exception)
     {
-        Exception? firstFailure = null;
-        while (PendingOperations.Count > 0)
-        {
-            try
-            {
-                PendingOperations.Dequeue().SignalFailure(exception);
-            }
-            catch (Exception cleanupException)
-            {
-                firstFailure ??= cleanupException;
-            }
-        }
+        foreach (var operation in PendingOperations)
+            operation.SignalFailureHandle(exception);
 
-        return firstFailure;
+        while (PendingOperations.Count > 0)
+            PendingOperations.Dequeue().ReleaseHoldOnce(null);
     }
 
     [DoesNotReturn]

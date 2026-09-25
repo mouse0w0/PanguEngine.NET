@@ -543,27 +543,15 @@ internal sealed unsafe class VulkanCommandList : CommandList
 
     private void ReleaseTrackedResources(ulong? submissionValue)
     {
-        List<Exception>? failures = null;
         foreach (var lifetime in _trackedResources)
         {
-            try
-            {
-                if (submissionValue.HasValue)
-                    lifetime.ReleaseHold(submissionValue.Value);
-                else
-                    lifetime.ReleaseHold();
-            }
-            catch (Exception exception)
-            {
-                failures ??= [];
-                failures.Add(exception);
-            }
+            if (submissionValue.HasValue)
+                lifetime.ReleaseHold(submissionValue.Value);
+            else
+                lifetime.ReleaseHold();
         }
 
         _trackedResources.Clear();
-
-        if (failures != null)
-            throw new AggregateException("Failed to release tracked Vulkan resources.", failures);
     }
 
     private void TrackResource(VulkanResourceLifetime lifetime)
