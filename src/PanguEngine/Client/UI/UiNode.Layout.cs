@@ -184,6 +184,10 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets how this node participates in layout, drawing, and hit testing.
     /// </summary>
+    /// <remarks>
+    /// Hiding or collapsing this node immediately clears focus, hover, and pressed states
+    /// for this node and its descendants. Showing it again does not restore focus or pressed states.
+    /// </remarks>
     public Visibility Visibility
     {
         get => GetValue(VisibilityProperty);

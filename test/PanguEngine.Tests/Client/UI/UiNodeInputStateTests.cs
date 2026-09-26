@@ -328,6 +328,226 @@ public sealed class UiNodeInputStateTests
         manager.Close();
     }
 
+    [Theory]
+    [InlineData(Visibility.Hidden, false)]
+    [InlineData(Visibility.Collapsed, false)]
+    [InlineData(Visibility.Hidden, true)]
+    [InlineData(Visibility.Collapsed, true)]
+    public void HidingNodeClearsInputBeforeLossEventsAndVisibilityNotification(
+        Visibility visibility,
+        bool hideParent)
+    {
+        var root = new Canvas();
+        var container = Place(root, new Canvas(), 0, 0, 40, 40);
+        var child = Place(container, new TestControl { Focusable = true }, 0, 0, 40, 40);
+        UiNode target = hideParent ? container : child;
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        var events = new List<string>();
+
+        void AssertCleared()
+        {
+            Assert.Null(screen.FocusedNode);
+            Assert.False(child.IsFocused);
+            Assert.False(child.IsPressed);
+            Assert.False(child.IsHovered);
+            Assert.Equal(!hideParent, container.IsHovered);
+            Assert.True(root.IsHovered);
+        }
+
+        child.LostFocus += (_, _) =>
+        {
+            AssertCleared();
+            events.Add("lost");
+        };
+        child.PointerExited += (_, _) =>
+        {
+            AssertCleared();
+            events.Add("child-exit");
+        };
+        container.PointerExited += (_, _) => events.Add("parent-exit");
+        using var subscription = target.Subscribe(UiNode.VisibilityProperty, (_, _) =>
+        {
+            AssertCleared();
+            events.Add("visibility");
+        });
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.True(child.IsFocused);
+        Assert.True(child.IsHovered);
+        Assert.True(child.IsPressed);
+
+        target.Visibility = visibility;
+
+        AssertCleared();
+        Assert.Equal(
+            hideParent
+                ? new[] { "lost", "child-exit", "parent-exit", "visibility" }
+                : new[] { "lost", "child-exit", "visibility" },
+            events);
+        Assert.False(child.Focus());
+        manager.Close();
+    }
+
+    [Theory]
+    [InlineData(Visibility.Hidden)]
+    [InlineData(Visibility.Collapsed)]
+    public void HidingHoveredBranchPreservesFocusAndPressInAnotherBranch(Visibility visibility)
+    {
+        var root = new Canvas();
+        var pressed = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
+        var container = Place(root, new Canvas(), 50, 0, 40, 40);
+        var hovered = Place(container, new TestNode(), 0, 0, 40, 40);
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        var lostFocusCalls = 0;
+        var releaseCalls = 0;
+        pressed.LostFocus += (_, _) => lostFocusCalls++;
+        pressed.PointerReleased += (_, _) => releaseCalls++;
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerMoved(new Point(55, 5));
+        Assert.True(hovered.IsHovered);
+        Assert.True(pressed.IsPressed);
+
+        container.Visibility = visibility;
+
+        Assert.False(container.IsHovered);
+        Assert.False(hovered.IsHovered);
+        Assert.True(root.IsHovered);
+        Assert.True(pressed.IsPressed);
+        Assert.True(pressed.IsFocused);
+        Assert.Same(pressed, screen.FocusedNode);
+        Assert.Equal(0, lostFocusCalls);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.Equal(1, releaseCalls);
+        Assert.False(pressed.IsPressed);
+        manager.Close();
+    }
+
+    [Theory]
+    [InlineData(Visibility.Hidden)]
+    [InlineData(Visibility.Collapsed)]
+    public void ShowingHiddenButtonDoesNotRestorePressOrClickOnRelease(Visibility visibility)
+    {
+        var root = new Canvas();
+        var button = Place(root, new Button(), 0, 0, 40, 40);
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        var releaseCalls = 0;
+        var pointerClickCalls = 0;
+        var clickCalls = 0;
+        button.PointerReleased += (_, _) => releaseCalls++;
+        button.PointerClicked += (_, _) => pointerClickCalls++;
+        button.Click += (_, _) => clickCalls++;
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.True(button.IsPressed);
+        Assert.True(button.IsFocused);
+
+        button.Visibility = visibility;
+        button.Visibility = Visibility.Visible;
+
+        Assert.False(button.IsPressed);
+        Assert.False(button.IsFocused);
+        Assert.False(button.IsHovered);
+        manager.PrepareFrame(new Size(100, 100), 0);
+        Assert.True(button.IsHovered);
+        Assert.False(button.IsPressed);
+        Assert.False(button.IsFocused);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.Equal(0, releaseCalls);
+        Assert.Equal(0, pointerClickCalls);
+        Assert.Equal(0, clickCalls);
+
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.Equal(1, clickCalls);
+        manager.Close();
+    }
+
+    [Theory]
+    [InlineData(Visibility.Hidden)]
+    [InlineData(Visibility.Collapsed)]
+    public void HidingFocusedNodeInsideGotFocusDoesNotRestoreFocus(Visibility visibility)
+    {
+        var root = new Canvas();
+        var node = Place(root, new TestNode { Focusable = true }, 0, 0, 40, 40);
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        var events = new List<string>();
+        node.GotFocus += (_, _) =>
+        {
+            events.Add($"got:{node.IsFocused}");
+            node.Visibility = visibility;
+        };
+        node.LostFocus += (_, _) => events.Add($"lost:{node.IsFocused}");
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+
+        Assert.True(node.Focus());
+
+        Assert.Equal(visibility, node.Visibility);
+        Assert.False(node.IsFocused);
+        Assert.Null(screen.FocusedNode);
+        Assert.Equal(["got:True", "lost:False"], events);
+        manager.Close();
+    }
+
+    [Theory]
+    [InlineData(Visibility.Hidden, false)]
+    [InlineData(Visibility.Collapsed, false)]
+    [InlineData(Visibility.Hidden, true)]
+    [InlineData(Visibility.Collapsed, true)]
+    public void VisibilityCleanupCallbacksDoNotRepeatLossOrRestoreInput(
+        Visibility visibility,
+        bool removeOnExit)
+    {
+        var root = new Canvas();
+        var container = Place(root, new Canvas(), 0, 0, 40, 40);
+        var child = Place(container, new TestControl { Focusable = true }, 0, 0, 40, 40);
+        var manager = new UiManager();
+        var screen = new UiScreen(root);
+        var events = new List<string>();
+        child.LostFocus += (_, _) =>
+        {
+            events.Add("lost");
+            container.Visibility = Visibility.Visible;
+        };
+        child.PointerExited += (_, _) =>
+        {
+            events.Add("child-exit");
+            if (removeOnExit)
+                Assert.True(root.Children.Remove(container));
+            else
+                container.Visibility = visibility;
+        };
+        container.PointerExited += (_, _) => events.Add("parent-exit");
+        manager.Open(screen);
+        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.True(child.IsFocused);
+        Assert.True(child.IsPressed);
+        Assert.True(child.IsHovered);
+
+        container.Visibility = visibility;
+
+        Assert.Equal(["lost", "child-exit", "parent-exit"], events);
+        Assert.Null(screen.FocusedNode);
+        Assert.False(child.IsFocused);
+        Assert.False(child.IsPressed);
+        Assert.False(child.IsHovered);
+        Assert.False(container.IsHovered);
+        if (removeOnExit)
+            Assert.Null(container.Screen);
+        else
+            Assert.Equal(visibility, container.Visibility);
+        manager.Close();
+    }
+
     [Fact]
     public void HoverStateCallbackClosingScreenPreventsLaterTrueProjection()
     {

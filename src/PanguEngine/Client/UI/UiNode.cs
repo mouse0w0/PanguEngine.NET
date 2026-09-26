@@ -167,10 +167,12 @@ public abstract partial class UiNode
     private void RaisePropertyChanged<T>(UiProperty<T> property, T oldValue, T newValue)
     {
         var eventArgs = new UiPropertyChangedEventArgs<T>(property, oldValue, newValue);
-        if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) &&
-            eventArgs is UiPropertyChangedEventArgs<bool> { NewValue: false })
+        if ((ReferenceEquals(eventArgs.Property, IsEnabledProperty) &&
+             eventArgs is UiPropertyChangedEventArgs<bool> { NewValue: false }) ||
+            (ReferenceEquals(eventArgs.Property, VisibilityProperty) &&
+             eventArgs is UiPropertyChangedEventArgs<Visibility> { NewValue: not Visibility.Visible }))
         {
-            Screen?.CommitAndNotifyInputStateAfterNodeDisabled(this);
+            Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(this);
         }
 
         property.RaiseChanged(this, oldValue, newValue);

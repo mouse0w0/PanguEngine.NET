@@ -326,9 +326,11 @@ public partial class UiScreen
         return CommitInputStateCore(clearAll: false);
     }
 
-    internal void CommitAndNotifyInputStateAfterNodeDisabled(UiNode node)
+    internal void CommitAndNotifyInputStateAfterNodeUnavailable(UiNode node)
     {
-        if (!ReferenceEquals(node.Screen, this) || node.IsEnabled || !IsScreenActive())
+        if (!ReferenceEquals(node.Screen, this) ||
+            (node.IsEnabled && node.Visibility == Visibility.Visible) ||
+            !IsScreenActive())
             return;
 
         if (!BeginRuntimeOperationIfOpen())
@@ -791,7 +793,7 @@ public partial class UiScreen
 
         for (var current = node; current is not null; current = current.Parent)
         {
-            if (!current.IsEnabled)
+            if (!current.IsEnabled || current.Visibility != Visibility.Visible)
                 return false;
             if (ReferenceEquals(current, Root))
                 return true;
