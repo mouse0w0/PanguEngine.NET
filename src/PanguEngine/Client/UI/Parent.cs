@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using System.Collections.ObjectModel;
 using PanguEngine.Client.UI.Styling;
 
@@ -15,10 +16,9 @@ public abstract class Parent : UiNode
     /// <summary>
     /// Identifies the <see cref="ClipToBounds"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> ClipToBoundsProperty =
-        UiProperty.Register<Parent, bool>(
-            nameof(ClipToBounds),
-            invalidation: UiPropertyInvalidation.Input | UiPropertyInvalidation.Render);
+    public static readonly Property<bool> ClipToBoundsProperty =
+        Property.Register<Parent, bool>(
+            nameof(ClipToBounds));
 
     private readonly List<UiNode> _children = [];
     private readonly ReadOnlyCollection<UiNode> _readOnlyChildren;

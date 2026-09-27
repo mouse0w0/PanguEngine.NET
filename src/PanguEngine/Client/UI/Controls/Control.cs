@@ -1,5 +1,7 @@
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Client.UI.Controls;
 
 /// <summary>
@@ -7,16 +9,15 @@ namespace PanguEngine.Client.UI.Controls;
 /// </summary>
 public abstract class Control : Region
 {
-    private static readonly UiPropertyKey<bool> IsPressedPropertyKey =
-        UiProperty.RegisterReadOnly<Control, bool>(
+    private static readonly PropertyKey<bool> IsPressedPropertyKey =
+        Property.RegisterReadOnly<Control, bool>(
             nameof(IsPressed),
-            invalidation: UiPropertyInvalidation.Render,
             onChanged: static (node, _, _) => ((Control)node).RefreshPressedPseudoClass());
 
     /// <summary>
     /// Identifies the <see cref="IsPressed"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> IsPressedProperty = IsPressedPropertyKey.Property;
+    public static readonly Property<bool> IsPressedProperty = IsPressedPropertyKey.Property;
 
     static Control()
     {

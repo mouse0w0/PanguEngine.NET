@@ -1,5 +1,7 @@
 using PanguEngine.Resources;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Client.UI.Styling;
 
 /// <summary>
@@ -70,7 +72,7 @@ internal sealed partial class UiStyleResolver
             ? (context ?? new VariableContext()).Get(this, node)
             : UiCssVariableEnvironment.Empty;
         var winners =
-            new Dictionary<(UiProperty Property, UiStyleEdge? Component), (CascadeKey Key, DeclarationEntry Entry)>();
+            new Dictionary<(Property Property, UiStyleEdge? Component), (CascadeKey Key, DeclarationEntry Entry)>();
         var variableBindings =
             new Dictionary<(UiStyleRule Rule, UiStyleRule.BoundVariableDeclaration Declaration),
                 IReadOnlyList<UiStyleRule.BoundDeclaration>>();
@@ -101,8 +103,8 @@ internal sealed partial class UiStyleResolver
             }
         }
 
-        var values = new Dictionary<UiProperty, object?>(winners.Count);
-        var sourceLists = new Dictionary<UiProperty, List<UiStyleValueSource>>();
+        var values = new Dictionary<Property, object?>(winners.Count);
+        var sourceLists = new Dictionary<Property, List<UiStyleValueSource>>();
         foreach (var ((property, component), (_, entry)) in winners)
         {
             values.TryGetValue(property, out var value);
@@ -126,7 +128,7 @@ internal sealed partial class UiStyleResolver
                 isMaskedByLocalValue: false));
         }
 
-        var sources = new Dictionary<UiProperty, IReadOnlyList<UiStyleValueSource>>(sourceLists.Count);
+        var sources = new Dictionary<Property, IReadOnlyList<UiStyleValueSource>>(sourceLists.Count);
         foreach (var (property, propertySources) in sourceLists)
         {
             propertySources.Sort((left, right) => Nullable.Compare(left.Component, right.Component));

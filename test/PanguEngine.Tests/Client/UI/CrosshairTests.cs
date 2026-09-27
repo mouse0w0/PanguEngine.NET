@@ -8,7 +8,7 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class CrosshairTests
 {
     [Fact]
-    public void DefaultsExposeExpectedPropertiesAndInvalidation()
+    public void DefaultsExposeExpectedProperties()
     {
         var crosshair = new Crosshair();
 
@@ -22,17 +22,6 @@ public sealed class CrosshairTests
         Assert.False(crosshair.ShowCenterDot);
         Assert.Equal(2, crosshair.CenterDotSize);
         Assert.False(crosshair.UseUiScale);
-
-        Assert.Equal(UiPropertyInvalidation.Render, Crosshair.ColorProperty.Invalidation);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Crosshair.LengthProperty.Invalidation);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Crosshair.ShapeProperty.Invalidation);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Crosshair.UseUiScaleProperty.Invalidation);
     }
 
     [Theory]

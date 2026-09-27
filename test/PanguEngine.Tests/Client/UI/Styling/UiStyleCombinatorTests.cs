@@ -3,6 +3,8 @@ using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiStyleCombinatorTests
@@ -652,7 +654,7 @@ public sealed class UiStyleCombinatorTests
 
         internal static int ConvertCount;
 
-        internal static readonly UiProperty<double> CountProperty =
-            UiProperty.Register<CountingNode, double>("Count", 0);
+        internal static readonly Property<double> CountProperty =
+            Property.Register<CountingNode, double>("Count", 0);
     }
 }

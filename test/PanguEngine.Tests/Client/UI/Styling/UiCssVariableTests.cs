@@ -2,6 +2,8 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiCssVariableTests
@@ -353,8 +355,8 @@ public sealed class UiCssVariableTests
 
     private sealed class RawValueNode : UiNode
     {
-        internal static readonly UiProperty<string> ValueProperty =
-            UiProperty.Register<RawValueNode, string>("Value", "");
+        internal static readonly Property<string> ValueProperty =
+            Property.Register<RawValueNode, string>("Value", "");
 
         static RawValueNode() =>
             UiCssRegistry.RegisterProperty<RawValueNode, string>("raw", ValueProperty, value => value);

@@ -1,10 +1,12 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using PanguEngine.Client.UI;
+using PanguEngine.ComponentModel;
+using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
-namespace PanguEngine.Tests.Client.UI;
+namespace PanguEngine.Tests.ComponentModel;
 
-public sealed class UiBindingTests
+public sealed class BindingTests
 {
     [Fact]
     public void OneWayDirectBindingSynchronizesInitialAndNamedChanges()
@@ -341,7 +343,7 @@ public sealed class UiBindingTests
     }
 
     [Fact]
-    public void UiPropertyBindingsSynchronizeAndHonorSourceProtection()
+    public void PropertyBindingsSynchronizeAndHonorSourceProtection()
     {
         var source = new TestNode { Value = 2 };
         var target = new TestNode();
@@ -357,7 +359,7 @@ public sealed class UiBindingTests
     }
 
     [Fact]
-    public void ConvertedUiPropertyBindingsSynchronizeBothDirections()
+    public void ConvertedPropertyBindingsSynchronizeBothDirections()
     {
         var source = new TestNode { Value = 2 };
         var oneWayTarget = new TestNode();
@@ -411,7 +413,7 @@ public sealed class UiBindingTests
     }
 
     [Fact]
-    public void MutualUiBindingsTerminateAtEqualValues()
+    public void MutualBindingsTerminateAtEqualValues()
     {
         var first = new TestNode { Value = 1 };
         var second = new TestNode { Value = 1 };
@@ -470,14 +472,14 @@ public sealed class UiBindingTests
 
     private class TestNode : UiNode
     {
-        internal static readonly UiProperty<int> ValueProperty =
-            UiProperty.Register<TestNode, int>(nameof(Value), 10);
+        internal static readonly Property<int> ValueProperty =
+            Property.Register<TestNode, int>(nameof(Value), 10);
 
-        internal static readonly UiProperty<string> TextProperty =
-            UiProperty.Register<TestNode, string>(nameof(Text), string.Empty);
+        internal static readonly Property<string> TextProperty =
+            Property.Register<TestNode, string>(nameof(Text), string.Empty);
 
-        internal static readonly UiProperty<object?> ObjectProperty =
-            UiProperty.Register<TestNode, object?>(nameof(ObjectValue));
+        internal static readonly Property<object?> ObjectProperty =
+            Property.Register<TestNode, object?>(nameof(ObjectValue));
 
         internal int Value
         {
@@ -502,7 +504,7 @@ public sealed class UiBindingTests
     {
         internal bool ThrowNotifications { get; set; }
 
-        protected override void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs)
+        protected override void OnPropertyChanged(PanguEngine.ComponentModel.PropertyChangedEventArgs eventArgs)
         {
             base.OnPropertyChanged(eventArgs);
             if (ThrowNotifications)
@@ -595,7 +597,7 @@ public sealed class UiBindingTests
         public int this[int index] => _value + index;
 
         public void Raise(string? propertyName) =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+            PropertyChanged?.Invoke(this, new SourcePropertyChangedEventArgs(propertyName));
 
         public void SetValueWithoutNotification(int value) =>
             _value = value;
@@ -615,7 +617,7 @@ public sealed class UiBindingTests
             set
             {
                 _value = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
+                PropertyChanged?.Invoke(this, new SourcePropertyChangedEventArgs(nameof(Value)));
             }
         }
     }

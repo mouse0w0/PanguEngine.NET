@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using System.Reflection;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
@@ -48,8 +49,7 @@ public sealed class ControlTests
             typeof(Control),
             nameof(Control.IsPressed),
             defaultValue: false,
-            isReadOnly: true,
-            UiPropertyInvalidation.Render);
+            isReadOnly: true);
         Assert.Null(typeof(Control).GetField(
             nameof(UiNode.IsEnabledProperty),
             BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
@@ -611,12 +611,11 @@ public sealed class ControlTests
     }
 
     private static void AssertProperty(
-        UiProperty<bool> property,
+        Property<bool> property,
         Type ownerType,
         string name,
         bool defaultValue,
-        bool isReadOnly,
-        UiPropertyInvalidation invalidation)
+        bool isReadOnly)
     {
         Assert.Equal(name, property.Name);
         Assert.Equal(ownerType, property.OwnerType);
@@ -624,7 +623,6 @@ public sealed class ControlTests
         Assert.Equal(typeof(bool), property.ValueType);
         Assert.Equal(defaultValue, property.DefaultValue);
         Assert.Equal(isReadOnly, property.IsReadOnly);
-        Assert.Equal(invalidation, property.Invalidation);
     }
 
     private static T Place<T>(Canvas parent, T child, double x, double y, double width, double height)

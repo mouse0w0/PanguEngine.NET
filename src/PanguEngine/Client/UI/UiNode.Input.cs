@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Input;
 using PanguEngine.Client.UI.Styling;
 
@@ -5,54 +6,54 @@ namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
-    private static readonly UiPropertyKey<bool> IsHoveredPropertyKey =
-        UiProperty.RegisterReadOnly<UiNode, bool>(
+    private static readonly PropertyKey<bool> IsHoveredPropertyKey =
+        Property.RegisterReadOnly<UiNode, bool>(
             nameof(IsHovered),
-            invalidation: UiPropertyInvalidation.Render,
             onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.Hover, node.IsHovered));
 
-    private static readonly UiPropertyKey<bool> IsFocusedPropertyKey =
-        UiProperty.RegisterReadOnly<UiNode, bool>(
+    private static readonly PropertyKey<bool> IsFocusedPropertyKey =
+        Property.RegisterReadOnly<UiNode, bool>(
             nameof(IsFocused),
-            invalidation: UiPropertyInvalidation.Render,
             onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.Focus, node.IsFocused));
 
     /// <summary>
     /// Identifies the <see cref="Focusable"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> FocusableProperty =
-        UiProperty.Register<UiNode, bool>(
-            nameof(Focusable),
-            invalidation: UiPropertyInvalidation.Input);
+    public static readonly Property<bool> FocusableProperty =
+        Property.Register<UiNode, bool>(
+            nameof(Focusable));
 
     /// <summary>
     /// Identifies the <see cref="IsHitTestVisible"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> IsHitTestVisibleProperty =
-        UiProperty.Register<UiNode, bool>(
+    public static readonly Property<bool> IsHitTestVisibleProperty =
+        Property.Register<UiNode, bool>(
             nameof(IsHitTestVisible),
-            true,
-            UiPropertyInvalidation.Input);
+            true);
 
     /// <summary>
     /// Identifies the <see cref="IsEnabled"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> IsEnabledProperty =
-        UiProperty.Register<UiNode, bool>(
+    public static readonly Property<bool> IsEnabledProperty =
+        Property.Register<UiNode, bool>(
             nameof(IsEnabled),
             true,
-            UiPropertyInvalidation.Input | UiPropertyInvalidation.Render,
-            onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.Disabled, !node.IsEnabled));
+            onChanged: static (node, _, newValue) =>
+            {
+                if (!newValue)
+                    node.Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
+                node.SetPseudoClass(UiPseudoClass.Disabled, !node.IsEnabled);
+            });
 
     /// <summary>
     /// Identifies the <see cref="IsHovered"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> IsHoveredProperty = IsHoveredPropertyKey.Property;
+    public static readonly Property<bool> IsHoveredProperty = IsHoveredPropertyKey.Property;
 
     /// <summary>
     /// Identifies the <see cref="IsFocused"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> IsFocusedProperty = IsFocusedPropertyKey.Property;
+    public static readonly Property<bool> IsFocusedProperty = IsFocusedPropertyKey.Property;
 
     /// <summary>
     /// Gets or sets whether this node can receive keyboard focus.

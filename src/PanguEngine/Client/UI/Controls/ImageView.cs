@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 
@@ -11,38 +12,37 @@ public sealed class ImageView : UiNode
     /// <summary>
     /// Identifies the image source property.
     /// </summary>
-    public static readonly UiProperty<UiImage?> SourceProperty =
-        UiProperty.Register<ImageView, UiImage?>(
+    public static readonly Property<UiImage?> SourceProperty =
+        Property.Register<ImageView, UiImage?>(
             nameof(Source),
             defaultValue: null,
-            invalidation: UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the image stretch property.
     /// </summary>
-    public static readonly UiProperty<ImageStretch> StretchProperty =
-        UiProperty.Register<ImageView, ImageStretch>(
+    public static readonly Property<ImageStretch> StretchProperty =
+        Property.Register<ImageView, ImageStretch>(
             nameof(Stretch),
             ImageStretch.Uniform,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the source region property.
     /// </summary>
-    public static readonly UiProperty<Rect?> SourceRectProperty =
-        UiProperty.Register<ImageView, Rect?>(
+    public static readonly Property<Rect?> SourceRectProperty =
+        Property.Register<ImageView, Rect?>(
             nameof(SourceRect),
             defaultValue: null,
-            invalidation: UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the image sampling mode property.
     /// </summary>
-    public static readonly UiProperty<ImageSamplingMode> SamplingModeProperty =
-        UiProperty.Register<ImageView, ImageSamplingMode>(
+    public static readonly Property<ImageSamplingMode> SamplingModeProperty =
+        Property.Register<ImageView, ImageSamplingMode>(
             nameof(SamplingMode),
-            ImageSamplingMode.Linear,
-            UiPropertyInvalidation.Render);
+            ImageSamplingMode.Linear);
 
     static ImageView()
     {

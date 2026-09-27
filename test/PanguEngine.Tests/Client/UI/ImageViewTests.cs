@@ -14,8 +14,6 @@ public sealed class ImageViewTests
 
         Assert.Equal(typeof(ImageView), ImageView.SourceProperty.OwnerType);
         Assert.Equal(typeof(ImageView), ImageView.SourceProperty.TargetType);
-        Assert.Equal(UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            ImageView.SourceProperty.Invalidation);
         Assert.Null(view.Source);
         Assert.Equal(ImageStretch.Uniform, view.Stretch);
         Assert.Null(view.SourceRect);

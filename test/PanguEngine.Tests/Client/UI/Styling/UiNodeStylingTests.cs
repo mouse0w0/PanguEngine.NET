@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using System.Reflection;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
@@ -810,7 +811,7 @@ public sealed class UiNodeStylingTests
     private static UiStyleRule Rule(UiStyleSelector selector, params UiStyleSetter[] setters) =>
         new(selector, setters);
 
-    private static UiStyleSetter Setter<T>(UiProperty<T> property, T value) =>
+    private static UiStyleSetter Setter<T>(Property<T> property, T value) =>
         UiStyleSetter.Create(property, value);
 
     private static Brush Brush(byte value) => new SolidColorBrush(value, value, value);
@@ -819,11 +820,10 @@ public sealed class UiNodeStylingTests
 
     private sealed class EquatableNode : UiNode
     {
-        internal static readonly UiProperty<EquatableValue> ValueProperty =
-            UiProperty.Register<EquatableNode, EquatableValue>(
+        internal static readonly Property<EquatableValue> ValueProperty =
+            Property.Register<EquatableNode, EquatableValue>(
                 "Value",
-                new EquatableValue(0),
-                UiPropertyInvalidation.Render);
+                new EquatableValue(0));
     }
 
     private sealed class EquatableValue(int value) : IEquatable<EquatableValue>
@@ -862,14 +862,14 @@ public sealed class UiNodeStylingTests
 
     private sealed class GuardedStyleNode : UiNode
     {
-        internal static readonly UiProperty<GuardedValue> ValueProperty =
-            UiProperty.Register<GuardedStyleNode, GuardedValue>("Value", new GuardedValue(0));
+        internal static readonly Property<GuardedValue> ValueProperty =
+            Property.Register<GuardedStyleNode, GuardedValue>("Value", new GuardedValue(0));
     }
 
     private sealed class ReentrantPreparationNode : UiNode
     {
-        internal static readonly UiProperty<GuardedValue> ValueProperty =
-            UiProperty.Register<ReentrantPreparationNode, GuardedValue>("Value", new GuardedValue(0));
+        internal static readonly Property<GuardedValue> ValueProperty =
+            Property.Register<ReentrantPreparationNode, GuardedValue>("Value", new GuardedValue(0));
 
         internal Action? OnRead { get; set; }
     }

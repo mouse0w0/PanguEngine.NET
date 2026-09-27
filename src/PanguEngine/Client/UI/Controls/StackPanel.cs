@@ -1,5 +1,7 @@
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Client.UI.Controls;
 
 /// <summary>
@@ -10,19 +12,19 @@ public sealed class StackPanel : Panel
     /// <summary>
     /// Identifies the <see cref="Orientation"/> property.
     /// </summary>
-    public static readonly UiProperty<Orientation> OrientationProperty =
-        UiProperty.Register<StackPanel, Orientation>(
+    public static readonly Property<Orientation> OrientationProperty =
+        Property.Register<StackPanel, Orientation>(
             nameof(Orientation),
             Orientation.Vertical,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Spacing"/> property.
     /// </summary>
-    public static readonly UiProperty<double> SpacingProperty =
-        UiProperty.Register<StackPanel, double>(
+    public static readonly Property<double> SpacingProperty =
+        Property.Register<StackPanel, double>(
             nameof(Spacing),
-            invalidation: UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     static StackPanel()
     {

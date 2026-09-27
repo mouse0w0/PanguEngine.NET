@@ -1,12 +1,12 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
 /// <summary>
-/// Provides information about a UI property value change.
+/// Provides information about an observable property value change.
 /// </summary>
-public abstract class UiPropertyChangedEventArgs : EventArgs
+public abstract class PropertyChangedEventArgs : EventArgs
 {
-    private protected UiPropertyChangedEventArgs(
-        UiProperty property,
+    private protected PropertyChangedEventArgs(
+        Property property,
         object? oldValue,
         object? newValue)
     {
@@ -16,7 +16,7 @@ public abstract class UiPropertyChangedEventArgs : EventArgs
     }
 
     /// <summary>Gets the property that changed.</summary>
-    public UiProperty Property { get; }
+    public Property Property { get; }
 
     /// <summary>Gets the previous effective value.</summary>
     public object? OldValue { get; }
@@ -26,12 +26,12 @@ public abstract class UiPropertyChangedEventArgs : EventArgs
 }
 
 /// <summary>
-/// Provides strongly typed information about a UI property value change.
+/// Provides strongly typed information about an observable property value change.
 /// </summary>
 /// <typeparam name="T">The property value type.</typeparam>
-public sealed class UiPropertyChangedEventArgs<T> : UiPropertyChangedEventArgs
+public sealed class PropertyChangedEventArgs<T> : PropertyChangedEventArgs
 {
-    internal UiPropertyChangedEventArgs(UiProperty<T> property, T oldValue, T newValue)
+    internal PropertyChangedEventArgs(Property<T> property, T oldValue, T newValue)
         : base(property, oldValue, newValue)
     {
         Property = property;
@@ -40,7 +40,7 @@ public sealed class UiPropertyChangedEventArgs<T> : UiPropertyChangedEventArgs
     }
 
     /// <summary>Gets the strongly typed property that changed.</summary>
-    public new UiProperty<T> Property { get; }
+    public new Property<T> Property { get; }
 
     /// <summary>Gets the previous strongly typed effective value.</summary>
     public new T OldValue { get; }

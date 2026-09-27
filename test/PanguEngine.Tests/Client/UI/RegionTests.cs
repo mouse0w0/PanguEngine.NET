@@ -73,27 +73,21 @@ public sealed class RegionTests
         Assert.Equal(typeof(Region), Region.PaddingProperty.OwnerType);
         Assert.Equal(typeof(Thickness), Region.PaddingProperty.ValueType);
         Assert.Equal(Thickness.Zero, Region.PaddingProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Measure, Region.PaddingProperty.Invalidation);
 
         Assert.Equal(nameof(Region.Background), Region.BackgroundProperty.Name);
         Assert.Equal(typeof(Region), Region.BackgroundProperty.OwnerType);
         Assert.Equal(typeof(Brush), Region.BackgroundProperty.ValueType);
         Assert.Null(Region.BackgroundProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Render, Region.BackgroundProperty.Invalidation);
 
         Assert.Equal(nameof(Region.BorderBrush), Region.BorderBrushProperty.Name);
         Assert.Equal(typeof(Region), Region.BorderBrushProperty.OwnerType);
         Assert.Equal(typeof(Brush), Region.BorderBrushProperty.ValueType);
         Assert.Null(Region.BorderBrushProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Render, Region.BorderBrushProperty.Invalidation);
 
         Assert.Equal(nameof(Region.BorderThickness), Region.BorderThicknessProperty.Name);
         Assert.Equal(typeof(Region), Region.BorderThicknessProperty.OwnerType);
         Assert.Equal(typeof(Thickness), Region.BorderThicknessProperty.ValueType);
         Assert.Equal(Thickness.Zero, Region.BorderThicknessProperty.DefaultValue);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Region.BorderThicknessProperty.Invalidation);
     }
 
     [Fact]

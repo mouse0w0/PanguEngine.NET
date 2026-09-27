@@ -1,8 +1,8 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
-public abstract partial class UiNode
+public abstract partial class ObservableObject
 {
-    private Dictionary<UiProperty, UiPropertySubscriptionList>? _subscriptions;
+    private Dictionary<Property, PropertySubscriptionList>? _subscriptions;
 
     /// <summary>
     /// Subscribes to changes of one property without sending its current value.
@@ -12,14 +12,14 @@ public abstract partial class UiNode
     /// <param name="handler">The change handler.</param>
     /// <returns>A token that removes this subscription when disposed.</returns>
     public IDisposable Subscribe<T>(
-        UiProperty<T> property,
-        EventHandler<UiPropertyChangedEventArgs<T>> handler)
+        Property<T> property,
+        EventHandler<PropertyChangedEventArgs<T>> handler)
     {
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(handler);
         property.VerifyOwner(this);
 
-        return AddSubscription(property, new UiPropertySubscription<T>(handler));
+        return AddSubscription(property, new PropertySubscription<T>(handler));
     }
 
     /// <summary>
@@ -35,24 +35,24 @@ public abstract partial class UiNode
     /// delegate may never be collected, so callers cannot rely on handler collection.
     /// </remarks>
     public IDisposable SubscribeWeak<T>(
-        UiProperty<T> property,
-        EventHandler<UiPropertyChangedEventArgs<T>> handler)
+        Property<T> property,
+        EventHandler<PropertyChangedEventArgs<T>> handler)
     {
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(handler);
         property.VerifyOwner(this);
 
-        return AddSubscription(property, new WeakUiPropertySubscription<T>(handler));
+        return AddSubscription(property, new WeakPropertySubscription<T>(handler));
     }
 
-    private UiPropertySubscriptionToken AddSubscription(
-        UiProperty property,
-        IUiPropertySubscription subscription)
+    private PropertySubscriptionToken AddSubscription(
+        Property property,
+        IPropertySubscription subscription)
     {
         _subscriptions ??= [];
         if (!_subscriptions.TryGetValue(property, out var subscriptions))
         {
-            subscriptions = new UiPropertySubscriptionList();
+            subscriptions = new PropertySubscriptionList();
             _subscriptions.Add(property, subscriptions);
         }
         else if (subscriptions.ReaderCount > 0)
@@ -62,10 +62,10 @@ public abstract partial class UiNode
         }
 
         subscriptions.Items.Add(subscription);
-        return new UiPropertySubscriptionToken(this, property, subscription);
+        return new PropertySubscriptionToken(this, property, subscription);
     }
 
-    internal void RemoveSubscription(UiProperty property, IUiPropertySubscription subscription)
+    internal void RemoveSubscription(Property property, IPropertySubscription subscription)
     {
         if (_subscriptions is null || !_subscriptions.TryGetValue(property, out var subscriptions))
             return;
@@ -91,7 +91,7 @@ public abstract partial class UiNode
         subscriptions.Items.RemoveAt(index);
     }
 
-    private UiPropertySubscriptionList? BeginSubscriptionNotification(UiProperty property)
+    private PropertySubscriptionList? BeginSubscriptionNotification(Property property)
     {
         if (_subscriptions is null || !_subscriptions.TryGetValue(property, out var subscriptions))
             return null;
@@ -100,15 +100,15 @@ public abstract partial class UiNode
         return subscriptions;
     }
 
-    private static void EndSubscriptionNotification(UiPropertySubscriptionList? subscriptions)
+    private static void EndSubscriptionNotification(PropertySubscriptionList? subscriptions)
     {
         if (subscriptions is not null)
             subscriptions.ReaderCount--;
     }
 
     private void NotifySubscriptions(
-        UiPropertyChangedEventArgs eventArgs,
-        UiPropertySubscriptionList? subscriptions)
+        PropertyChangedEventArgs eventArgs,
+        PropertySubscriptionList? subscriptions)
     {
         if (subscriptions is null)
             return;
@@ -120,23 +120,23 @@ public abstract partial class UiNode
         }
     }
 
-    private sealed class UiPropertySubscriptionList
+    private sealed class PropertySubscriptionList
     {
-        public UiPropertySubscriptionList()
+        public PropertySubscriptionList()
         {
             Items = [];
         }
 
-        private UiPropertySubscriptionList(List<IUiPropertySubscription> items)
+        private PropertySubscriptionList(List<IPropertySubscription> items)
         {
             Items = items;
         }
 
-        public List<IUiPropertySubscription> Items { get; }
+        public List<IPropertySubscription> Items { get; }
 
         public int ReaderCount { get; set; }
 
-        public UiPropertySubscriptionList Clone() =>
+        public PropertySubscriptionList Clone() =>
             new([.. Items]);
     }
 }

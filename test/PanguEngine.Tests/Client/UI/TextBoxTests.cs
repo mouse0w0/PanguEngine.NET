@@ -1,3 +1,5 @@
+using PanguEngine.ComponentModel;
+using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 using System.ComponentModel;
 using System.Reflection;
 using System.Text;
@@ -21,18 +23,15 @@ public sealed class TextBoxTests
 
         Assert.True(typeof(TextBox).IsSealed);
         Assert.Equal(typeof(Control), typeof(TextBox).BaseType);
-        AssertProperty(TextBox.TextProperty, string.Empty,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.PlaceholderProperty, string.Empty,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.FontProperty, new Font(string.Empty),
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.FontSizeProperty, 16d, UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.ForegroundProperty, new Color(242, 244, 247), UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.PlaceholderForegroundProperty, new Color(139, 148, 160), UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.SelectionBackgroundProperty, new Color(47, 100, 160), UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.CaretColorProperty, new Color(242, 244, 247), UiPropertyInvalidation.Render);
-        AssertProperty(TextBox.IsReadOnlyProperty, false, UiPropertyInvalidation.Render);
+        AssertProperty(TextBox.TextProperty, string.Empty);
+        AssertProperty(TextBox.PlaceholderProperty, string.Empty);
+        AssertProperty(TextBox.FontProperty, new Font(string.Empty));
+        AssertProperty(TextBox.FontSizeProperty, 16d);
+        AssertProperty(TextBox.ForegroundProperty, new Color(242, 244, 247));
+        AssertProperty(TextBox.PlaceholderForegroundProperty, new Color(139, 148, 160));
+        AssertProperty(TextBox.SelectionBackgroundProperty, new Color(47, 100, 160));
+        AssertProperty(TextBox.CaretColorProperty, new Color(242, 244, 247));
+        AssertProperty(TextBox.IsReadOnlyProperty, false);
         Assert.True(textBox.Focusable);
         Assert.Equal(160d, textBox.MinWidth);
         Assert.Equal(new Thickness(8, 6), textBox.Padding);
@@ -55,7 +54,7 @@ public sealed class TextBoxTests
     {
         var node = new TextBox();
         var screen = new UiScreen(node);
-        var properties = new UiProperty[]
+        var properties = new Property[]
         {
             UiNode.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
             Region.BorderBrushProperty, Region.BorderThicknessProperty, TextBox.FontSizeProperty,
@@ -687,16 +686,14 @@ public sealed class TextBoxTests
     }
 
     private static void AssertProperty<T>(
-        UiProperty<T> property,
-        T defaultValue,
-        UiPropertyInvalidation invalidation)
+        Property<T> property,
+        T defaultValue)
     {
         Assert.Equal(typeof(TextBox), property.OwnerType);
         Assert.Equal(typeof(TextBox), property.TargetType);
         Assert.Equal(typeof(T), property.ValueType);
         Assert.Equal(defaultValue, property.DefaultValue);
         Assert.False(property.IsReadOnly);
-        Assert.Equal(invalidation, property.Invalidation);
     }
 
     private sealed class TestClipboard : Clipboard

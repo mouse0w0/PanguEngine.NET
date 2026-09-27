@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using System.Collections.ObjectModel;
 
 namespace PanguEngine.Client.UI.Styling;
@@ -16,8 +17,7 @@ public sealed class UiStyleRule
     /// <param name="sourceLocation">The optional source location for parsed rules.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="selectors"/> or <paramref name="setters"/> is null.</exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when the selector list is empty or contains null, when a setter targets an incompatible or input-invalidating
-    /// property.
+    /// Thrown when the selector list is empty or contains null, or a setter targets an incompatible or read-only property.
     /// </exception>
     public UiStyleRule(IEnumerable<UiStyleSelector> selectors, IEnumerable<UiStyleSetter> setters,
         UiStyleSourceLocation? sourceLocation = null)
@@ -174,7 +174,7 @@ public sealed class UiStyleRule
         }
 
         var result = new List<BoundDeclaration>(setters.Count);
-        var components = new HashSet<(UiProperty, UiStyleEdge?)>();
+        var components = new HashSet<(Property, UiStyleEdge?)>();
         foreach (var setter in setters)
         {
             try
@@ -224,9 +224,6 @@ public sealed class UiStyleRule
                 $"Property '{setter.Property.Name}' is read-only and cannot be styled.", nameof(setter));
         if (targetType is not null)
             ValidateSetterTarget(targetType, setter);
-        if (setter.Property.Invalidation.HasFlag(UiPropertyInvalidation.Input))
-            throw new ArgumentException(
-                $"Property '{setter.Property.Name}' invalidates input and cannot be styled.", nameof(setter));
     }
 
     private static void ValidateSetterTarget(Type targetType, UiStyleSetter setter)

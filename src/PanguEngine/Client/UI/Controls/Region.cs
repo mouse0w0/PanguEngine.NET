@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 
@@ -11,38 +12,36 @@ public abstract class Region : Parent
     /// <summary>
     /// Identifies the <see cref="Padding"/> property.
     /// </summary>
-    public static readonly UiProperty<Thickness> PaddingProperty =
-        UiProperty.Register<Region, Thickness>(
+    public static readonly Property<Thickness> PaddingProperty =
+        Property.Register<Region, Thickness>(
             nameof(Padding),
             Thickness.Zero,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Background"/> property.
     /// </summary>
-    public static readonly UiProperty<Brush?> BackgroundProperty =
-        UiProperty.Register<Region, Brush?>(
+    public static readonly Property<Brush?> BackgroundProperty =
+        Property.Register<Region, Brush?>(
             nameof(Background),
-            defaultValue: null,
-            invalidation: UiPropertyInvalidation.Render);
+            defaultValue: null);
 
     /// <summary>
     /// Identifies the <see cref="BorderBrush"/> property.
     /// </summary>
-    public static readonly UiProperty<Brush?> BorderBrushProperty =
-        UiProperty.Register<Region, Brush?>(
+    public static readonly Property<Brush?> BorderBrushProperty =
+        Property.Register<Region, Brush?>(
             nameof(BorderBrush),
-            defaultValue: null,
-            invalidation: UiPropertyInvalidation.Render);
+            defaultValue: null);
 
     /// <summary>
     /// Identifies the <see cref="BorderThickness"/> property.
     /// </summary>
-    public static readonly UiProperty<Thickness> BorderThicknessProperty =
-        UiProperty.Register<Region, Thickness>(
+    public static readonly Property<Thickness> BorderThicknessProperty =
+        Property.Register<Region, Thickness>(
             nameof(BorderThickness),
             Thickness.Zero,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     private Rect _committedDecorationBounds;
     private Rect _committedBorderInnerBounds;

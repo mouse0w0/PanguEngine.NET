@@ -1,6 +1,8 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class UiNodeScreenTests
@@ -67,7 +69,7 @@ public sealed class UiNodeScreenTests
             if (args.Property.Name != nameof(UiNode.Screen))
                 return;
 
-            var change = Assert.IsType<UiPropertyChangedEventArgs<UiScreen?>>(args);
+            var change = Assert.IsType<PropertyChangedEventArgs<UiScreen?>>(args);
             Assert.Same(change.NewValue, node.Screen);
             changes.Add((change.OldValue, change.NewValue));
         };

@@ -23,19 +23,14 @@ public sealed class UiHitTestTests
         Assert.Equal(typeof(UiNode), UiNode.FocusableProperty.OwnerType);
         Assert.Equal(typeof(UiNode), UiNode.FocusableProperty.TargetType);
         Assert.False(UiNode.FocusableProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Input, UiNode.FocusableProperty.Invalidation);
 
         Assert.Equal(typeof(UiNode), UiNode.IsHitTestVisibleProperty.OwnerType);
         Assert.Equal(typeof(UiNode), UiNode.IsHitTestVisibleProperty.TargetType);
         Assert.True(UiNode.IsHitTestVisibleProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Input, UiNode.IsHitTestVisibleProperty.Invalidation);
 
         Assert.Equal(typeof(Parent), Parent.ClipToBoundsProperty.OwnerType);
         Assert.Equal(typeof(Parent), Parent.ClipToBoundsProperty.TargetType);
         Assert.False(Parent.ClipToBoundsProperty.DefaultValue);
-        Assert.Equal(
-            UiPropertyInvalidation.Input | UiPropertyInvalidation.Render,
-            Parent.ClipToBoundsProperty.Invalidation);
     }
 
     [Fact]

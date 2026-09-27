@@ -1,3 +1,5 @@
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Client.UI.Styling;
 
 /// <summary>
@@ -5,7 +7,7 @@ namespace PanguEngine.Client.UI.Styling;
 /// </summary>
 public abstract class UiStyleSetter
 {
-    private protected UiStyleSetter(UiProperty property, object? boxedValue, UiStyleEdge? component = null)
+    private protected UiStyleSetter(Property property, object? boxedValue, UiStyleEdge? component = null)
     {
         ArgumentNullException.ThrowIfNull(property);
         Property = property;
@@ -14,7 +16,7 @@ public abstract class UiStyleSetter
     }
 
     /// <summary>Gets the property targeted by this setter.</summary>
-    public UiProperty Property { get; }
+    public Property Property { get; }
 
     /// <summary>Gets the boxed property value.</summary>
     public object? BoxedValue { get; }
@@ -27,19 +29,19 @@ public abstract class UiStyleSetter
     /// <param name="property">The property to set.</param>
     /// <param name="value">The value to assign.</param>
     /// <returns>A new immutable setter.</returns>
-    public static UiStyleSetter Create<T>(UiProperty<T> property, T value) => new TypedSetter<T>(property, value);
+    public static UiStyleSetter Create<T>(Property<T> property, T value) => new TypedSetter<T>(property, value);
 
     /// <summary>Creates an immutable setter for one edge of a thickness property.</summary>
     /// <param name="property">The thickness property to style.</param>
     /// <param name="edge">The edge to style.</param>
     /// <param name="value">The finite non-negative spacing in logical pixels.</param>
     /// <returns>A setter that affects only the specified edge.</returns>
-    public static UiStyleSetter CreateEdge(UiProperty<Thickness> property, UiStyleEdge edge, double value) =>
+    public static UiStyleSetter CreateEdge(Property<Thickness> property, UiStyleEdge edge, double value) =>
         new TypedSetter<Thickness>(property, new Thickness(value), edge);
 
     internal IEnumerable<UiStyleSetter> Expand()
     {
-        if (Component is not null || Property is not UiProperty<Thickness> property)
+        if (Component is not null || Property is not Property<Thickness> property)
         {
             yield return this;
             yield break;
@@ -69,7 +71,7 @@ public abstract class UiStyleSetter
         };
     }
 
-    private sealed class TypedSetter<T>(UiProperty<T> property, T value, UiStyleEdge? component = null)
+    private sealed class TypedSetter<T>(Property<T> property, T value, UiStyleEdge? component = null)
         : UiStyleSetter(property, value, component)
     {
     }

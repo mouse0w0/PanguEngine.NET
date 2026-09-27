@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 using PanguEngine.Graphics.Text;
@@ -12,65 +13,64 @@ public sealed class Text : UiNode
     /// <summary>
     /// Identifies the <see cref="Content"/> property.
     /// </summary>
-    public static readonly UiProperty<string> ContentProperty =
-        UiProperty.Register<Text, string>(
+    public static readonly Property<string> ContentProperty =
+        Property.Register<Text, string>(
             nameof(Content),
             string.Empty,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Font"/> property.
     /// </summary>
-    public static readonly UiProperty<Font> FontProperty =
-        UiProperty.Register<Text, Font>(
+    public static readonly Property<Font> FontProperty =
+        Property.Register<Text, Font>(
             nameof(Font),
             new Font(string.Empty),
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="FontSize"/> property.
     /// </summary>
-    public static readonly UiProperty<double> FontSizeProperty =
-        UiProperty.Register<Text, double>(
+    public static readonly Property<double> FontSizeProperty =
+        Property.Register<Text, double>(
             nameof(FontSize),
             16,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Color"/> property.
     /// </summary>
-    public static readonly UiProperty<Color> ColorProperty =
-        UiProperty.Register<Text, Color>(
+    public static readonly Property<Color> ColorProperty =
+        Property.Register<Text, Color>(
             nameof(Color),
-            new Color(255, 255, 255),
-            UiPropertyInvalidation.Render);
+            new Color(255, 255, 255));
 
     /// <summary>
     /// Identifies the <see cref="LineHeight"/> property.
     /// </summary>
-    public static readonly UiProperty<double> LineHeightProperty =
-        UiProperty.Register<Text, double>(
+    public static readonly Property<double> LineHeightProperty =
+        Property.Register<Text, double>(
             nameof(LineHeight),
             1,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Wrapping"/> property.
     /// </summary>
-    public static readonly UiProperty<TextWrapping> WrappingProperty =
-        UiProperty.Register<Text, TextWrapping>(
+    public static readonly Property<TextWrapping> WrappingProperty =
+        Property.Register<Text, TextWrapping>(
             nameof(Wrapping),
             TextWrapping.NoWrap,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Alignment"/> property.
     /// </summary>
-    public static readonly UiProperty<TextAlignment> AlignmentProperty =
-        UiProperty.Register<Text, TextAlignment>(
+    public static readonly Property<TextAlignment> AlignmentProperty =
+        Property.Register<Text, TextAlignment>(
             nameof(Alignment),
             TextAlignment.Left,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     static Text()
     {

@@ -15,32 +15,28 @@ public sealed class CanvasTests
         Assert.Equal(typeof(UiNode), Canvas.LeftProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.LeftProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.LeftProperty.DefaultValue));
-        Assert.Equal(UiPropertyInvalidation.Arrange, Canvas.LeftProperty.Invalidation);
 
         Assert.Equal("Top", Canvas.TopProperty.Name);
         Assert.Equal(typeof(Canvas), Canvas.TopProperty.OwnerType);
         Assert.Equal(typeof(UiNode), Canvas.TopProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.TopProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.TopProperty.DefaultValue));
-        Assert.Equal(UiPropertyInvalidation.Arrange, Canvas.TopProperty.Invalidation);
 
         Assert.Equal("Right", Canvas.RightProperty.Name);
         Assert.Equal(typeof(Canvas), Canvas.RightProperty.OwnerType);
         Assert.Equal(typeof(UiNode), Canvas.RightProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.RightProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.RightProperty.DefaultValue));
-        Assert.Equal(UiPropertyInvalidation.Arrange, Canvas.RightProperty.Invalidation);
 
         Assert.Equal("Bottom", Canvas.BottomProperty.Name);
         Assert.Equal(typeof(Canvas), Canvas.BottomProperty.OwnerType);
         Assert.Equal(typeof(UiNode), Canvas.BottomProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.BottomProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.BottomProperty.DefaultValue));
-        Assert.Equal(UiPropertyInvalidation.Arrange, Canvas.BottomProperty.Invalidation);
     }
 
     [Fact]
-    public void PositionAccessorsUseTheUiPropertyPath()
+    public void PositionAccessorsUseThePropertyPath()
     {
         var node = new TestNode();
         var changes = 0;

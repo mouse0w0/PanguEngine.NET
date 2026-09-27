@@ -1,9 +1,10 @@
 using System.Runtime.CompilerServices;
 using PanguEngine.Client.UI;
+using PanguEngine.ComponentModel;
 
-namespace PanguEngine.Tests.Client.UI;
+namespace PanguEngine.Tests.ComponentModel;
 
-public sealed class UiPropertyTests
+public sealed class PropertyTests
 {
     [Fact]
     public void PropertyDescriptorPreservesIdentityAndMetadata()
@@ -15,7 +16,6 @@ public sealed class UiPropertyTests
         Assert.Equal(typeof(TestNode), property.TargetType);
         Assert.Equal(typeof(int), property.ValueType);
         Assert.Equal(10, property.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Measure, property.Invalidation);
     }
 
     [Fact]
@@ -42,11 +42,11 @@ public sealed class UiPropertyTests
     public void RegistrationRejectsInvalidNames()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            UiProperty.Register<TestNode, int>(null!));
+            Property.Register<TestNode, int>(null!));
         Assert.Throws<ArgumentException>(() =>
-            UiProperty.Register<TestNode, int>(string.Empty));
+            Property.Register<TestNode, int>(string.Empty));
         Assert.Throws<ArgumentException>(() =>
-            UiProperty.Register<TestNode, int>(" "));
+            Property.Register<TestNode, int>(" "));
     }
 
     [Fact]
@@ -70,9 +70,9 @@ public sealed class UiPropertyTests
         _ = TestNode.ValueProperty;
 
         Assert.Throws<InvalidOperationException>(() =>
-            UiProperty.Register<TestNode, int>(nameof(TestNode.Value), 20));
+            Property.Register<TestNode, int>(nameof(TestNode.Value), 20));
         Assert.Throws<InvalidOperationException>(() =>
-            UiProperty.Register<TestNode, string>(nameof(TestNode.Value), "duplicate"));
+            Property.Register<TestNode, string>(nameof(TestNode.Value), "duplicate"));
     }
 
     [Fact]
@@ -85,7 +85,6 @@ public sealed class UiPropertyTests
         Assert.Equal(typeof(AttachedTarget), property.TargetType);
         Assert.Equal(typeof(int), property.ValueType);
         Assert.Equal(7, property.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Arrange, property.Invalidation);
     }
 
     [Fact]
@@ -134,14 +133,14 @@ public sealed class UiPropertyTests
     public void AttachedRegistrationUsesOwnerAndNameAsTheUniqueKey()
     {
         var name = $"Attached_{Guid.NewGuid():N}";
-        _ = UiProperty.RegisterAttached<AttachedOwner, AttachedTarget, int>(name);
+        _ = Property.RegisterAttached<AttachedOwner, AttachedTarget, int>(name);
 
         Assert.Throws<InvalidOperationException>(() =>
-            UiProperty.Register<AttachedOwner, int>(name));
+            Property.Register<AttachedOwner, int>(name));
         Assert.Throws<InvalidOperationException>(() =>
-            UiProperty.RegisterAttached<AttachedOwner, DerivedAttachedTarget, int>(name));
+            Property.RegisterAttached<AttachedOwner, DerivedAttachedTarget, int>(name));
         Assert.Throws<InvalidOperationException>(() =>
-            UiProperty.RegisterAttached<AttachedOwner, AttachedTarget, string>(name));
+            Property.RegisterAttached<AttachedOwner, AttachedTarget, string>(name));
     }
 
     [Fact]
@@ -157,7 +156,7 @@ public sealed class UiPropertyTests
                 barrier.SignalAndWait();
                 try
                 {
-                    UiProperty.Register<ConcurrentNode, int>(name);
+                    Property.Register<ConcurrentNode, int>(name);
                     return (Exception?)null;
                 }
                 catch (Exception exception)
@@ -246,7 +245,7 @@ public sealed class UiPropertyTests
     {
         var node = new TestNode();
         var calls = 0;
-        EventHandler<UiPropertyChangedEventArgs<int>> handler = (_, _) => calls++;
+        EventHandler<PropertyChangedEventArgs<int>> handler = (_, _) => calls++;
         using var subscription = node.SubscribeWeak(TestNode.ValueProperty, handler);
 
         node.Value = 11;
@@ -260,7 +259,7 @@ public sealed class UiPropertyTests
     {
         var node = new TestNode();
         var calls = 0;
-        EventHandler<UiPropertyChangedEventArgs<int>> handler = (_, _) => calls++;
+        EventHandler<PropertyChangedEventArgs<int>> handler = (_, _) => calls++;
         var subscription = node.SubscribeWeak(TestNode.ValueProperty, handler);
 
         subscription.Dispose();
@@ -359,7 +358,7 @@ public sealed class UiPropertyTests
         using var existingSubscription = node.Subscribe(
             TestNode.ValueProperty,
             (_, _) => existingNotifications++);
-        EventHandler<UiPropertyChangedEventArgs> throwingHandler = (_, _) => throw exception;
+        EventHandler<PropertyChangedEventArgs> throwingHandler = (_, _) => throw exception;
         node.PropertyChanged += throwingHandler;
 
         var actual = Assert.Throws<InvalidOperationException>(() => node.Value = 11);
@@ -406,24 +405,25 @@ public sealed class UiPropertyTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference<EventHandler<UiPropertyChangedEventArgs<int>>> CreateWeakSubscription(
+    private static WeakReference<EventHandler<PropertyChangedEventArgs<int>>> CreateWeakSubscription(
         TestNode node,
         List<int> calls,
         out IDisposable subscription)
     {
-        EventHandler<UiPropertyChangedEventArgs<int>> handler = (_, args) => calls.Add(args.NewValue);
-        var weakHandler = new WeakReference<EventHandler<UiPropertyChangedEventArgs<int>>>(handler);
+        EventHandler<PropertyChangedEventArgs<int>> handler = (_, args) => calls.Add(args.NewValue);
+        var weakHandler = new WeakReference<EventHandler<PropertyChangedEventArgs<int>>>(handler);
         subscription = node.SubscribeWeak(TestNode.ValueProperty, handler);
         return weakHandler;
     }
 
     private class TestNode : UiNode
     {
-        internal static readonly UiProperty<int> ValueProperty =
-            UiProperty.Register<TestNode, int>(nameof(Value), 10, UiPropertyInvalidation.Measure);
+        internal static readonly Property<int> ValueProperty =
+            Property.Register<TestNode, int>(nameof(Value), 10,
+                onChanged: static (node, _, _) => node.InvalidateMeasure());
 
-        internal static readonly UiProperty<string> TextProperty =
-            UiProperty.Register<TestNode, string>(nameof(Text), string.Empty);
+        internal static readonly Property<string> TextProperty =
+            Property.Register<TestNode, string>(nameof(Text), string.Empty);
 
         internal int Value
         {
@@ -452,11 +452,11 @@ public sealed class UiPropertyTests
 
     private sealed class AttachedOwner : UiNode
     {
-        internal static readonly UiProperty<int> ValueProperty =
-            UiProperty.RegisterAttached<AttachedOwner, AttachedTarget, int>(
+        internal static readonly Property<int> ValueProperty =
+            Property.RegisterAttached<AttachedOwner, AttachedTarget, int>(
                 "Value",
                 7,
-                UiPropertyInvalidation.Arrange);
+                onChanged: static (node, _, _) => node.InvalidateArrange());
     }
 
     private class AttachedTarget : UiNode
@@ -471,7 +471,7 @@ public sealed class UiPropertyTests
     {
         internal int OnPropertyChangedCalls { get; private set; }
 
-        protected override void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs)
+        protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
         {
             OnPropertyChangedCalls++;
             base.OnPropertyChanged(eventArgs);

@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using PanguEngine.Client.UI.Drawing;
@@ -17,83 +18,78 @@ public sealed class TextBox : Control
     /// <summary>
     /// Identifies the <see cref="Text"/> property.
     /// </summary>
-    public static readonly UiProperty<string> TextProperty =
-        UiProperty.Register<TextBox, string>(
+    public static readonly Property<string> TextProperty =
+        Property.Register<TextBox, string>(
             nameof(Text),
             string.Empty,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Placeholder"/> property.
     /// </summary>
-    public static readonly UiProperty<string> PlaceholderProperty =
-        UiProperty.Register<TextBox, string>(
+    public static readonly Property<string> PlaceholderProperty =
+        Property.Register<TextBox, string>(
             nameof(Placeholder),
             string.Empty,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Font"/> property.
     /// </summary>
-    public static readonly UiProperty<Font> FontProperty =
-        UiProperty.Register<TextBox, Font>(
+    public static readonly Property<Font> FontProperty =
+        Property.Register<TextBox, Font>(
             nameof(Font),
             new Font(string.Empty),
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="FontSize"/> property.
     /// </summary>
-    public static readonly UiProperty<double> FontSizeProperty =
-        UiProperty.Register<TextBox, double>(
+    public static readonly Property<double> FontSizeProperty =
+        Property.Register<TextBox, double>(
             nameof(FontSize),
             16d,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Foreground"/> property.
     /// </summary>
-    public static readonly UiProperty<Color> ForegroundProperty =
-        UiProperty.Register<TextBox, Color>(
+    public static readonly Property<Color> ForegroundProperty =
+        Property.Register<TextBox, Color>(
             nameof(Foreground),
-            new Color(242, 244, 247),
-            UiPropertyInvalidation.Render);
+            new Color(242, 244, 247));
 
     /// <summary>
     /// Identifies the <see cref="PlaceholderForeground"/> property.
     /// </summary>
-    public static readonly UiProperty<Color> PlaceholderForegroundProperty =
-        UiProperty.Register<TextBox, Color>(
+    public static readonly Property<Color> PlaceholderForegroundProperty =
+        Property.Register<TextBox, Color>(
             nameof(PlaceholderForeground),
-            new Color(139, 148, 160),
-            UiPropertyInvalidation.Render);
+            new Color(139, 148, 160));
 
     /// <summary>
     /// Identifies the <see cref="SelectionBackground"/> property.
     /// </summary>
-    public static readonly UiProperty<Color> SelectionBackgroundProperty =
-        UiProperty.Register<TextBox, Color>(
+    public static readonly Property<Color> SelectionBackgroundProperty =
+        Property.Register<TextBox, Color>(
             nameof(SelectionBackground),
-            new Color(47, 100, 160),
-            UiPropertyInvalidation.Render);
+            new Color(47, 100, 160));
 
     /// <summary>
     /// Identifies the <see cref="CaretColor"/> property.
     /// </summary>
-    public static readonly UiProperty<Color> CaretColorProperty =
-        UiProperty.Register<TextBox, Color>(
+    public static readonly Property<Color> CaretColorProperty =
+        Property.Register<TextBox, Color>(
             nameof(CaretColor),
-            new Color(242, 244, 247),
-            UiPropertyInvalidation.Render);
+            new Color(242, 244, 247));
 
     /// <summary>
     /// Identifies the <see cref="IsReadOnly"/> property.
     /// </summary>
-    public static readonly UiProperty<bool> IsReadOnlyProperty =
-        UiProperty.Register<TextBox, bool>(
+    public static readonly Property<bool> IsReadOnlyProperty =
+        Property.Register<TextBox, bool>(
             nameof(IsReadOnly),
-            false,
-            UiPropertyInvalidation.Render);
+            false);
 
     static TextBox()
     {
@@ -455,11 +451,11 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs)
+    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
     {
         if (ReferenceEquals(eventArgs.Property, TextProperty))
         {
-            var change = (UiPropertyChangedEventArgs<string>)eventArgs;
+            var change = (PropertyChangedEventArgs<string>)eventArgs;
             if (_pendingChange is { } pending &&
                 string.Equals(pending.ExpectedText, change.OldValue, StringComparison.Ordinal) &&
                 string.Equals(pending.Text, change.NewValue, StringComparison.Ordinal))

@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Drawing.Geometry;
 
@@ -15,56 +16,55 @@ public abstract partial class Shape : UiNode
     /// <summary>
     /// Identifies the <see cref="Fill"/> property.
     /// </summary>
-    public static readonly UiProperty<Brush?> FillProperty =
-        UiProperty.Register<Shape, Brush?>(
+    public static readonly Property<Brush?> FillProperty =
+        Property.Register<Shape, Brush?>(
             nameof(Fill),
-            new SolidColorBrush(new Color(0, 0, 0)),
-            UiPropertyInvalidation.Render);
+            new SolidColorBrush(new Color(0, 0, 0)));
 
     /// <summary>
     /// Identifies the <see cref="Stroke"/> property.
     /// </summary>
-    public static readonly UiProperty<Brush?> StrokeProperty =
-        UiProperty.Register<Shape, Brush?>(
+    public static readonly Property<Brush?> StrokeProperty =
+        Property.Register<Shape, Brush?>(
             nameof(Stroke),
             defaultValue: null,
-            invalidation: UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="StrokeThickness"/> property.
     /// </summary>
-    public static readonly UiProperty<double> StrokeThicknessProperty =
-        UiProperty.Register<Shape, double>(
+    public static readonly Property<double> StrokeThicknessProperty =
+        Property.Register<Shape, double>(
             nameof(StrokeThickness),
             1,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="StrokeLineCap"/> property.
     /// </summary>
-    public static readonly UiProperty<StrokeLineCap> StrokeLineCapProperty =
-        UiProperty.Register<Shape, StrokeLineCap>(
+    public static readonly Property<StrokeLineCap> StrokeLineCapProperty =
+        Property.Register<Shape, StrokeLineCap>(
             nameof(StrokeLineCap),
             StrokeLineCap.Butt,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="StrokeLineJoin"/> property.
     /// </summary>
-    public static readonly UiProperty<StrokeLineJoin> StrokeLineJoinProperty =
-        UiProperty.Register<Shape, StrokeLineJoin>(
+    public static readonly Property<StrokeLineJoin> StrokeLineJoinProperty =
+        Property.Register<Shape, StrokeLineJoin>(
             nameof(StrokeLineJoin),
             StrokeLineJoin.Miter,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="StrokeMiterLimit"/> property.
     /// </summary>
-    public static readonly UiProperty<double> StrokeMiterLimitProperty =
-        UiProperty.Register<Shape, double>(
+    public static readonly Property<double> StrokeMiterLimitProperty =
+        Property.Register<Shape, double>(
             nameof(StrokeMiterLimit),
             4,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     private ShapeGeometry? _geometry;
     private ShapeGeometryKey _geometryKey;

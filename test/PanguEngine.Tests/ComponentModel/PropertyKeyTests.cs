@@ -1,10 +1,12 @@
 using System.ComponentModel;
 using System.Reflection;
 using PanguEngine.Client.UI;
+using PanguEngine.ComponentModel;
+using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
-namespace PanguEngine.Tests.Client.UI;
+namespace PanguEngine.Tests.ComponentModel;
 
-public sealed class UiPropertyKeyTests
+public sealed class PropertyKeyTests
 {
     [Fact]
     public void ReadOnlyDefaultsAndOwnerWritesDoNotResolveStyles()
@@ -32,10 +34,9 @@ public sealed class UiPropertyKeyTests
         Assert.Equal(typeof(ReadOnlyNode), property.TargetType);
         Assert.Equal(typeof(int), property.ValueType);
         Assert.Equal(5, property.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Render, property.Invalidation);
         Assert.True(property.IsReadOnly);
         Assert.Same(property, ReadOnlyNode.ValueProperty);
-        Assert.Empty(typeof(UiPropertyKey<int>).GetConstructors());
+        Assert.Empty(typeof(PropertyKey<int>).GetConstructors());
     }
 
     [Fact]
@@ -62,7 +63,7 @@ public sealed class UiPropertyKeyTests
         var subscribedChanges = new List<(int OldValue, int NewValue)>();
         node.PropertyChanged += (_, args) =>
         {
-            var typedArgs = Assert.IsType<UiPropertyChangedEventArgs<int>>(args);
+            var typedArgs = Assert.IsType<PanguEngine.ComponentModel.PropertyChangedEventArgs<int>>(args);
             globalChanges.Add((typedArgs.OldValue, typedArgs.NewValue));
         };
         var subscription = node.Subscribe(
@@ -182,7 +183,7 @@ public sealed class UiPropertyKeyTests
     }
 
     [Fact]
-    public void UiPropertyBindingsRejectReadOnlyTargetsBeforeReadingSource()
+    public void PropertyBindingsRejectReadOnlyTargetsBeforeReadingSource()
     {
         var node = new ReadOnlyNode();
         var source = new WritableNode { Value = 9 };
@@ -214,7 +215,7 @@ public sealed class UiPropertyKeyTests
     }
 
     [Fact]
-    public void ReadOnlyUiPropertySupportsOneWayBindings()
+    public void ReadOnlyPropertySupportsOneWayBindings()
     {
         var source = new ReadOnlyNode();
         var sameTypeTarget = new WritableNode();
@@ -286,31 +287,30 @@ public sealed class UiPropertyKeyTests
 
     private class ReadOnlyNode : UiNode
     {
-        private static readonly UiPropertyKey<int> ValuePropertyKey =
-            UiProperty.RegisterReadOnly<ReadOnlyNode, int>(
+        private static readonly PropertyKey<int> ValuePropertyKey =
+            Property.RegisterReadOnly<ReadOnlyNode, int>(
                 nameof(Value),
-                5,
-                UiPropertyInvalidation.Render);
+                5);
 
-        internal static UiProperty<int> ValueProperty => ValuePropertyKey.Property;
+        internal static Property<int> ValueProperty => ValuePropertyKey.Property;
         internal int Value => GetValue(ValueProperty);
         internal void SetValueFromOwner(int value) => SetValue(ValuePropertyKey, value);
         internal void ClearValueFromOwner() => ClearValue(ValuePropertyKey);
 
-        internal void SetArbitraryKey(UiPropertyKey<int> propertyKey, int value) =>
+        internal void SetArbitraryKey(PropertyKey<int> propertyKey, int value) =>
             SetValue(propertyKey, value);
 
-        internal void ClearArbitraryKey(UiPropertyKey<int> propertyKey) =>
+        internal void ClearArbitraryKey(PropertyKey<int> propertyKey) =>
             ClearValue(propertyKey);
     }
 
     private sealed class WritableNode : UiNode
     {
-        internal static readonly UiProperty<int> ValueProperty =
-            UiProperty.Register<WritableNode, int>(nameof(Value));
+        internal static readonly Property<int> ValueProperty =
+            Property.Register<WritableNode, int>(nameof(Value));
 
-        internal static readonly UiProperty<string> TextProperty =
-            UiProperty.Register<WritableNode, string>(nameof(Text), string.Empty);
+        internal static readonly Property<string> TextProperty =
+            Property.Register<WritableNode, string>(nameof(Text), string.Empty);
 
         internal int Value
         {
@@ -327,8 +327,8 @@ public sealed class UiPropertyKeyTests
 
     private sealed class ForeignReadOnlyNode : UiNode
     {
-        internal static readonly UiPropertyKey<int> ValuePropertyKey =
-            UiProperty.RegisterReadOnly<ForeignReadOnlyNode, int>("Value");
+        internal static readonly PropertyKey<int> ValuePropertyKey =
+            Property.RegisterReadOnly<ForeignReadOnlyNode, int>("Value");
     }
 
     private sealed class ForeignNode : UiNode
@@ -337,8 +337,8 @@ public sealed class UiPropertyKeyTests
 
     private sealed class AttachedOwner : UiNode
     {
-        internal static readonly UiProperty<int> ValueProperty =
-            UiProperty.RegisterAttached<AttachedOwner, AttachedTarget, int>("Value");
+        internal static readonly Property<int> ValueProperty =
+            Property.RegisterAttached<AttachedOwner, AttachedTarget, int>("Value");
     }
 
     private sealed class AttachedTarget : UiNode
@@ -379,7 +379,7 @@ public sealed class UiPropertyKeyTests
                 if (_value == value)
                     return;
                 _value = value;
-                _propertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
+                _propertyChanged?.Invoke(this, new SourcePropertyChangedEventArgs(nameof(Value)));
             }
         }
     }

@@ -3,6 +3,8 @@ using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiScreenStyleSheetsTests
@@ -319,7 +321,7 @@ public sealed class UiScreenStyleSheetsTests
 
         internal static Action? OnConvert;
 
-        internal static readonly UiProperty<double> ValueProperty = UiProperty.Register<CallbackNode, double>(
+        internal static readonly Property<double> ValueProperty = Property.Register<CallbackNode, double>(
             "Value", 0);
     }
 }

@@ -1,16 +1,16 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
-internal sealed class UiPropertyBinding<TSource, TTarget> : UiBinding<TSource, TTarget>
+internal sealed class PropertyBinding<TSource, TTarget> : Binding<TSource, TTarget>
 {
-    private readonly UiNode _source;
-    private readonly UiProperty<TSource> _sourceProperty;
+    private readonly ObservableObject _source;
+    private readonly Property<TSource> _sourceProperty;
     private readonly IDisposable _subscription;
 
-    internal UiPropertyBinding(
-        UiNode target,
-        UiProperty<TTarget> targetProperty,
-        UiNode source,
-        UiProperty<TSource> sourceProperty,
+    internal PropertyBinding(
+        ObservableObject target,
+        Property<TTarget> targetProperty,
+        ObservableObject source,
+        Property<TSource> sourceProperty,
         Func<TSource, TTarget> converter,
         TryConverter<TTarget, TSource>? convertBack)
         : base(target, targetProperty, converter, convertBack)
@@ -29,6 +29,6 @@ internal sealed class UiPropertyBinding<TSource, TTarget> : UiBinding<TSource, T
     protected override void DetachSource() =>
         _subscription.Dispose();
 
-    private void OnSourcePropertyChanged(object? sender, UiPropertyChangedEventArgs<TSource> eventArgs) =>
+    private void OnSourcePropertyChanged(object? sender, PropertyChangedEventArgs<TSource> eventArgs) =>
         UpdateTarget();
 }

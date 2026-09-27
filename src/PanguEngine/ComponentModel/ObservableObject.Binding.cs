@@ -1,22 +1,22 @@
 using System.ComponentModel;
 using System.Linq.Expressions;
 
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
-public abstract partial class UiNode
+public abstract partial class ObservableObject
 {
-    private Dictionary<UiProperty, IUiBinding>? _bindings;
+    private Dictionary<Property, IBinding>? _bindings;
 
     /// <summary>
     /// Creates a one-way binding from a notifying data source expression.
     /// </summary>
     /// <typeparam name="TRoot">The notifying source object type.</typeparam>
     /// <typeparam name="TValue">The source and target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
     /// <param name="source">The notifying source object.</param>
     /// <param name="sourceExpression">The source value expression.</param>
     public void Bind<TRoot, TValue>(
-        UiProperty<TValue> targetProperty,
+        Property<TValue> targetProperty,
         TRoot source,
         Expression<Func<TRoot, TValue>> sourceExpression)
         where TRoot : class, INotifyPropertyChanged
@@ -26,7 +26,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TValue>.ParseOneWay(sourceExpression);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
         var initialValue = expression.Getter(source);
         var binding = new NotifyPropertyChangedBinding<TRoot, TValue, TValue>(
             this,
@@ -46,12 +46,12 @@ public abstract partial class UiNode
     /// <typeparam name="TRoot">The notifying source object type.</typeparam>
     /// <typeparam name="TSource">The source value type.</typeparam>
     /// <typeparam name="TTarget">The target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
     /// <param name="source">The notifying source object.</param>
     /// <param name="sourceExpression">The source value expression.</param>
     /// <param name="converter">The forward value converter.</param>
     public void Bind<TRoot, TSource, TTarget>(
-        UiProperty<TTarget> targetProperty,
+        Property<TTarget> targetProperty,
         TRoot source,
         Expression<Func<TRoot, TSource>> sourceExpression,
         Func<TSource, TTarget> converter)
@@ -63,7 +63,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TSource>.ParseOneWay(sourceExpression);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
         var initialValue = converter(expression.Getter(source));
         var binding = new NotifyPropertyChangedBinding<TRoot, TSource, TTarget>(
             this,
@@ -82,11 +82,11 @@ public abstract partial class UiNode
     /// </summary>
     /// <typeparam name="TRoot">The notifying source object type.</typeparam>
     /// <typeparam name="TValue">The source and target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
     /// <param name="source">The notifying source object.</param>
     /// <param name="sourceProperty">The writable direct source property expression.</param>
     public void BindTwoWay<TRoot, TValue>(
-        UiProperty<TValue> targetProperty,
+        Property<TValue> targetProperty,
         TRoot source,
         Expression<Func<TRoot, TValue>> sourceProperty)
         where TRoot : class, INotifyPropertyChanged
@@ -96,7 +96,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TValue>.ParseTwoWay(sourceProperty);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
         var initialValue = expression.Getter(source);
         var binding = new NotifyPropertyChangedBinding<TRoot, TValue, TValue>(
             this,
@@ -116,13 +116,13 @@ public abstract partial class UiNode
     /// <typeparam name="TRoot">The notifying source object type.</typeparam>
     /// <typeparam name="TSource">The source value type.</typeparam>
     /// <typeparam name="TTarget">The target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
     /// <param name="source">The notifying source object.</param>
     /// <param name="sourceProperty">The writable direct source property expression.</param>
     /// <param name="converter">The forward value converter.</param>
     /// <param name="convertBack">The reverse value converter.</param>
     public void BindTwoWay<TRoot, TSource, TTarget>(
-        UiProperty<TTarget> targetProperty,
+        Property<TTarget> targetProperty,
         TRoot source,
         Expression<Func<TRoot, TSource>> sourceProperty,
         Func<TSource, TTarget> converter,
@@ -136,7 +136,7 @@ public abstract partial class UiNode
         VerifyCanBind(targetProperty);
 
         var expression = BindingExpression<TRoot, TSource>.ParseTwoWay(sourceProperty);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
         var initialValue = converter(expression.Getter(source));
         var binding = new NotifyPropertyChangedBinding<TRoot, TSource, TTarget>(
             this,
@@ -151,25 +151,25 @@ public abstract partial class UiNode
     }
 
     /// <summary>
-    /// Creates a one-way binding from another UI property with the same value type.
+    /// Creates a one-way binding from another registered property with the same value type.
     /// </summary>
     /// <typeparam name="TValue">The source and target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
-    /// <param name="source">The source UI node.</param>
-    /// <param name="sourceProperty">The source UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
+    /// <param name="source">The source property host.</param>
+    /// <param name="sourceProperty">The source property.</param>
     public void Bind<TValue>(
-        UiProperty<TValue> targetProperty,
-        UiNode source,
-        UiProperty<TValue> sourceProperty)
+        Property<TValue> targetProperty,
+        ObservableObject source,
+        Property<TValue> sourceProperty)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(sourceProperty);
         sourceProperty.VerifyOwner(source);
         VerifyCanBind(targetProperty);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
 
         var initialValue = source.GetValue(sourceProperty);
-        var binding = new UiPropertyBinding<TValue, TValue>(
+        var binding = new PropertyBinding<TValue, TValue>(
             this,
             targetProperty,
             source,
@@ -180,18 +180,18 @@ public abstract partial class UiNode
     }
 
     /// <summary>
-    /// Creates a converted one-way binding from another UI property.
+    /// Creates a converted one-way binding from another registered property.
     /// </summary>
     /// <typeparam name="TSource">The source value type.</typeparam>
     /// <typeparam name="TTarget">The target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
-    /// <param name="source">The source UI node.</param>
-    /// <param name="sourceProperty">The source UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
+    /// <param name="source">The source property host.</param>
+    /// <param name="sourceProperty">The source property.</param>
     /// <param name="converter">The forward value converter.</param>
     public void Bind<TSource, TTarget>(
-        UiProperty<TTarget> targetProperty,
-        UiNode source,
-        UiProperty<TSource> sourceProperty,
+        Property<TTarget> targetProperty,
+        ObservableObject source,
+        Property<TSource> sourceProperty,
         Func<TSource, TTarget> converter)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -199,10 +199,10 @@ public abstract partial class UiNode
         ArgumentNullException.ThrowIfNull(converter);
         sourceProperty.VerifyOwner(source);
         VerifyCanBind(targetProperty);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
 
         var initialValue = converter(source.GetValue(sourceProperty));
-        var binding = new UiPropertyBinding<TSource, TTarget>(
+        var binding = new PropertyBinding<TSource, TTarget>(
             this,
             targetProperty,
             source,
@@ -213,26 +213,26 @@ public abstract partial class UiNode
     }
 
     /// <summary>
-    /// Creates a two-way binding to another UI property with the same value type.
+    /// Creates a two-way binding to another registered property with the same value type.
     /// </summary>
     /// <typeparam name="TValue">The source and target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
-    /// <param name="source">The source UI node.</param>
-    /// <param name="sourceProperty">The source UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
+    /// <param name="source">The source property host.</param>
+    /// <param name="sourceProperty">The source property.</param>
     public void BindTwoWay<TValue>(
-        UiProperty<TValue> targetProperty,
-        UiNode source,
-        UiProperty<TValue> sourceProperty)
+        Property<TValue> targetProperty,
+        ObservableObject source,
+        Property<TValue> sourceProperty)
     {
         ArgumentNullException.ThrowIfNull(source);
         ArgumentNullException.ThrowIfNull(sourceProperty);
         sourceProperty.VerifyOwner(source);
         sourceProperty.VerifyWritable();
         VerifyCanBind(targetProperty);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
 
         var initialValue = source.GetValue(sourceProperty);
-        var binding = new UiPropertyBinding<TValue, TValue>(
+        var binding = new PropertyBinding<TValue, TValue>(
             this,
             targetProperty,
             source,
@@ -243,19 +243,19 @@ public abstract partial class UiNode
     }
 
     /// <summary>
-    /// Creates a converted two-way binding to another UI property.
+    /// Creates a converted two-way binding to another registered property.
     /// </summary>
     /// <typeparam name="TSource">The source value type.</typeparam>
     /// <typeparam name="TTarget">The target value type.</typeparam>
-    /// <param name="targetProperty">The target UI property.</param>
-    /// <param name="source">The source UI node.</param>
-    /// <param name="sourceProperty">The source UI property.</param>
+    /// <param name="targetProperty">The target property.</param>
+    /// <param name="source">The source property host.</param>
+    /// <param name="sourceProperty">The source property.</param>
     /// <param name="converter">The forward value converter.</param>
     /// <param name="convertBack">The reverse value converter.</param>
     public void BindTwoWay<TSource, TTarget>(
-        UiProperty<TTarget> targetProperty,
-        UiNode source,
-        UiProperty<TSource> sourceProperty,
+        Property<TTarget> targetProperty,
+        ObservableObject source,
+        Property<TSource> sourceProperty,
         Func<TSource, TTarget> converter,
         TryConverter<TTarget, TSource> convertBack)
     {
@@ -266,10 +266,10 @@ public abstract partial class UiNode
         sourceProperty.VerifyOwner(source);
         sourceProperty.VerifyWritable();
         VerifyCanBind(targetProperty);
-        VerifyPropertyAccess(targetProperty);
+        VerifyMutationAccess();
 
         var initialValue = converter(source.GetValue(sourceProperty));
-        var binding = new UiPropertyBinding<TSource, TTarget>(
+        var binding = new PropertyBinding<TSource, TTarget>(
             this,
             targetProperty,
             source,
@@ -283,9 +283,9 @@ public abstract partial class UiNode
     /// Gets whether a target property currently has a binding.
     /// </summary>
     /// <typeparam name="T">The property value type.</typeparam>
-    /// <param name="property">The target UI property.</param>
+    /// <param name="property">The target property.</param>
     /// <returns>Whether the property is bound.</returns>
-    public bool IsBound<T>(UiProperty<T> property)
+    public bool IsBound<T>(Property<T> property)
     {
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
@@ -296,15 +296,15 @@ public abstract partial class UiNode
     /// Removes a binding while preserving its last effective value as a local value.
     /// </summary>
     /// <typeparam name="T">The property value type.</typeparam>
-    /// <param name="property">The target UI property.</param>
-    public void Unbind<T>(UiProperty<T> property)
+    /// <param name="property">The target property.</param>
+    public void Unbind<T>(Property<T> property)
     {
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
         if (!TryGetBinding(property, out var binding))
             return;
 
-        VerifyPropertyAccess(property);
+        VerifyMutationAccess();
         var currentValue = GetValueCore(property);
         binding.Detach();
         RemoveBinding(property, binding);
@@ -312,18 +312,21 @@ public abstract partial class UiNode
         _localValues[property] = currentValue;
     }
 
-    internal bool IsCurrentBinding(UiProperty property, IUiBinding binding) =>
+    internal bool IsCurrentBinding(Property property, IBinding binding) =>
         _bindings is not null &&
         _bindings.TryGetValue(property, out var currentBinding) &&
         ReferenceEquals(currentBinding, binding);
 
-    internal void SetValueFromBinding<T>(UiProperty<T> property, T value, IUiBinding binding)
+    internal void SetValueFromBinding<T>(Property<T> property, T value, IBinding binding)
     {
         if (IsCurrentBinding(property, binding))
+        {
+            VerifyMutationAccess();
             SetValueCore(property, value);
+        }
     }
 
-    private void VerifyCanBind<T>(UiProperty<T> targetProperty)
+    private void VerifyCanBind<T>(Property<T> targetProperty)
     {
         ArgumentNullException.ThrowIfNull(targetProperty);
         targetProperty.VerifyOwner(this);
@@ -332,11 +335,11 @@ public abstract partial class UiNode
             throw new InvalidOperationException($"Property '{targetProperty.Name}' is already bound.");
     }
 
-    private void AddBinding<T>(UiProperty<T> property, IUiBinding binding, T initialValue)
+    private void AddBinding<T>(Property<T> property, IBinding binding, T initialValue)
     {
         try
         {
-            VerifyPropertyAccess(property);
+            VerifyMutationAccess();
         }
         catch
         {
@@ -351,14 +354,14 @@ public abstract partial class UiNode
             throw new InvalidOperationException($"Property '{property.Name}' is already bound.");
         }
 
-        SetValueFromBinding(property, initialValue, binding);
+        SetValueCore(property, initialValue);
     }
 
-    private bool TryGetBinding<T>(UiProperty<T> property, out IUiBinding<T> binding)
+    private bool TryGetBinding<T>(Property<T> property, out IBinding<T> binding)
     {
         if (_bindings is not null && _bindings.TryGetValue(property, out var untypedBinding))
         {
-            binding = (IUiBinding<T>)untypedBinding;
+            binding = (IBinding<T>)untypedBinding;
             return true;
         }
 
@@ -366,7 +369,7 @@ public abstract partial class UiNode
         return false;
     }
 
-    private void RemoveBinding(UiProperty property, IUiBinding binding)
+    private void RemoveBinding(Property property, IBinding binding)
     {
         if (!IsCurrentBinding(property, binding))
             return;

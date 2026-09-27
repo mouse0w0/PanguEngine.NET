@@ -2,6 +2,8 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiCssVariableIntegrationTests
@@ -274,8 +276,8 @@ public sealed class UiCssVariableIntegrationTests
     {
         internal static int Conversions;
 
-        internal static readonly UiProperty<string> ValueProperty =
-            UiProperty.Register<CountingNode, string>("Value", "");
+        internal static readonly Property<string> ValueProperty =
+            Property.Register<CountingNode, string>("Value", "");
 
         static CountingNode() => UiCssRegistry.RegisterProperty<CountingNode, string>("raw", ValueProperty, value =>
         {

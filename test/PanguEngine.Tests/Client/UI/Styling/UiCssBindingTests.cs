@@ -4,6 +4,8 @@ using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 using Path = PanguEngine.Client.UI.Controls.Path;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiCssBindingTests
@@ -471,11 +473,11 @@ public sealed class UiCssBindingTests
         var root = new Panel();
         root.Children.Add(reader);
         root.Children.Add(sibling);
-        var changes = new List<UiPropertyChangedEventArgs<double>>();
+        var changes = new List<PropertyChangedEventArgs<double>>();
         sibling.PropertyChanged += (_, args) =>
         {
             if (ReferenceEquals(args.Property, UiNode.OpacityProperty))
-                changes.Add(Assert.IsType<UiPropertyChangedEventArgs<double>>(args));
+                changes.Add(Assert.IsType<PropertyChangedEventArgs<double>>(args));
         };
         SourceQueryNode.Current = reader;
         SourceQueryNode.QueryTarget = sibling;
@@ -532,7 +534,7 @@ public sealed class UiCssBindingTests
         internal static PseudoMutationNode? Current;
         internal static int Conversions;
 
-        internal static readonly UiProperty<double> ValueProperty = UiProperty.Register<PseudoMutationNode, double>(
+        internal static readonly Property<double> ValueProperty = Property.Register<PseudoMutationNode, double>(
             "Value", 0);
     }
 
@@ -558,7 +560,7 @@ public sealed class UiCssBindingTests
         internal IReadOnlyList<UiStyleValueSource>? SourceDuringBinding { get; private set; }
         internal double ValueDuringBinding { get; private set; }
 
-        internal static readonly UiProperty<double> ValueProperty = UiProperty.Register<SourceQueryNode, double>(
+        internal static readonly Property<double> ValueProperty = Property.Register<SourceQueryNode, double>(
             "Value", 0);
     }
 
@@ -589,8 +591,8 @@ public sealed class UiCssBindingTests
                 UiCssValueConverters.ParseLength);
         }
 
-        internal static readonly UiProperty<double> LevelProperty =
-            UiProperty.Register<AliasNode, double>("Level", 0);
+        internal static readonly Property<double> LevelProperty =
+            Property.Register<AliasNode, double>("Level", 0);
     }
 
     private sealed class CustomConvNode : UiNode
@@ -603,8 +605,8 @@ public sealed class UiCssBindingTests
                 value => value.Length);
         }
 
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<CustomConvNode, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<CustomConvNode, double>("Value", 0);
     }
 
     private sealed class CountingNode : UiNode
@@ -620,8 +622,8 @@ public sealed class UiCssBindingTests
 
         internal static int Conversions;
 
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<CountingNode, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<CountingNode, double>("Value", 0);
     }
 
     private sealed class FlakyNode : UiNode
@@ -639,8 +641,8 @@ public sealed class UiCssBindingTests
 
         internal static int Attempts;
 
-        internal static readonly UiProperty<double> FlakyProperty =
-            UiProperty.Register<FlakyNode, double>("Flaky", 0);
+        internal static readonly Property<double> FlakyProperty =
+            Property.Register<FlakyNode, double>("Flaky", 0);
     }
 
     private sealed class NumericNode : UiNode
@@ -652,8 +654,8 @@ public sealed class UiCssBindingTests
                 UiCssValueConverters.ParseLength);
         }
 
-        internal static readonly UiProperty<double> LevelProperty =
-            UiProperty.Register<NumericNode, double>("Level", 0);
+        internal static readonly Property<double> LevelProperty =
+            Property.Register<NumericNode, double>("Level", 0);
     }
 
     private sealed class LengthNode : UiNode
@@ -664,7 +666,7 @@ public sealed class UiCssBindingTests
             UiCssRegistry.RegisterProperty<LengthNode, double>("level", LevelProperty, static value => value.Length);
         }
 
-        internal static readonly UiProperty<double> LevelProperty =
-            UiProperty.Register<LengthNode, double>("Level", 0);
+        internal static readonly Property<double> LevelProperty =
+            Property.Register<LengthNode, double>("Level", 0);
     }
 }

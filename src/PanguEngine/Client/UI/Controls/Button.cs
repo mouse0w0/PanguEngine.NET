@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Input;
 using PanguEngine.Client.UI.Styling;
@@ -14,65 +15,64 @@ public sealed class Button : Control
     /// <summary>
     /// Identifies the <see cref="Text"/> property.
     /// </summary>
-    public static readonly UiProperty<string> TextProperty =
-        UiProperty.Register<Button, string>(
+    public static readonly Property<string> TextProperty =
+        Property.Register<Button, string>(
             nameof(Text),
             string.Empty,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Font"/> property.
     /// </summary>
-    public static readonly UiProperty<Font> FontProperty =
-        UiProperty.Register<Button, Font>(
+    public static readonly Property<Font> FontProperty =
+        Property.Register<Button, Font>(
             nameof(Font),
             new Font(string.Empty),
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="FontSize"/> property.
     /// </summary>
-    public static readonly UiProperty<double> FontSizeProperty =
-        UiProperty.Register<Button, double>(
+    public static readonly Property<double> FontSizeProperty =
+        Property.Register<Button, double>(
             nameof(FontSize),
             16d,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Foreground"/> property.
     /// </summary>
-    public static readonly UiProperty<Color> ForegroundProperty =
-        UiProperty.Register<Button, Color>(
+    public static readonly Property<Color> ForegroundProperty =
+        Property.Register<Button, Color>(
             nameof(Foreground),
-            new Color(242, 244, 247),
-            UiPropertyInvalidation.Render);
+            new Color(242, 244, 247));
 
     /// <summary>
     /// Identifies the <see cref="Icon"/> property.
     /// </summary>
-    public static readonly UiProperty<UiImage?> IconProperty =
-        UiProperty.Register<Button, UiImage?>(
+    public static readonly Property<UiImage?> IconProperty =
+        Property.Register<Button, UiImage?>(
             nameof(Icon),
             defaultValue: null,
-            invalidation: UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="IconSize"/> property.
     /// </summary>
-    public static readonly UiProperty<double> IconSizeProperty =
-        UiProperty.Register<Button, double>(
+    public static readonly Property<double> IconSizeProperty =
+        Property.Register<Button, double>(
             nameof(IconSize),
             16d,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Spacing"/> property.
     /// </summary>
-    public static readonly UiProperty<double> SpacingProperty =
-        UiProperty.Register<Button, double>(
+    public static readonly Property<double> SpacingProperty =
+        Property.Register<Button, double>(
             nameof(Spacing),
             6d,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     static Button()
     {
@@ -165,7 +165,7 @@ public sealed class Button : Control
     public event EventHandler? Click;
 
     /// <inheritdoc />
-    protected override void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs)
+    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
     {
         if (ReferenceEquals(eventArgs.Property, TextProperty))
             SynchronizeText();

@@ -1,23 +1,23 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
-internal interface IUiBinding
+internal interface IBinding
 {
     void Detach();
 }
 
-internal interface IUiBinding<in TTarget> : IUiBinding
+internal interface IBinding<in TTarget> : IBinding
 {
     bool IsTwoWay { get; }
     void UpdateSource(TTarget value);
 }
 
-internal abstract class UiBinding<TSource, TTarget>(
-    UiNode target,
-    UiProperty<TTarget> targetProperty,
+internal abstract class Binding<TSource, TTarget>(
+    ObservableObject target,
+    Property<TTarget> targetProperty,
     Func<TSource, TTarget> converter,
-    TryConverter<TTarget, TSource>? convertBack) : IUiBinding<TTarget>
+    TryConverter<TTarget, TSource>? convertBack) : IBinding<TTarget>
 {
-    private readonly WeakReference<UiNode> _target = new(target);
+    private readonly WeakReference<ObservableObject> _target = new(target);
     private bool _isDetached;
     private bool _isWritingSource;
 

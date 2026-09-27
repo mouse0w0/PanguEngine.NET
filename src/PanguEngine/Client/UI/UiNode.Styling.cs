@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
@@ -114,13 +115,13 @@ public abstract partial class UiNode
     /// <remarks>During style resolution, returns the last committed source without starting another resolution.</remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="property"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when the property cannot be stored on this node.</exception>
-    public IReadOnlyList<UiStyleValueSource> GetStyleValueSources(UiProperty property)
+    public IReadOnlyList<UiStyleValueSource> GetStyleValueSources(Property property)
     {
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
         EnsureStyleSnapshot();
         var sources = _styleSnapshot?.GetSources(property) ?? Array.Empty<UiStyleValueSource>();
-        var isMasked = _localValues is not null && _localValues.ContainsKey(property);
+        var isMasked = HasLocalValue(property);
         return isMasked
             ? Array.AsReadOnly(sources.Select(source => source.WithLocalValueMask(true)).ToArray())
             : sources;
@@ -141,12 +142,12 @@ public abstract partial class UiNode
     internal void CommitStyleSnapshot(UiStyleSnapshot snapshot) =>
         _styleSnapshot = snapshot;
 
-    private List<(UiProperty Property, object? Old, object? New)> ComputeStyleChanges(
+    private List<(Property Property, object? Old, object? New)> ComputeStyleChanges(
         UiStyleSnapshot? oldSnapshot,
         UiStyleSnapshot newSnapshot)
     {
-        var changed = new List<(UiProperty, object?, object?)>();
-        var keys = new HashSet<UiProperty>();
+        var changed = new List<(Property, object?, object?)>();
+        var keys = new HashSet<Property>();
         if (oldSnapshot is not null)
         {
             foreach (var property in oldSnapshot.StyledProperties)
@@ -158,7 +159,7 @@ public abstract partial class UiNode
 
         foreach (var property in keys)
         {
-            if (_localValues is not null && _localValues.ContainsKey(property))
+            if (HasLocalValue(property))
                 continue;
 
             var oldValue = oldSnapshot is null
@@ -284,24 +285,18 @@ public abstract partial class UiNode
         }
     }
 
-    private static object? GetSnapshotValue(UiStyleSnapshot snapshot, UiProperty property, object? defaultValue) =>
+    private static object? GetSnapshotValue(UiStyleSnapshot snapshot, Property property, object? defaultValue) =>
         snapshot.TryGetBoxedValue(property, out var value) ? value : defaultValue;
 
-    private bool IsPreparedValueCurrent(UiProperty property, object? expectedValue)
+    private bool IsPreparedValueCurrent(Property property, object? expectedValue)
     {
-        if (_localValues is not null && _localValues.ContainsKey(property))
+        if (HasLocalValue(property))
             return false;
         var currentValue = _styleSnapshot is null
             ? property.DefaultValue
             : GetSnapshotValue(_styleSnapshot, property, property.DefaultValue);
         return property.AreEqual(currentValue, expectedValue);
     }
-
-    internal void RaiseStyleEffectiveValueChanged<T>(UiProperty<T> property, object? oldValue, object? newValue) =>
-        RaisePropertyChanged(
-            property,
-            oldValue is null ? default! : (T)oldValue,
-            newValue is null ? default! : (T)newValue);
 
     internal static void RecomputeStyleSubtreeBatch(
         IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries)
@@ -385,5 +380,5 @@ public abstract partial class UiNode
     internal readonly record struct PreparedStyle(
         UiNode Node,
         UiStyleSnapshot Snapshot,
-        List<(UiProperty Property, object? Old, object? New)> Changes);
+        List<(Property Property, object? Old, object? New)> Changes);
 }

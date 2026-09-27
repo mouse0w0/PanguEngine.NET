@@ -1,26 +1,25 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
 /// <summary>
-/// Describes a registered UI property independently of its value type.
+/// Describes a registered observable property independently of its value type.
 /// </summary>
-public abstract class UiProperty
+public abstract class Property
 {
     private static readonly Lock RegistryLock = new();
-    private static readonly Dictionary<(Type OwnerType, string Name), UiProperty> Registry = [];
+    private static readonly Dictionary<(Type OwnerType, string Name), Property> Registry = [];
     private static int _registrationOrderCounter;
 
-    private protected UiProperty(
+    private protected Property(
         string name,
         Type ownerType,
         Type targetType,
         Type valueType,
         object? defaultValue,
-        UiPropertyInvalidation invalidation,
         bool isReadOnly)
     {
         ArgumentNullException.ThrowIfNull(name);
         if (name.Length == 0 || string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("A UI property name cannot be empty or whitespace.", nameof(name));
+            throw new ArgumentException("A property name cannot be empty or whitespace.", nameof(name));
 
         ArgumentNullException.ThrowIfNull(ownerType);
         ArgumentNullException.ThrowIfNull(targetType);
@@ -31,7 +30,6 @@ public abstract class UiProperty
         TargetType = targetType;
         ValueType = valueType;
         DefaultValue = defaultValue;
-        Invalidation = invalidation;
         IsReadOnly = isReadOnly;
     }
 
@@ -41,17 +39,14 @@ public abstract class UiProperty
     /// <summary>Gets the exact type that owns the registration.</summary>
     public Type OwnerType { get; }
 
-    /// <summary>Gets the node type on which the property can be stored.</summary>
+    /// <summary>Gets the host type on which the property can be stored.</summary>
     public Type TargetType { get; }
 
     /// <summary>Gets the registered value type.</summary>
     public Type ValueType { get; }
 
-    /// <summary>Gets the fallback value used when no local, binding, or style value applies.</summary>
+    /// <summary>Gets the default value used when the host supplies no other value.</summary>
     public object? DefaultValue { get; }
-
-    /// <summary>Gets the kinds of UI work that the property may invalidate.</summary>
-    public UiPropertyInvalidation Invalidation { get; }
 
     /// <summary>Gets whether the property can only be written through its registration key.</summary>
     public bool IsReadOnly { get; }
@@ -60,92 +55,92 @@ public abstract class UiProperty
     internal int RegistrationOrder { get; private set; }
 
     /// <summary>
-    /// Registers a strongly typed property for an owner node type.
+    /// Registers a strongly typed property for an owner host type.
     /// </summary>
-    /// <typeparam name="TOwner">The node type that owns the property.</typeparam>
+    /// <typeparam name="TOwner">The observable host type that owns the property.</typeparam>
     /// <typeparam name="TValue">The property value type.</typeparam>
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
-    /// <param name="invalidation">The UI work that the property may invalidate.</param>
-    /// <param name="onChanged">The internal callback receiving the target node and the old and new effective values before node notifications. Defaults and unchanged effective values do not invoke it.</param>
-    /// <remarks>A callback failure preserves the committed value and skips that change's node notifications.</remarks>
+    /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications. Defaults and unchanged effective values do not invoke it.</param>
+    /// <remarks>A callback failure preserves the committed value and skips that change's host notifications.</remarks>
     /// <returns>The registered property descriptor.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
-    public static UiProperty<TValue> Register<TOwner, TValue>(
+    public static Property<TValue> Register<TOwner, TValue>(
         string name,
         TValue defaultValue = default!,
-        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None,
-        Action<UiNode, TValue, TValue>? onChanged = null)
-        where TOwner : UiNode =>
+        Action<TOwner, TValue, TValue>? onChanged = null)
+        where TOwner : ObservableObject =>
         new(
             name,
             typeof(TOwner),
             typeof(TOwner),
             defaultValue,
-            invalidation,
             isReadOnly: false,
-            onChanged: onChanged);
+            onChanged: onChanged is null
+                ? null
+                : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue));
 
     /// <summary>
-    /// Registers a strongly typed read-only property for an owner node type.
+    /// Registers a strongly typed read-only property for an owner host type.
     /// </summary>
-    /// <typeparam name="TOwner">The node type that owns the property.</typeparam>
+    /// <typeparam name="TOwner">The observable host type that owns the property.</typeparam>
     /// <typeparam name="TValue">The property value type.</typeparam>
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
-    /// <param name="invalidation">The UI work that the property may invalidate.</param>
-    /// <param name="onChanged">The internal callback receiving the target node and the old and new effective values before node notifications. Defaults and unchanged effective values do not invoke it.</param>
-    /// <remarks>A callback failure preserves the committed value and skips that change's node notifications.</remarks>
+    /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications. Defaults and unchanged effective values do not invoke it.</param>
+    /// <remarks>A callback failure preserves the committed value and skips that change's host notifications.</remarks>
     /// <returns>The key that grants owner access to the registered property.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
-    public static UiPropertyKey<TValue> RegisterReadOnly<TOwner, TValue>(
+    public static PropertyKey<TValue> RegisterReadOnly<TOwner, TValue>(
         string name,
         TValue defaultValue = default!,
-        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None,
-        Action<UiNode, TValue, TValue>? onChanged = null)
-        where TOwner : UiNode
+        Action<TOwner, TValue, TValue>? onChanged = null)
+        where TOwner : ObservableObject
     {
-        var property = new UiProperty<TValue>(
+        var property = new Property<TValue>(
             name,
             typeof(TOwner),
             typeof(TOwner),
             defaultValue,
-            invalidation,
             isReadOnly: true,
-            onChanged: onChanged);
-        return new UiPropertyKey<TValue>(property);
+            onChanged: onChanged is null
+                ? null
+                : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue));
+        return new PropertyKey<TValue>(property);
     }
 
     /// <summary>
-    /// Registers a strongly typed attached property for a target node type.
+    /// Registers a strongly typed attached property for a target host type.
     /// </summary>
-    /// <typeparam name="TOwner">The node type that defines the property.</typeparam>
-    /// <typeparam name="TTarget">The node type on which the property can be stored.</typeparam>
+    /// <typeparam name="TOwner">The observable host type that defines the property.</typeparam>
+    /// <typeparam name="TTarget">The observable host type on which the property can be stored.</typeparam>
     /// <typeparam name="TValue">The property value type.</typeparam>
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
-    /// <param name="invalidation">The UI work that the property may invalidate.</param>
+    /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications.</param>
     /// <returns>The registered property descriptor.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
-    public static UiProperty<TValue> RegisterAttached<TOwner, TTarget, TValue>(
+    public static Property<TValue> RegisterAttached<TOwner, TTarget, TValue>(
         string name,
         TValue defaultValue = default!,
-        UiPropertyInvalidation invalidation = UiPropertyInvalidation.None)
-        where TOwner : UiNode
-        where TTarget : UiNode =>
+        Action<TTarget, TValue, TValue>? onChanged = null)
+        where TOwner : ObservableObject
+        where TTarget : ObservableObject =>
         new(
             name,
             typeof(TOwner),
             typeof(TTarget),
             defaultValue,
-            invalidation,
-            isReadOnly: false);
+            isReadOnly: false,
+            onChanged: onChanged is null
+                ? null
+                : (target, oldValue, newValue) => onChanged((TTarget)target, oldValue, newValue));
 
     /// <summary>
     /// Publishes this descriptor and assigns its registration order.
@@ -157,17 +152,17 @@ public abstract class UiProperty
         {
             if (Registry.ContainsKey((OwnerType, Name)))
                 throw new InvalidOperationException(
-                    $"A UI property named '{Name}' is already registered for owner '{OwnerType}'.");
+                    $"A property named '{Name}' is already registered for owner '{OwnerType}'.");
 
             Registry[(OwnerType, Name)] = this;
             RegistrationOrder = _registrationOrderCounter++;
         }
     }
 
-    internal bool IsOwnedBy(UiNode node) =>
+    internal bool IsOwnedBy(ObservableObject node) =>
         TargetType.IsInstanceOfType(node);
 
-    internal void VerifyOwner(UiNode node)
+    internal void VerifyOwner(ObservableObject node)
     {
         if (!IsOwnedBy(node))
             throw new ArgumentException(
@@ -180,28 +175,27 @@ public abstract class UiProperty
             throw new InvalidOperationException($"Property '{Name}' is read-only.");
     }
 
-    internal abstract void RaiseEffectiveValueChanged(UiNode node, object? oldValue, object? newValue);
+    internal abstract void RaiseEffectiveValueChanged(ObservableObject host, object? oldValue, object? newValue);
 
     internal abstract bool AreEqual(object? left, object? right);
 }
 
 /// <summary>
-/// Describes a strongly typed registered UI property.
+/// Describes a strongly typed registered observable property.
 /// </summary>
 /// <typeparam name="T">The property value type.</typeparam>
-public sealed class UiProperty<T> : UiProperty
+public sealed class Property<T> : Property
 {
-    private readonly Action<UiNode, T, T>? _onChanged;
+    private readonly Action<ObservableObject, T, T>? _onChanged;
 
-    internal UiProperty(
+    internal Property(
         string name,
         Type ownerType,
         Type targetType,
         T defaultValue,
-        UiPropertyInvalidation invalidation,
         bool isReadOnly,
-        Action<UiNode, T, T>? onChanged = null)
-        : base(name, ownerType, targetType, typeof(T), defaultValue, invalidation, isReadOnly)
+        Action<ObservableObject, T, T>? onChanged = null)
+        : base(name, ownerType, targetType, typeof(T), defaultValue, isReadOnly)
     {
         DefaultValue = defaultValue;
         _onChanged = onChanged;
@@ -211,11 +205,11 @@ public sealed class UiProperty<T> : UiProperty
     /// <summary>Gets the strongly typed default value.</summary>
     public new T DefaultValue { get; }
 
-    internal void RaiseChanged(UiNode node, T oldValue, T newValue) =>
+    internal void RaiseChanged(ObservableObject node, T oldValue, T newValue) =>
         _onChanged?.Invoke(node, oldValue, newValue);
 
-    internal override void RaiseEffectiveValueChanged(UiNode node, object? oldValue, object? newValue) =>
-        node.RaiseStyleEffectiveValueChanged(this, oldValue, newValue);
+    internal override void RaiseEffectiveValueChanged(ObservableObject host, object? oldValue, object? newValue) =>
+        host.RaiseEffectiveValueChanged(this, oldValue, newValue);
 
     internal override bool AreEqual(object? left, object? right) =>
         EqualityComparer<T>.Default.Equals(

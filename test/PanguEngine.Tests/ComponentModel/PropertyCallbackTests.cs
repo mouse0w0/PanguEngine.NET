@@ -1,9 +1,10 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.ComponentModel;
 
-namespace PanguEngine.Tests.Client.UI;
+namespace PanguEngine.Tests.ComponentModel;
 
-public sealed class UiPropertyCallbackTests
+public sealed class PropertyCallbackTests
 {
     [Fact]
     public void SetAndClearNotifyAfterCallbackWithCommittedValues()
@@ -112,7 +113,7 @@ public sealed class UiPropertyCallbackTests
             Assert.Equal(8, node.GetValue(CallbackNode.OtherProperty));
             throw error;
         };
-        var notified = new List<UiProperty>();
+        var notified = new List<Property>();
         node.PropertyChanged += (_, args) => notified.Add(args.Property);
 
         Assert.Same(error, Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets([
@@ -153,20 +154,20 @@ public sealed class UiPropertyCallbackTests
 
     private class CallbackNode : UiNode
     {
-        internal static readonly UiProperty<int> ValueProperty =
-            UiProperty.Register<CallbackNode, int>("Value", onChanged: static (node, oldValue, newValue) =>
+        internal static readonly Property<int> ValueProperty =
+            Property.Register<CallbackNode, int>("Value", onChanged: static (node, oldValue, newValue) =>
             {
                 var target = (CallbackNode)node;
                 target.Trace.Add("internal");
                 target.Changed?.Invoke(oldValue, newValue);
             });
 
-        internal static readonly UiProperty<int> OtherProperty =
-            UiProperty.Register<CallbackNode, int>("Other",
+        internal static readonly Property<int> OtherProperty =
+            Property.Register<CallbackNode, int>("Other",
                 onChanged: static (node, _, _) => ((CallbackNode)node).Trace.Add("other"));
 
-        private static readonly UiPropertyKey<int> ReadOnlyKey =
-            UiProperty.RegisterReadOnly<CallbackNode, int>("ReadOnly", onChanged: static (node, oldValue, newValue) =>
+        private static readonly PropertyKey<int> ReadOnlyKey =
+            Property.RegisterReadOnly<CallbackNode, int>("ReadOnly", onChanged: static (node, oldValue, newValue) =>
                 ((CallbackNode)node).Changes.Add((oldValue, newValue)));
 
         internal List<string> Trace { get; } = [];
@@ -175,7 +176,7 @@ public sealed class UiPropertyCallbackTests
         internal void SetReadOnlyValue(int value) => SetValue(ReadOnlyKey, value);
         internal void ClearReadOnlyValue() => ClearValue(ReadOnlyKey);
 
-        protected override void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs)
+        protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
         {
             Trace.Add("virtual");
             base.OnPropertyChanged(eventArgs);
@@ -184,6 +185,6 @@ public sealed class UiPropertyCallbackTests
 
     private sealed class NonDispatchingNode : CallbackNode
     {
-        protected override void OnPropertyChanged(UiPropertyChangedEventArgs eventArgs) => Trace.Add("override");
+        protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs) => Trace.Add("override");
     }
 }

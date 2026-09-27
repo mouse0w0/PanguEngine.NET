@@ -2,6 +2,8 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiCssRegistryTests
@@ -274,32 +276,22 @@ public sealed class UiCssRegistryTests
     }
 
     [Fact]
-    public void InvalidNameReadOnlyInputAndWrongTargetAreRejected()
+    public void InvalidNameReadOnlyAndWrongTargetAreRejected()
     {
         Assert.Throws<ArgumentException>(() =>
             UiCssRegistry.RegisterProperty<RejectCssNode, double>(
                 "9invalid",
-                UiProperty.Register<RejectCssNode, double>("Nine", 0),
+                Property.Register<RejectCssNode, double>("Nine", 0),
                 UiCssValueConverters.ParseLength));
 
-        var readOnly = UiProperty.RegisterReadOnly<RejectCssNode, double>("Value", 0).Property;
+        var readOnly = Property.RegisterReadOnly<RejectCssNode, double>("Value", 0).Property;
         Assert.Throws<ArgumentException>(() =>
             UiCssRegistry.RegisterProperty<RejectCssNode, double>(
                 "readonly-css",
                 readOnly,
                 UiCssValueConverters.ParseLength));
 
-        var input = UiProperty.Register<RejectCssNode, double>(
-            "Input",
-            0,
-            UiPropertyInvalidation.Input);
-        Assert.Throws<ArgumentException>(() =>
-            UiCssRegistry.RegisterProperty<RejectCssNode, double>(
-                "input-css",
-                input,
-                UiCssValueConverters.ParseLength));
-
-        var foreign = UiProperty.Register<ForeignOwnerNode, double>("Value", 0);
+        var foreign = Property.Register<ForeignOwnerNode, double>("Value", 0);
         Assert.Throws<ArgumentException>(() =>
             UiCssRegistry.RegisterProperty<RejectCssNode, double>(
                 "foreign-css",
@@ -361,10 +353,9 @@ public sealed class UiCssRegistryTests
     }
 
     [Fact]
-    public void ExpandRegistrationRejectsReadOnlyInputAndForeignOutputAtBind()
+    public void ExpandRegistrationRejectsReadOnlyAndForeignOutputAtBind()
     {
         AssertBindInvalid("ExpandRejectNode { reject-readonly: 1; }");
-        AssertBindInvalid("ExpandRejectNode { reject-input: 1; }");
         AssertBindInvalid("ExpandRejectNode { reject-foreign: 1; }");
     }
 
@@ -457,20 +448,20 @@ public sealed class UiCssRegistryTests
 
     private sealed class SimpleCssNode : UiNode
     {
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<SimpleCssNode, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<SimpleCssNode, double>("Value", 0);
     }
 
     private class FindBaseNode : UiNode
     {
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<FindBaseNode, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<FindBaseNode, double>("Value", 0);
     }
 
     private class FindDerivedNode : FindBaseNode
     {
-        internal new static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<FindDerivedNode, double>("Value", 1);
+        internal new static readonly Property<double> ValueProperty =
+            Property.Register<FindDerivedNode, double>("Value", 1);
     }
 
     private sealed class FindGrandchildNode : FindDerivedNode
@@ -479,20 +470,20 @@ public sealed class UiCssRegistryTests
 
     private sealed class FrozenCssNode : UiNode
     {
-        internal static readonly UiProperty<double> FirstProperty =
-            UiProperty.Register<FrozenCssNode, double>("First", 0);
+        internal static readonly Property<double> FirstProperty =
+            Property.Register<FrozenCssNode, double>("First", 0);
 
-        internal static readonly UiProperty<double> SecondProperty =
-            UiProperty.Register<FrozenCssNode, double>("Second", 0);
+        internal static readonly Property<double> SecondProperty =
+            Property.Register<FrozenCssNode, double>("Second", 0);
     }
 
     private sealed class DupCssNode : UiNode
     {
-        internal static readonly UiProperty<double> FirstProperty =
-            UiProperty.Register<DupCssNode, double>("First", 0);
+        internal static readonly Property<double> FirstProperty =
+            Property.Register<DupCssNode, double>("First", 0);
 
-        internal static readonly UiProperty<double> SecondProperty =
-            UiProperty.Register<DupCssNode, double>("Second", 0);
+        internal static readonly Property<double> SecondProperty =
+            Property.Register<DupCssNode, double>("Second", 0);
     }
 
     private sealed class RejectCssNode : UiNode
@@ -505,8 +496,8 @@ public sealed class UiCssRegistryTests
 
     private sealed class AttachedCssOwner : UiNode
     {
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.RegisterAttached<AttachedCssOwner, AttachedCssTarget, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.RegisterAttached<AttachedCssOwner, AttachedCssTarget, double>("Value", 0);
     }
 
     private sealed class AttachedCssTarget : UiNode
@@ -534,26 +525,27 @@ public sealed class UiCssRegistryTests
             ]);
         }
 
-        internal static readonly UiProperty<Thickness> PaddingProperty =
-            UiProperty.Register<ExpandCssNode, Thickness>("Padding", Thickness.Zero, UiPropertyInvalidation.Measure);
+        internal static readonly Property<Thickness> PaddingProperty =
+            Property.Register<ExpandCssNode, Thickness>("Padding", Thickness.Zero,
+                onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 
     private class FrozenBoundaryBase : UiNode
     {
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<FrozenBoundaryBase, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<FrozenBoundaryBase, double>("Value", 0);
     }
 
     private sealed class FrozenBoundaryDerivedA : FrozenBoundaryBase
     {
-        internal new static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<FrozenBoundaryDerivedA, double>("Value", 0);
+        internal new static readonly Property<double> ValueProperty =
+            Property.Register<FrozenBoundaryDerivedA, double>("Value", 0);
     }
 
     private sealed class FrozenBoundaryDerivedB : FrozenBoundaryBase
     {
-        internal new static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<FrozenBoundaryDerivedB, double>("Value", 0);
+        internal new static readonly Property<double> ValueProperty =
+            Property.Register<FrozenBoundaryDerivedB, double>("Value", 0);
     }
 
     private sealed class ExpandRejectNode : UiNode
@@ -562,23 +554,18 @@ public sealed class UiCssRegistryTests
         {
             UiCssRegistry.RegisterProperty<ExpandRejectNode>("reject-readonly", _ =>
                 new[] { UiStyleSetter.Create(ReadOnlyProperty, 1) });
-            UiCssRegistry.RegisterProperty<ExpandRejectNode>("reject-input", _ =>
-                new[] { UiStyleSetter.Create(InputProperty, 1d) });
             UiCssRegistry.RegisterProperty<ExpandRejectNode>("reject-foreign", _ =>
                 new[] { UiStyleSetter.Create(ExpandForeignOwner.ValueProperty, 1d) });
         }
 
-        internal static readonly UiProperty<int> ReadOnlyProperty =
-            UiProperty.RegisterReadOnly<ExpandRejectNode, int>("ReadOnly", 0).Property;
-
-        internal static readonly UiProperty<double> InputProperty =
-            UiProperty.Register<ExpandRejectNode, double>("Input", 0, UiPropertyInvalidation.Input);
+        internal static readonly Property<int> ReadOnlyProperty =
+            Property.RegisterReadOnly<ExpandRejectNode, int>("ReadOnly", 0).Property;
     }
 
     private sealed class ExpandForeignOwner : UiNode
     {
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<ExpandForeignOwner, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<ExpandForeignOwner, double>("Value", 0);
     }
 
     private sealed class ExpandMutableNode : UiNode
@@ -597,9 +584,9 @@ public sealed class UiCssRegistryTests
 
         internal static readonly List<UiStyleSetter> Output = [];
 
-        internal static readonly UiProperty<Thickness> PaddingProperty =
-            UiProperty.Register<ExpandMutableNode, Thickness>("Padding", Thickness.Zero,
-                UiPropertyInvalidation.Measure);
+        internal static readonly Property<Thickness> PaddingProperty =
+            Property.Register<ExpandMutableNode, Thickness>("Padding", Thickness.Zero,
+                onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 
     private sealed class FallbackNameNode : UiNode
@@ -625,8 +612,8 @@ public sealed class UiCssRegistryTests
                 UiCssValueConverters.ParseLength);
         }
 
-        internal static readonly UiProperty<double> BaseToneProperty =
-            UiProperty.Register<AliasBaseNode, double>("BaseTone", 0);
+        internal static readonly Property<double> BaseToneProperty =
+            Property.Register<AliasBaseNode, double>("BaseTone", 0);
     }
 
     private sealed class UnregisteredAliasDerivedNode : AliasBaseNode
@@ -639,8 +626,8 @@ public sealed class UiCssRegistryTests
                 UiCssValueConverters.ParseLength);
         }
 
-        internal static readonly UiProperty<double> DerivedToneProperty =
-            UiProperty.Register<UnregisteredAliasDerivedNode, double>("DerivedTone", 7);
+        internal static readonly Property<double> DerivedToneProperty =
+            Property.Register<UnregisteredAliasDerivedNode, double>("DerivedTone", 7);
     }
 
     private class ShadowTagBaseNode : UiNode
@@ -654,8 +641,8 @@ public sealed class UiCssRegistryTests
                 UiCssValueConverters.ParseLength);
         }
 
-        internal static readonly UiProperty<double> BaseToneProperty =
-            UiProperty.Register<ShadowTagBaseNode, double>("BaseTone", 9);
+        internal static readonly Property<double> BaseToneProperty =
+            Property.Register<ShadowTagBaseNode, double>("BaseTone", 9);
     }
 
     private sealed class ShadowTagDerivedNode : ShadowTagBaseNode
@@ -669,8 +656,8 @@ public sealed class UiCssRegistryTests
                 UiCssValueConverters.ParseLength);
         }
 
-        internal static readonly UiProperty<double> DerivedToneProperty =
-            UiProperty.Register<ShadowTagDerivedNode, double>("DerivedTone", 0);
+        internal static readonly Property<double> DerivedToneProperty =
+            Property.Register<ShadowTagDerivedNode, double>("DerivedTone", 0);
     }
 
     private sealed class CaseSensitiveNode : UiNode
@@ -684,8 +671,8 @@ public sealed class UiCssRegistryTests
                 UiCssValueConverters.ParseLength);
         }
 
-        internal static readonly UiProperty<double> LevelProperty =
-            UiProperty.Register<CaseSensitiveNode, double>("Level", 0);
+        internal static readonly Property<double> LevelProperty =
+            Property.Register<CaseSensitiveNode, double>("Level", 0);
     }
 
     private sealed class InvalidElementNode : UiNode
@@ -698,17 +685,17 @@ public sealed class UiCssRegistryTests
 
     private sealed class FrozenRegistrationNode : UiNode
     {
-        internal static readonly UiProperty<double> FirstProperty =
-            UiProperty.Register<FrozenRegistrationNode, double>("First", 0);
+        internal static readonly Property<double> FirstProperty =
+            Property.Register<FrozenRegistrationNode, double>("First", 0);
 
-        internal static readonly UiProperty<double> SecondProperty =
-            UiProperty.Register<FrozenRegistrationNode, double>("Second", 0);
+        internal static readonly Property<double> SecondProperty =
+            Property.Register<FrozenRegistrationNode, double>("Second", 0);
     }
 
     private sealed class LateRegistrationNode : UiNode
     {
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<LateRegistrationNode, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<LateRegistrationNode, double>("Value", 0);
     }
 
     private sealed class LazyAliasNode : UiNode

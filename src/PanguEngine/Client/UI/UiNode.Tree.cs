@@ -1,22 +1,24 @@
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
-    private static readonly UiPropertyKey<Parent?> ParentPropertyKey =
-        UiProperty.RegisterReadOnly<UiNode, Parent?>(nameof(Parent));
+    private static readonly PropertyKey<Parent?> ParentPropertyKey =
+        Property.RegisterReadOnly<UiNode, Parent?>(nameof(Parent));
 
-    private static readonly UiPropertyKey<UiScreen?> ScreenPropertyKey =
-        UiProperty.RegisterReadOnly<UiNode, UiScreen?>(nameof(Screen));
+    private static readonly PropertyKey<UiScreen?> ScreenPropertyKey =
+        Property.RegisterReadOnly<UiNode, UiScreen?>(nameof(Screen));
 
     /// <summary>
     /// Identifies the <see cref="Parent"/> property.
     /// </summary>
-    public static readonly UiProperty<Parent?> ParentProperty = ParentPropertyKey.Property;
+    public static readonly Property<Parent?> ParentProperty = ParentPropertyKey.Property;
 
     /// <summary>
     /// Identifies the <see cref="Screen"/> property.
     /// </summary>
-    public static readonly UiProperty<UiScreen?> ScreenProperty = ScreenPropertyKey.Property;
+    public static readonly Property<UiScreen?> ScreenProperty = ScreenPropertyKey.Property;
 
     /// <summary>
     /// Gets the framework-maintained direct parent of this node.

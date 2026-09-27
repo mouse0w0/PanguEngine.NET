@@ -3,6 +3,8 @@ using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics.Text;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI;
 
 [Collection(TextServicesCollection.Name)]
@@ -32,18 +34,17 @@ public sealed class TextTests
     }
 
     [Fact]
-    public void PropertiesExposeFixedDefaultsAndExpectedInvalidation()
+    public void PropertiesExposeFixedDefaults()
     {
         var text = new Text();
-        var layoutInvalidation = UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render;
 
-        AssertProperty(Text.ContentProperty, string.Empty, layoutInvalidation);
-        AssertProperty(Text.FontProperty, new Font(string.Empty), layoutInvalidation);
-        AssertProperty(Text.FontSizeProperty, 16d, layoutInvalidation);
-        AssertProperty(Text.ColorProperty, new Color(255, 255, 255), UiPropertyInvalidation.Render);
-        AssertProperty(Text.LineHeightProperty, 1d, layoutInvalidation);
-        AssertProperty(Text.WrappingProperty, TextWrapping.NoWrap, layoutInvalidation);
-        AssertProperty(Text.AlignmentProperty, TextAlignment.Left, layoutInvalidation);
+        AssertProperty(Text.ContentProperty, string.Empty);
+        AssertProperty(Text.FontProperty, new Font(string.Empty));
+        AssertProperty(Text.FontSizeProperty, 16d);
+        AssertProperty(Text.ColorProperty, new Color(255, 255, 255));
+        AssertProperty(Text.LineHeightProperty, 1d);
+        AssertProperty(Text.WrappingProperty, TextWrapping.NoWrap);
+        AssertProperty(Text.AlignmentProperty, TextAlignment.Left);
 
         Assert.Equal(string.Empty, text.Content);
         Assert.Equal(new Font(string.Empty), text.Font);
@@ -251,13 +252,11 @@ public sealed class TextTests
         Assert.Single(screen.CreateDrawCommandList().OfType<UiDrawTextCommand>());
 
     private static void AssertProperty<T>(
-        UiProperty<T> property,
-        T defaultValue,
-        UiPropertyInvalidation invalidation)
+        Property<T> property,
+        T defaultValue)
     {
         Assert.Equal(typeof(Text), property.OwnerType);
         Assert.Equal(typeof(Text), property.TargetType);
         Assert.Equal(defaultValue, property.DefaultValue);
-        Assert.Equal(invalidation, property.Invalidation);
     }
 }

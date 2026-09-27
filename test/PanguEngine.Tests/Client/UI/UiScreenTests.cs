@@ -5,6 +5,8 @@ using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 using PanguEngine.Input;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class UiScreenTests
@@ -1510,8 +1512,8 @@ public sealed class UiScreenTests
 
     private sealed class ProbeNode : UiNode
     {
-        public static readonly UiProperty<int> ValueProperty =
-            UiProperty.Register<ProbeNode, int>(nameof(Value));
+        public static readonly Property<int> ValueProperty =
+            Property.Register<ProbeNode, int>(nameof(Value));
 
         public int Value
         {
@@ -1583,14 +1585,14 @@ public sealed class UiScreenTests
 
     private sealed class ThrowingStyleNode : UiNode
     {
-        internal static readonly UiProperty<GuardedValue> ValueProperty =
-            UiProperty.Register<ThrowingStyleNode, GuardedValue>("Value", new GuardedValue(0));
+        internal static readonly Property<GuardedValue> ValueProperty =
+            Property.Register<ThrowingStyleNode, GuardedValue>("Value", new GuardedValue(0));
     }
 
     private sealed class FailOnceStyleNode : UiNode
     {
-        internal static readonly UiProperty<GuardedValue> ValueProperty =
-            UiProperty.Register<FailOnceStyleNode, GuardedValue>("Value", new GuardedValue(0));
+        internal static readonly Property<GuardedValue> ValueProperty =
+            Property.Register<FailOnceStyleNode, GuardedValue>("Value", new GuardedValue(0));
 
         internal double Value => GetValue(ValueProperty).Number;
     }

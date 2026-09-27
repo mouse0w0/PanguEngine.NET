@@ -10,14 +10,13 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiDrawingTests
 {
     [Fact]
-    public void OpacityPropertyUsesExpectedOwnerDefaultAndRenderInvalidation()
+    public void OpacityPropertyUsesExpectedOwnerAndDefault()
     {
         var node = new DrawingNode();
 
         Assert.Equal(typeof(UiNode), UiNode.OpacityProperty.OwnerType);
         Assert.Equal(typeof(UiNode), UiNode.OpacityProperty.TargetType);
         Assert.Equal(1, UiNode.OpacityProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Render, UiNode.OpacityProperty.Invalidation);
         Assert.Equal(1, node.Opacity);
     }
 

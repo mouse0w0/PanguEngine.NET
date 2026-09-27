@@ -9,25 +9,12 @@ namespace PanguEngine.Tests;
 public sealed class UiShapeTests
 {
     [Fact]
-    public void ShapeDefaultsUseExpectedValuesAndInvalidation()
+    public void ShapeDefaultsUseExpectedValues()
     {
         var shape = new Rectangle();
 
         Assert.Equal(typeof(Shape), Shape.FillProperty.OwnerType);
         Assert.Equal(typeof(Shape), Shape.FillProperty.TargetType);
-        Assert.Equal(UiPropertyInvalidation.Render, Shape.FillProperty.Invalidation);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Shape.StrokeProperty.Invalidation);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Shape.StrokeThicknessProperty.Invalidation);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Shape.StrokeLineCapProperty.Invalidation);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            Shape.StrokeMiterLimitProperty.Invalidation);
 
         var fill = Assert.IsType<SolidColorBrush>(shape.Fill);
         Assert.Equal(new Color(0, 0, 0), fill.Color);

@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 
@@ -9,74 +10,72 @@ namespace PanguEngine.Client.UI.Controls;
 public sealed class Crosshair : UiNode
 {
     /// <summary>Identifies the <see cref="Color"/> property.</summary>
-    public static readonly UiProperty<Color> ColorProperty =
-        UiProperty.Register<Crosshair, Color>(
+    public static readonly Property<Color> ColorProperty =
+        Property.Register<Crosshair, Color>(
             nameof(Color),
-            new Color(255, 255, 255),
-            UiPropertyInvalidation.Render);
+            new Color(255, 255, 255));
 
     /// <summary>Identifies the <see cref="Length"/> property.</summary>
-    public static readonly UiProperty<double> LengthProperty =
-        UiProperty.Register<Crosshair, double>(
+    public static readonly Property<double> LengthProperty =
+        Property.Register<Crosshair, double>(
             nameof(Length),
             8,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>Identifies the <see cref="Thickness"/> property.</summary>
-    public static readonly UiProperty<double> ThicknessProperty =
-        UiProperty.Register<Crosshair, double>(
+    public static readonly Property<double> ThicknessProperty =
+        Property.Register<Crosshair, double>(
             nameof(Thickness),
             2,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>Identifies the <see cref="Gap"/> property.</summary>
-    public static readonly UiProperty<double> GapProperty =
-        UiProperty.Register<Crosshair, double>(
+    public static readonly Property<double> GapProperty =
+        Property.Register<Crosshair, double>(
             nameof(Gap),
             3,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>Identifies the <see cref="OutlineColor"/> property.</summary>
-    public static readonly UiProperty<Color> OutlineColorProperty =
-        UiProperty.Register<Crosshair, Color>(
+    public static readonly Property<Color> OutlineColorProperty =
+        Property.Register<Crosshair, Color>(
             nameof(OutlineColor),
-            new Color(0, 0, 0),
-            UiPropertyInvalidation.Render);
+            new Color(0, 0, 0));
 
     /// <summary>Identifies the <see cref="OutlineThickness"/> property.</summary>
-    public static readonly UiProperty<double> OutlineThicknessProperty =
-        UiProperty.Register<Crosshair, double>(
+    public static readonly Property<double> OutlineThicknessProperty =
+        Property.Register<Crosshair, double>(
             nameof(OutlineThickness),
             1,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>Identifies the <see cref="Shape"/> property.</summary>
-    public static readonly UiProperty<CrosshairShape> ShapeProperty =
-        UiProperty.Register<Crosshair, CrosshairShape>(
+    public static readonly Property<CrosshairShape> ShapeProperty =
+        Property.Register<Crosshair, CrosshairShape>(
             nameof(Shape),
             CrosshairShape.Cross,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>Identifies the <see cref="ShowCenterDot"/> property.</summary>
-    public static readonly UiProperty<bool> ShowCenterDotProperty =
-        UiProperty.Register<Crosshair, bool>(
+    public static readonly Property<bool> ShowCenterDotProperty =
+        Property.Register<Crosshair, bool>(
             nameof(ShowCenterDot),
             false,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>Identifies the <see cref="CenterDotSize"/> property.</summary>
-    public static readonly UiProperty<double> CenterDotSizeProperty =
-        UiProperty.Register<Crosshair, double>(
+    public static readonly Property<double> CenterDotSizeProperty =
+        Property.Register<Crosshair, double>(
             nameof(CenterDotSize),
             2,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>Identifies the <see cref="UseUiScale"/> property.</summary>
-    public static readonly UiProperty<bool> UseUiScaleProperty =
-        UiProperty.Register<Crosshair, bool>(
+    public static readonly Property<bool> UseUiScaleProperty =
+        Property.Register<Crosshair, bool>(
             nameof(UseUiScale),
             false,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     static Crosshair()
     {

@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 
 namespace PanguEngine.Client.UI;
@@ -7,11 +8,10 @@ public abstract partial class UiNode
     /// <summary>
     /// Identifies the <see cref="Opacity"/> property.
     /// </summary>
-    public static readonly UiProperty<double> OpacityProperty =
-        UiProperty.Register<UiNode, double>(
+    public static readonly Property<double> OpacityProperty =
+        Property.Register<UiNode, double>(
             nameof(Opacity),
-            1,
-            UiPropertyInvalidation.Render);
+            1);
 
     /// <summary>
     /// Gets or sets the opacity applied to this node and its descendants.

@@ -2,6 +2,9 @@ using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 
+using PanguEngine.ComponentModel;
+using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
+
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class UiNodeLayoutTests
@@ -589,15 +592,12 @@ public sealed class UiNodeLayoutTests
     }
 
     [Fact]
-    public void VisibilityPropertyExposesThreeStateMeasureAndRenderMetadata()
+    public void VisibilityPropertyExposesThreeStateMetadata()
     {
         Assert.Equal(nameof(UiNode.Visibility), UiNode.VisibilityProperty.Name);
         Assert.Equal(typeof(UiNode), UiNode.VisibilityProperty.OwnerType);
         Assert.Equal(typeof(UiNode), UiNode.VisibilityProperty.TargetType);
         Assert.Equal(Visibility.Visible, UiNode.VisibilityProperty.DefaultValue);
-        Assert.Equal(
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render,
-            UiNode.VisibilityProperty.Invalidation);
         Assert.Equal(
             [Visibility.Visible, Visibility.Hidden, Visibility.Collapsed],
             Enum.GetValues<Visibility>());
@@ -944,10 +944,9 @@ public sealed class UiNodeLayoutTests
 
     private sealed class TestNode : UiNode
     {
-        internal static readonly UiProperty<int> RenderOnlyProperty =
-            UiProperty.Register<TestNode, int>(
-                nameof(RenderOnlyValue),
-                invalidation: UiPropertyInvalidation.Render);
+        internal static readonly Property<int> RenderOnlyProperty =
+            Property.Register<TestNode, int>(
+                nameof(RenderOnlyValue));
 
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }

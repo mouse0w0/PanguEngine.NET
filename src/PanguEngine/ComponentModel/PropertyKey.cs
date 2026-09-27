@@ -1,16 +1,16 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
 /// <summary>
-/// Provides owner access to a read-only registered UI property.
+/// Provides owner access to a read-only registered property.
 /// </summary>
 /// <typeparam name="T">The property value type.</typeparam>
-public sealed class UiPropertyKey<T>
+public sealed class PropertyKey<T>
 {
-    internal UiPropertyKey(UiProperty<T> property)
+    internal PropertyKey(Property<T> property)
     {
         Property = property;
     }
 
     /// <summary>Gets the read-only property descriptor associated with this key.</summary>
-    public UiProperty<T> Property { get; }
+    public Property<T> Property { get; }
 }

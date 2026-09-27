@@ -1,6 +1,8 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class UiNodeParentTests
@@ -109,7 +111,7 @@ public sealed class UiNodeParentTests
             if (args.Property.Name != nameof(UiNode.Parent))
                 return;
 
-            var change = Assert.IsType<UiPropertyChangedEventArgs<Parent?>>(args);
+            var change = Assert.IsType<PropertyChangedEventArgs<Parent?>>(args);
             Assert.Same(change.NewValue, node.Parent);
             changes.Add((change.OldValue, change.NewValue));
         };

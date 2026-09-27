@@ -3,6 +3,8 @@ using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiStyleComponentsTests
@@ -377,11 +379,11 @@ public sealed class UiStyleComponentsTests
                 new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value)) });
         }
 
-        internal static readonly UiProperty<Thickness> PaddingProperty =
-            UiProperty.Register<DefaultThicknessNode, Thickness>(
+        internal static readonly Property<Thickness> PaddingProperty =
+            Property.Register<DefaultThicknessNode, Thickness>(
                 "Padding",
                 new Thickness(7),
-                UiPropertyInvalidation.Measure);
+                onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 
     private sealed class ExpandIndexNode : UiNode
@@ -401,7 +403,8 @@ public sealed class UiStyleComponentsTests
                 new[] { UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value)) });
         }
 
-        internal static readonly UiProperty<Thickness> PaddingProperty =
-            UiProperty.Register<ExpandIndexNode, Thickness>("Padding", Thickness.Zero, UiPropertyInvalidation.Measure);
+        internal static readonly Property<Thickness> PaddingProperty =
+            Property.Register<ExpandIndexNode, Thickness>("Padding", Thickness.Zero,
+                onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 }

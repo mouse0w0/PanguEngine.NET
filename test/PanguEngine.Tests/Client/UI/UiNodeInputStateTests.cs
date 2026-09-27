@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
@@ -17,22 +18,19 @@ public sealed class UiNodeInputStateTests
             typeof(UiNode),
             nameof(UiNode.IsEnabled),
             defaultValue: true,
-            isReadOnly: false,
-            UiPropertyInvalidation.Input | UiPropertyInvalidation.Render);
+            isReadOnly: false);
         AssertProperty(
             UiNode.IsHoveredProperty,
             typeof(UiNode),
             nameof(UiNode.IsHovered),
             defaultValue: false,
-            isReadOnly: true,
-            UiPropertyInvalidation.Render);
+            isReadOnly: true);
         AssertProperty(
             UiNode.IsFocusedProperty,
             typeof(UiNode),
             nameof(UiNode.IsFocused),
             defaultValue: false,
-            isReadOnly: true,
-            UiPropertyInvalidation.Render);
+            isReadOnly: true);
 
         Assert.True(node.IsEnabled);
         Assert.False(node.IsHovered);
@@ -638,12 +636,11 @@ public sealed class UiNodeInputStateTests
     }
 
     private static void AssertProperty(
-        UiProperty<bool> property,
+        Property<bool> property,
         Type ownerType,
         string name,
         bool defaultValue,
-        bool isReadOnly,
-        UiPropertyInvalidation invalidation)
+        bool isReadOnly)
     {
         Assert.Equal(name, property.Name);
         Assert.Equal(ownerType, property.OwnerType);
@@ -651,7 +648,6 @@ public sealed class UiNodeInputStateTests
         Assert.Equal(typeof(bool), property.ValueType);
         Assert.Equal(defaultValue, property.DefaultValue);
         Assert.Equal(isReadOnly, property.IsReadOnly);
-        Assert.Equal(invalidation, property.Invalidation);
     }
 
     private static T Place<T>(Canvas parent, T child, double x, double y, double width, double height)

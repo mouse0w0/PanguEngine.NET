@@ -1,4 +1,4 @@
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
 /// <summary>
 /// Attempts to convert an input value without ending an active binding when conversion fails.

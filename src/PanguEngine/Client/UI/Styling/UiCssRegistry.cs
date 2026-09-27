@@ -1,6 +1,8 @@
 using System.Runtime.CompilerServices;
 using PanguEngine.Client.UI.Controls;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Client.UI.Styling;
 
 /// <summary>
@@ -53,7 +55,7 @@ public static class UiCssRegistry
     /// <param name="converter">The converter from a trimmed CSS value to the typed value.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="property"/> or <paramref name="converter"/> is null.</exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when the name is invalid, the property is read-only, invalidates input, or targets a type that
+    /// Thrown when the name is invalid, the property is read-only, or targets a type that
     /// <typeparamref name="TTarget"/> cannot be stored on.
     /// </exception>
     /// <exception cref="InvalidOperationException">
@@ -61,7 +63,7 @@ public static class UiCssRegistry
     /// </exception>
     public static void RegisterProperty<TTarget, TValue>(
         string name,
-        UiProperty<TValue> property,
+        Property<TValue> property,
         Func<string, TValue> converter)
         where TTarget : UiNode
     {
@@ -71,9 +73,6 @@ public static class UiCssRegistry
         if (property.IsReadOnly)
             throw new ArgumentException(
                 $"Property '{property.Name}' is read-only and cannot be exposed to CSS.", nameof(property));
-        if (property.Invalidation.HasFlag(UiPropertyInvalidation.Input))
-            throw new ArgumentException(
-                $"Property '{property.Name}' invalidates input and cannot be exposed to CSS.", nameof(property));
         if (!property.TargetType.IsAssignableFrom(typeof(TTarget)))
             throw new ArgumentException(
                 $"Property '{property.Name}' targets '{property.TargetType}' which is not assignable from '{typeof(TTarget)}'.",

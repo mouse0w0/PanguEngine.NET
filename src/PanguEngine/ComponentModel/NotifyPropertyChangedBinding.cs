@@ -1,8 +1,9 @@
 using System.ComponentModel;
+using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
-internal sealed class NotifyPropertyChangedBinding<TRoot, TSource, TTarget> : UiBinding<TSource, TTarget>
+internal sealed class NotifyPropertyChangedBinding<TRoot, TSource, TTarget> : Binding<TSource, TTarget>
     where TRoot : class, INotifyPropertyChanged
 {
     private readonly TRoot _source;
@@ -11,8 +12,8 @@ internal sealed class NotifyPropertyChangedBinding<TRoot, TSource, TTarget> : Ui
     private readonly string? _propertyName;
 
     internal NotifyPropertyChangedBinding(
-        UiNode target,
-        UiProperty<TTarget> targetProperty,
+        ObservableObject target,
+        Property<TTarget> targetProperty,
         TRoot source,
         Func<TRoot, TSource> getter,
         Action<TRoot, TSource>? setter,
@@ -37,7 +38,7 @@ internal sealed class NotifyPropertyChangedBinding<TRoot, TSource, TTarget> : Ui
     protected override void DetachSource() =>
         _source.PropertyChanged -= OnSourcePropertyChanged;
 
-    private void OnSourcePropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
+    private void OnSourcePropertyChanged(object? sender, SourcePropertyChangedEventArgs eventArgs)
     {
         if (_propertyName is not null &&
             !string.IsNullOrEmpty(eventArgs.PropertyName) &&

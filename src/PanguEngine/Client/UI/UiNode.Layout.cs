@@ -1,3 +1,5 @@
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
@@ -7,90 +9,95 @@ public abstract partial class UiNode
     /// <summary>
     /// Identifies the <see cref="Width"/> property.
     /// </summary>
-    public static readonly UiProperty<double> WidthProperty =
-        UiProperty.Register<UiNode, double>(
+    public static readonly Property<double> WidthProperty =
+        Property.Register<UiNode, double>(
             nameof(Width),
             double.NaN,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Height"/> property.
     /// </summary>
-    public static readonly UiProperty<double> HeightProperty =
-        UiProperty.Register<UiNode, double>(
+    public static readonly Property<double> HeightProperty =
+        Property.Register<UiNode, double>(
             nameof(Height),
             double.NaN,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="MinWidth"/> property.
     /// </summary>
-    public static readonly UiProperty<double> MinWidthProperty =
-        UiProperty.Register<UiNode, double>(
+    public static readonly Property<double> MinWidthProperty =
+        Property.Register<UiNode, double>(
             nameof(MinWidth),
-            invalidation: UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="MinHeight"/> property.
     /// </summary>
-    public static readonly UiProperty<double> MinHeightProperty =
-        UiProperty.Register<UiNode, double>(
+    public static readonly Property<double> MinHeightProperty =
+        Property.Register<UiNode, double>(
             nameof(MinHeight),
-            invalidation: UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="MaxWidth"/> property.
     /// </summary>
-    public static readonly UiProperty<double> MaxWidthProperty =
-        UiProperty.Register<UiNode, double>(
+    public static readonly Property<double> MaxWidthProperty =
+        Property.Register<UiNode, double>(
             nameof(MaxWidth),
             double.PositiveInfinity,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="MaxHeight"/> property.
     /// </summary>
-    public static readonly UiProperty<double> MaxHeightProperty =
-        UiProperty.Register<UiNode, double>(
+    public static readonly Property<double> MaxHeightProperty =
+        Property.Register<UiNode, double>(
             nameof(MaxHeight),
             double.PositiveInfinity,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="Margin"/> property.
     /// </summary>
-    public static readonly UiProperty<Thickness> MarginProperty =
-        UiProperty.Register<UiNode, Thickness>(
+    public static readonly Property<Thickness> MarginProperty =
+        Property.Register<UiNode, Thickness>(
             nameof(Margin),
             Thickness.Zero,
-            UiPropertyInvalidation.Measure);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="HorizontalAlignment"/> property.
     /// </summary>
-    public static readonly UiProperty<HorizontalAlignment> HorizontalAlignmentProperty =
-        UiProperty.Register<UiNode, HorizontalAlignment>(
+    public static readonly Property<HorizontalAlignment> HorizontalAlignmentProperty =
+        Property.Register<UiNode, HorizontalAlignment>(
             nameof(HorizontalAlignment),
             HorizontalAlignment.Stretch,
-            UiPropertyInvalidation.Arrange);
+            onChanged: static (node, _, _) => node.InvalidateArrange());
 
     /// <summary>
     /// Identifies the <see cref="VerticalAlignment"/> property.
     /// </summary>
-    public static readonly UiProperty<VerticalAlignment> VerticalAlignmentProperty =
-        UiProperty.Register<UiNode, VerticalAlignment>(
+    public static readonly Property<VerticalAlignment> VerticalAlignmentProperty =
+        Property.Register<UiNode, VerticalAlignment>(
             nameof(VerticalAlignment),
             VerticalAlignment.Stretch,
-            UiPropertyInvalidation.Arrange);
+            onChanged: static (node, _, _) => node.InvalidateArrange());
 
     /// <summary>
     /// Identifies the <see cref="Visibility"/> property.
     /// </summary>
-    public static readonly UiProperty<Visibility> VisibilityProperty =
-        UiProperty.Register<UiNode, Visibility>(
+    public static readonly Property<Visibility> VisibilityProperty =
+        Property.Register<UiNode, Visibility>(
             nameof(Visibility),
             Visibility.Visible,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, newValue) =>
+            {
+                if (newValue != Visibility.Visible)
+                    node.Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
+                node.InvalidateMeasure();
+            });
 
     private Size _lastMeasureConstraint;
     private Size _desiredContentSize;
@@ -437,23 +444,9 @@ public abstract partial class UiNode
     private void VerifyLayoutMutationAccess() =>
         Screen?.VerifyTreeMutationAccess();
 
-    private void VerifyPropertyAccess(UiProperty property)
-    {
-        if (property.Invalidation != UiPropertyInvalidation.None)
-            VerifyLayoutMutationAccess();
-    }
-
-    private void ApplyPropertyInvalidation(UiProperty property)
-    {
-        if ((property.Invalidation & UiPropertyInvalidation.Measure) != 0)
-        {
-            InvalidateMeasureCore();
-            return;
-        }
-
-        if ((property.Invalidation & UiPropertyInvalidation.Arrange) != 0)
-            InvalidateArrangeCore();
-    }
+    /// <inheritdoc />
+    protected override void VerifyMutationAccess() =>
+        VerifyLayoutMutationAccess();
 
     private void InvalidateMeasureCore()
     {

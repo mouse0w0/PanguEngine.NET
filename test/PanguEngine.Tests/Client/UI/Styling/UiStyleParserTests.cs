@@ -5,6 +5,8 @@ using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 using PanguEngine.Graphics.Text;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiStyleParserTests
@@ -727,8 +729,8 @@ public sealed class UiStyleParserTests
                 });
         }
 
-        internal static readonly UiProperty<bool> FlagProperty =
-            UiProperty.Register<FlagConvNode, bool>("Flag", false);
+        internal static readonly Property<bool> FlagProperty =
+            Property.Register<FlagConvNode, bool>("Flag", false);
     }
 
     private sealed class BoolNode : UiNode
@@ -738,8 +740,8 @@ public sealed class UiStyleParserTests
             UiCssRegistry.RegisterProperty<BoolNode, bool>("flag", FlagProperty, UiCssValueConverters.ParseBool);
         }
 
-        internal static readonly UiProperty<bool> FlagProperty =
-            UiProperty.Register<BoolNode, bool>("Flag", false);
+        internal static readonly Property<bool> FlagProperty =
+            Property.Register<BoolNode, bool>("Flag", false);
     }
 
     private sealed class TrimNode : UiNode
@@ -751,8 +753,8 @@ public sealed class UiStyleParserTests
 
         internal static string? Received;
 
-        internal static readonly UiProperty<string> RawProperty =
-            UiProperty.Register<TrimNode, string>("Raw", string.Empty);
+        internal static readonly Property<string> RawProperty =
+            Property.Register<TrimNode, string>("Raw", string.Empty);
     }
 
     private sealed class ThrowingNode : UiNode
@@ -764,8 +766,8 @@ public sealed class UiStyleParserTests
 
         internal static Exception Error = new FormatException("default");
 
-        internal static readonly UiProperty<string> RawProperty =
-            UiProperty.Register<ThrowingNode, string>("Raw", string.Empty);
+        internal static readonly Property<string> RawProperty =
+            Property.Register<ThrowingNode, string>("Raw", string.Empty);
     }
 
     private class BaseStyleNode : UiNode
@@ -775,8 +777,8 @@ public sealed class UiStyleParserTests
             UiCssRegistry.RegisterProperty<BaseStyleNode, string>("tone", ToneProperty, static value => value);
         }
 
-        internal static readonly UiProperty<string> ToneProperty =
-            UiProperty.Register<BaseStyleNode, string>("Tone", string.Empty);
+        internal static readonly Property<string> ToneProperty =
+            Property.Register<BaseStyleNode, string>("Tone", string.Empty);
     }
 
     private sealed class DerivedStyleNode : BaseStyleNode
@@ -786,8 +788,8 @@ public sealed class UiStyleParserTests
             UiCssRegistry.RegisterProperty<DerivedStyleNode, string>("tone", ToneProperty, static value => value);
         }
 
-        internal new static readonly UiProperty<string> ToneProperty =
-            UiProperty.Register<DerivedStyleNode, string>("Tone", string.Empty);
+        internal new static readonly Property<string> ToneProperty =
+            Property.Register<DerivedStyleNode, string>("Tone", string.Empty);
     }
 
     private sealed class FailingStream : Stream

@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 
@@ -16,29 +17,28 @@ public sealed class Path : Shape
     /// <summary>
     /// Identifies the <see cref="Data"/> property.
     /// </summary>
-    public static readonly UiProperty<PathGeometry?> DataProperty =
-        UiProperty.Register<Path, PathGeometry?>(
+    public static readonly Property<PathGeometry?> DataProperty =
+        Property.Register<Path, PathGeometry?>(
             nameof(Data),
             defaultValue: null,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     /// <summary>
     /// Identifies the <see cref="FillRule"/> property.
     /// </summary>
-    public static readonly UiProperty<ShapeFillRule> FillRuleProperty =
-        UiProperty.Register<Path, ShapeFillRule>(
+    public static readonly Property<ShapeFillRule> FillRuleProperty =
+        Property.Register<Path, ShapeFillRule>(
             nameof(FillRule),
-            ShapeFillRule.NonZero,
-            UiPropertyInvalidation.Render);
+            ShapeFillRule.NonZero);
 
     /// <summary>
     /// Identifies the <see cref="Stretch"/> property.
     /// </summary>
-    public static readonly UiProperty<PathStretch> StretchProperty =
-        UiProperty.Register<Path, PathStretch>(
+    public static readonly Property<PathStretch> StretchProperty =
+        Property.Register<Path, PathStretch>(
             nameof(Stretch),
             PathStretch.Uniform,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
 
     static Path()
     {

@@ -2,6 +2,8 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Styling;
 
+using PanguEngine.ComponentModel;
+
 namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class UiStyleCombinatorUpdateTests
@@ -904,8 +906,8 @@ public sealed class UiStyleCombinatorUpdateTests
 
         internal GuardedNode() => Classes.Add("guard");
 
-        internal static readonly UiProperty<GuardedValue> ValueProperty =
-            UiProperty.Register<GuardedNode, GuardedValue>("Value", new GuardedValue(0));
+        internal static readonly Property<GuardedValue> ValueProperty =
+            Property.Register<GuardedNode, GuardedValue>("Value", new GuardedValue(0));
     }
 
     private sealed class MutationCallbackNode : UiNode
@@ -921,7 +923,7 @@ public sealed class UiStyleCombinatorUpdateTests
 
         internal static Action? OnConvert;
 
-        internal static readonly UiProperty<double> ValueProperty =
-            UiProperty.Register<MutationCallbackNode, double>("Value", 0);
+        internal static readonly Property<double> ValueProperty =
+            Property.Register<MutationCallbackNode, double>("Value", 0);
     }
 }

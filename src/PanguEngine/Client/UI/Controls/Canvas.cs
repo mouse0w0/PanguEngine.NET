@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI.Controls;
@@ -10,38 +11,38 @@ public sealed class Canvas : Panel
     /// <summary>
     /// Identifies the attached horizontal position property.
     /// </summary>
-    public static readonly UiProperty<double> LeftProperty =
-        UiProperty.RegisterAttached<Canvas, UiNode, double>(
+    public static readonly Property<double> LeftProperty =
+        Property.RegisterAttached<Canvas, UiNode, double>(
             "Left",
             double.NaN,
-            UiPropertyInvalidation.Arrange);
+            onChanged: static (node, _, _) => node.InvalidateArrange());
 
     /// <summary>
     /// Identifies the attached vertical position property.
     /// </summary>
-    public static readonly UiProperty<double> TopProperty =
-        UiProperty.RegisterAttached<Canvas, UiNode, double>(
+    public static readonly Property<double> TopProperty =
+        Property.RegisterAttached<Canvas, UiNode, double>(
             "Top",
             double.NaN,
-            UiPropertyInvalidation.Arrange);
+            onChanged: static (node, _, _) => node.InvalidateArrange());
 
     /// <summary>
     /// Identifies the attached horizontal position from the right content edge.
     /// </summary>
-    public static readonly UiProperty<double> RightProperty =
-        UiProperty.RegisterAttached<Canvas, UiNode, double>(
+    public static readonly Property<double> RightProperty =
+        Property.RegisterAttached<Canvas, UiNode, double>(
             "Right",
             double.NaN,
-            UiPropertyInvalidation.Arrange);
+            onChanged: static (node, _, _) => node.InvalidateArrange());
 
     /// <summary>
     /// Identifies the attached vertical position from the bottom content edge.
     /// </summary>
-    public static readonly UiProperty<double> BottomProperty =
-        UiProperty.RegisterAttached<Canvas, UiNode, double>(
+    public static readonly Property<double> BottomProperty =
+        Property.RegisterAttached<Canvas, UiNode, double>(
             "Bottom",
             double.NaN,
-            UiPropertyInvalidation.Arrange);
+            onChanged: static (node, _, _) => node.InvalidateArrange());
 
     static Canvas()
     {

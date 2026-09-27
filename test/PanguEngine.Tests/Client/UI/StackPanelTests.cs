@@ -16,11 +16,9 @@ public sealed class StackPanelTests
         Assert.Equal(typeof(StackPanel), StackPanel.OrientationProperty.OwnerType);
         Assert.Equal(typeof(StackPanel), StackPanel.OrientationProperty.TargetType);
         Assert.Equal(Orientation.Vertical, StackPanel.OrientationProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Measure, StackPanel.OrientationProperty.Invalidation);
         Assert.Equal(typeof(StackPanel), StackPanel.SpacingProperty.OwnerType);
         Assert.Equal(typeof(StackPanel), StackPanel.SpacingProperty.TargetType);
         Assert.Equal(0, StackPanel.SpacingProperty.DefaultValue);
-        Assert.Equal(UiPropertyInvalidation.Measure, StackPanel.SpacingProperty.Invalidation);
         Assert.True(typeof(StackPanel).IsSealed);
     }
 

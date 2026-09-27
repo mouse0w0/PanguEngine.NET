@@ -1,7 +1,7 @@
 using System.Linq.Expressions;
 using System.Reflection;
 
-namespace PanguEngine.Client.UI;
+namespace PanguEngine.ComponentModel;
 
 internal sealed class BindingExpression<TRoot, TValue>(
     Func<TRoot, TValue> getter,

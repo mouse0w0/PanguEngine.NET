@@ -1,3 +1,4 @@
+using PanguEngine.ComponentModel;
 using System.Reflection;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
@@ -22,29 +23,23 @@ public sealed class ButtonTests
         Assert.Equal(typeof(Control), typeof(Button).BaseType);
         AssertProperty(
             Button.TextProperty,
-            string.Empty,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            string.Empty);
         AssertProperty(
             Button.FontProperty,
-            new Font(string.Empty),
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            new Font(string.Empty));
         AssertProperty(
             Button.FontSizeProperty,
-            16d,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            16d);
         AssertProperty(
             Button.ForegroundProperty,
-            new Color(242, 244, 247),
-            UiPropertyInvalidation.Render);
+            new Color(242, 244, 247));
         AssertProperty(
             Button.IconProperty,
-            (UiImage?)null,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
+            (UiImage?)null);
         AssertProperty(
             Button.IconSizeProperty,
-            16d,
-            UiPropertyInvalidation.Measure | UiPropertyInvalidation.Render);
-        AssertProperty(Button.SpacingProperty, 6d, UiPropertyInvalidation.Measure);
+            16d);
+        AssertProperty(Button.SpacingProperty, 6d);
         Assert.True(button.Focusable);
         Assert.Equal(new Thickness(12, 7), button.Padding);
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
@@ -1090,7 +1085,7 @@ public sealed class ButtonTests
     private static IReadOnlyList<UiFillRectangleCommand> GetFills(UiScreen screen) =>
         screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().ToArray();
 
-    private static UiStyleValueSource? StyleSource(UiNode node, UiProperty property) =>
+    private static UiStyleValueSource? StyleSource(UiNode node, Property property) =>
         node.GetStyleValueSources(property).SingleOrDefault();
 
     private static UiImage CreateImage(int width, int height) =>
@@ -1103,15 +1098,13 @@ public sealed class ButtonTests
         Assert.InRange(Math.Abs(expected - actual) * scale, 0, 0.5 + 1e-9);
 
     private static void AssertProperty<T>(
-        UiProperty<T> property,
-        T defaultValue,
-        UiPropertyInvalidation invalidation)
+        Property<T> property,
+        T defaultValue)
     {
         Assert.Equal(typeof(Button), property.OwnerType);
         Assert.Equal(typeof(Button), property.TargetType);
         Assert.Equal(typeof(T), property.ValueType);
         Assert.Equal(defaultValue, property.DefaultValue);
         Assert.False(property.IsReadOnly);
-        Assert.Equal(invalidation, property.Invalidation);
     }
 }
