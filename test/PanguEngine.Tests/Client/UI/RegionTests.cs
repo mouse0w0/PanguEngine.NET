@@ -754,7 +754,7 @@ public sealed class RegionTests
 
     private sealed class TestRegion : Region
     {
-        internal void Add(UiNode child) => AddChild(child);
+        internal void Add(UiNode child) => Children.Add(child);
     }
 
     private sealed class HookRegion : Region

@@ -383,9 +383,9 @@ public abstract partial class UiNode
         if (this is Parent parent &&
             (!parent.ClipToBounds || IsWithinLayoutBounds(localPoint)))
         {
-            for (var index = parent.Children.Count - 1; index >= 0; index--)
+            for (var index = parent.ReadOnlyChildren.Count - 1; index >= 0; index--)
             {
-                var child = parent.Children[index];
+                var child = parent.ReadOnlyChildren[index];
                 var childPoint = new Point(
                     localPoint.X - child.LayoutBounds.X,
                     localPoint.Y - child.LayoutBounds.Y);

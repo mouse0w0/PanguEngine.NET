@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Diagnostics.CodeAnalysis;
 
 namespace PanguEngine.Collections;
 
@@ -10,11 +11,15 @@ namespace PanguEngine.Collections;
 /// Changes are reported synchronously on the calling thread. Nested mutations during a mutation
 /// or notification throw <see cref="InvalidOperationException"/>. This collection is not thread-safe.
 /// Listener exceptions stop notification and propagate without undoing the completed change.
+/// Public mutations enter a mutation scope and call the corresponding protected operation.
+/// Overrides must complete their associated state updates before returning and must not publish
+/// the operation's event themselves. The public entry point publishes after the override returns.
+/// Range operations have separate extension points and do not call the single-item overrides.
 /// </remarks>
-public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
+public class ObservableList<T> : IList<T>, IReadOnlyList<T>
 {
     private readonly List<T> _items;
-    private bool _mutationActive;
+    private bool _isMutating;
 
     /// <summary>
     /// Creates an empty observable list.
@@ -63,11 +68,8 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
         {
             using var mutation = BeginMutation();
             var oldItem = _items[index];
-            var handler = Changed;
-            var change = handler is null ? null :
-                new ListChangedEventArgs<T>(ListChangeKind.Replace, index, [oldItem], [value]);
-            _items[index] = value;
-            handler?.Invoke(this, change!);
+            SetItem(index, value);
+            PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Replace, index, [oldItem], [value]));
         }
     }
 
@@ -86,11 +88,8 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
     {
         using var mutation = BeginMutation();
         ValidateInsertIndex(index);
-        var handler = Changed;
-        var change = handler is null ? null :
-            new ListChangedEventArgs<T>(ListChangeKind.Add, index, newItems: [item]);
-        _items.Insert(index, item);
-        handler?.Invoke(this, change!);
+        InsertItem(index, item);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Add, index, newItems: [item]));
     }
 
     /// <summary>
@@ -111,11 +110,8 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
         var additions = CopyItems(items);
         if (additions.Length == 0)
             return;
-        var handler = Changed;
-        var change = handler is null ? null :
-            new ListChangedEventArgs<T>(ListChangeKind.Add, index, newItems: additions);
-        _items.InsertRange(index, additions);
-        handler?.Invoke(this, change!);
+        InsertItems(index, additions);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Add, index, newItems: additions));
     }
 
     /// <summary>
@@ -130,12 +126,9 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
             return;
         var kind = _items.Count == 0 ? ListChangeKind.Add :
             replacements.Length == 0 ? ListChangeKind.Remove : ListChangeKind.Replace;
-        var handler = Changed;
-        var change = handler is null ? null :
-            new ListChangedEventArgs<T>(kind, 0, _items.ToArray(), replacements);
-        _items.Clear();
-        _items.AddRange(replacements);
-        handler?.Invoke(this, change!);
+        var previous = _items.ToArray();
+        ReplaceItems(replacements);
+        PublishChange(new ListChangedEventArgs<T>(kind, 0, previous, replacements));
     }
 
     /// <summary>
@@ -149,16 +142,9 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
         ValidateRange(index, count);
         if (count == 0)
             return;
-        var handler = Changed;
-        ListChangedEventArgs<T>? change = null;
-        if (handler is not null)
-        {
-            var removed = new T[count];
-            _items.CopyTo(index, removed, 0, count);
-            change = new ListChangedEventArgs<T>(ListChangeKind.Remove, index, oldItems: removed);
-        }
-        _items.RemoveRange(index, count);
-        handler?.Invoke(this, change!);
+        var removed = _items.GetRange(index, count).ToArray();
+        RemoveItems(index, count);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Remove, index, oldItems: removed));
     }
 
     /// <summary>
@@ -209,17 +195,11 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
         using var mutation = BeginMutation();
         if (_items.Count < 2)
             return;
-        var handler = Changed;
-        ListChangedEventArgs<T>? change = null;
-        if (handler is not null)
-        {
-            var permutation = new int[_items.Count];
-            for (var oldIndex = 0; oldIndex < permutation.Length; oldIndex++)
-                permutation[oldIndex] = permutation.Length - oldIndex - 1;
-            change = new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation);
-        }
-        _items.Reverse();
-        handler?.Invoke(this, change!);
+        var permutation = new int[_items.Count];
+        for (var oldIndex = 0; oldIndex < permutation.Length; oldIndex++)
+            permutation[oldIndex] = permutation.Length - oldIndex - 1;
+        ReorderItems(permutation);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation));
     }
 
     /// <summary>
@@ -227,17 +207,15 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
     /// </summary>
     /// <param name="item">The item to remove.</param>
     /// <returns>Whether a matching item was removed.</returns>
-    public bool Remove(T item)
+    public bool Remove(T? item)
     {
         using var mutation = BeginMutation();
-        var index = _items.IndexOf(item);
+        var index = IndexOfItem(item);
         if (index < 0)
             return false;
-        var handler = Changed;
-        var change = handler is null ? null :
-            new ListChangedEventArgs<T>(ListChangeKind.Remove, index, oldItems: [_items[index]]);
-        _items.RemoveAt(index);
-        handler?.Invoke(this, change!);
+        var removed = _items[index];
+        RemoveItem(index);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Remove, index, oldItems: [removed]));
         return true;
     }
 
@@ -249,11 +227,9 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
     {
         using var mutation = BeginMutation();
         ValidateItemIndex(index);
-        var handler = Changed;
-        var change = handler is null ? null :
-            new ListChangedEventArgs<T>(ListChangeKind.Remove, index, oldItems: [_items[index]]);
-        _items.RemoveAt(index);
-        handler?.Invoke(this, change!);
+        var removed = _items[index];
+        RemoveItem(index);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Remove, index, oldItems: [removed]));
     }
 
     /// <summary>
@@ -264,11 +240,9 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
         using var mutation = BeginMutation();
         if (_items.Count == 0)
             return;
-        var handler = Changed;
-        var change = handler is null ? null :
-            new ListChangedEventArgs<T>(ListChangeKind.Remove, 0, oldItems: _items.ToArray());
-        _items.Clear();
-        handler?.Invoke(this, change!);
+        var removed = _items.ToArray();
+        ClearItems();
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Remove, 0, oldItems: removed));
     }
 
     /// <summary>
@@ -276,21 +250,27 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
     /// </summary>
     /// <param name="item">The item to locate.</param>
     /// <returns>Whether a matching item exists.</returns>
-    public bool Contains(T item) => _items.Contains(item);
+    public bool Contains([AllowNull] T item) => IndexOfItem(item) >= 0;
 
     /// <summary>
     /// Finds an item index.
     /// </summary>
     /// <param name="item">The item to locate.</param>
     /// <returns>The first matching index, or -1 when absent.</returns>
-    public int IndexOf(T item) => _items.IndexOf(item);
+    public int IndexOf([AllowNull] T item) => IndexOfItem(item);
 
     /// <summary>
     /// Copies items into an array.
     /// </summary>
     /// <param name="array">The destination array.</param>
     /// <param name="arrayIndex">The starting destination index.</param>
-    public void CopyTo(T[] array, int arrayIndex) => _items.CopyTo(array, arrayIndex);
+    public void CopyTo(T[] array, int arrayIndex)
+    {
+        ArgumentNullException.ThrowIfNull(array);
+        if ((uint)arrayIndex > (uint)array.Length)
+            throw new ArgumentOutOfRangeException(nameof(arrayIndex));
+        _items.CopyTo(array, arrayIndex);
+    }
 
     /// <summary>
     /// Returns an enumerator over the list.
@@ -300,18 +280,95 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
-    private MutationScope BeginMutation()
+    /// <summary>
+    /// Enters a mutation, rejecting nested writes until the returned scope is disposed.
+    /// </summary>
+    /// <returns>The mutation scope.</returns>
+    protected IDisposable BeginMutation()
     {
-        if (_mutationActive)
+        if (_isMutating)
             throw new InvalidOperationException("The list cannot be modified during change notification or preparation.");
-        _mutationActive = true;
+        _isMutating = true;
         return new MutationScope(this);
     }
 
     private readonly struct MutationScope(ObservableList<T> owner) : IDisposable
     {
-        public void Dispose() => owner._mutationActive = false;
+        public void Dispose() => owner._isMutating = false;
     }
+
+    /// <summary>
+    /// Finds an item using this collection's identity rules.
+    /// </summary>
+    /// <param name="item">The item to locate.</param>
+    /// <returns>The matching index, or -1.</returns>
+    protected virtual int IndexOfItem(T? item) => _items.IndexOf(item!);
+
+    /// <summary>
+    /// Replaces one item within the active mutation scope.
+    /// </summary>
+    /// <param name="index">The item index.</param>
+    /// <param name="value">The replacement value.</param>
+    protected virtual void SetItem(int index, T value) => _items[index] = value;
+
+    /// <summary>
+    /// Inserts an item without publishing a notification.
+    /// </summary>
+    /// <param name="index">The insertion index.</param>
+    /// <param name="item">The item to insert.</param>
+    protected virtual void InsertItem(int index, T item) => _items.Insert(index, item);
+
+    /// <summary>
+    /// Removes an item without publishing a notification.
+    /// </summary>
+    /// <param name="index">The item index.</param>
+    protected virtual void RemoveItem(int index) => _items.RemoveAt(index);
+
+    /// <summary>Clears the items without publishing a notification.</summary>
+    protected virtual void ClearItems() => _items.Clear();
+
+    /// <summary>Moves an item without publishing a notification.</summary>
+    /// <param name="oldIndex">The current index.</param>
+    /// <param name="newIndex">The final index.</param>
+    protected virtual void MoveItem(int oldIndex, int newIndex)
+    {
+        var item = _items[oldIndex];
+        _items.RemoveAt(oldIndex);
+        _items.Insert(newIndex, item);
+    }
+
+    /// <summary>Inserts a range without publishing a notification.</summary>
+    /// <param name="index">The insertion index.</param>
+    /// <param name="items">The prepared item snapshot.</param>
+    protected virtual void InsertItems(int index, IReadOnlyList<T> items) => _items.InsertRange(index, items);
+
+    /// <summary>Removes a range without publishing a notification.</summary>
+    /// <param name="index">The first item index.</param>
+    /// <param name="count">The item count.</param>
+    protected virtual void RemoveItems(int index, int count) => _items.RemoveRange(index, count);
+
+    /// <summary>Replaces all items without publishing a notification.</summary>
+    /// <param name="items">The prepared replacement snapshot.</param>
+    protected virtual void ReplaceItems(IReadOnlyList<T> items)
+    {
+        _items.Clear();
+        _items.AddRange(items);
+    }
+
+    /// <summary>Reorders items without publishing a notification.</summary>
+    /// <param name="permutation">The old-index to new-index permutation.</param>
+    protected virtual void ReorderItems(IReadOnlyList<int> permutation)
+    {
+        var previous = _items.ToArray();
+        for (var index = 0; index < previous.Length; index++)
+            _items[permutation[index]] = previous[index];
+    }
+
+    /// <summary>
+    /// Publishes a committed change to the current subscribers.
+    /// </summary>
+    /// <param name="change">The completed change.</param>
+    protected void PublishChange(ListChangedEventArgs<T> change) => Changed?.Invoke(this, change);
 
     private static T[] CopyItems(IEnumerable<T> items)
     {
@@ -340,29 +397,20 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
 
     private void MoveCore(int oldIndex, int newIndex)
     {
-        var handler = Changed;
-        ListChangedEventArgs<T>? change = null;
-        if (handler is not null)
+        var permutation = CreateIdentityPermutation(_items.Count);
+        permutation[oldIndex] = newIndex;
+        if (oldIndex < newIndex)
         {
-            var permutation = CreateIdentityPermutation(_items.Count);
-            permutation[oldIndex] = newIndex;
-            if (oldIndex < newIndex)
-            {
-                for (var index = oldIndex + 1; index <= newIndex; index++)
-                    permutation[index] = index - 1;
-            }
-            else
-            {
-                for (var index = newIndex; index < oldIndex; index++)
-                    permutation[index] = index + 1;
-            }
-            change = new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation);
+            for (var index = oldIndex + 1; index <= newIndex; index++)
+                permutation[index] = index - 1;
         }
-
-        var item = _items[oldIndex];
-        _items.RemoveAt(oldIndex);
-        _items.Insert(newIndex, item);
-        handler?.Invoke(this, change!);
+        else
+        {
+            for (var index = newIndex; index < oldIndex; index++)
+                permutation[index] = index + 1;
+        }
+        MoveItem(oldIndex, newIndex);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation));
     }
 
     private void SortCore(IComparer<T> comparer)
@@ -388,18 +436,11 @@ public sealed class ObservableList<T> : IList<T>, IReadOnlyList<T>
         if (!changed)
             return;
 
-        var handler = Changed;
-        ListChangedEventArgs<T>? change = null;
-        if (handler is not null)
-        {
-            var permutation = new int[entries.Length];
-            for (var newIndex = 0; newIndex < entries.Length; newIndex++)
-                permutation[entries[newIndex].OriginalIndex] = newIndex;
-            change = new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation);
-        }
+        var permutation = new int[entries.Length];
         for (var newIndex = 0; newIndex < entries.Length; newIndex++)
-            _items[newIndex] = entries[newIndex].Item;
-        handler?.Invoke(this, change!);
+            permutation[entries[newIndex].OriginalIndex] = newIndex;
+        ReorderItems(permutation);
+        PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation));
     }
 
     private static void MergeSort(

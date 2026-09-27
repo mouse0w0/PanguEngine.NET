@@ -301,6 +301,6 @@ public sealed class UiHitTestTests
 
     private sealed class TestParent : Parent
     {
-        internal void Add(UiNode child) => AddChild(child);
+        internal void Add(UiNode child) => Children.Add(child);
     }
 }

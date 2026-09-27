@@ -241,7 +241,7 @@ public sealed class UiShowcaseBindingTests
 
         if (root is Parent parent)
         {
-            foreach (var child in parent.Children)
+            foreach (var child in parent.ReadOnlyChildren)
             {
                 var found = TryFind<T>(child, styleId);
                 if (found is not null)
@@ -260,7 +260,7 @@ public sealed class UiShowcaseBindingTests
 
         if (node is Parent parent)
         {
-            foreach (var child in parent.Children)
+            foreach (var child in parent.ReadOnlyChildren)
             {
                 var found = TryFind<T>(child, styleId);
                 if (found is not null)

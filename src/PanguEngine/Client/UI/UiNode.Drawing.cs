@@ -73,7 +73,7 @@ public abstract partial class UiNode
                 ? UiDrawingContext.PushCommand(commands, new UiPushClipCommand(
                     new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height)))
                 : -1;
-            foreach (var child in parent.Children)
+            foreach (var child in parent.ReadOnlyChildren)
                 child.AppendDrawCommands(commands, combinedOpacity);
             UiDrawingContext.PopCommand(commands, clipIndex);
         }

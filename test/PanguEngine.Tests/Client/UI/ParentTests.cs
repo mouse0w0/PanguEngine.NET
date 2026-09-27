@@ -12,12 +12,12 @@ public sealed class ParentTests
         var parent = new TestParent();
         var first = new TestNode();
         var second = new TestNode();
-        var view = parent.Children;
+        var view = parent.ReadOnlyChildren;
 
         parent.Add(first);
         parent.Insert(0, second);
 
-        Assert.Same(view, parent.Children);
+        Assert.Same(view, parent.ReadOnlyChildren);
         Assert.Equal(new UiNode[] { second, first }, view);
         Assert.Same(parent, first.Parent);
         Assert.Same(parent, second.Parent);
@@ -46,7 +46,7 @@ public sealed class ParentTests
 
         Assert.Empty(parent.Children);
         Assert.Null(second.Parent);
-        Assert.Throws<ArgumentNullException>(() => parent.Remove(null!));
+        Assert.False(parent.Remove(null!));
     }
 
     [Fact]
@@ -317,7 +317,7 @@ public sealed class ParentTests
     }
 
     [Fact]
-    public void ReparentWithinSameScreenKeepsSubtreeActive()
+    public void ReparentWithinSameScreenInvalidatesSubtreeLayout()
     {
         var root = new Canvas();
         var oldParent = new Canvas();
@@ -343,10 +343,10 @@ public sealed class ParentTests
         Assert.Same(newParent, child.Parent);
         Assert.Same(screen, child.Screen);
         Assert.Same(screen, leaf.Screen);
-        Assert.True(child.IsMeasureValid);
-        Assert.True(child.IsArrangeValid);
-        Assert.True(leaf.IsMeasureValid);
-        Assert.True(leaf.IsArrangeValid);
+        Assert.False(child.IsMeasureValid);
+        Assert.False(child.IsArrangeValid);
+        Assert.False(leaf.IsMeasureValid);
+        Assert.False(leaf.IsArrangeValid);
         screen.Close();
     }
 
@@ -737,16 +737,16 @@ public sealed class ParentTests
     private sealed class TestParent : Parent
     {
         internal void Add(UiNode child) =>
-            AddChild(child);
+            Children.Add(child);
 
         internal void Insert(int index, UiNode child) =>
-            InsertChild(index, child);
+            Children.Insert(index, child);
 
         internal bool Remove(UiNode child) =>
-            RemoveChild(child);
+            Children.Remove(child);
 
         internal void Clear() =>
-            ClearChildren();
+            Children.Clear();
     }
 
     private static T RunOnBackgroundThread<T>(Func<T> action)

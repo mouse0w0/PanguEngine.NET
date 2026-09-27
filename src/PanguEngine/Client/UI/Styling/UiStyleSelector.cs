@@ -350,7 +350,7 @@ public sealed class UiStyleSelector
             case UiStyleCombinator.AdjacentSibling:
                 if (node.Parent is { } adjacentParent)
                 {
-                    var children = adjacentParent.Children;
+                    var children = adjacentParent.ReadOnlyChildren;
                     var position = IndexOfChild(children, node);
                     if (position > 0)
                         TryMatchPrefix(index - 1, children[position - 1], ref bestPrefixDepth);
@@ -360,7 +360,7 @@ public sealed class UiStyleSelector
             case UiStyleCombinator.SubsequentSibling:
                 if (node.Parent is { } precedingParent)
                 {
-                    var children = precedingParent.Children;
+                    var children = precedingParent.ReadOnlyChildren;
                     var position = IndexOfChild(children, node);
                     for (var childIndex = 0; childIndex < position; childIndex++)
                         TryMatchPrefix(index - 1, children[childIndex], ref bestPrefixDepth);

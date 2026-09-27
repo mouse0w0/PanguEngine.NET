@@ -834,7 +834,7 @@ public sealed class UiStyleCombinatorUpdateTests
     }
 
     [Fact]
-    public void FailedReparentPreparationKeepsCommittedTreeAndPreviousSnapshot()
+    public void FailedRemovalPreparationLeavesNodeDetachedWithPreviousSnapshot()
     {
         var source = MakePanel("host");
         var destination = MakePanel();
@@ -858,7 +858,9 @@ public sealed class UiStyleCombinatorUpdateTests
             GuardedValue.ThrowOnCompare = false;
         }
 
-        Assert.Same(destination, guard.Parent);
+        Assert.Null(guard.Parent);
+        Assert.Null(guard.Screen);
+        Assert.Empty(destination.Children);
         Assert.DoesNotContain(guard, source.Children);
         Assert.Equal(0.4, guard.Opacity);
         Assert.NotSame(GuardedNode.ValueProperty.DefaultValue, guard.GetValue(GuardedNode.ValueProperty));

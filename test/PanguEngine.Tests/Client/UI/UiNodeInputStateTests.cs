@@ -1,7 +1,7 @@
-using PanguEngine.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
+using PanguEngine.ComponentModel;
 using PanguEngine.Input;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -222,8 +222,9 @@ public sealed class UiNodeInputStateTests
         var leaf = Place(branch, new TestNode(), 0, 0, 20, 20);
         var manager = new UiManager();
         var screen = new UiScreen(root);
-        UiNode? exitSource = null;
-        branch.PointerExited += (_, args) => exitSource = args.Source;
+        var exits = new List<(UiNode Node, UiNode Source)>();
+        leaf.PointerExited += (_, args) => exits.Add((leaf, args.Source));
+        branch.PointerExited += (_, args) => exits.Add((branch, args.Source));
         manager.Open(screen);
         manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
@@ -236,8 +237,8 @@ public sealed class UiNodeInputStateTests
         Assert.Null(branch.Screen);
         Assert.Same(screen, leaf.Screen);
         Assert.False(branch.IsHovered);
-        Assert.True(leaf.IsHovered);
-        Assert.Same(branch, exitSource);
+        Assert.False(leaf.IsHovered);
+        Assert.Equal([(leaf, leaf), (branch, branch)], exits);
         manager.Close();
     }
 

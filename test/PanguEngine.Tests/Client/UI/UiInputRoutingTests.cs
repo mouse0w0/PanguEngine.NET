@@ -797,7 +797,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void SameScreenReparentPreservesFocusPressAndDefersHoverDiff()
+    public void SameScreenReparentClearsFocusPressAndHoverDuringRemoval()
     {
         var (manager, screen, root) = OpenScene();
         var oldParent = Place(root, new Canvas(), 0, 0, 40, 40);
@@ -814,14 +814,14 @@ public sealed class UiInputRoutingTests
 
         newParent.Children.Add(leaf);
 
-        Assert.Same(leaf, screen.FocusedNode);
-        Assert.Empty(events);
+        Assert.Null(screen.FocusedNode);
+        Assert.Equal(["leaf-exit"], events);
 
         manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerReleased(new Point(55, 5), MouseButton.Left, KeyModifiers.None);
 
-        Assert.Equal(["leaf-exit", "leaf-enter", "leaf-click"], events);
-        Assert.Same(leaf, screen.FocusedNode);
+        Assert.Equal(["leaf-exit", "leaf-enter"], events);
+        Assert.Null(screen.FocusedNode);
     }
 
     [Fact]
@@ -1604,7 +1604,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void PromotingDescendantRootPreservesItsInteractionState()
+    public void PromotingDescendantRootClearsItsInteractionState()
     {
         var manager = new UiManager();
         var oldRoot = new Canvas();
@@ -1617,6 +1617,7 @@ public sealed class UiInputRoutingTests
         var screen = new UiScreen(oldRoot);
         var events = new List<string>();
         incoming.PointerExited += (_, _) => events.Add("incoming-exit");
+        leaf.LostFocus += (_, _) => events.Add("lost");
         leaf.PointerExited += (_, _) => events.Add("leaf-exit");
         leaf.PointerClicked += (_, _) => events.Add("click");
         manager.Open(screen);
@@ -1627,15 +1628,18 @@ public sealed class UiInputRoutingTests
 
         screen.Root = incoming;
 
-        Assert.Empty(events);
-        Assert.Same(leaf, screen.FocusedNode);
+        Assert.Equal(["lost", "leaf-exit", "incoming-exit"], events);
+        Assert.Null(screen.FocusedNode);
+        Assert.False(leaf.IsFocused);
+        Assert.False(leaf.IsHovered);
+        Assert.False(incoming.IsHovered);
         Assert.Null(oldRoot.Screen);
         Assert.Same(screen, incoming.Screen);
         Assert.Same(screen, leaf.Screen);
 
         manager.PrepareFrame(new Size(100, 100), 0);
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
-        Assert.Equal(["click"], events);
+        Assert.Equal(["lost", "leaf-exit", "incoming-exit"], events);
         manager.Close();
     }
 

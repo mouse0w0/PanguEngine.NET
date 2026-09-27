@@ -73,7 +73,7 @@ public abstract partial class UiNode
         if (this is not Parent parent)
             return;
 
-        foreach (var child in parent.Children)
+        foreach (var child in parent.ReadOnlyChildren)
             child.SetScreenRecursive(screen);
     }
 

@@ -51,7 +51,7 @@ public sealed class PanelTests
     {
         var panel = new TestPanel();
         var mutable = panel.Children;
-        var readOnly = ((Parent)panel).Children;
+        var readOnly = ((Parent)panel).ReadOnlyChildren;
         var first = new TestNode();
         var second = new TestNode();
 
@@ -59,7 +59,7 @@ public sealed class PanelTests
         mutable.Insert(0, second);
 
         Assert.Same(mutable, panel.Children);
-        Assert.Same(readOnly, ((Parent)panel).Children);
+        Assert.Same(readOnly, ((Parent)panel).ReadOnlyChildren);
         Assert.Equal(new UiNode[] { second, first }, mutable);
         Assert.Equal(new UiNode[] { second, first }, readOnly);
         Assert.False(mutable.IsReadOnly);
@@ -110,7 +110,7 @@ public sealed class PanelTests
 
         Assert.Throws<ArgumentNullException>(() => panel.Children.Add(null!));
         Assert.Throws<ArgumentNullException>(() => panel.Children.Insert(0, null!));
-        Assert.Throws<ArgumentNullException>(() => panel.Children.Remove(null!));
+        Assert.False(panel.Children.Remove(null));
         Assert.Throws<ArgumentNullException>(() => panel.Children[0] = null!);
         Assert.Throws<ArgumentOutOfRangeException>(() => _ = panel.Children[-1]);
         Assert.Throws<ArgumentOutOfRangeException>(() => panel.Children.Insert(2, new TestNode()));
@@ -309,7 +309,7 @@ public sealed class PanelTests
     }
 
     [Fact]
-    public void SameChildReplacementIsANoOp()
+    public void SameChildReplacementPreservesTreeAndLayout()
     {
         var panel = new TestPanel();
         var child = new TestNode();
@@ -475,7 +475,7 @@ public sealed class PanelTests
         Assert.False(enumerator.MoveNext());
     }
 
-    private static void AssertEnumeratorInvalidated(Action<UiNodeCollection> change)
+    private static void AssertEnumeratorInvalidated(Action<UiNodeList> change)
     {
         var panel = CreateTwoChildPanel();
         var enumerator = panel.Children.GetEnumerator();

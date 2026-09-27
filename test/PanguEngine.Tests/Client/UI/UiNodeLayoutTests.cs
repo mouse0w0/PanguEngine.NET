@@ -989,7 +989,7 @@ public sealed class UiNodeLayoutTests
     private sealed class TestParent : Parent
     {
         internal void Add(UiNode child) =>
-            AddChild(child);
+            Children.Add(child);
     }
 
     private sealed class LayoutSource : INotifyPropertyChanged

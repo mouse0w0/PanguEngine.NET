@@ -39,7 +39,7 @@ public sealed class TextBoxTests
         Assert.Equal(new SolidColorBrush(92, 103, 116), textBox.BorderBrush);
         Assert.Equal(new Thickness(1), textBox.BorderThickness);
         Assert.False(textBox.ClipToBounds);
-        Assert.Empty(textBox.Children);
+        Assert.Empty(textBox.ReadOnlyChildren);
 
         foreach (var name in new[] { "PasswordChar", "MaxLength", "Submitted", "Editor", "Controller" })
         {

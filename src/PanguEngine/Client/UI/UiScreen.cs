@@ -304,7 +304,6 @@ public partial class UiScreen
         root?.VerifyStylePreparationIdle();
         var sourceScreen = root?.Screen;
         var rootOriginalParent = root?.Parent;
-        var rootOriginalResolver = root?.Screen?.StyleResolver ?? UiStyleResolver.Default;
         var targetOperation = false;
         var sourceOperation = false;
         InputStateCleanupSnapshot? targetSnapshot = null;
@@ -315,15 +314,20 @@ public partial class UiScreen
             if (sourceScreen is not null && !ReferenceEquals(sourceScreen, this))
                 sourceOperation = sourceScreen.BeginRootTransferOperation();
 
-            var oldRoot = _root;
-            var oldRootScreen = oldRoot?.Screen;
             if (root is not null)
             {
-                root.Parent?.RemoveChildForRootTransfer(root);
+                if (rootOriginalParent is not null)
+                {
+                    rootOriginalParent.Children.Remove(root);
+                    if (root.Parent is not null || root.Screen is not null)
+                        throw new InvalidOperationException("The UI node was attached during removal notification.");
+                }
                 if (sourceScreen is not null && ReferenceEquals(sourceScreen._root, root))
                     sourceScreen.ClearRootForTransfer();
             }
 
+            var oldRoot = _root;
+            var oldRootScreen = oldRoot?.Screen;
             _root = null;
             oldRoot?.SetScreenRecursive(null);
             _root = root;
@@ -336,11 +340,6 @@ public partial class UiScreen
             root?.InvalidateTreeStructure();
 
             var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
-            UiNode.AddSubtreeRefreshEntry(
-                styleEntries,
-                rootOriginalParent,
-                rootOriginalResolver,
-                rootOriginalParent?.Screen?.StyleResolver ?? UiStyleResolver.Default);
             styleEntries.Add((oldRoot, UiStyleResolver.Default));
             styleEntries.Add((root, _styleResolver));
             UiNode.RecomputeStyleSubtreeBatch(styleEntries);

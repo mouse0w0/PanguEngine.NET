@@ -1478,7 +1478,7 @@ public sealed class UiDrawingTests
         internal Action<UiDrawingContext>? DrawAction { get; set; }
 
         internal void Add(UiNode child) =>
-            AddChild(child);
+            Children.Add(child);
 
         protected override void DrawCore(UiDrawingContext context)
         {
@@ -1493,13 +1493,13 @@ public sealed class UiDrawingTests
         internal Action<UiDrawingContext>? DrawAction { get; set; }
 
         internal void Add(UiNode child) =>
-            AddChild(child);
+            Children.Add(child);
 
         internal bool Remove(UiNode child) =>
-            RemoveChild(child);
+            Children.Remove(child);
 
         internal void Clear() =>
-            ClearChildren();
+            Children.Clear();
 
         protected override void DrawCore(UiDrawingContext context) =>
             DrawAction?.Invoke(context);

@@ -344,7 +344,7 @@ public sealed class Button : Control
             if (_textNode is null)
                 return;
 
-            _ = RemoveChild(_textNode);
+            _ = Children.Remove(_textNode);
             _textNode = null;
             return;
         }
@@ -364,7 +364,7 @@ public sealed class Button : Control
             Wrapping = TextWrapping.NoWrap,
             IsHitTestVisible = false
         };
-        AddChild(text);
+        Children.Add(text);
         _textNode = text;
     }
 
@@ -376,7 +376,7 @@ public sealed class Button : Control
             if (_imageNode is null)
                 return;
 
-            _ = RemoveChild(_imageNode);
+            _ = Children.Remove(_imageNode);
             _imageNode = null;
             return;
         }
@@ -394,7 +394,7 @@ public sealed class Button : Control
             IsHitTestVisible = false
         };
         SetIconSize(image);
-        InsertChild(0, image);
+        Children.Insert(0, image);
         _imageNode = image;
     }
 

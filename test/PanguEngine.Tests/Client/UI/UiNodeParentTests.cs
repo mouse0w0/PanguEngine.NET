@@ -1,6 +1,5 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
-
 using PanguEngine.ComponentModel;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -120,7 +119,7 @@ public sealed class UiNodeParentTests
         second.Children.Add(node);
         second.Children.Remove(node);
 
-        Assert.Equal([(null, first), (first, second), (second, null)], changes);
+        Assert.Equal([(null, first), (first, null), (null, second), (second, null)], changes);
     }
 
     [Fact]
@@ -132,25 +131,30 @@ public sealed class UiNodeParentTests
         firstParent.Children.Add(node);
         var firstScreen = new UiScreen(firstParent);
         var secondScreen = new UiScreen(secondParent);
-        var order = new List<string>();
+        var changes = new List<(string Property, Parent? Parent, UiScreen? Screen)>();
         node.PropertyChanged += (_, args) =>
         {
             if (args.Property.Name == nameof(UiNode.Parent))
             {
-                Assert.Same(secondParent, node.Parent);
-                Assert.Same(firstScreen, node.Screen);
-                order.Add("parent");
+                var change = Assert.IsType<PropertyChangedEventArgs<Parent?>>(args);
+                Assert.Same(change.NewValue, node.Parent);
+                changes.Add(("parent", node.Parent, node.Screen));
             }
             else if (ReferenceEquals(args.Property, UiNode.ScreenProperty))
             {
-                Assert.Same(secondParent, node.Parent);
-                Assert.Same(secondScreen, node.Screen);
-                order.Add("screen");
+                var change = Assert.IsType<PropertyChangedEventArgs<UiScreen?>>(args);
+                Assert.Same(change.NewValue, node.Screen);
+                changes.Add(("screen", node.Parent, node.Screen));
             }
         };
 
         secondParent.Children.Add(node);
 
-        Assert.Equal(["parent", "screen"], order);
+        Assert.Equal([
+            ("parent", null, firstScreen),
+            ("screen", null, null),
+            ("parent", secondParent, null),
+            ("screen", secondParent, secondScreen)
+        ], changes);
     }
 }

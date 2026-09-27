@@ -137,14 +137,14 @@ internal sealed class UiShowcaseShell : Region
         };
         _returnButton.Classes.Add("showcase-return");
 
-        AddChild(_header);
-        AddChild(_nav);
-        AddChild(_contentClip);
-        AddChild(_feedback);
-        AddChild(_warning);
-        AddChild(_scaleRow);
-        AddChild(_scaleValue);
-        AddChild(_returnButton);
+        Children.Add(_header);
+        Children.Add(_nav);
+        Children.Add(_contentClip);
+        Children.Add(_feedback);
+        Children.Add(_warning);
+        Children.Add(_scaleRow);
+        Children.Add(_scaleValue);
+        Children.Add(_returnButton);
     }
 
     internal IReadOnlyList<Button> CategoryButtons => _categoryButtons;

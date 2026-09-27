@@ -21,21 +21,21 @@ public sealed class ControlTests
         Assert.Null(typeof(Control).GetProperty(
             nameof(Parent.Children),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
-        Assert.IsAssignableFrom<IReadOnlyList<UiNode>>(control.Children);
+        Assert.IsAssignableFrom<IReadOnlyList<UiNode>>(control.ReadOnlyChildren);
 
         control.Add(first);
         control.Add(second);
 
-        Assert.Equal([first, second], control.Children);
+        Assert.Equal([first, second], control.ReadOnlyChildren);
         Assert.Same(control, first.Parent);
         Assert.Same(control, second.Parent);
 
         Assert.True(control.Remove(first));
         Assert.Null(first.Parent);
-        Assert.Equal([second], control.Children);
+        Assert.Equal([second], control.ReadOnlyChildren);
 
         control.Clear();
-        Assert.Empty(control.Children);
+        Assert.Empty(control.ReadOnlyChildren);
         Assert.Null(second.Parent);
     }
 
@@ -181,7 +181,7 @@ public sealed class ControlTests
     }
 
     [Fact]
-    public void SameScreenReparentKeepsOriginalPressedControlUntilRelease()
+    public void SameScreenReparentClearsOriginalPressedControl()
     {
         var root = new Canvas();
         var oldControl = Place(root, new TestControl(), 0, 0, 40, 40);
@@ -196,10 +196,10 @@ public sealed class ControlTests
 
         newControl.Add(child);
 
-        Assert.True(oldControl.IsPressed);
+        Assert.False(oldControl.IsPressed);
         Assert.False(newControl.IsPressed);
         manager.PrepareFrame(new Size(100, 100), 0);
-        Assert.True(oldControl.IsPressed);
+        Assert.False(oldControl.IsPressed);
         Assert.False(newControl.IsPressed);
 
         manager.ProcessPointerReleased(new Point(55, 5), MouseButton.Left, KeyModifiers.None);
@@ -210,7 +210,7 @@ public sealed class ControlTests
     }
 
     [Fact]
-    public void ReparentIntoDisabledControlNormalizesStateOnNextUpdate()
+    public void ReparentIntoDisabledControlClearsStateDuringRemoval()
     {
         var root = new Canvas();
         var oldControl = Place(root, new TestControl(), 0, 0, 40, 40);
@@ -229,8 +229,8 @@ public sealed class ControlTests
 
         disabledControl.Add(child);
 
-        Assert.True(oldControl.IsPressed);
-        Assert.Same(child, screen.FocusedNode);
+        Assert.False(oldControl.IsPressed);
+        Assert.Null(screen.FocusedNode);
 
         manager.PrepareFrame(new Size(100, 100), 0);
 
@@ -638,9 +638,9 @@ public sealed class ControlTests
 
     private sealed class TestControl : Control
     {
-        internal void Add(UiNode child) => AddChild(child);
-        internal bool Remove(UiNode child) => RemoveChild(child);
-        internal void Clear() => ClearChildren();
+        internal void Add(UiNode child) => Children.Add(child);
+        internal bool Remove(UiNode child) => Children.Remove(child);
+        internal void Clear() => Children.Clear();
     }
 
     private sealed class TestNode : UiNode

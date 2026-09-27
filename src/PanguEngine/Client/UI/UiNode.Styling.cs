@@ -347,7 +347,7 @@ public abstract partial class UiNode
         yield return root;
         if (root is Parent parent)
         {
-            foreach (var child in parent.Children)
+            foreach (var child in parent.ReadOnlyChildren)
             {
                 foreach (var descendant in PreOrderTraversal(child))
                     yield return descendant;

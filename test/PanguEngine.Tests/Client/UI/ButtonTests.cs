@@ -48,7 +48,7 @@ public sealed class ButtonTests
         Assert.Equal("Button", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         Assert.False(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
         Assert.False(button.ClipToBounds);
-        Assert.Empty(button.Children);
+        Assert.Empty(button.ReadOnlyChildren);
         Assert.NotNull(typeof(Button).GetEvent(
             nameof(Button.Click),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
@@ -63,7 +63,7 @@ public sealed class ButtonTests
         Assert.Null(typeof(Button).GetProperty(
             nameof(Parent.Children),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
-        Assert.IsAssignableFrom<IReadOnlyList<UiNode>>(button.Children);
+        Assert.IsAssignableFrom<IReadOnlyList<UiNode>>(button.ReadOnlyChildren);
     }
 
     [Fact]
@@ -73,8 +73,8 @@ public sealed class ButtonTests
         var secondIcon = CreateImage(4, 8);
         var button = new Button { Text = "Open", Icon = firstIcon };
 
-        var image = Assert.IsType<ImageView>(button.Children[0]);
-        var text = Assert.IsType<Text>(button.Children[1]);
+        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
+        var text = Assert.IsType<Text>(button.ReadOnlyChildren[1]);
         Assert.Same(firstIcon, image.Source);
         Assert.Equal("Open", text.Content);
         Assert.False(image.IsHitTestVisible);
@@ -85,20 +85,20 @@ public sealed class ButtonTests
         button.Icon = secondIcon;
         button.Text = string.Empty;
 
-        Assert.Single(button.Children);
-        Assert.Same(image, button.Children[0]);
+        Assert.Single(button.ReadOnlyChildren);
+        Assert.Same(image, button.ReadOnlyChildren[0]);
         Assert.Same(secondIcon, image.Source);
         Assert.Null(text.Parent);
 
         button.Text = "Save";
 
-        Assert.Equal(2, button.Children.Count);
-        Assert.Same(image, button.Children[0]);
-        Assert.NotSame(text, button.Children[1]);
+        Assert.Equal(2, button.ReadOnlyChildren.Count);
+        Assert.Same(image, button.ReadOnlyChildren[0]);
+        Assert.NotSame(text, button.ReadOnlyChildren[1]);
 
         button.Icon = null;
 
-        Assert.IsType<Text>(Assert.Single(button.Children));
+        Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
         Assert.Null(image.Parent);
     }
 
@@ -115,12 +115,12 @@ public sealed class ButtonTests
             IconSize = 23
         };
 
-        Assert.Empty(button.Children);
+        Assert.Empty(button.ReadOnlyChildren);
 
         button.Text = "Value";
         button.Icon = icon;
-        var image = Assert.IsType<ImageView>(button.Children[0]);
-        var text = Assert.IsType<Text>(button.Children[1]);
+        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
+        var text = Assert.IsType<Text>(button.ReadOnlyChildren[1]);
 
         Assert.Equal(font, text.Font);
         Assert.Equal(19, text.FontSize);
@@ -149,7 +149,7 @@ public sealed class ButtonTests
         button.Arrange(new Rect(0, 0, button.DesiredSize));
 
         Assert.Equal(new Size(26, 16), button.DesiredSize);
-        Assert.Empty(button.Children);
+        Assert.Empty(button.ReadOnlyChildren);
         Assert.Equal(new Rect(13, 8, 0, 0), button.ContentBounds);
     }
 
@@ -165,7 +165,7 @@ public sealed class ButtonTests
         button.Measure(Size.Infinite);
         button.Arrange(new Rect(0, 0, button.DesiredSize));
 
-        var image = Assert.IsType<ImageView>(Assert.Single(button.Children));
+        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
         Assert.Equal(new Size(42, 32), button.DesiredSize);
         Assert.Equal(new Size(16, 16), image.DesiredSize);
         Assert.Equal(new Rect(13, 8, 16, 16), image.LayoutBounds);
@@ -199,8 +199,8 @@ public sealed class ButtonTests
         button.Measure(new Size(200, 80));
         button.Arrange(new Rect(0, 0, 200, 80));
 
-        var image = Assert.IsType<ImageView>(button.Children[0]);
-        var text = Assert.IsType<Text>(button.Children[1]);
+        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
+        var text = Assert.IsType<Text>(button.ReadOnlyChildren[1]);
         Assert.Equal(16, image.DesiredSize.Width, 12);
         Assert.Equal(
             image.LayoutBounds.X + image.LayoutBounds.Width + 5.6,
@@ -234,7 +234,7 @@ public sealed class ButtonTests
         button.Measure(new Size(100, 100));
         button.Arrange(new Rect(0, 0, 10, 8));
 
-        var image = Assert.IsType<ImageView>(Assert.Single(button.Children));
+        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
         Assert.True(image.LayoutBounds.X < button.ContentBounds.X);
         Assert.True(image.LayoutBounds.Y < button.ContentBounds.Y);
         Assert.False(button.ClipToBounds);
@@ -251,7 +251,7 @@ public sealed class ButtonTests
             Icon = CreateImage(4, 4),
             IconSize = value
         };
-        var image = Assert.IsType<ImageView>(Assert.Single(button.Children));
+        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
 
         Assert.Throws<InvalidOperationException>(() => button.Measure(Size.Infinite));
 
@@ -271,7 +271,7 @@ public sealed class ButtonTests
             Icon = CreateImage(4, 4),
             Spacing = value
         };
-        var image = Assert.IsType<ImageView>(Assert.Single(button.Children));
+        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
 
         Assert.Throws<InvalidOperationException>(() => button.Measure(Size.Infinite));
 
@@ -419,7 +419,7 @@ public sealed class ButtonTests
                 UiStyleSelector.For<Text>(),
                 [UiStyleSetter.Create(UiNode.OpacityProperty, 0.4)])
         ])]);
-        var oldText = Assert.IsType<Text>(Assert.Single(button.Children));
+        var oldText = Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
         var opacityNotifications = 0;
         oldText.PropertyChanged += (_, e) =>
             opacityNotifications += ReferenceEquals(e.Property, UiNode.OpacityProperty) ? 1 : 0;
@@ -433,7 +433,7 @@ public sealed class ButtonTests
                 [UiStyleSetter.Create(UiNode.OpacityProperty, 0.8)])
         ])]);
 
-        Assert.Empty(button.Children);
+        Assert.Empty(button.ReadOnlyChildren);
         Assert.Null(oldText.Screen);
         Assert.Equal(1, oldText.Opacity);
         Assert.Equal(1, opacityNotifications);
@@ -491,7 +491,7 @@ public sealed class ButtonTests
     {
         var button = new Button { Text = "Delete" };
         button.Classes.Add("danger");
-        var text = Assert.IsType<Text>(Assert.Single(button.Children));
+        var text = Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
 
         button.IsEnabled = false;
 
@@ -556,7 +556,7 @@ public sealed class ButtonTests
         var commands = screen.CreateDrawCommandList();
         var imageCommand = Assert.Single(commands.OfType<UiDrawImageCommand>());
         var textCommand = Assert.Single(commands.OfType<UiDrawTextCommand>());
-        var image = Assert.IsType<ImageView>(button.Children[0]);
+        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
 
         Assert.Equal(
             new Rect(0, 0, image.LayoutBounds.Width, image.LayoutBounds.Height),

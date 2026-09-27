@@ -352,7 +352,7 @@ internal static class ShowcaseTestSupport
 
         if (node is Parent parent)
         {
-            foreach (var child in parent.Children)
+            foreach (var child in parent.ReadOnlyChildren)
             {
                 var match = FindByIdOrNull(child, id);
                 if (match is not null)

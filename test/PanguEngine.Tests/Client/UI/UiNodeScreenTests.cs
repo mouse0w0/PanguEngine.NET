@@ -1,6 +1,5 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
-
 using PanguEngine.ComponentModel;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -42,18 +41,18 @@ public sealed class UiNodeScreenTests
 
         Assert.Empty(changes);
         secondParent.Children.Add(node);
-        Assert.Empty(changes);
+        Assert.Equal([(first, null), (null, first)], changes);
 
         second.Root = node;
         second.Root = node;
-        Assert.Equal([(first, second)], changes);
+        Assert.Equal([(first, null), (null, first), (first, null), (null, second)], changes);
 
         second.Root = null;
-        Assert.Equal([(first, second), (second, null)], changes);
+        Assert.Equal([(first, null), (null, first), (first, null), (null, second), (second, null)], changes);
 
         subscription.Dispose();
         firstParent.Children.Add(node);
-        Assert.Equal(2, changes.Count);
+        Assert.Equal(5, changes.Count);
         Assert.Same(first, node.Screen);
     }
 
