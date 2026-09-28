@@ -17,7 +17,7 @@ public sealed class UiStyleRule
     /// <param name="sourceLocation">The optional source location for parsed rules.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="selectors"/> or <paramref name="setters"/> is null.</exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when the selector list is empty or contains null, or a setter targets an incompatible or read-only property.
+    /// Thrown when the selector list is empty or contains null, or a setter targets an incompatible, read-only, or direct property.
     /// </exception>
     public UiStyleRule(IEnumerable<UiStyleSelector> selectors, IEnumerable<UiStyleSetter> setters,
         UiStyleSourceLocation? sourceLocation = null)
@@ -219,6 +219,9 @@ public sealed class UiStyleRule
 
     private static void ValidateSetter(Type? targetType, UiStyleSetter setter)
     {
+        if (setter.Property.IsDirect)
+            throw new ArgumentException(
+                $"Property '{setter.Property.Name}' is direct and cannot be styled.", nameof(setter));
         if (setter.Property.IsReadOnly)
             throw new ArgumentException(
                 $"Property '{setter.Property.Name}' is read-only and cannot be styled.", nameof(setter));

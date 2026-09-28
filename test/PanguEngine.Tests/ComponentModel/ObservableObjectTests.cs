@@ -112,13 +112,15 @@ public sealed class ObservableObjectTests
     }
 
     [Fact]
-    public void OneWayBindingRejectsWritesAndUnbindPreservesLastValue()
+    public void OneWayBindingAllowsWritesAndUnbindPreservesLastValue()
     {
         var source = new Model { Value = 6 };
         var target = new Model();
         target.Bind(Model.ValueProperty, source, Model.ValueProperty);
         Assert.Equal(6, target.Value);
-        Assert.Throws<InvalidOperationException>(() => target.Value = 9);
+        target.Value = 9;
+        Assert.Equal(9, target.Value);
+        Assert.Equal(6, source.Value);
         source.Value = 8;
         Assert.Equal(8, target.Value);
 

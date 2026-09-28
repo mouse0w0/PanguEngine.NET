@@ -119,6 +119,8 @@ public abstract partial class UiNode
     {
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
+        if (property.IsDirect)
+            return Array.Empty<UiStyleValueSource>();
         EnsureStyleSnapshot();
         var sources = _styleSnapshot?.GetSources(property) ?? Array.Empty<UiStyleValueSource>();
         var isMasked = HasLocalValue(property);

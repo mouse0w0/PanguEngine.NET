@@ -55,7 +55,7 @@ public static class UiCssRegistry
     /// <param name="converter">The converter from a trimmed CSS value to the typed value.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="property"/> or <paramref name="converter"/> is null.</exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when the name is invalid, the property is read-only, or targets a type that
+    /// Thrown when the name is invalid, the property is read-only or direct, or targets a type that
     /// <typeparamref name="TTarget"/> cannot be stored on.
     /// </exception>
     /// <exception cref="InvalidOperationException">
@@ -70,6 +70,9 @@ public static class UiCssRegistry
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(converter);
         UiStyleIdentifier.ThrowIfInvalid(name, nameof(name));
+        if (property.IsDirect)
+            throw new ArgumentException(
+                $"Property '{property.Name}' is direct and cannot be exposed to CSS.", nameof(property));
         if (property.IsReadOnly)
             throw new ArgumentException(
                 $"Property '{property.Name}' is read-only and cannot be exposed to CSS.", nameof(property));

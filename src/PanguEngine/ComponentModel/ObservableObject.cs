@@ -24,7 +24,7 @@ public abstract partial class ObservableObject
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The property descriptor.</param>
     /// <returns>
-    /// The local or binding value when present, otherwise the host's fallback value.
+    /// The direct getter value, or the local or binding value when present, otherwise the host's fallback value.
     /// </returns>
     public T GetValue<T>(Property<T> property)
     {
@@ -34,16 +34,17 @@ public abstract partial class ObservableObject
     }
 
     /// <summary>
-    /// Sets a local value for a registered property.
+    /// Sets a registered property through its direct setter or local value storage.
     /// </summary>
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The property descriptor.</param>
-    /// <param name="value">The new local value.</param>
+    /// <param name="value">The new property value.</param>
     /// <remarks>
-    /// A one-way binding rejects direct assignment. A two-way binding writes a changed value back to its source.
+    /// Assignment preserves an existing binding. One-way bindings do not write back; two-way bindings
+    /// observe property change notifications and synchronize the current target value to their source.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the property is read-only or is the target of a one-way binding.
+    /// Thrown when the property is read-only or the host's write-access policy rejects the operation.
     /// </exception>
     public void SetValue<T>(Property<T> property, T value)
     {
@@ -51,33 +52,49 @@ public abstract partial class ObservableObject
         property.VerifyOwner(this);
         property.VerifyWritable();
 
-        if (TryGetBinding(property, out var binding))
-        {
-            if (!binding.IsTwoWay)
-                throw new InvalidOperationException($"Property '{property.Name}' has a one-way binding.");
-
-            VerifyMutationAccess();
-            if (EqualityComparer<T>.Default.Equals(GetValueCore(property), value))
-                return;
-
-            VerifyMutationAccess();
-            SetValueCore(property, value);
-            if (IsCurrentBinding(property, binding))
-                binding.UpdateSource(value);
-            return;
-        }
-
         VerifyMutationAccess();
         SetValueCore(property, value);
     }
 
+    /// <summary>Updates a direct property's backing field and publishes a change when its value differs.</summary>
+    /// <typeparam name="TOwner">The observable host type that owns the property.</typeparam>
+    /// <typeparam name="TValue">The property value type.</typeparam>
+    /// <param name="property">The direct property associated with the field.</param>
+    /// <param name="field">The backing field read by the registered getter.</param>
+    /// <param name="value">The value to assign.</param>
+    /// <returns>True when the field changed; otherwise false.</returns>
+    /// <remarks>
+    /// Owner code may update read-only direct properties through this method. Writes honor the host's
+    /// access policy. Changed values invoke the registered callback and host notifications.
+    /// Bindings observe those notifications. Failures preserve the committed field value.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when property is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the property does not target this host.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the host's write-access policy rejects the write.</exception>
+    protected bool SetField<TOwner, TValue>(
+        DirectProperty<TOwner, TValue> property, ref TValue field, TValue value)
+        where TOwner : ObservableObject
+    {
+        ArgumentNullException.ThrowIfNull(property);
+        property.VerifyOwner(this);
+        VerifyMutationAccess();
+        if (EqualityComparer<TValue>.Default.Equals(field, value))
+            return false;
+
+        var oldValue = field;
+        field = value;
+        RaisePropertyChanged(property, oldValue, value);
+        return true;
+    }
+
     /// <summary>
-    /// Clears a local value and restores the host's fallback value.
+    /// Clears a local value or resets a direct property through its setter.
     /// </summary>
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The property descriptor.</param>
     /// <remarks>
-    /// Clearing a bound property removes its binding and restores the host's fallback value.
+    /// Clearing a bound property removes its binding and restores the host's fallback value,
+    /// or passes the registered reset value to a direct property's setter.
     /// Use <see cref="Unbind{T}(Property{T})"/> to
     /// remove a binding while preserving its current value.
     /// </remarks>
@@ -200,6 +217,8 @@ public abstract partial class ObservableObject
 
     private T GetValueCore<T>(Property<T> property)
     {
+        if (property is IDirectProperty<T> direct)
+            return direct.GetValue(this);
         if (_localValues is not null && _localValues.TryGetValue(property, out var local))
             return local is null ? default! : (T)local;
         return GetFallbackValue(property);
@@ -207,6 +226,12 @@ public abstract partial class ObservableObject
 
     private void SetValueCore<T>(Property<T> property, T value)
     {
+        if (property is IDirectProperty<T> direct)
+        {
+            direct.SetValue(this, value);
+            return;
+        }
+
         var oldValue = GetValueCore(property);
         _localValues ??= [];
         _localValues[property] = value;
@@ -218,6 +243,12 @@ public abstract partial class ObservableObject
 
     private void ClearValueCore<T>(Property<T> property)
     {
+        if (property is IDirectProperty<T> direct)
+        {
+            direct.SetValue(this, property.DefaultValue);
+            return;
+        }
+
         if (_localValues is null || !_localValues.Remove(property, out var storedValue))
             return;
 

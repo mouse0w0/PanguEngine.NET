@@ -118,15 +118,18 @@ public sealed class BindingTests
     }
 
     [Fact]
-    public void OneWayTargetRejectsDirectAssignment()
+    public void OneWayTargetAllowsLocalAssignmentAndResynchronizesOnSourceNotification()
     {
         var model = new Model { Value = 2 };
         var node = new TestNode();
         node.Bind(TestNode.ValueProperty, model, value => value.Value);
 
-        Assert.Throws<InvalidOperationException>(() => node.Value = 3);
-        Assert.Equal(2, node.Value);
+        node.Value = 3;
+        Assert.Equal(3, node.Value);
         Assert.Equal(2, model.Value);
+        Assert.True(node.IsBound(TestNode.ValueProperty));
+        model.Raise(nameof(Model.Value));
+        Assert.Equal(2, node.Value);
     }
 
     [Fact]
@@ -249,7 +252,43 @@ public sealed class BindingTests
     }
 
     [Fact]
-    public void TargetNotificationExceptionSkipsCurrentWriteback()
+    public void TargetHandlerBeforeBindingCanStopWritebackByThrowing()
+    {
+        var model = new Model { Value = 2 };
+        var node = new TestNode();
+        node.PropertyChanged += (_, _) =>
+        {
+            if (node.Value == 3)
+                throw new InvalidOperationException("before binding");
+        };
+        node.BindTwoWay(TestNode.ValueProperty, model, value => value.Value);
+
+        Assert.Throws<InvalidOperationException>(() => node.Value = 3);
+
+        Assert.Equal(3, node.Value);
+        Assert.Equal(2, model.Value);
+    }
+
+    [Fact]
+    public void EarlierTargetHandlerCanDetachBindingBeforeItsSnapshotCallback()
+    {
+        var model = new Model { Value = 2 };
+        var node = new TestNode();
+        node.PropertyChanged += (_, _) =>
+        {
+            if (node.Value == 3)
+                node.Unbind(TestNode.ValueProperty);
+        };
+        node.BindTwoWay(TestNode.ValueProperty, model, value => value.Value);
+
+        node.Value = 3;
+
+        Assert.Equal(2, model.Value);
+        Assert.False(node.IsBound(TestNode.ValueProperty));
+    }
+
+    [Fact]
+    public void NotificationExceptionAfterBaseCallDoesNotUndoCompletedWriteback()
     {
         var model = new Model { Value = 2 };
         var node = new ThrowingNode();
@@ -260,7 +299,7 @@ public sealed class BindingTests
 
         Assert.Equal("target notification failed", exception.Message);
         Assert.Equal(3, node.Value);
-        Assert.Equal(2, model.Value);
+        Assert.Equal(3, model.Value);
         Assert.True(node.IsBound(TestNode.ValueProperty));
     }
 
@@ -343,7 +382,7 @@ public sealed class BindingTests
     }
 
     [Fact]
-    public void PropertyBindingsSynchronizeAndHonorSourceProtection()
+    public void PropertyBindingsSynchronizeBothDirections()
     {
         var source = new TestNode { Value = 2 };
         var target = new TestNode();
@@ -386,7 +425,7 @@ public sealed class BindingTests
     }
 
     [Fact]
-    public void UiTwoWaySourceUsesItsPublicSetValueProtection()
+    public void UiTwoWaySourceCanHaveItsOwnOneWayBinding()
     {
         var model = new Model { Value = 2 };
         var source = new TestNode();
@@ -394,8 +433,12 @@ public sealed class BindingTests
         var target = new TestNode();
         target.BindTwoWay(TestNode.ValueProperty, source, TestNode.ValueProperty);
 
-        Assert.Throws<InvalidOperationException>(() => target.Value = 3);
+        target.Value = 3;
+        Assert.Equal(3, source.Value);
         Assert.Equal(2, model.Value);
+        model.Value = 4;
+        Assert.Equal(4, source.Value);
+        Assert.Equal(4, target.Value);
     }
 
     [Fact]
@@ -439,10 +482,12 @@ public sealed class BindingTests
         GC.KeepAlive(target);
     }
 
-    [Fact]
-    public void LongLivedSourceDoesNotKeepTargetAlive()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LongLivedSourceDoesNotKeepTargetAlive(bool twoWay)
     {
-        var (weakTarget, source) = CreateTargetWithExternalSource();
+        var (weakTarget, source) = CreateTargetWithExternalSource(twoWay);
 
         GC.Collect();
         GC.WaitForPendingFinalizers();
@@ -462,11 +507,14 @@ public sealed class BindingTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static (WeakReference<TestNode> Target, Model Source) CreateTargetWithExternalSource()
+    private static (WeakReference<TestNode> Target, Model Source) CreateTargetWithExternalSource(bool twoWay)
     {
         var source = new Model { Value = 2 };
         var target = new TestNode();
-        target.Bind(TestNode.ValueProperty, source, value => value.Value);
+        if (twoWay)
+            target.BindTwoWay(TestNode.ValueProperty, source, value => value.Value);
+        else
+            target.Bind(TestNode.ValueProperty, source, value => value.Value);
         return (new WeakReference<TestNode>(target), source);
     }
 

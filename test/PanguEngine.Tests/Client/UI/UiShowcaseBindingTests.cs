@@ -171,7 +171,10 @@ public sealed class UiShowcaseBindingTests
         Assert.Equal("初始文本", text.Content);
         Assert.Equal("更新 0 次", count.Content);
         Assert.True(text.IsBound(Text.ContentProperty));
-        Assert.Throws<InvalidOperationException>(() => text.Content = "直接写入");
+        text.Content = "直接写入";
+        Assert.Equal("直接写入", text.Content);
+        Assert.Equal("更新 0 次", count.Content);
+        Assert.True(text.IsBound(Text.ContentProperty));
 
         host.Click(advance);
         Assert.Equal("文本 1", text.Content);

@@ -413,7 +413,7 @@ public sealed class TextBoxTests
     }
 
     [Fact]
-    public void OneWayBindingRejectsEditBeforeStateCommit()
+    public void OneWayBindingAllowsEditingWithoutChangingSource()
     {
         using var context = new UiTextTestContext();
         var source = new Text { Content = "bound" };
@@ -422,11 +422,15 @@ public sealed class TextBoxTests
         var (manager, _, _) = OpenTextBox(textBox: textBox);
         Assert.True(textBox.Focus());
 
-        Assert.Throws<InvalidOperationException>(() => manager.ProcessTextInput("x"));
+        manager.ProcessTextInput("x");
 
-        Assert.Equal("bound", textBox.Text);
-        Assert.Equal(5, textBox.CaretIndex);
-        Assert.False(textBox.CanUndo);
+        Assert.Equal("boundx", textBox.Text);
+        Assert.Equal("bound", source.Content);
+        Assert.Equal(6, textBox.CaretIndex);
+        Assert.True(textBox.CanUndo);
+        Assert.True(textBox.IsBound(TextBox.TextProperty));
+        source.Content = "updated";
+        Assert.Equal("updated", textBox.Text);
     }
 
     [Fact]

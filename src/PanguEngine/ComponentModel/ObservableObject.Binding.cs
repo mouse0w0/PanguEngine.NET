@@ -293,7 +293,7 @@ public abstract partial class ObservableObject
     }
 
     /// <summary>
-    /// Removes a binding while preserving its last effective value as a local value.
+    /// Removes a binding while preserving the current direct field or local value.
     /// </summary>
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The target property.</param>
@@ -305,6 +305,13 @@ public abstract partial class ObservableObject
             return;
 
         VerifyMutationAccess();
+        if (property.IsDirect)
+        {
+            binding.Detach();
+            RemoveBinding(property, binding);
+            return;
+        }
+
         var currentValue = GetValueCore(property);
         binding.Detach();
         RemoveBinding(property, binding);
@@ -335,7 +342,7 @@ public abstract partial class ObservableObject
             throw new InvalidOperationException($"Property '{targetProperty.Name}' is already bound.");
     }
 
-    private void AddBinding<T>(Property<T> property, IBinding binding, T initialValue)
+    private void AddBinding<T>(Property<T> property, IBinding<T> binding, T initialValue)
     {
         try
         {
@@ -354,7 +361,7 @@ public abstract partial class ObservableObject
             throw new InvalidOperationException($"Property '{property.Name}' is already bound.");
         }
 
-        SetValueCore(property, initialValue);
+        binding.Initialize(initialValue);
     }
 
     private bool TryGetBinding<T>(Property<T> property, out IBinding<T> binding)
