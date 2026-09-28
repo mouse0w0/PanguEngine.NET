@@ -359,22 +359,29 @@ public sealed class UiObservableChildrenTests
     }
 
     [Fact]
-    public void ParentViewIsReadOnlyAndCollectionNotifiesWithItsOwnSender()
+    public void ParentViewIsReadOnlyAndBothViewsNotifyWithTheirOwnSenders()
     {
         var panel = new Panel();
         Parent parent = panel;
         var view = parent.ReadOnlyChildren;
         Assert.False(view is ObservableList<UiNode>);
-        Assert.Throws<NotSupportedException>(() => ((IList<UiNode>)view).Add(new Panel()));
-        var notifications = 0;
-        panel.Children.Changed += (sender, _) =>
+        Assert.False(view is IList<UiNode>);
+        var changes = new List<ListChangedEventArgs<UiNode>>();
+        var viewChanges = new List<ListChangedEventArgs<UiNode>>();
+        panel.Children.Changed += (sender, change) =>
         {
             Assert.Same(panel.Children, sender);
-            notifications++;
+            changes.Add(change);
+        };
+        view.Changed += (sender, change) =>
+        {
+            Assert.Same(view, sender);
+            viewChanges.Add(change);
         };
         panel.Children.Add(new Panel());
-        Assert.Equal(1, notifications);
+        Assert.Same(Assert.Single(changes), Assert.Single(viewChanges));
         Assert.Same(view, parent.ReadOnlyChildren);
+        Assert.Same(view, panel.Children.AsReadOnly());
         Assert.Single(view);
     }
 

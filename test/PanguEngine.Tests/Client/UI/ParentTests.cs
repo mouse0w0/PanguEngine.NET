@@ -22,8 +22,7 @@ public sealed class ParentTests
         Assert.Same(parent, first.Parent);
         Assert.Same(parent, second.Parent);
         Assert.IsNotType<List<UiNode>>(view);
-        Assert.Throws<NotSupportedException>(() =>
-            ((IList<UiNode>)view).Add(new TestNode()));
+        Assert.False(view is IList<UiNode>);
     }
 
     [Fact]

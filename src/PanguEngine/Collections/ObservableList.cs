@@ -16,9 +16,10 @@ namespace PanguEngine.Collections;
 /// the operation's event themselves. The public entry point publishes after the override returns.
 /// Range operations have separate extension points and do not call the single-item overrides.
 /// </remarks>
-public class ObservableList<T> : IList<T>, IReadOnlyList<T>
+public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
 {
     private readonly List<T> _items;
+    private ReadOnlyObservableList<T>? _readOnlyView;
     private bool _isMutating;
 
     /// <summary>
@@ -250,14 +251,14 @@ public class ObservableList<T> : IList<T>, IReadOnlyList<T>
     /// </summary>
     /// <param name="item">The item to locate.</param>
     /// <returns>Whether a matching item exists.</returns>
-    public bool Contains([AllowNull] T item) => IndexOfItem(item) >= 0;
+    public bool Contains(T? item) => IndexOfItem(item) >= 0;
 
     /// <summary>
     /// Finds an item index.
     /// </summary>
     /// <param name="item">The item to locate.</param>
     /// <returns>The first matching index, or -1 when absent.</returns>
-    public int IndexOf([AllowNull] T item) => IndexOfItem(item);
+    public int IndexOf(T? item) => IndexOfItem(item);
 
     /// <summary>
     /// Copies items into an array.
@@ -279,6 +280,12 @@ public class ObservableList<T> : IList<T>, IReadOnlyList<T>
     public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    /// <summary>
+    /// Returns a live read-only view of this list that reports its changes.
+    /// </summary>
+    /// <returns>The same read-only view on every call for this list.</returns>
+    public ReadOnlyObservableList<T> AsReadOnly() => _readOnlyView ??= new ReadOnlyObservableList<T>(this);
 
     /// <summary>
     /// Enters a mutation, rejecting nested writes until the returned scope is disposed.
@@ -453,7 +460,7 @@ public class ObservableList<T> : IList<T>, IReadOnlyList<T>
         if (end - start < 2)
             return;
 
-        var middle = start + ((end - start) / 2);
+        var middle = start + (end - start) / 2;
         MergeSort(entries, buffer, start, middle, comparer);
         MergeSort(entries, buffer, middle, end, comparer);
         var left = start;

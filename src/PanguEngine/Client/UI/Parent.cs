@@ -1,5 +1,5 @@
 using PanguEngine.ComponentModel;
-using System.Collections.ObjectModel;
+using PanguEngine.Collections;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI;
@@ -31,13 +31,13 @@ public abstract class Parent : UiNode
     protected Parent()
     {
         Children = new UiNodeList(this);
-        ReadOnlyChildren = new ReadOnlyCollection<UiNode>(Children);
+        ReadOnlyChildren = Children.AsReadOnly();
     }
 
     /// <summary>
     /// Gets a stable read-only view of the direct children in drawing order.
     /// </summary>
-    public IReadOnlyList<UiNode> ReadOnlyChildren { get; }
+    public IReadOnlyObservableList<UiNode> ReadOnlyChildren { get; }
 
     /// <summary>
     /// Gets the mutable collection of direct children for derived controls.
