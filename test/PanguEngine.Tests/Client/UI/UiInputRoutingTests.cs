@@ -1212,7 +1212,7 @@ public sealed class UiInputRoutingTests
     }
 
     [Fact]
-    public void FocusRequiresActiveVisibleArrangedFocusableNode()
+    public void FocusRequiresActiveVisibleFocusableNodeWithoutRequiringValidLayout()
     {
         var inactive = new TestNode { Focusable = true };
         Assert.False(inactive.Focus());
@@ -1242,8 +1242,37 @@ public sealed class UiInputRoutingTests
         Assert.Same(hitTestInvisible, screen.FocusedNode);
 
         eligible.InvalidateArrange();
-        Assert.False(eligible.Focus());
+        Assert.False(eligible.IsArrangeValid);
+        Assert.True(eligible.Focus());
+        Assert.Same(eligible, screen.FocusedNode);
         manager.PrepareFrame(new Size(100, 100), 0);
+        Assert.Same(eligible, screen.FocusedNode);
+        manager.Close();
+    }
+
+    [Fact]
+    public void AttachedNodeCanReceiveFocusAndKeyboardInputBeforeItsFirstLayout()
+    {
+        var (manager, screen, root) = OpenScene();
+        var node = new TestNode { Focusable = true, Width = 20, Height = 20 };
+        root.Children.Add(node);
+        var gotFocus = 0;
+        var keyDown = 0;
+        node.GotFocus += (_, _) => gotFocus++;
+        node.KeyDown += (_, _) => keyDown++;
+
+        Assert.False(node.IsArrangeValid);
+        Assert.True(node.Focus());
+        Assert.True(node.IsFocused);
+        Assert.Same(node, screen.FocusedNode);
+        Assert.Equal(1, gotFocus);
+
+        manager.ProcessKeyDown(Key.A, KeyModifiers.None);
+        Assert.Equal(1, keyDown);
+        manager.PrepareFrame(new Size(100, 100), 0);
+        Assert.Same(node, screen.FocusedNode);
+        Assert.Equal(1, gotFocus);
+        manager.Close();
     }
 
     [Fact]

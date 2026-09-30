@@ -554,7 +554,7 @@ public partial class UiScreen
         BeginInputRouting();
         try
         {
-            if (FocusedNode is not null && !CanRetainFocus(FocusedNode))
+            if (FocusedNode is not null && !CanFocus(FocusedNode))
                 _ = ChangeFocus(null);
             if (!IsScreenActive() || FocusedNode is null)
                 return false;
@@ -696,14 +696,6 @@ public partial class UiScreen
     }
 
     private bool CanFocus(UiNode node)
-    {
-        if (!node.IsArrangeValid || !CanRetainFocus(node))
-            return false;
-
-        return true;
-    }
-
-    private bool CanRetainFocus(UiNode node)
     {
         if (!IsActive(node) ||
             !node.IsEnabled ||
