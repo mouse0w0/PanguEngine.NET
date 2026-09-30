@@ -322,6 +322,7 @@ public partial class UiScreen
                     if (root.Parent is not null || root.Screen is not null)
                         throw new InvalidOperationException("The UI node was attached during removal notification.");
                 }
+
                 if (sourceScreen is not null && ReferenceEquals(sourceScreen._root, root))
                     sourceScreen.ClearRootForTransfer();
             }
@@ -522,9 +523,7 @@ public partial class UiScreen
     private void CloseCore()
     {
         OnClosing();
-        var snapshot = CommitInputStateForClose();
-        if (snapshot is not null)
-            NotifyInputStateLoss(snapshot);
+        CancelPendingPointerInput();
         OnClosed();
         ResetOpenState();
     }

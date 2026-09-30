@@ -106,12 +106,13 @@ public partial class UiScreen
         {
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
+
             if (!IsScreenActive())
                 return false;
 
             UiHitPathEntry[] path;
             var pressedTarget = _pressedTargets[GetButtonIndex(MouseButton.Left)];
-            if (pressedTarget is not null && IsActive(pressedTarget))
+            if (pressedTarget is not null && ReferenceEquals(pressedTarget.Screen, this))
                 path = BuildPathForNode(pressedTarget, logicalPosition).ToArray();
             else
                 path = _hoverPath.ToArray();
@@ -141,6 +142,7 @@ public partial class UiScreen
         {
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
+
             if (!IsScreenActive())
                 return false;
 
@@ -157,6 +159,9 @@ public partial class UiScreen
 
                 ProjectPressedDifference(oldPressedControls, newPressedControls);
             }
+
+            if (!IsScreenActive())
+                return false;
 
             UiNode? focusCandidate = null;
             for (var pathIndex = path.Length - 1; pathIndex >= 0; pathIndex--)
@@ -200,6 +205,7 @@ public partial class UiScreen
         {
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
+
             if (!IsScreenActive())
                 return false;
 
@@ -232,7 +238,7 @@ public partial class UiScreen
                 static (node, eventArgs) => node.RaisePointerReleased(eventArgs));
             var handled = args.Handled;
 
-            if (!IsScreenActive() || !IsActive(target))
+            if (!IsActive(target))
                 return handled;
 
             var currentPath = BuildHitPath(logicalPosition);
@@ -311,36 +317,7 @@ public partial class UiScreen
             if (focused)
                 return;
 
-            var pressedTargets = _pressedTargets.ToArray();
-            var pointerPosition = _pointerPosition;
-            var snapshot = CommitInputStateForClose();
-            if (snapshot is not null)
-                NotifyInputStateLoss(snapshot);
-
-            for (var index = 0; index < pressedTargets.Length; index++)
-            {
-                if (!IsScreenActive())
-                    break;
-
-                var target = pressedTargets[index];
-                if (target is null || !IsInputStateCurrent(target))
-                    continue;
-
-                var path = BuildPathForNode(target, pointerPosition);
-                if (path.Count == 0)
-                    continue;
-
-                var args = new UiPointerButtonEventArgs(
-                    target,
-                    pointerPosition,
-                    (MouseButton)((int)MouseButton.Left + index),
-                    KeyModifiers.None,
-                    path);
-                Bubble(
-                    path,
-                    args,
-                    static (node, eventArgs) => node.RaisePointerCanceled(eventArgs));
-            }
+            CancelPendingPointerInput();
         }
         finally
         {
@@ -408,6 +385,37 @@ public partial class UiScreen
             var args = new UiPointerEventArgs(snapshot.ExitedNodes[^1], snapshot.PointerPosition, path);
             for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
                 snapshot.ExitedNodes[index].RaisePointerExited(args);
+        }
+    }
+
+    private void CancelPendingPointerInput()
+    {
+        var pressedTargets = _pressedTargets.ToArray();
+        var pointerPosition = _pointerPosition;
+        var snapshot = CommitInputStateForClose();
+        if (snapshot is not null)
+            NotifyInputStateLoss(snapshot);
+
+        for (var index = 0; index < pressedTargets.Length; index++)
+        {
+            var target = pressedTargets[index];
+            if (target is null || !IsInputStateCurrent(target))
+                continue;
+
+            var path = BuildPathForNode(target, pointerPosition);
+            if (path.Count == 0)
+                continue;
+
+            var args = new UiPointerButtonEventArgs(
+                target,
+                pointerPosition,
+                (MouseButton)((int)MouseButton.Left + index),
+                KeyModifiers.None,
+                path);
+            Bubble(
+                path,
+                args,
+                static (node, eventArgs) => node.RaisePointerCanceled(eventArgs));
         }
     }
 
@@ -496,7 +504,7 @@ public partial class UiScreen
     private List<UiHitPathEntry> BuildPathForNode(UiNode node, Point screenPoint)
     {
         var root = Root;
-        if (root is null || !IsActive(node))
+        if (root is null || !ReferenceEquals(node.Screen, this))
             return [];
 
         var nodes = new List<UiNode>();
@@ -555,19 +563,8 @@ public partial class UiScreen
             if (path.Count == 0)
                 return false;
 
-            var nodes = path.Select(static entry => entry.Node).ToArray();
             var args = createEventArgs(FocusedNode);
-            for (var index = nodes.Length - 1; index >= 0; index--)
-            {
-                if (!IsScreenActive())
-                    break;
-                if (!IsActive(nodes[index]))
-                    continue;
-                raise(nodes[index], args);
-                if (args.Handled)
-                    break;
-            }
-
+            Bubble(path, args, raise);
             return args.Handled;
         }
         finally
@@ -619,8 +616,8 @@ public partial class UiScreen
             for (var index = oldPath.Length - 1; index >= commonLength; index--)
             {
                 if (!IsScreenActive())
-                    break;
-                if (!IsActive(oldPath[index].Node))
+                    return;
+                if (!ReferenceEquals(oldPath[index].Node.Screen, this))
                     continue;
                 oldPath[index].Node.RaisePointerExited(args);
             }
@@ -632,8 +629,8 @@ public partial class UiScreen
             for (var index = commonLength; index < newPath.Length; index++)
             {
                 if (!IsScreenActive())
-                    break;
-                if (!IsActive(newPath[index].Node))
+                    return;
+                if (!ReferenceEquals(newPath[index].Node.Screen, this))
                     continue;
                 newPath[index].Node.RaisePointerEntered(args);
             }
@@ -850,9 +847,7 @@ public partial class UiScreen
     {
         for (var index = path.Count - 1; index >= 0; index--)
         {
-            if (!IsScreenActive())
-                break;
-            if (!IsActive(path[index].Node))
+            if (!ReferenceEquals(path[index].Node.Screen, this))
                 continue;
             raise(path[index].Node, eventArgs);
             if (eventArgs.Handled)
