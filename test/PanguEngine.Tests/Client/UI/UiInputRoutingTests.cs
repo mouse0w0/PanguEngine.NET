@@ -425,8 +425,25 @@ public sealed class UiInputRoutingTests
         var events = new List<string>();
         control.LostFocus += (_, _) => events.Add("lost");
         control.PointerExited += (_, _) => events.Add("exit");
+        control.PointerCanceled += (_, args) =>
+        {
+            Assert.False(control.IsFocused);
+            Assert.False(control.IsHovered);
+            Assert.False(control.IsPressed);
+            Assert.Null(screen.FocusedNode);
+            Assert.Same(control, args.Source);
+            Assert.Equal(MouseButton.Left, args.Button);
+            Assert.Equal(new Point(5, 5), args.ScreenPosition);
+            events.Add("cancel");
+        };
+        control.PointerReleased += (_, _) => events.Add("release");
+        control.PointerClicked += (_, _) => events.Add("click");
+        control.KeyDown += (_, args) => events.Add($"down-{args.Key}");
+        control.KeyUp += (_, _) => events.Add("up");
+        root.KeyUp += (_, _) => events.Add("root-up");
         manager.ProcessPointerMoved(new Point(5, 5));
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
         Assert.True(control.IsFocused);
         Assert.True(control.IsHovered);
         Assert.True(control.IsPressed);
@@ -439,7 +456,207 @@ public sealed class UiInputRoutingTests
         Assert.False(control.IsHovered);
         Assert.False(control.IsPressed);
         Assert.Null(screen.FocusedNode);
-        Assert.Equal(["lost", "exit"], events);
+        manager.ProcessFocusChanged(false);
+        manager.ProcessFocusChanged(true);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.Equal(["down-Space", "lost", "exit", "cancel"], events);
+    }
+
+    [Fact]
+    public void FocusLossCancelsEachButtonAtItsOriginalTargetAndBubblesWithLastPosition()
+    {
+        var (manager, _, root) = OpenScene();
+        var first = Place(root, new TestNode(), 10, 10, 20, 20);
+        var second = Place(root, new TestNode(), 40, 10, 20, 20);
+        var events = new List<string>();
+        first.PointerCanceled += (_, args) =>
+        {
+            Assert.Same(first, args.Source);
+            Assert.Equal(new Point(70, 60), args.GetPosition(first));
+            events.Add($"first-{args.Button}");
+            args.Handled = args.Button == MouseButton.Left;
+        };
+        second.PointerCanceled += (_, args) =>
+        {
+            Assert.Same(second, args.Source);
+            Assert.Equal(new Point(40, 60), args.GetPosition(second));
+            events.Add($"second-{args.Button}");
+        };
+        root.PointerCanceled += (_, args) =>
+        {
+            Assert.Equal(new Point(80, 70), args.ScreenPosition);
+            Assert.Equal(KeyModifiers.None, args.Modifiers);
+            events.Add($"root-{args.Button}");
+        };
+        manager.ProcessPointerPressed(new Point(15, 15), MouseButton.Left, KeyModifiers.Shift);
+        manager.ProcessPointerPressed(new Point(45, 15), MouseButton.Right, KeyModifiers.Shift);
+        manager.ProcessPointerPressed(new Point(15, 15), MouseButton.Button12, KeyModifiers.None);
+        manager.ProcessPointerMoved(new Point(80, 70));
+
+        manager.ProcessFocusChanged(false);
+
+        Assert.Equal(
+            ["first-Left", "second-Right", "root-Right", "first-Button12", "root-Button12"],
+            events);
+    }
+
+    [Fact]
+    public void PointerCanceledClosingScreenStopsRemainingNotifications()
+    {
+        var (manager, screen, root) = OpenScene();
+        var first = Place(root, new TestNode(), 0, 0, 20, 20);
+        var second = Place(root, new TestNode(), 30, 0, 20, 20);
+        var events = new List<string>();
+        first.PointerCanceled += (_, _) =>
+        {
+            events.Add("first");
+            manager.Close();
+        };
+        second.PointerCanceled += (_, _) => events.Add("second");
+        root.PointerCanceled += (_, _) => events.Add("root");
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerPressed(new Point(35, 5), MouseButton.Right, KeyModifiers.None);
+
+        manager.ProcessFocusChanged(false);
+
+        Assert.False(screen.IsOpen());
+        Assert.Equal(["first"], events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void PointerCanceledSkipsLaterTargetMadeUnavailableByEarlierCallback(bool removeTarget)
+    {
+        var (manager, _, root) = OpenScene();
+        var first = Place(root, new TestNode(), 0, 0, 20, 20);
+        var second = Place(root, new TestNode(), 30, 0, 20, 20);
+        var events = new List<string>();
+        first.PointerCanceled += (_, _) =>
+        {
+            events.Add("first");
+            if (removeTarget)
+                root.Children.Remove(second);
+            else
+                second.IsEnabled = false;
+        };
+        second.PointerCanceled += (_, _) => events.Add("second");
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerPressed(new Point(35, 5), MouseButton.Right, KeyModifiers.None);
+
+        manager.ProcessFocusChanged(false);
+
+        Assert.Equal(["first"], events);
+        if (removeTarget)
+            Assert.Null(second.Screen);
+        else
+            Assert.False(second.IsEnabled);
+    }
+
+    [Fact]
+    public void FocusLossCancelsPendingButtonWithoutFocusHoverOrPressedControls()
+    {
+        var (manager, screen, root) = OpenScene();
+        var leaf = Place(root, new TestNode(), 0, 0, 20, 20);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Right, KeyModifiers.None);
+        manager.ProcessPointerMoved(new Point(150, 150));
+        Assert.Null(screen.FocusedNode);
+        Assert.False(root.IsHovered);
+        Assert.False(leaf.IsHovered);
+        var events = new List<string>();
+        leaf.PointerCanceled += (_, args) =>
+        {
+            Assert.Equal(MouseButton.Right, args.Button);
+            Assert.Equal(new Point(150, 150), args.ScreenPosition);
+            events.Add("cancel");
+        };
+        leaf.LostFocus += (_, _) => events.Add("lost");
+        leaf.PointerExited += (_, _) => events.Add("exit");
+        root.PointerExited += (_, _) => events.Add("root-exit");
+        leaf.PointerReleased += (_, _) => events.Add("release");
+        leaf.PointerClicked += (_, _) => events.Add("click");
+
+        manager.ProcessFocusChanged(false);
+        manager.ProcessFocusChanged(true);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Right, KeyModifiers.None);
+
+        Assert.Equal(["cancel"], events);
+    }
+
+    [Fact]
+    public void PointerCanceledExceptionPropagatesAndClearsAllPendingButtons()
+    {
+        var (manager, _, root) = OpenScene();
+        var leaf = Place(root, new TestNode(), 0, 0, 20, 20);
+        var expected = new InvalidOperationException("canceled");
+        var events = new List<string>();
+        EventHandler<UiPointerButtonEventArgs> throwingHandler = (_, args) =>
+        {
+            events.Add($"cancel-{args.Button}");
+            throw expected;
+        };
+        leaf.PointerCanceled += throwingHandler;
+        leaf.PointerReleased += (_, _) => events.Add("release");
+        leaf.PointerClicked += (_, _) => events.Add("click");
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Right, KeyModifiers.None);
+
+        var actual = Assert.Throws<InvalidOperationException>(() => manager.ProcessFocusChanged(false));
+        leaf.PointerCanceled -= throwingHandler;
+        manager.ProcessFocusChanged(true);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Right, KeyModifiers.None);
+
+        Assert.Same(expected, actual);
+        Assert.Equal(["cancel-Left"], events);
+
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+
+        Assert.Equal(["cancel-Left", "release", "click"], events);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void CloseOrNodeUnavailabilityDoesNotRaisePointerCanceled(bool closeScreen)
+    {
+        var (manager, _, root) = OpenScene();
+        var leaf = Place(root, new TestControl(), 0, 0, 20, 20);
+        var canceled = 0;
+        leaf.PointerCanceled += (_, _) => canceled++;
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        Assert.True(leaf.IsPressed);
+
+        if (closeScreen)
+            manager.Close();
+        else
+            leaf.IsEnabled = false;
+        manager.ProcessFocusChanged(false);
+
+        Assert.False(leaf.IsPressed);
+        Assert.Equal(0, canceled);
+    }
+
+    [Fact]
+    public void NormalReleaseAndFocusChangesWithoutPendingPressDoNotRaisePointerCanceled()
+    {
+        var (manager, _, root) = OpenScene();
+        var leaf = Place(root, new TestNode(), 0, 0, 20, 20);
+        var events = new List<string>();
+        leaf.PointerCanceled += (_, _) => events.Add("cancel");
+        leaf.PointerReleased += (_, _) => events.Add("release");
+        leaf.PointerClicked += (_, _) => events.Add("click");
+
+        manager.ProcessPointerMoved(new Point(5, 5));
+        manager.ProcessFocusChanged(false);
+        manager.ProcessFocusChanged(true);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessFocusChanged(true);
+        manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        manager.ProcessFocusChanged(false);
+
+        Assert.Equal(["release", "click"], events);
     }
 
     [Fact]

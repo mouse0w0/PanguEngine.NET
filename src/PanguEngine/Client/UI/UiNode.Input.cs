@@ -118,6 +118,17 @@ public abstract partial class UiNode
     public event EventHandler<UiPointerButtonEventArgs>? PointerReleased;
 
     /// <summary>
+    /// Occurs when window focus loss cancels an active pointer button interaction on this node's route.
+    /// </summary>
+    /// <remarks>
+    /// This event bubbles from the original pressed target after input state has been cleared.
+    /// Each canceled button reports the last known pointer position and no key modifiers.
+    /// Cancellation does not produce a release or click and does not require reverting interaction results.
+    /// Screen closure and node unavailability use lifecycle cleanup without raising this event.
+    /// </remarks>
+    public event EventHandler<UiPointerButtonEventArgs>? PointerCanceled;
+
+    /// <summary>
     /// Occurs when a pointer button press and release form a click on this node.
     /// </summary>
     public event EventHandler<UiPointerButtonEventArgs>? PointerClicked;
@@ -256,6 +267,13 @@ public abstract partial class UiNode
         PointerReleased?.Invoke(this, eventArgs);
 
     /// <summary>
+    /// Raises the pointer canceled event.
+    /// </summary>
+    /// <param name="eventArgs">The event data.</param>
+    protected virtual void OnPointerCanceled(UiPointerButtonEventArgs eventArgs) =>
+        PointerCanceled?.Invoke(this, eventArgs);
+
+    /// <summary>
     /// Raises the pointer clicked event.
     /// </summary>
     /// <param name="eventArgs">The event data.</param>
@@ -309,6 +327,7 @@ public abstract partial class UiNode
     internal void RaisePointerMoved(UiPointerEventArgs eventArgs) => OnPointerMoved(eventArgs);
     internal void RaisePointerPressed(UiPointerButtonEventArgs eventArgs) => OnPointerPressed(eventArgs);
     internal void RaisePointerReleased(UiPointerButtonEventArgs eventArgs) => OnPointerReleased(eventArgs);
+    internal void RaisePointerCanceled(UiPointerButtonEventArgs eventArgs) => OnPointerCanceled(eventArgs);
     internal void RaisePointerClicked(UiPointerButtonEventArgs eventArgs) => OnPointerClicked(eventArgs);
     internal void RaisePointerWheel(UiPointerWheelEventArgs eventArgs) => OnPointerWheel(eventArgs);
     internal void RaiseKeyDown(UiKeyEventArgs eventArgs) => OnKeyDown(eventArgs);

@@ -311,9 +311,36 @@ public partial class UiScreen
             if (focused)
                 return;
 
+            var pressedTargets = _pressedTargets.ToArray();
+            var pointerPosition = _pointerPosition;
             var snapshot = CommitInputStateForClose();
             if (snapshot is not null)
                 NotifyInputStateLoss(snapshot);
+
+            for (var index = 0; index < pressedTargets.Length; index++)
+            {
+                if (!IsScreenActive())
+                    break;
+
+                var target = pressedTargets[index];
+                if (target is null || !IsInputStateCurrent(target))
+                    continue;
+
+                var path = BuildPathForNode(target, pointerPosition);
+                if (path.Count == 0)
+                    continue;
+
+                var args = new UiPointerButtonEventArgs(
+                    target,
+                    pointerPosition,
+                    (MouseButton)((int)MouseButton.Left + index),
+                    KeyModifiers.None,
+                    path);
+                Bubble(
+                    path,
+                    args,
+                    static (node, eventArgs) => node.RaisePointerCanceled(eventArgs));
+            }
         }
         finally
         {
