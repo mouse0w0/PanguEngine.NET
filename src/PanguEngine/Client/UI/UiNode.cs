@@ -24,7 +24,6 @@ public abstract partial class UiNode : ObservableObject
     {
         if (property.IsReadOnly)
             return property.DefaultValue;
-        EnsureStyleSnapshot();
         if (_styleSnapshot is not null && _styleSnapshot.TryGetBoxedValue(property, out var style))
             return style is null ? default! : (T)style;
         return base.GetFallbackValue(property);

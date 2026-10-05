@@ -38,14 +38,17 @@ public sealed class UiScreenStyleSheetsTests
         var screen = new UiScreen(button);
         screen.SetBaseStyleSheets([UiStyleSheet.Parse("Button { background: #010203; }")]);
         screen.SetStyleSheets([UiStyleSheet.Parse("Button { background: #040506; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(4, 5, 6), button.Background);
 
         screen.SetStyleSheets([]);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(new SolidColorBrush(1, 2, 3), button.Background);
         Assert.Equal(UiStyleOrigin.Base, Assert.Single(button.GetStyleValueSources(Region.BackgroundProperty)).Origin);
 
         screen.SetBaseStyleSheets([]);
+        screen.Root!.UpdateStyles();
 
         Assert.Empty(screen.BaseStyleSheets);
         Assert.Empty(screen.StyleSheets);
@@ -63,11 +66,13 @@ public sealed class UiScreenStyleSheetsTests
         var screen = new UiScreen(button);
         var sheet = UiStyleSheet.Parse("Button { background: #010203; }");
         SetSheets(screen, baseStyles, [sheet]);
+        screen.Root!.UpdateStyles();
         var resolver = screen.StyleResolver;
         var changes = 0;
         button.PropertyChanged += (_, _) => changes++;
 
         SetSheets(screen, baseStyles, [sheet]);
+        screen.Root!.UpdateStyles();
 
         Assert.Same(resolver, screen.StyleResolver);
         Assert.Equal(0, changes);
@@ -94,26 +99,27 @@ public sealed class UiScreenStyleSheetsTests
         Assert.Equal(background, button.Background);
 
         SetSheets(screen, baseStyles, [UiStyleSheet.Parse("Button { background: #010203; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(1, 2, 3), button.Background);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void BindingFailurePreservesBothSourcesAndNodeStyles(bool baseStyles)
+    public void BindingFailurePreservesNodeStylesAndKeepsNewConfiguration(bool baseStyles)
     {
         var button = new Button();
         var screen = new UiScreen(button);
         var previous = screen.StyleResolver;
         var background = button.Background;
 
-        var error = Assert.Throws<UiStyleParseException>(() => SetSheets(
-            screen, baseStyles, [UiStyleSheet.Parse("Button { background: nope; }")]));
+        var invalid = UiStyleSheet.Parse("Button { background: nope; }");
+        SetSheets(screen, baseStyles, [invalid]);
+        var error = Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-        Assert.Same(previous, screen.StyleResolver);
-        Assert.Same(previous.BaseStyleSheets, screen.BaseStyleSheets);
-        Assert.Same(previous.StyleSheets, screen.StyleSheets);
+        Assert.NotSame(previous, screen.StyleResolver);
+        Assert.Same(invalid, Assert.Single(GetSheets(screen, baseStyles)));
         Assert.Equal(background, button.Background);
     }
 
@@ -193,7 +199,7 @@ public sealed class UiScreenStyleSheetsTests
     }
 
     [Fact]
-    public void PreparationRejectsStructureChangesFromConverter()
+    public void ConverterCanDetachTheCurrentNodeWithoutLosingItsInvalidation()
     {
         var root = new Panel();
         var node = new CallbackNode();
@@ -203,12 +209,14 @@ public sealed class UiScreenStyleSheetsTests
         CallbackNode.OnConvert = () => root.Children.Clear();
         try
         {
-            var error = Assert.Throws<UiStyleParseException>(() =>
-                screen.SetStyleSheets([UiStyleSheet.Parse("CallbackNode { callback-value: 1; }")]));
+            screen.SetStyleSheets([UiStyleSheet.Parse("CallbackNode { callback-value: 1; }")]);
+            screen.Root!.UpdateStyles();
 
-            Assert.IsType<InvalidOperationException>(error.InnerException);
-            Assert.Same(node, Assert.Single(root.Children));
-            Assert.Same(previous, screen.StyleResolver);
+            Assert.Empty(root.Children);
+            Assert.Null(node.Parent);
+            Assert.Null(node.Screen);
+            Assert.False(node.IsStyleSubtreeValid);
+            Assert.NotSame(previous, screen.StyleResolver);
         }
         finally
         {
@@ -217,10 +225,11 @@ public sealed class UiScreenStyleSheetsTests
     }
 
     [Fact]
-    public void PreparationRejectsStyleInputsAndSourceReplacementFromConverter()
+    public void ConverterCanInvalidateStyleInputsButCannotReplaceScreenSources()
     {
         var node = new CallbackNode();
         var screen = new UiScreen(node);
+        screen.Open();
         var errors = new List<Exception?>();
         CallbackNode.OnConvert = () =>
         {
@@ -232,21 +241,27 @@ public sealed class UiScreenStyleSheetsTests
         try
         {
             screen.SetStyleSheets([UiStyleSheet.Parse("CallbackNode { callback-value: 1; }")]);
+            screen.PrepareFrame(new Size(100, 100), 0);
 
             Assert.Equal(4, errors.Count);
-            Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
-            Assert.Empty(node.Classes);
-            Assert.Null(node.StyleId);
+            Assert.IsType<InvalidOperationException>(errors[0]);
+            Assert.IsType<InvalidOperationException>(errors[1]);
+            Assert.Null(errors[2]);
+            Assert.Null(errors[3]);
+            Assert.Contains("blocked", node.Classes);
+            Assert.Equal("blocked", node.StyleId);
+            Assert.True(node.IsStyleSubtreeValid);
             Assert.Equal(1d, node.GetValue(CallbackNode.ValueProperty));
         }
         finally
         {
             CallbackNode.OnConvert = null;
+            screen.Close();
         }
     }
 
     [Fact]
-    public void NotificationRejectsReplacingEitherSourceAndChangingClasses()
+    public void NotificationRejectsReplacingSourcesButAllowsInvalidatingClasses()
     {
         var button = new Button();
         var screen = new UiScreen(button);
@@ -263,11 +278,20 @@ public sealed class UiScreenStyleSheetsTests
         };
 
         screen.SetStyleSheets([UiStyleSheet.Parse("Button { background: #010203; }")]);
+        screen.Open();
+        try
+        {
+            screen.PrepareFrame(new Size(100, 100), 0);
 
-        Assert.IsType<InvalidOperationException>(authorError);
-        Assert.IsType<InvalidOperationException>(baseStylesError);
-        Assert.IsType<InvalidOperationException>(classesError);
-        Assert.Equal(new SolidColorBrush(1, 2, 3), button.Background);
+            Assert.IsType<InvalidOperationException>(authorError);
+            Assert.IsType<InvalidOperationException>(baseStylesError);
+            Assert.Null(classesError);
+            Assert.Equal(new SolidColorBrush(1, 2, 3), button.Background);
+        }
+        finally
+        {
+            screen.Close();
+        }
     }
 
     [Fact]
@@ -279,6 +303,7 @@ public sealed class UiScreenStyleSheetsTests
         screen.SetStyleSheets([UiStyleSheet.Parse("Button { background: #040506; }")]);
 
         screen.Root = null;
+        button.UpdateStyles();
 
         Assert.Null(button.Screen);
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);

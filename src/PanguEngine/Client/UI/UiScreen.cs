@@ -23,7 +23,6 @@ public partial class UiScreen
     private bool _isDraining;
     private bool _isInteractionActive;
     private bool _isTransitioning;
-    private bool _isApplyingStyleSheets;
     private bool _isPreparingStyleSheets;
 
     /// <summary>
@@ -224,27 +223,30 @@ public partial class UiScreen
             IsUpdatingLayout = true;
             try
             {
+                root.UpdateStyles();
                 root.Measure(logicalViewportSize);
-                if (root.IsMeasureValid)
-                    root.Arrange(viewportBounds);
+                if (!root.IsStyleSubtreeValid || !root.IsMeasureValid) continue;
+
+                root.Arrange(viewportBounds);
             }
             finally
             {
                 IsUpdatingLayout = false;
             }
 
-            if (!root.IsMeasureValid || !root.IsArrangeValid)
+            if (!root.IsStyleSubtreeValid || !root.IsMeasureValid || !root.IsArrangeValid)
                 continue;
 
             RefreshPointerAfterLayout();
             if (!IsScreenActive() || Root is null)
                 return;
 
-            if (ReferenceEquals(Root, root) && root.IsMeasureValid && root.IsArrangeValid)
+            if (ReferenceEquals(Root, root) && root.IsStyleSubtreeValid && root.IsMeasureValid && root.IsArrangeValid)
                 return;
         }
 
-        var stage = Root is { IsMeasureValid: false } ? "Measure"
+        var stage = Root is { IsStyleSubtreeValid: false } ? "Style"
+            : Root is { IsMeasureValid: false } ? "Measure"
             : Root is { IsArrangeValid: false } ? "Arrange"
             : "Root/Scale coordination";
         throw new InvalidOperationException(
@@ -286,22 +288,11 @@ public partial class UiScreen
 
     internal bool IsUpdatingLayout { get; private set; }
 
-    internal bool IsApplyingStyleSheets
-    {
-        get
-        {
-            lock (_stateSync)
-                return _isApplyingStyleSheets;
-        }
-    }
-
     private void SetRoot(UiNode? root)
     {
         if (ReferenceEquals(_root, root))
             return;
 
-        _root?.VerifyStylePreparationIdle();
-        root?.VerifyStylePreparationIdle();
         var sourceScreen = root?.Screen;
         var rootOriginalParent = root?.Parent;
         var targetOperation = false;
@@ -340,10 +331,8 @@ public partial class UiScreen
             oldRoot?.InvalidateTreeStructure();
             root?.InvalidateTreeStructure();
 
-            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
-            styleEntries.Add((oldRoot, UiStyleResolver.Default));
-            styleEntries.Add((root, _styleResolver));
-            UiNode.RecomputeStyleSubtreeBatch(styleEntries);
+            oldRoot?.InvalidateStyleSubtree();
+            root?.InvalidateStyleSubtree();
 
             if (targetOperation)
                 targetSnapshot = CommitInputStateAfterTreeChange();
@@ -378,11 +367,10 @@ public partial class UiScreen
                     "The UI screen root cannot change while drawing commands are generated.");
             }
 
-            if (_ownerThreadId is null)
-                return false;
-
             if (IsUpdatingLayout)
                 throw new InvalidOperationException("The UI screen root cannot change during layout.");
+            if (_ownerThreadId is null)
+                return false;
             _operationDepth++;
             return true;
         }
@@ -409,6 +397,8 @@ public partial class UiScreen
     private void VerifyCanOpenCore()
     {
         VerifyNotPreparingStyleSheets();
+        if (IsUpdatingLayout)
+            throw new InvalidOperationException("The UI screen cannot open during layout or style application.");
         if (_ownerThreadId is not null)
             throw new InvalidOperationException("The UI screen is already open.");
         if (_isTransitioning || _operationDepth != 0)

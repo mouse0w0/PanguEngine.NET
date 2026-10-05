@@ -102,7 +102,7 @@ public sealed class PropertyCallbackTests
     }
 
     [Fact]
-    public void StyleBatchCommitsAllValuesBeforeCallbacksAndStopsAfterFailure()
+    public void NodeStyleUpdateCommitsAllItsValuesBeforeCallbacksAndStopsAfterFailure()
     {
         var error = new InvalidOperationException("internal");
         var node = new CallbackNode();
@@ -116,14 +116,15 @@ public sealed class PropertyCallbackTests
         var notified = new List<Property>();
         node.PropertyChanged += (_, args) => notified.Add(args.Property);
 
-        Assert.Same(error, Assert.Throws<InvalidOperationException>(() => screen.SetStyleSheets([
+        screen.SetStyleSheets([
             new UiStyleSheet([
                 new UiStyleRule(UiStyleSelector.For<CallbackNode>(), [
                     UiStyleSetter.Create(CallbackNode.ValueProperty, 7),
                     UiStyleSetter.Create(CallbackNode.OtherProperty, 8)
                 ])
             ])
-        ])));
+        ]);
+        Assert.Same(error, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
 
         Assert.Equal(7, node.GetValue(CallbackNode.ValueProperty));
         Assert.Empty(notified);
@@ -145,9 +146,11 @@ public sealed class PropertyCallbackTests
         node.Changed = (oldValue, newValue) => node.Changes.Add((oldValue, newValue));
 
         node.Classes.Add("active");
+        screen.Root!.UpdateStyles();
         node.SetValue(CallbackNode.ValueProperty, 9);
         node.ClearValue(CallbackNode.ValueProperty);
         node.Classes.Remove("active");
+        screen.Root!.UpdateStyles();
 
         Assert.Equal([(0, 7), (7, 9), (9, 7), (7, 0)], node.Changes);
     }

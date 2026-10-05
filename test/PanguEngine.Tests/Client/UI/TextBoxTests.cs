@@ -20,6 +20,7 @@ public sealed class TextBoxTests
     public void PublicSurfaceAndDefaultsMatchTheTextBoxContract()
     {
         var textBox = new TextBox();
+        textBox.GetStyleRoot().UpdateStyles();
 
         Assert.True(typeof(TextBox).IsSealed);
         Assert.Equal(typeof(Control), typeof(TextBox).BaseType);
@@ -54,6 +55,7 @@ public sealed class TextBoxTests
     {
         var node = new TextBox();
         var screen = new UiScreen(node);
+        screen.Root!.UpdateStyles();
         var properties = new Property[]
         {
             UiNode.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
@@ -73,6 +75,7 @@ public sealed class TextBoxTests
         }
 
         screen.SetBaseStyleSheets([]);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(UiNode.MinWidthProperty.DefaultValue, node.MinWidth);
         Assert.Equal(Region.PaddingProperty.DefaultValue, node.Padding);
@@ -88,18 +91,23 @@ public sealed class TextBoxTests
     {
         var node = new TextBox();
         node.SetHovered(true);
+        node.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(139, 148, 160), node.BorderBrush);
         node.SetFocused(true);
+        node.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(84, 169, 255), node.BorderBrush);
         node.IsEnabled = false;
+        node.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(52, 58, 65), node.BorderBrush);
         Assert.Equal(new Color(139, 148, 160), node.Foreground);
         Assert.Equal(new Thickness(1), node.BorderThickness);
         Assert.Equal(new Thickness(8, 6), node.Padding);
         node.IsEnabled = true;
+        node.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(84, 169, 255), node.BorderBrush);
         node.SetFocused(false);
         node.SetHovered(false);
+        node.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(92, 103, 116), node.BorderBrush);
     }
 
@@ -127,6 +135,7 @@ public sealed class TextBoxTests
         node.SetHovered(true);
         node.SetFocused(true);
         node.IsEnabled = false;
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(90d, node.MinWidth);
         Assert.Equal(new Thickness(2), node.Padding);
@@ -164,6 +173,7 @@ public sealed class TextBoxTests
     {
         using var context = new UiTextTestContext();
         var textBox = new TextBox();
+        textBox.GetStyleRoot().UpdateStyles();
 
         textBox.Measure(Size.Infinite);
         var expectedWidth = textBox.DesiredSize.Width;
@@ -620,6 +630,7 @@ public sealed class TextBoxTests
         textBox.Placeholder = "hint";
         manager.PrepareFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
+        screen.Root!.UpdateStyles();
 
         var commands = screen.CreateDrawCommandList().ToArray();
         var placeholderIndex = Array.FindIndex(commands, command =>
@@ -635,6 +646,7 @@ public sealed class TextBoxTests
         Assert.True(focusIndex < placeholderIndex);
 
         textBox.IsEnabled = false;
+        screen.Root!.UpdateStyles();
         commands = screen.CreateDrawCommandList().ToArray();
         var overlayIndex = Array.FindLastIndex(commands, command =>
             command is UiFillRectangleCommand fill && fill.Color == new Color(0, 0, 0, 112));

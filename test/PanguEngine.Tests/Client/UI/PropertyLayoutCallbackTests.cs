@@ -67,6 +67,11 @@ public sealed class PropertyLayoutCallbackTests
             new UiStyleRule(UiStyleSelector.For<TestNode>(), [UiStyleSetter.Create(UiNode.WidthProperty, 25d)])
         ])]);
 
+        Assert.True(double.IsNaN(node.Width));
+        Assert.True(node.IsMeasureValid);
+        Assert.True(node.IsArrangeValid);
+        screen.Root!.UpdateStyles();
+
         Assert.Equal(25, node.Width);
         Assert.False(node.IsMeasureValid);
         Assert.False(node.IsArrangeValid);

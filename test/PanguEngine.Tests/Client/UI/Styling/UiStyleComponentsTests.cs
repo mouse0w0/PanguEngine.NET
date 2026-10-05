@@ -152,6 +152,7 @@ public sealed class UiStyleComponentsTests
         var node = new Panel();
         var screen = new UiScreen(node);
         screen.SetStyleSheets([UiStyleSheet.Parse("Panel { padding: 4px 8px; }")]);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(new Thickness(8, 4, 8, 4), node.Padding);
         Assert.All(node.GetStyleValueSources(Region.PaddingProperty), source => Assert.False(source.IsMaskedByLocalValue));
@@ -222,12 +223,13 @@ public sealed class UiStyleComponentsTests
             notifications += ReferenceEquals(eventArgs.Property, Region.PaddingProperty) ? 1 : 0;
 
         screen.SetStyleSheets([UiStyleSheet.Parse("Panel { padding: 4px; }")]);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(1, notifications);
         Assert.Equal(new Thickness(4), node.Padding);
 
-        Assert.Throws<UiStyleParseException>(() =>
-            screen.SetStyleSheets([UiStyleSheet.Parse("Panel { padding: nope; }")]));
+        screen.SetStyleSheets([UiStyleSheet.Parse("Panel { padding: nope; }")]);
+        Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
 
         Assert.Equal(1, notifications);
         Assert.Equal(new Thickness(4), node.Padding);
@@ -351,6 +353,7 @@ public sealed class UiStyleComponentsTests
         var node = new Panel();
         var screen = new UiScreen(node);
         screen.SetStyleSheets([UiStyleSheet.Parse("Panel { padding: 4px; }")]);
+        screen.Root!.UpdateStyles();
 
         var sources = node.GetStyleValueSources(Region.PaddingProperty);
         var list = Assert.IsAssignableFrom<IList<UiStyleValueSource>>(sources);

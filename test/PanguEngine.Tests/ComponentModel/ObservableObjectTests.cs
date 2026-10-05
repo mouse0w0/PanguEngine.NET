@@ -182,6 +182,7 @@ public sealed class ObservableObjectTests
         screen.SetStyleSheets([new UiStyleSheet([
             new UiStyleRule(UiStyleSelector.For<ValueNode>(), [UiStyleSetter.Create(ValueNode.ValueProperty, 20)])
         ])]);
+        screen.Root!.UpdateStyles();
         var changes = new List<(int Old, int New)>();
         using var subscription = node.Subscribe(ValueNode.ValueProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));

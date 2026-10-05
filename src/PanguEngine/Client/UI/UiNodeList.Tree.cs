@@ -4,11 +4,7 @@ namespace PanguEngine.Client.UI;
 
 public sealed partial class UiNodeList
 {
-    private void VerifyTreeAccess()
-    {
-        _owner.VerifyStylePreparationIdle();
-        _owner.Screen?.VerifyTreeMutationAccess();
-    }
+    private void VerifyTreeAccess() => _owner.Screen?.VerifyTreeMutationAccess();
 
     private void ReplaceChildren(int index, int count, IReadOnlyList<UiNode> newItems, Action updateStorage)
     {
@@ -47,7 +43,6 @@ public sealed partial class UiNodeList
 
     private void VerifyIncomingChild(UiNode child)
     {
-        child.VerifyStylePreparationIdle();
         child.Screen?.VerifyTreeMutationAccess();
         for (UiNode? ancestor = _owner; ancestor is not null; ancestor = ancestor.Parent)
         {
@@ -85,8 +80,9 @@ public sealed partial class UiNodeList
                     child.InvalidateMeasureSubtree();
             }
             _owner.InvalidateTreeStructure();
+            _owner.InvalidateStyle();
 
-            var styleEntries = new List<(UiNode? Root, UiStyleResolver Resolver)>();
+            var styleEntries = new List<UiNode>();
             UiNode.AddRelationshipRefreshEntry(styleEntries, _owner, _owner.Screen?.StyleResolver ?? UiStyleResolver.Default);
             foreach (var (child, oldScreen) in changedNodes)
             {
@@ -118,7 +114,7 @@ public sealed partial class UiNodeList
             if (preserveHitTestLayout)
                 _owner.RestoreHitTestLayoutAfterChildOrderChange();
             if (resolver.HasSiblingRelationships)
-                CommitAndNotifyWithStyle(activeScreens, [(_owner, resolver)]);
+                CommitAndNotifyWithStyle(activeScreens, [_owner]);
         }
         finally
         {
@@ -159,7 +155,7 @@ public sealed partial class UiNodeList
 
     private static void CommitAndNotifyWithStyle(
         List<UiScreen> screens,
-        IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> styleEntries)
+        IReadOnlyList<UiNode> styleEntries)
     {
         var snapshots = new List<(UiScreen Screen, UiScreen.InputStateCleanupSnapshot Snapshot)>();
         foreach (var screen in screens)
@@ -167,7 +163,7 @@ public sealed partial class UiNodeList
             if (screen.CommitInputStateAfterTreeChange() is { } snapshot)
                 snapshots.Add((screen, snapshot));
         }
-        UiNode.RecomputeStyleSubtreeBatch(styleEntries);
+        UiNode.InvalidateStyleSubtreeBatch(styleEntries);
         foreach (var (screen, snapshot) in snapshots)
             screen.NotifyInputStateLoss(snapshot);
     }

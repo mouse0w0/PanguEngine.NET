@@ -532,7 +532,7 @@ public sealed class ControlTests
         Assert.Equal(0, enabledNotifications);
         Assert.Equal(0, opacityNotifications);
         Assert.False(control.IsEnabled);
-        Assert.False(control.HasPseudoClass(UiPseudoClass.Disabled));
+        Assert.True(control.HasPseudoClass(UiPseudoClass.Disabled));
         Assert.Equal(1, control.Opacity);
         manager.Close();
     }

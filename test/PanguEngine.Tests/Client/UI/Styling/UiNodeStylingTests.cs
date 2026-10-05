@@ -60,6 +60,8 @@ public sealed class UiNodeStylingTests
 
         button.Classes.Add("primary");
 
+        button.GetStyleRoot().UpdateStyles();
+
         Assert.Equal(new SolidColorBrush(7, 7, 7), button.Background);
         Assert.Equal(0, changes);
     }
@@ -75,7 +77,9 @@ public sealed class UiNodeStylingTests
             changes += ReferenceEquals(e.Property, Region.BackgroundProperty) ? 1 : 0;
 
         Assert.True(button.Classes.Add("primary"));
+        button.GetStyleRoot().UpdateStyles();
         Assert.False(button.Classes.Add("primary"));
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(1, changes);
     }
 
@@ -90,12 +94,15 @@ public sealed class UiNodeStylingTests
             changes += ReferenceEquals(e.Property, Region.BackgroundProperty) ? 1 : 0;
 
         button.StyleId = "save";
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(1, changes);
 
         button.StyleId = "save";
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(1, changes);
 
         button.StyleId = "other";
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(2, changes);
     }
 
@@ -110,9 +117,11 @@ public sealed class UiNodeStylingTests
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
 
         button.SetHovered(true);
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(Brush(9), button.Background);
 
         button.SetHovered(false);
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
     }
 
@@ -136,7 +145,7 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void EarlierBatchHandlerCanLocallyMaskLaterStyleNotification()
+    public void EarlierPropertyHandlerCanLocallyMaskLaterStyleNotification()
     {
         var button = new Button();
         var screen = new UiScreen(button);
@@ -154,6 +163,7 @@ public sealed class UiNodeStylingTests
         ]);
 
         screen.SetStyleSheets([sheet]);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(Brush(9), button.BorderBrush);
         Assert.Equal(1, borderNotifications);
@@ -184,6 +194,7 @@ public sealed class UiNodeStylingTests
         };
 
         button.Classes.Add("primary");
+        button.GetStyleRoot().UpdateStyles();
 
         Assert.Equal(Brush(9), button.BorderBrush);
         Assert.Equal(1, borderNotifications);
@@ -214,10 +225,170 @@ public sealed class UiNodeStylingTests
         Assert.Equal("bg-fail", exception.Message);
         Assert.Equal(new[] { "Background" }, order);
         Assert.Equal(Brush(2), button.BorderBrush);
+        Assert.False(button.IsUpdatingStyles);
+        Assert.False(button.Screen!.IsUpdatingLayout);
     }
 
     [Fact]
-    public void ReentrantStyleChangeProcessesPendingRecompute()
+    public void FailedNodeUpdateKeepsEarlierUpdatesAndLeavesRemainingNodesPending()
+    {
+        var root = new Panel();
+        var first = new Panel();
+        var failing = new GuardedStyleNode();
+        var last = new Panel();
+        root.Children.Add(first);
+        root.Children.Add(failing);
+        root.Children.Add(last);
+        var screen = new UiScreen(root);
+        screen.SetStyleSheets([new UiStyleSheet([
+            Rule(Selector<Panel>(), Setter(UiNode.OpacityProperty, 0.4)),
+            Rule(Selector<GuardedStyleNode>(), Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
+        ])]);
+        var firstNotifications = 0;
+        first.PropertyChanged += (_, args) =>
+            firstNotifications += args.Property == UiNode.OpacityProperty ? 1 : 0;
+
+        GuardedValue.ThrowOnCompare = true;
+        try
+        {
+            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+        }
+        finally
+        {
+            GuardedValue.ThrowOnCompare = false;
+        }
+
+        Assert.Equal(0.4, first.Opacity);
+        Assert.Equal(0d, failing.GetValue(GuardedStyleNode.ValueProperty).Number);
+        Assert.Equal(1d, last.Opacity);
+        Assert.False(root.IsStyleSubtreeValid);
+        Assert.False(failing.IsStyleSubtreeValid);
+        Assert.False(root.IsUpdatingStyles);
+        Assert.False(screen.IsUpdatingLayout);
+
+        screen.Root!.UpdateStyles();
+
+        Assert.Equal(0.5, failing.GetValue(GuardedStyleNode.ValueProperty).Number);
+        Assert.Equal(0.4, last.Opacity);
+        Assert.Equal(1, firstNotifications);
+        Assert.True(root.IsStyleSubtreeValid);
+    }
+
+    [Fact]
+    public void LaterChildUpdateDoesNotClearAncestorInvalidation()
+    {
+        var root = new Panel();
+        var first = new Panel { StyleId = "first" };
+        var last = new Panel { StyleId = "last" };
+        root.Children.Add(first);
+        root.Children.Add(last);
+        var screen = new UiScreen(root);
+        screen.SetStyleSheets([UiStyleSheet.Parse("#first.active, #last.active { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
+        var notifications = 0;
+        first.PropertyChanged += (_, args) =>
+        {
+            if (args.Property != UiNode.OpacityProperty)
+                return;
+            notifications++;
+            last.Classes.Add("active");
+        };
+
+        first.Classes.Add("active");
+        screen.Root!.UpdateStyles();
+
+        Assert.Equal(0.4, last.Opacity);
+        Assert.True(first.IsStyleSubtreeValid);
+        Assert.True(last.IsStyleSubtreeValid);
+        Assert.True(root.IsStyleValid);
+        Assert.False(root.IsStyleSubtreeValid);
+
+        screen.Root!.UpdateStyles();
+
+        Assert.True(root.IsStyleSubtreeValid);
+        Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void NotificationFailureStopsBeforeUpdatingLaterNodes()
+    {
+        var root = new Panel();
+        var first = new Panel();
+        var last = new Panel();
+        root.Children.Add(first);
+        root.Children.Add(last);
+        var screen = new UiScreen(root);
+        screen.SetStyleSheets([UiStyleSheet.Parse("Panel { opacity: 0.4; }")]);
+        var expected = new InvalidOperationException("notification failed");
+        first.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == UiNode.OpacityProperty)
+                throw expected;
+        };
+
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+        Assert.Equal(0.4, first.Opacity);
+        Assert.Equal(1d, last.Opacity);
+        Assert.False(root.IsStyleSubtreeValid);
+
+        Assert.False(root.IsUpdatingStyles);
+        Assert.False(first.IsUpdatingStyles);
+        Assert.False(last.IsUpdatingStyles);
+
+        screen.Root!.UpdateStyles();
+
+        Assert.Equal(0.4, last.Opacity);
+        Assert.True(root.IsStyleSubtreeValid);
+    }
+
+    [Fact]
+    public void StandaloneStyleNotificationCannotReenterTheSameTree()
+    {
+        var button = new Button();
+        Exception? error = null;
+        button.PropertyChanged += (_, args) =>
+        {
+            if (args.Property != Region.BackgroundProperty)
+                return;
+            Assert.True(button.IsUpdatingStyles);
+            error = Record.Exception(button.UpdateStyles);
+        };
+
+        button.UpdateStyles();
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.False(button.IsUpdatingStyles);
+        Assert.True(button.IsStyleSubtreeValid);
+    }
+
+    [Fact]
+    public void RemovedLaterNodeIsNotUpdatedByTheOldTree()
+    {
+        var root = new Panel();
+        var first = new Panel();
+        var last = new Button();
+        root.Children.Add(first);
+        root.Children.Add(last);
+        var screen = new UiScreen(root);
+        screen.SetStyleSheets([UiStyleSheet.Parse("Panel { opacity: 0.4; } Button { background: #010203; }")]);
+        first.PropertyChanged += (_, args) =>
+        {
+            if (args.Property == UiNode.OpacityProperty)
+                root.Children.Remove(last);
+        };
+
+        screen.Root!.UpdateStyles();
+
+        Assert.Null(last.Parent);
+        Assert.Null(last.Screen);
+        Assert.Null(last.Background);
+        Assert.False(last.IsStyleSubtreeValid);
+        last.UpdateStyles();
+        Assert.Equal(new SolidColorBrush(48, 54, 62), last.Background);
+    }
+
+    [Fact]
+    public void ReentrantStyleChangeRemainsPendingUntilTheNextApplication()
     {
         var button = new Button();
         ApplyTheme(
@@ -236,6 +407,11 @@ public sealed class UiNodeStylingTests
         };
 
         button.Classes.Add("x");
+        button.GetStyleRoot().UpdateStyles();
+
+        Assert.Equal(Brush(5), button.Background);
+        Assert.Equal(1, backgroundNotifications);
+        button.GetStyleRoot().UpdateStyles();
 
         Assert.Equal(Brush(9), button.Background);
         Assert.Equal(2, backgroundNotifications);
@@ -263,7 +439,8 @@ public sealed class UiNodeStylingTests
             }
         };
 
-        var actual = Assert.Throws<InvalidOperationException>(() => button.Classes.Add("x"));
+        button.Classes.Add("x");
+        var actual = Assert.Throws<InvalidOperationException>(button.GetStyleRoot().UpdateStyles);
 
         Assert.Same(expected, actual);
         Assert.Equal(Brush(5), button.Background);
@@ -272,12 +449,33 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void FreshButtonReadResolvesDefaultBaseStyles()
+    public void FreshButtonReadUsesDefaultsUntilStylesAreApplied()
     {
         var button = new Button();
 
+        Assert.Empty(button.GetStyleValueSources(Region.BackgroundProperty));
+        Assert.Null(button.Background);
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal("Button", Assert.Single(button.GetStyleValueSources(Region.BackgroundProperty)).SelectorText);
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
+    }
+
+    [Fact]
+    public void StandaloneLayoutDoesNotUpdateStyles()
+    {
+        var button = new Button();
+
+        button.Measure(Size.Infinite);
+        button.Arrange(new Rect(0, 0, button.DesiredSize));
+
+        Assert.Equal(Size.Zero, button.DesiredSize);
+        Assert.Null(button.Background);
+        Assert.Empty(button.GetStyleValueSources(Region.BackgroundProperty));
+
+        button.GetStyleRoot().UpdateStyles();
+        Assert.False(button.IsMeasureValid);
+        button.Measure(Size.Infinite);
+        Assert.Equal(new Size(26, 16), button.DesiredSize);
     }
 
     [Fact]
@@ -291,6 +489,7 @@ public sealed class UiNodeStylingTests
                 Setter(Region.BackgroundProperty, Brush(1, 2, 3))));
         button.Classes.Add("primary");
         button.Background = new SolidColorBrush(9, 9, 9);
+        button.GetStyleRoot().UpdateStyles();
 
         var source = Assert.Single(button.GetStyleValueSources(Region.BackgroundProperty));
 
@@ -307,17 +506,21 @@ public sealed class UiNodeStylingTests
         var screen = new UiScreen(button);
         screen.SetStyleSheets([UiStyleSheet.Parse(".plain, #target { opacity: 0.4; }")]);
         button.Classes.Add("plain");
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(UiNode.OpacityProperty)).SelectorText);
         button.StyleId = "target";
         button.Opacity = 0.9;
+        button.GetStyleRoot().UpdateStyles();
         var source = Assert.Single(button.GetStyleValueSources(UiNode.OpacityProperty));
         Assert.Equal("#target", source.SelectorText);
         Assert.True(source.IsMaskedByLocalValue);
         button.StyleId = null;
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(UiNode.OpacityProperty)).SelectorText);
         button.ClearValue(UiNode.OpacityProperty);
         Assert.Equal(0.4, button.Opacity);
         button.Classes.Remove("plain");
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(1d, button.Opacity);
     }
 
@@ -332,7 +535,7 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void StyleSelectorInputsRollbackWhenResolutionFails()
+    public void StyleSelectorInputsRemainCommittedWhenApplicationFails()
     {
         var node = new GuardedStyleNode { StyleId = "old" };
         var sheet = new UiStyleSheet([
@@ -342,58 +545,60 @@ public sealed class UiNodeStylingTests
         ]);
         var screen = new UiScreen(node);
         screen.SetStyleSheets([sheet]);
+        screen.Root!.UpdateStyles();
         GuardedValue.ThrowOnCompare = true;
         try
         {
-            Assert.Throws<InvalidOperationException>(() => node.StyleId = "new");
-            Assert.Throws<InvalidOperationException>(() => node.Classes.Add("primary"));
+            node.StyleId = "new";
+            node.Classes.Add("primary");
+            Assert.Throws<InvalidOperationException>(node.GetStyleRoot().UpdateStyles);
         }
         finally
         {
             GuardedValue.ThrowOnCompare = false;
         }
 
-        Assert.Equal("old", node.StyleId);
-        Assert.Empty(node.Classes);
+        Assert.Equal("new", node.StyleId);
+        Assert.Contains("primary", node.Classes);
         Assert.Same(screen, node.Screen);
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SelectorInputsCannotReenterDuringNodeResolution(bool changeId)
+    public void SelectorChangesDuringNodeCalculationRemainPending(bool changeId)
     {
-        var node = new ReentrantPreparationNode { StyleId = "original" };
+        var node = new GuardedStyleNode { StyleId = "original" };
         var screen = new UiScreen(node);
         screen.SetStyleSheets([
             new UiStyleSheet([
                 Rule(
-                    UiStyleSelector.For<ReentrantPreparationNode>(),
-                    Setter(ReentrantPreparationNode.ValueProperty, new GuardedValue(0.5)))
+                    UiStyleSelector.For<GuardedStyleNode>(),
+                    Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
             ])
         ]);
-        node.OnRead = () =>
+        GuardedValue.OnCompare = () =>
         {
             if (changeId)
                 node.StyleId = "nested";
             else
                 node.Classes.Add("nested");
         };
-        GuardedValue.OnCompare = () => node.OnRead?.Invoke();
         try
         {
-            Assert.Throws<InvalidOperationException>(() => node.Classes.Add("outer"));
+            node.Classes.Add("outer");
+            node.GetStyleRoot().UpdateStyles();
         }
         finally
         {
             GuardedValue.OnCompare = null;
         }
 
-        Assert.Empty(node.Classes);
-        Assert.Equal("original", node.StyleId);
-        Assert.Equal(1d, node.Opacity);
-        node.OnRead = null;
-        Assert.True(node.Classes.Add("accepted"));
+        Assert.Equal(changeId ? "nested" : "original", node.StyleId);
+        Assert.Equal(!changeId, node.Classes.Contains("nested"));
+        Assert.False(node.IsStyleSubtreeValid);
+        node.GetStyleRoot().UpdateStyles();
+        Assert.True(node.IsStyleSubtreeValid);
     }
 
     [Fact]
@@ -412,17 +617,19 @@ public sealed class UiNodeStylingTests
         ]);
         var screen = new UiScreen(node);
         screen.SetStyleSheets([firstSheet]);
+        screen.Root!.UpdateStyles();
         var notifications = 0;
         node.PropertyChanged += (_, e) =>
             notifications += ReferenceEquals(e.Property, EquatableNode.ValueProperty) ? 1 : 0;
 
         screen.SetStyleSheets([secondSheet]);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0, notifications);
     }
 
     [Fact]
-    public void PseudoClassHandlerExceptionStillUpdatesStyle()
+    public void PseudoClassHandlerExceptionStillInvalidatesStyle()
     {
         var button = new Button();
         ApplyTheme(button, Rule(
@@ -436,11 +643,14 @@ public sealed class UiNodeStylingTests
 
         Assert.Throws<InvalidOperationException>(() => button.SetHovered(true));
 
+        Assert.True(button.HasPseudoClass(UiPseudoClass.Hover));
+        Assert.NotEqual(Brush(9), button.Background);
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(Brush(9), button.Background);
     }
 
     [Fact]
-    public void PseudoClassPreparationFailureKeepsOldSnapshotAndRetriesOnlyOnRealChange()
+    public void PseudoClassCalculationFailureKeepsOldSnapshotUntilExplicitRetry()
     {
         var node = new GuardedStyleNode();
         ApplyTheme(
@@ -467,7 +677,8 @@ public sealed class UiNodeStylingTests
         GuardedValue.ThrowOnCompare = true;
         try
         {
-            Assert.Throws<InvalidOperationException>(() => node.SetHovered(true));
+            node.SetHovered(true);
+            Assert.Throws<InvalidOperationException>(node.GetStyleRoot().UpdateStyles);
         }
         finally
         {
@@ -476,15 +687,19 @@ public sealed class UiNodeStylingTests
 
         Assert.True(node.HasPseudoClass(UiPseudoClass.Hover));
         Assert.Equal(0.25, node.Opacity);
-        Assert.Equal(0, hoverEvents);
-        Assert.Equal(0, hoverSubscriptions);
+        Assert.Equal(1, hoverEvents);
+        Assert.Equal(1, hoverSubscriptions);
 
         node.SetHovered(true);
         Assert.Equal(0.25, node.Opacity);
+        node.GetStyleRoot().UpdateStyles();
+        Assert.Equal(0.75, node.Opacity);
 
         node.SetHovered(false);
+        node.GetStyleRoot().UpdateStyles();
         Assert.Equal(0.25, node.Opacity);
         node.SetHovered(true);
+        node.GetStyleRoot().UpdateStyles();
         Assert.Equal(0.75, node.Opacity);
     }
 
@@ -499,11 +714,13 @@ public sealed class UiNodeStylingTests
                 Setter(Region.BackgroundProperty, Brush(6))));
 
         control.SetLoading(true);
+        control.GetStyleRoot().UpdateStyles();
 
         Assert.True(control.HasPseudoClass(Loading));
         Assert.Equal(Brush(6), control.Background);
 
         control.SetLoading(false);
+        control.GetStyleRoot().UpdateStyles();
 
         Assert.False(control.HasPseudoClass(Loading));
         Assert.NotEqual(Brush(6), control.Background);
@@ -522,9 +739,11 @@ public sealed class UiNodeStylingTests
         Assert.Equal(1d, host.Opacity);
 
         host.Set(Loading, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(0.4, host.Opacity);
 
         host.Set(Loading, false);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1d, host.Opacity);
     }
 
@@ -539,12 +758,15 @@ public sealed class UiNodeStylingTests
                 Setter(UiNode.OpacityProperty, 0.4)));
 
         host.Set(UiPseudoClass.Hover, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1d, host.Opacity);
 
         host.Set(Loading, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(0.4, host.Opacity);
 
         host.Set(UiPseudoClass.Hover, false);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1d, host.Opacity);
     }
 
@@ -565,12 +787,14 @@ public sealed class UiNodeStylingTests
             throw expected;
         };
 
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => host.Set(Loading, true)));
+        host.Set(Loading, true);
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(host.GetStyleRoot().UpdateStyles));
         Assert.True(host.IsActive(Loading));
         Assert.Equal(0.4, host.Opacity);
         Assert.Single(host.GetStyleValueSources(UiNode.OpacityProperty));
 
         host.Set(Loading, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1, notifications);
     }
 
@@ -589,9 +813,11 @@ public sealed class UiNodeStylingTests
             refreshes += ReferenceEquals(e.Property, UiNode.OpacityProperty) ? 1 : 0;
 
         host.Set(UiPseudoClass.Get("LOADING"), true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(0.4, host.Opacity);
 
         host.Set(Loading, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1, refreshes);
     }
 
@@ -610,12 +836,15 @@ public sealed class UiNodeStylingTests
             refreshes += ReferenceEquals(e.Property, UiNode.OpacityProperty) ? 1 : 0;
 
         host.Set(Loading, false);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(0, refreshes);
 
         host.Set(Loading, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1, refreshes);
 
         host.Set(Loading, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1, refreshes);
     }
 
@@ -632,6 +861,7 @@ public sealed class UiNodeStylingTests
         Assert.Equal(1d, host.Opacity);
 
         host.Set(Phantom, true);
+        host.GetStyleRoot().UpdateStyles();
         Assert.Equal(0.4, host.Opacity);
     }
 
@@ -691,27 +921,27 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void PseudoClassInputsCannotChangeDuringLayoutOrDrawing()
+    public void PseudoClassInputsCanChangeDuringLayoutButNotDrawing()
     {
         var node = new StyleMutationNode();
         var screen = new UiScreen(node);
         Exception? layoutError = null;
         Exception? drawingError = null;
         node.MeasureAction = () => layoutError = Record.Exception(() => node.Set(Loading, true));
-        node.DrawAction = () => drawingError = Record.Exception(() => node.Set(Loading, true));
+        node.DrawAction = () => drawingError = Record.Exception(() => node.Set(Loading, false));
         screen.Open();
 
         screen.PrepareFrame(new Size(20, 20), 0);
         _ = screen.CreateDrawCommandList();
 
-        Assert.IsType<InvalidOperationException>(layoutError);
+        Assert.Null(layoutError);
         Assert.IsType<InvalidOperationException>(drawingError);
-        Assert.False(node.IsActive(Loading));
+        Assert.True(node.IsActive(Loading));
         screen.Close();
     }
 
     [Fact]
-    public void PseudoClassInputsAreRejectedDuringStyleSheetApplicationNotification()
+    public void PseudoClassInputsInvalidateStylesDuringApplicationNotification()
     {
         var host = new PseudoClassHost();
         var screen = new UiScreen(host);
@@ -720,6 +950,7 @@ public sealed class UiNodeStylingTests
                 Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.3))
             ])
         ]);
+        screen.Root!.UpdateStyles();
         Exception? error = null;
         host.PropertyChanged += (_, e) =>
         {
@@ -732,13 +963,14 @@ public sealed class UiNodeStylingTests
                 Rule(UiStyleSelector.For<PseudoClassHost>(), Setter(UiNode.OpacityProperty, 0.8))
             ])
         ]);
+        screen.Root!.UpdateStyles();
 
-        Assert.IsType<InvalidOperationException>(error);
-        Assert.False(host.IsActive(Loading));
+        Assert.Null(error);
+        Assert.True(host.IsActive(Loading));
     }
 
     [Fact]
-    public void StyleInputsCannotChangeDuringLayoutOrDrawing()
+    public void StyleInputsCanChangeDuringLayoutButNotDrawing()
     {
         var node = new StyleMutationNode();
         var screen = new UiScreen(node);
@@ -761,12 +993,12 @@ public sealed class UiNodeStylingTests
         screen.PrepareFrame(new Size(20, 20), 0);
         _ = screen.CreateDrawCommandList();
 
-        Assert.IsType<InvalidOperationException>(layoutStyleIdError);
-        Assert.IsType<InvalidOperationException>(layoutClassError);
+        Assert.Null(layoutStyleIdError);
+        Assert.Null(layoutClassError);
         Assert.IsType<InvalidOperationException>(drawingStyleIdError);
         Assert.IsType<InvalidOperationException>(drawingClassError);
-        Assert.Null(node.StyleId);
-        Assert.Empty(node.Classes);
+        Assert.Equal("layout", node.StyleId);
+        Assert.Equal(new[] { "layout" }, node.Classes);
         screen.Close();
     }
 
@@ -780,6 +1012,43 @@ public sealed class UiNodeStylingTests
         var internalCtor = typeof(UiStyleClassCollection).GetConstructor(
             BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(UiNode) }, null);
         Assert.NotNull(internalCtor);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void StyleChangesApplyAfterAllChildrenCompleteTheCurrentLayoutPass(bool duringArrange)
+    {
+        var root = new StackPanel();
+        var first = new StyleMutationNode { Height = 10 };
+        var second = new StyleMutationNode { StyleId = "target", Height = 10 };
+        root.Children.Add(first);
+        root.Children.Add(second);
+        var screen = new UiScreen(root);
+        screen.SetStyleSheets([UiStyleSheet.Parse("#target { width: 10; } .wide #target { width: 20; }")]);
+        var measuredWidths = new List<double>();
+        var arrangedWidths = new List<double>();
+        second.MeasureAction = () => measuredWidths.Add(second.Width);
+        second.ArrangeAction = () => arrangedWidths.Add(second.Width);
+        if (duringArrange)
+            first.ArrangeAction = () => root.Classes.Add("wide");
+        else
+            first.MeasureAction = () => root.Classes.Add("wide");
+        screen.Open();
+        try
+        {
+            screen.PrepareFrame(new Size(100, 100), 0);
+
+            Assert.Equal(new[] { 10d, 20d }, measuredWidths);
+            Assert.Equal(duringArrange ? new[] { 10d, 20d } : new[] { 20d }, arrangedWidths);
+            Assert.Equal(20, second.LayoutBounds.Width);
+            Assert.True(root.IsMeasureValid);
+            Assert.True(root.IsArrangeValid);
+        }
+        finally
+        {
+            screen.Close();
+        }
     }
 
     [Fact]
@@ -796,10 +1065,64 @@ public sealed class UiNodeStylingTests
         Assert.True(classes.SetEquals(["wide", "primary"]));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LayoutAndStyleApplicationDoNotBlockUnrelatedScreens(bool duringLayout)
+    {
+        var node = new StyleMutationNode();
+        var screen = new UiScreen(node);
+        var other = new UiScreen(new Panel());
+        var visited = false;
+        Action updateOther = () =>
+        {
+            visited = true;
+            Assert.True(screen.IsUpdatingLayout);
+            Assert.Equal(!duringLayout, node.IsUpdatingStyles);
+            Assert.False(other.IsUpdatingLayout);
+            Assert.False(other.Root!.IsUpdatingStyles);
+            other.Root = new Panel();
+            other.Scale = 2;
+            other.SetStyleSheets([UiStyleSheet.Parse("Panel { opacity: 0.6; }")]);
+            other.Root!.UpdateStyles();
+            Assert.Equal(0.6, other.Root!.Opacity);
+            Assert.True(screen.IsUpdatingLayout);
+            Assert.Equal(!duringLayout, node.IsUpdatingStyles);
+            if (!duringLayout)
+            {
+                Assert.Throws<InvalidOperationException>(node.UpdateStyles);
+                Assert.Throws<InvalidOperationException>(() => node.Measure(new Size(100, 100)));
+            }
+        };
+        if (duringLayout)
+            node.MeasureAction = updateOther;
+        else
+            node.PropertyChanged += (_, args) =>
+            {
+                if (args.Property == UiNode.OpacityProperty)
+                    updateOther();
+            };
+        screen.SetStyleSheets([UiStyleSheet.Parse("* { opacity: 0.4; }")]);
+        screen.Open();
+        try
+        {
+            screen.PrepareFrame(new Size(100, 100), 0);
+
+            Assert.True(visited);
+            Assert.False(screen.IsUpdatingLayout);
+            Assert.False(node.IsUpdatingStyles);
+        }
+        finally
+        {
+            screen.Close();
+        }
+    }
+
     private static void ApplyTheme(UiNode node, params UiStyleRule[] rules)
     {
         var screen = new UiScreen(node);
         screen.SetStyleSheets([new UiStyleSheet(rules)]);
+        screen.Root!.UpdateStyles();
     }
 
     private static UiStyleSelector Selector<TNode>(
@@ -866,14 +1189,6 @@ public sealed class UiNodeStylingTests
             Property.Register<GuardedStyleNode, GuardedValue>("Value", new GuardedValue(0));
     }
 
-    private sealed class ReentrantPreparationNode : UiNode
-    {
-        internal static readonly Property<GuardedValue> ValueProperty =
-            Property.Register<ReentrantPreparationNode, GuardedValue>("Value", new GuardedValue(0));
-
-        internal Action? OnRead { get; set; }
-    }
-
     private sealed class CustomStateControl : Control
     {
         internal void SetLoading(bool value) => SetPseudoClass(Loading, value);
@@ -882,6 +1197,7 @@ public sealed class UiNodeStylingTests
     private sealed class StyleMutationNode : PseudoClassHost
     {
         internal Action? MeasureAction { get; set; }
+        internal Action? ArrangeAction { get; set; }
         internal Action? DrawAction { get; set; }
 
         protected override Size MeasureCore(Size availableSize)
@@ -891,5 +1207,7 @@ public sealed class UiNodeStylingTests
         }
 
         protected override void DrawCore(UiDrawingContext context) => DrawAction?.Invoke();
+
+        protected override void ArrangeCore(Size finalSize) => ArrangeAction?.Invoke();
     }
 }

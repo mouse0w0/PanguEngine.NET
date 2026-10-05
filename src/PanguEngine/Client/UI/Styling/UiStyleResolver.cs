@@ -62,14 +62,13 @@ internal sealed partial class UiStyleResolver
 
     /// <summary>Resolves the winning style declarations for the supplied node.</summary>
     /// <param name="node">The node whose runtime type, classes, id and pseudo states select rules.</param>
-    /// <param name="context">The optional shared variable environment context for the current style batch.</param>
     /// <returns>An immutable snapshot of the resolved style values and their sources.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
-    internal UiStyleSnapshot Resolve(UiNode node, VariableContext? context = null)
+    internal UiStyleSnapshot Resolve(UiNode node)
     {
         ArgumentNullException.ThrowIfNull(node);
         var variables = HasVariables
-            ? (context ?? new VariableContext()).Get(this, node)
+            ? ResolveVariables(node)
             : UiCssVariableEnvironment.Empty;
         var winners =
             new Dictionary<(Property Property, UiStyleEdge? Component), (CascadeKey Key, DeclarationEntry Entry)>();

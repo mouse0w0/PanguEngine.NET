@@ -142,8 +142,9 @@ public sealed class UiScreenLayoutStabilityTests
                 screen.PrepareFrame(new Size(400, 300), 0));
             Assert.Equal(16, transitions);
             Assert.Contains("16", error.Message);
-            Assert.Contains("Arrange", error.Message);
+            Assert.Contains("Style", error.Message);
             Assert.False(target.IsHovered);
+            Assert.False(root.IsStyleSubtreeValid);
             Assert.False(root.IsArrangeValid);
             Assert.Equal(1, screen.Updates);
         }

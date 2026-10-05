@@ -18,7 +18,7 @@ public sealed class UiStyleClassCollection : ICollection<string>, IReadOnlySet<s
 
     /// <summary>Adds a class when it is a valid identifier and not already present.</summary>
     /// <param name="item">The class to add.</param>
-    /// <returns>true when the class was added and triggered a style recompute; false when it was already present.</returns>
+    /// <returns>true when the class was added and invalidated styles; false when it was already present.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="item"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="item"/> is not a valid ASCII identifier.</exception>
     public bool Add(string item)
@@ -28,9 +28,8 @@ public sealed class UiStyleClassCollection : ICollection<string>, IReadOnlySet<s
         if (_items.Contains(item, StringComparer.Ordinal))
             return false;
         _owner.VerifyStyleInputAccess();
-        _owner.ChangeStyleInput(
-            () => _items.Add(item),
-            () => _items.RemoveAt(_items.Count - 1));
+        _items.Add(item);
+        _owner.InvalidateStyle();
         return true;
     }
 
@@ -43,10 +42,8 @@ public sealed class UiStyleClassCollection : ICollection<string>, IReadOnlySet<s
         if (_items.Count == 0)
             return;
         _owner.VerifyStyleInputAccess();
-        var previous = _items.ToArray();
-        _owner.ChangeStyleInput(
-            _items.Clear,
-            () => _items.AddRange(previous));
+        _items.Clear();
+        _owner.InvalidateStyle();
     }
 
     /// <inheritdoc cref="ICollection{string}.Contains" />
@@ -61,10 +58,8 @@ public sealed class UiStyleClassCollection : ICollection<string>, IReadOnlySet<s
         if (!_items.Contains(item, StringComparer.Ordinal))
             return false;
         _owner.VerifyStyleInputAccess();
-        var index = _items.IndexOf(item);
-        _owner.ChangeStyleInput(
-            () => _items.RemoveAt(index),
-            () => _items.Insert(index, item));
+        _items.Remove(item);
+        _owner.InvalidateStyle();
         return true;
     }
 

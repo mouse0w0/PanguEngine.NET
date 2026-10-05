@@ -30,9 +30,11 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
 
         host.Classes.Add("host");
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         host.Classes.Remove("host");
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
     }
 
@@ -49,6 +51,7 @@ public sealed class UiStyleCombinatorUpdateTests
             ".unused, .leader + .target { opacity: 0.4; }")]);
 
         first.Classes.Add("leader");
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0.4, second.Opacity);
     }
@@ -67,9 +70,11 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, second.Opacity);
 
         first.Classes.Add("leader");
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, second.Opacity);
 
         first.Classes.Remove("leader");
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, second.Opacity);
     }
 
@@ -87,6 +92,7 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
 
         host.StyleId = "menu";
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
     }
 
@@ -104,9 +110,11 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
 
         host.Set("loading", true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         host.Set("loading", false);
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
     }
 
@@ -126,10 +134,12 @@ public sealed class UiStyleCombinatorUpdateTests
         screen.SetStyleSheets([UiStyleSheet.Parse(
             prefix + ".source > .target { opacity: 0.4; }" +
             prefix + ".destination > .target { opacity: 0.7; }")]);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
 
         destination.Children.Add(target);
+        screen.Root!.UpdateStyles();
 
         Assert.Same(destination, target.Parent);
         Assert.Equal(0.7, target.Opacity);
@@ -143,6 +153,7 @@ public sealed class UiStyleCombinatorUpdateTests
         host.Children.Add(target);
         var first = new UiScreen(host);
         first.SetStyleSheets([UiStyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        first.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         var secondHost = MakePanel();
@@ -150,6 +161,7 @@ public sealed class UiStyleCombinatorUpdateTests
         second.SetStyleSheets([UiStyleSheet.Parse(".target { opacity: 0.7; }")]);
 
         secondHost.Children.Add(target);
+        second.Root!.UpdateStyles();
 
         Assert.Same(second, target.Screen);
         Assert.Equal(0.7, target.Opacity);
@@ -167,10 +179,13 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(target);
         var screen = new UiScreen(root);
         screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         var other = new UiScreen();
         other.Root = leader;
+        screen.Root!.UpdateStyles();
+        other.Root!.UpdateStyles();
 
         Assert.Same(other, leader.Screen);
         Assert.DoesNotContain(leader, root.Children);
@@ -191,6 +206,7 @@ public sealed class UiStyleCombinatorUpdateTests
 
         var leader = MakePanel("leader");
         root.Children.Insert(0, leader);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
     }
@@ -207,9 +223,11 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(target);
         var screen = new UiScreen(root);
         screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         root.Children.Remove(leader);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(1d, target.Opacity);
     }
@@ -229,6 +247,7 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
 
         root.Children[0] = MakePanel("leader");
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
     }
@@ -245,9 +264,11 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(host);
         var screen = new UiScreen(root);
         screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".host .target { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, child.Opacity);
 
         host.Children.Clear();
+        child.UpdateStyles();
 
         Assert.Null(child.Parent);
         Assert.Null(child.Screen);
@@ -266,9 +287,11 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(target);
         var screen = new UiScreen(root);
         screen.SetStyleSheets([UiStyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         root.Children.Move(1, 0);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(1d, target.Opacity);
     }
@@ -285,17 +308,20 @@ public sealed class UiStyleCombinatorUpdateTests
         screen.SetStyleSheets([UiStyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
 
         target.MoveToFront();
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         leader.MoveToFront();
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
 
         leader.MoveToBack();
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
     }
 
     [Fact]
-    public void OverlappingRefreshRangesNotifyOnceAndReleasePreparationState()
+    public void OverlappingRefreshRangesNotifyOnce()
     {
         var a = MakePanel("a");
         var target = MakePanel("target");
@@ -311,6 +337,7 @@ public sealed class UiStyleCombinatorUpdateTests
 
         root.Children.Add(target);
 
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
         Assert.Equal(1, notifications);
 
@@ -318,7 +345,7 @@ public sealed class UiStyleCombinatorUpdateTests
     }
 
     [Fact]
-    public void AllSnapshotsAreCommittedBeforeNotificationsRun()
+    public void EachNodeNotifiesBeforeLaterNodesAreUpdated()
     {
         var host = MakePanel("host");
         var first = MakePanel("first");
@@ -330,10 +357,12 @@ public sealed class UiStyleCombinatorUpdateTests
             .host .first { opacity: 0.4; }
             .host .second { opacity: 0.7; }
             """)]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, first.Opacity);
         Assert.Equal(0.7, second.Opacity);
 
         host.Classes.Remove("host");
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, first.Opacity);
         Assert.Equal(1d, second.Opacity);
 
@@ -345,12 +374,14 @@ public sealed class UiStyleCombinatorUpdateTests
         };
 
         host.Classes.Add("host");
+        screen.Root!.UpdateStyles();
 
-        Assert.Equal(0.7, observed);
+        Assert.Equal(1d, observed);
+        Assert.Equal(0.7, second.Opacity);
     }
 
     [Fact]
-    public void ReentrantAncestorMutationProcessesPendingRefresh()
+    public void ReentrantAncestorMutationRemainsPendingUntilTheNextApplication()
     {
         var host = MakePanel();
         var target = MakePanel("target");
@@ -372,13 +403,18 @@ public sealed class UiStyleCombinatorUpdateTests
         };
 
         host.Classes.Add("host");
+        screen.Root!.UpdateStyles();
+
+        Assert.Equal(0.4, target.Opacity);
+        Assert.Equal(1, notifications);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0.9, target.Opacity);
         Assert.Equal(2, notifications);
     }
 
     [Fact]
-    public void ClassChangeRollsBackOnPreparationFailure()
+    public void ClassChangeRemainsCommittedOnCalculationFailure()
     {
         var host = MakePanel();
         var guard = new GuardedNode();
@@ -391,19 +427,20 @@ public sealed class UiStyleCombinatorUpdateTests
         GuardedValue.ThrowOnCompare = true;
         try
         {
-            Assert.Throws<InvalidOperationException>(() => host.Classes.Add("host"));
+            host.Classes.Add("host");
+            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
         }
         finally
         {
             GuardedValue.ThrowOnCompare = false;
         }
 
-        Assert.Empty(host.Classes);
+        Assert.Contains("host", host.Classes);
         Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
     }
 
     [Fact]
-    public void PseudoClassPreparationFailureKeepsTheActivePseudoAndOldSnapshot()
+    public void PseudoClassCalculationFailureKeepsTheActivePseudoAndOldSnapshot()
     {
         var host = new PseudoPanel();
         var guard = new GuardedNode();
@@ -416,7 +453,8 @@ public sealed class UiStyleCombinatorUpdateTests
         GuardedValue.ThrowOnCompare = true;
         try
         {
-            Assert.Throws<InvalidOperationException>(() => host.Set("loading", true));
+            host.Set("loading", true);
+            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
         }
         finally
         {
@@ -428,21 +466,22 @@ public sealed class UiStyleCombinatorUpdateTests
     }
 
     [Fact]
-    public void CandidateStylesheetReplacementIsTransactional()
+    public void FailedStylesheetApplicationPreservesThePreviousNodeSnapshot()
     {
         var host = MakePanel("host");
         var target = MakePanel("target");
         host.Children.Add(target);
         var screen = new UiScreen(host);
         screen.SetStyleSheets([UiStyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         var resolver = screen.StyleResolver;
         Assert.Equal(0.4, target.Opacity);
 
-        var error = Assert.Throws<UiStyleParseException>(() =>
-            screen.SetStyleSheets([UiStyleSheet.Parse(".host .target { padding: nope; }")]));
+        screen.SetStyleSheets([UiStyleSheet.Parse(".host .target { padding: nope; }")]);
+        var error = Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-        Assert.Same(resolver, screen.StyleResolver);
+        Assert.NotSame(resolver, screen.StyleResolver);
         Assert.Equal(0.4, target.Opacity);
     }
 
@@ -454,6 +493,7 @@ public sealed class UiStyleCombinatorUpdateTests
         host.Children.Add(target);
         var screen = new UiScreen(host);
         screen.SetStyleSheets([UiStyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         target.Opacity = 0.9;
@@ -488,6 +528,7 @@ public sealed class UiStyleCombinatorUpdateTests
             Assert.Equal(Thickness.Zero, target.Padding);
 
             root.Children.Move(1, 0);
+            screen.Root!.UpdateStyles();
 
             Assert.Equal(new Thickness(4), target.Padding);
             Assert.False(target.IsMeasureValid);
@@ -513,15 +554,17 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(destination);
         var screen = new UiScreen(root);
         screen.SetStyleSheets([UiStyleSheet.Parse(".target + .remainder { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, remainder.Opacity);
 
         destination.Children.Add(target);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(1d, remainder.Opacity);
     }
 
     [Fact]
-    public void ReentrantCrossNodeMutationRunsItsOwnBatch()
+    public void ReentrantCrossNodeMutationAppliesWhenTheLaterNodeIsVisited()
     {
         var host = MakePanel();
         var target = MakePanel("target");
@@ -548,10 +591,11 @@ public sealed class UiStyleCombinatorUpdateTests
         };
 
         host.Classes.Add("host");
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
+        Assert.Equal(1d, observed);
         Assert.Equal(0.9, other.Opacity);
-        Assert.Equal(0.9, observed);
     }
 
     [Fact]
@@ -574,13 +618,15 @@ public sealed class UiStyleCombinatorUpdateTests
             throw expected;
         };
 
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => host.Classes.Add("host")));
+        host.Classes.Add("host");
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
 
         Assert.Contains("host", host.Classes);
         Assert.Equal(0.4, target.Opacity);
         Assert.Single(target.GetStyleValueSources(UiNode.OpacityProperty));
 
         host.Classes.Add("host");
+        screen.Root!.UpdateStyles();
         Assert.Equal(1, notifications);
     }
 
@@ -593,6 +639,7 @@ public sealed class UiStyleCombinatorUpdateTests
         var screen = new UiScreen(host);
         screen.SetStyleSheets([UiStyleSheet.Parse(".host:loading .target { opacity: 0.4; }")]);
         host.Set("loading", true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         var notifications = 0;
@@ -603,12 +650,13 @@ public sealed class UiStyleCombinatorUpdateTests
         host.Classes.Add("host");
         host.StyleId = null;
         host.Classes.Remove("absent");
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(0, notifications);
     }
 
     [Fact]
-    public void StyleIdChangeRollsBackOnPreparationFailure()
+    public void StyleIdChangeRemainsCommittedOnCalculationFailure()
     {
         var host = MakePanel();
         var guard = new GuardedNode();
@@ -621,19 +669,20 @@ public sealed class UiStyleCombinatorUpdateTests
         GuardedValue.ThrowOnCompare = true;
         try
         {
-            Assert.Throws<InvalidOperationException>(() => host.StyleId = "menu");
+            host.StyleId = "menu";
+            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
         }
         finally
         {
             GuardedValue.ThrowOnCompare = false;
         }
 
-        Assert.Null(host.StyleId);
+        Assert.Equal("menu", host.StyleId);
         Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
     }
 
     [Fact]
-    public void ConverterCannotMoveTreeDuringRelationshipBatchPreparation()
+    public void ConverterCanInvalidateRelationshipsAndAddChildren()
     {
         var host = MakePanel("host");
         var screen = new UiScreen(host);
@@ -649,98 +698,49 @@ public sealed class UiStyleCombinatorUpdateTests
         try
         {
             host.Children.Add(node);
+            screen.Root!.UpdateStyles();
         }
         finally
         {
             MutationCallbackNode.OnConvert = null;
         }
 
-        Assert.IsType<InvalidOperationException>(moveError);
-        Assert.IsType<InvalidOperationException>(classError);
-        Assert.Same(node, Assert.Single(host.Children));
-        Assert.DoesNotContain("blocked", host.Classes);
+        Assert.Null(moveError);
+        Assert.Null(classError);
+        Assert.Equal(2, host.Children.Count);
+        Assert.Same(node, host.Children[0]);
+        Assert.Contains("blocked", host.Classes);
+        Assert.False(host.IsStyleSubtreeValid);
+        screen.Root!.UpdateStyles();
+        Assert.True(host.IsStyleSubtreeValid);
     }
 
     [Fact]
-    public void ConverterCannotMoveTreeDuringLazyStyleSnapshot()
+    public void ConverterCanApplyUnrelatedStylesButCannotReenterTheCurrentTree()
     {
         var host = MakePanel("host");
         var node = new MutationCallbackNode();
         host.Children.Add(node);
         var screen = new UiScreen(host);
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
-        Exception? moveError = null;
-        Exception? classError = null;
-        MutationCallbackNode.OnConvert = () =>
-        {
-            moveError = Record.Exception(() => host.Children.Add(new Panel()));
-            classError = Record.Exception(() => host.Classes.Add("blocked"));
-        };
-        try
-        {
-            node.ComputeStyleSnapshot(resolver);
-        }
-        finally
-        {
-            MutationCallbackNode.OnConvert = null;
-        }
-
-        Assert.IsType<InvalidOperationException>(moveError);
-        Assert.IsType<InvalidOperationException>(classError);
-        Assert.Same(node, Assert.Single(host.Children));
-        Assert.DoesNotContain("blocked", host.Classes);
-    }
-
-    [Theory]
-    [InlineData(false, false)]
-    [InlineData(false, true)]
-    [InlineData(true, false)]
-    [InlineData(true, true)]
-    public void RelationshipPreparationOnlyRestrictsTheCurrentTree(bool attachToScreen, bool prepareBatch)
-    {
-        var host = MakePanel("host");
-        var node = new MutationCallbackNode();
-        host.Children.Add(node);
-        if (attachToScreen)
-            _ = new UiScreen(host);
-
+        screen.SetStyleSheets([UiStyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
         var otherRoot = MakePanel("other");
         var otherScreen = new UiScreen(otherRoot);
         var otherChild = MakePanel("target");
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
         Exception? unrelatedError = null;
-        Exception? inputError = null;
-        Exception? transferError = null;
-        Exception? rootTransferError = null;
+        Exception? reentryError = null;
         MutationCallbackNode.OnConvert = () =>
         {
             unrelatedError = Record.Exception(() =>
             {
                 otherRoot.Children.Add(otherChild);
-                otherRoot.Classes.Add("changed");
                 otherScreen.SetStyleSheets([UiStyleSheet.Parse(".other > .target { opacity: 0.7; }")]);
-                otherScreen.Root = new Panel();
-                otherRoot.Children.Clear();
-                otherRoot.Children.Add(otherChild);
-                otherScreen.Root = otherRoot;
+                otherScreen.Root!.UpdateStyles();
             });
-            inputError = Record.Exception(() => host.Classes.Add("blocked"));
-            transferError = Record.Exception(() => otherRoot.Children.Add(node));
-            rootTransferError = Record.Exception(() => otherScreen.Root = node);
+            reentryError = Record.Exception(node.UpdateStyles);
         };
-        UiStyleSnapshot snapshot;
         try
         {
-            if (prepareBatch)
-            {
-                var prepared = UiNode.PrepareStyleSubtreeBatch([(host, resolver)]);
-                prepared.Commit();
-                snapshot = node.ComputeStyleSnapshot(resolver);
-            }
-            else
-            {
-                snapshot = node.ComputeStyleSnapshot(resolver);
-            }
+            screen.Root!.UpdateStyles();
         }
         finally
         {
@@ -748,30 +748,26 @@ public sealed class UiStyleCombinatorUpdateTests
         }
 
         Assert.Null(unrelatedError);
-        Assert.IsType<InvalidOperationException>(inputError);
-        Assert.IsType<InvalidOperationException>(transferError);
-        Assert.IsType<InvalidOperationException>(rootTransferError);
-        Assert.Same(host, node.Parent);
-        Assert.Same(otherRoot, otherScreen.Root);
-        Assert.Same(otherChild, Assert.Single(otherRoot.Children));
+        Assert.IsType<InvalidOperationException>(reentryError);
         Assert.Equal(0.7, otherChild.Opacity);
-        Assert.Equal(1d, snapshot.GetValue(MutationCallbackNode.ValueProperty));
-        Assert.DoesNotContain("blocked", host.Classes);
-        Assert.True(host.Classes.Add("after-preparation"));
+        Assert.Equal(1d, node.GetValue(MutationCallbackNode.ValueProperty));
+        Assert.False(host.IsUpdatingStyles);
+        Assert.False(screen.IsUpdatingLayout);
     }
 
     [Fact]
-    public void FailedRelationshipPreparationReleasesTheTreeState()
+    public void FailedRelationshipCalculationReleasesTheTreeState()
     {
         var host = MakePanel("host");
         var node = new MutationCallbackNode();
         host.Children.Add(node);
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
+        var screen = new UiScreen(host);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
         var expected = new InvalidOperationException("conversion failed");
         MutationCallbackNode.OnConvert = () => throw expected;
         try
         {
-            var error = Assert.Throws<UiStyleParseException>(() => node.ComputeStyleSnapshot(resolver));
+            var error = Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
             Assert.Same(expected, error.InnerException);
         }
         finally
@@ -779,6 +775,9 @@ public sealed class UiStyleCombinatorUpdateTests
             MutationCallbackNode.OnConvert = null;
         }
 
+        Assert.False(node.IsStyleSubtreeValid);
+        Assert.False(host.IsUpdatingStyles);
+        Assert.False(screen.IsUpdatingLayout);
         Assert.True(host.Classes.Add("after-failure"));
         var otherRoot = new Panel();
         otherRoot.Children.Add(node);
@@ -802,10 +801,14 @@ public sealed class UiStyleCombinatorUpdateTests
         destinationRoot.Children.Add(destinationTarget);
         var destination = new UiScreen(destinationRoot);
         destination.SetStyleSheets([UiStyleSheet.Parse(".leader ~ .target { opacity: 0.7; }")]);
+        source.Root!.UpdateStyles();
+        destination.Root!.UpdateStyles();
         Assert.Equal(0.4, sourceTarget.Opacity);
         Assert.Equal(1d, destinationTarget.Opacity);
 
         destinationRoot.Children.Insert(0, leader);
+        source.Root!.UpdateStyles();
+        destination.Root!.UpdateStyles();
 
         Assert.Same(destination, leader.Screen);
         Assert.Equal(1d, sourceTarget.Opacity);
@@ -827,14 +830,16 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Equal(1d, target.Opacity);
 
         leader.SetHovered(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         leader.SetHovered(false);
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
     }
 
     [Fact]
-    public void FailedRemovalPreparationLeavesNodeDetachedWithPreviousSnapshot()
+    public void FailedApplicationAfterMovingPreservesTheCommittedTreeAndPreviousSnapshot()
     {
         var source = MakePanel("host");
         var destination = MakePanel();
@@ -845,22 +850,24 @@ public sealed class UiStyleCombinatorUpdateTests
         root.Children.Add(destination);
         var screen = new UiScreen(root);
         screen.SetStyleSheets([UiStyleSheet.Parse(".host .guard { guarded: risky; opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, guard.Opacity);
         Assert.Single(guard.GetStyleValueSources(GuardedNode.ValueProperty));
 
         GuardedValue.ThrowOnCompare = true;
         try
         {
-            Assert.Throws<InvalidOperationException>(() => destination.Children.Add(guard));
+            destination.Children.Add(guard);
+            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
         }
         finally
         {
             GuardedValue.ThrowOnCompare = false;
         }
 
-        Assert.Null(guard.Parent);
-        Assert.Null(guard.Screen);
-        Assert.Empty(destination.Children);
+        Assert.Same(destination, guard.Parent);
+        Assert.Same(screen, guard.Screen);
+        Assert.Same(guard, Assert.Single(destination.Children));
         Assert.DoesNotContain(guard, source.Children);
         Assert.Equal(0.4, guard.Opacity);
         Assert.NotSame(GuardedNode.ValueProperty.DefaultValue, guard.GetValue(GuardedNode.ValueProperty));

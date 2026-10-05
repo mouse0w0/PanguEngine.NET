@@ -40,9 +40,9 @@ public abstract partial class UiNode
             true,
             onChanged: static (node, _, newValue) =>
             {
+                node.SetPseudoClass(UiPseudoClass.Disabled, !node.IsEnabled);
                 if (!newValue)
                     node.Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
-                node.SetPseudoClass(UiPseudoClass.Disabled, !node.IsEnabled);
             });
 
     /// <summary>

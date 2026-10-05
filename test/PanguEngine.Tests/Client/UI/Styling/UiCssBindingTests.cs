@@ -104,6 +104,7 @@ public sealed class UiCssBindingTests
         root.Children.Add(node);
         var screen = new UiScreen(root);
         screen.SetStyleSheets([sheet]);
+        screen.Root!.UpdateStyles();
 
         var afterInitial = CountingNode.Conversions;
         Assert.True(afterInitial > 0);
@@ -111,12 +112,14 @@ public sealed class UiCssBindingTests
         node.Classes.Add("primary");
         node.StyleId = "save";
         node.SetHovered(true);
+        screen.Root!.UpdateStyles();
 
         Assert.Equal(afterInitial, CountingNode.Conversions);
         Assert.Equal(3d, node.GetValue(CountingNode.ValueProperty));
 
         var second = new CountingNode();
         root.Children.Add(second);
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, second.GetValue(CountingNode.ValueProperty));
         Assert.Equal(afterInitial, CountingNode.Conversions);
         Assert.Same(screen, second.Screen);
@@ -214,16 +217,20 @@ public sealed class UiCssBindingTests
         Assert.Empty(node.GetStyleValueSources(Region.BackgroundProperty));
 
         node.Classes.Add("danger");
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.25, node.Opacity);
 
         node.StyleId = "save";
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.6, node.Opacity);
 
         node.SetHovered(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(4, 4, 4), node.Background);
         Assert.Equal(0.6, node.Opacity);
 
         node.StyleId = null;
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.25, node.Opacity);
     }
 
@@ -290,24 +297,26 @@ public sealed class UiCssBindingTests
     }
 
     [Fact]
-    public void StyleSheetApplicationFailureLeavesPreviousSourcesAndValue()
+    public void StyleSheetApplicationFailureLeavesPreviousValueAndNewSources()
     {
         var button = new Button();
         var screen = new UiScreen(button);
+        screen.Root!.UpdateStyles();
         var original = button.Background;
         Assert.Equal(new SolidColorBrush(48, 54, 62), original);
 
         var previous = screen.StyleResolver;
-        var error = Assert.Throws<UiStyleParseException>(() =>
-            screen.SetStyleSheets([UiStyleSheet.Parse("Button { background: nope; }")]));
+        screen.SetStyleSheets([UiStyleSheet.Parse("Button { background: nope; }")]);
+        var error = Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-        Assert.Same(previous, screen.StyleResolver);
-        Assert.Empty(screen.StyleSheets);
+        Assert.NotSame(previous, screen.StyleResolver);
+        Assert.Single(screen.StyleSheets);
         Assert.Equal(original, button.Background);
 
         var goodSheet = UiStyleSheet.Parse("Button { background: #010203; }");
         screen.SetStyleSheets([goodSheet]);
+        screen.Root!.UpdateStyles();
 
         Assert.Same(goodSheet, Assert.Single(screen.StyleSheets));
         Assert.Equal(new SolidColorBrush(1, 2, 3), button.Background);
@@ -336,6 +345,7 @@ public sealed class UiCssBindingTests
         var sheet = UiStyleSheet.Parse("Button { text: hello; opacity: 0.6; }");
 
         screen.SetStyleSheets([sheet]);
+        screen.Root!.UpdateStyles();
 
         Assert.Same(sheet, Assert.Single(screen.StyleSheets));
         Assert.Equal(Button.TextProperty.DefaultValue, button.Text);
@@ -354,6 +364,7 @@ public sealed class UiCssBindingTests
         try
         {
             screen.Root = node;
+            screen.Root!.UpdateStyles();
 
             Assert.Equal(1, SourceQueryNode.Conversions);
             Assert.Empty(node.SourceDuringBinding!);
@@ -379,12 +390,15 @@ public sealed class UiCssBindingTests
 
         first.SetStyleSheets([sheet]);
         second.SetStyleSheets([sheet]);
+        first.Root!.UpdateStyles();
+        second.Root!.UpdateStyles();
 
         Assert.Equal(2, CountingNode.Conversions);
         Assert.NotSame(first.StyleResolver, second.StyleResolver);
         Assert.Equal(3d, firstNode.GetValue(CountingNode.ValueProperty));
         Assert.Equal(3d, secondNode.GetValue(CountingNode.ValueProperty));
         first.SetStyleSheets([]);
+        first.Root!.UpdateStyles();
         Assert.Equal(0d, firstNode.GetValue(CountingNode.ValueProperty));
         Assert.Equal(3d, secondNode.GetValue(CountingNode.ValueProperty));
         Assert.Same(sheet, Assert.Single(second.StyleSheets));
@@ -398,6 +412,7 @@ public sealed class UiCssBindingTests
         var node = new SourceQueryNode();
         var screen = new UiScreen(node);
         screen.SetStyleSheets([UiStyleSheet.Parse("SourceQueryNode { opacity: 0.3; }", "old.css")]);
+        screen.Root!.UpdateStyles();
         if (localOverride)
             node.Opacity = 0.8;
         var previousSource = node.GetStyleValueSources(UiNode.OpacityProperty);
@@ -409,6 +424,7 @@ public sealed class UiCssBindingTests
                 UiStyleSheet.Parse(
                     "SourceQueryNode { query-value: 2; opacity: 0.6; }", "new.css")
             ]);
+            screen.Root!.UpdateStyles();
 
             Assert.NotEmpty(previousSource);
             Assert.NotNull(node.SourceDuringBinding);
@@ -427,7 +443,7 @@ public sealed class UiCssBindingTests
     }
 
     [Fact]
-    public void PreparatoryPseudoClassWriteIsRejectedWithoutRollingBackEnabledOrPollutingPseudoSet()
+    public void ConverterStateChangesKeepStylesPending()
     {
         var screen = new UiScreen();
         screen.SetStyleSheets([UiStyleSheet.Parse("PseudoMutationNode { mutating-value: 2; }")]);
@@ -436,21 +452,19 @@ public sealed class UiCssBindingTests
         PseudoMutationNode.Conversions = 0;
         try
         {
-            var error = Assert.Throws<UiStyleParseException>(() => screen.Root = node);
+            screen.Root = node;
+            screen.Root!.UpdateStyles();
 
-            Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
             Assert.False(node.IsEnabled);
-            Assert.False(node.HasPseudoClass(UiPseudoClass.Disabled));
-            Assert.Equal(1, PseudoMutationNode.Conversions);
-
-            Assert.Equal(2d, node.GetValue(PseudoMutationNode.ValueProperty));
-            Assert.Equal(2, PseudoMutationNode.Conversions);
-            Assert.Equal(2d, screen.StyleResolver.Resolve(node).GetValue(PseudoMutationNode.ValueProperty));
-            Assert.Equal(2, PseudoMutationNode.Conversions);
-
-            node.IsEnabled = true;
-            node.IsEnabled = false;
             Assert.True(node.HasPseudoClass(UiPseudoClass.Disabled));
+            Assert.Equal(1, PseudoMutationNode.Conversions);
+            Assert.False(node.IsStyleSubtreeValid);
+            Assert.Equal(2d, node.GetValue(PseudoMutationNode.ValueProperty));
+
+            screen.Root!.UpdateStyles();
+
+            Assert.True(node.IsStyleSubtreeValid);
+            Assert.Equal(1, PseudoMutationNode.Conversions);
         }
         finally
         {
@@ -461,7 +475,7 @@ public sealed class UiCssBindingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SiblingQueriesDuringRootAttachmentPreserveNotificationsAndRestoreGuards(bool failAfterQuery)
+    public void SiblingQueriesDuringApplicationPreserveNotificationsAndRestoreGuards(bool failAfterQuery)
     {
         var screen = new UiScreen();
         var readerRule = failAfterQuery
@@ -484,10 +498,11 @@ public sealed class UiCssBindingTests
         SourceQueryNode.Conversions = 0;
         try
         {
+            screen.Root = root;
             if (failAfterQuery)
-                Assert.Throws<UiStyleParseException>(() => screen.Root = root);
+                Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
             else
-                screen.Root = root;
+                screen.Root!.UpdateStyles();
 
             Assert.Equal(1, SourceQueryNode.Conversions);
             Assert.NotNull(reader.SourceDuringBinding);
@@ -497,6 +512,7 @@ public sealed class UiCssBindingTests
             {
                 Assert.Empty(changes);
                 screen.SetStyleSheets([]);
+                screen.Root!.UpdateStyles();
                 Assert.Equal(1d, sibling.Opacity);
             }
             else

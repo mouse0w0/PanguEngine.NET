@@ -33,7 +33,7 @@ public partial class UiScreen
 
     /// <summary>Replaces the base style sheets while preserving the application style sheets.</summary>
     /// <param name="styleSheets">The ordered style sheets to copy into the new base snapshot.</param>
-    /// <remarks>Preparation failure preserves the previous style sheets and node styles.</remarks>
+    /// <remarks>Replaces the configuration immediately. Node styles are applied during screen layout.</remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="styleSheets"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown on the wrong owner thread or during a conflicting screen operation.</exception>
     public void SetBaseStyleSheets(IEnumerable<UiStyleSheet> styleSheets) =>
@@ -41,7 +41,7 @@ public partial class UiScreen
 
     /// <summary>Replaces the application style sheets while preserving the base style sheets.</summary>
     /// <param name="styleSheets">The ordered style sheets to copy into the new author snapshot.</param>
-    /// <remarks>Preparation failure preserves the previous style sheets and node styles.</remarks>
+    /// <remarks>Replaces the configuration immediately. Node styles are applied during screen layout.</remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="styleSheets"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown on the wrong owner thread or during a conflicting screen operation.</exception>
     public void SetStyleSheets(IEnumerable<UiStyleSheet> styleSheets) =>
@@ -75,13 +75,11 @@ public partial class UiScreen
                 VerifyOwnerThreadCore();
             if (_isTransitioning || IsUpdatingLayout || _isDrawing)
                 throw new InvalidOperationException(
-                    "The UI screen style sheets cannot change while it is transitioning, updating layout, or drawing.");
+                    "The UI screen style sheets cannot change while it is transitioning, updating layout, applying styles, or drawing.");
 
-            if (_isApplyingStyleSheets)
-                throw new InvalidOperationException("The UI screen style sheets are already being applied.");
+            VerifyNotPreparingStyleSheets();
 
             root = _root;
-            _isApplyingStyleSheets = true;
             _isPreparingStyleSheets = true;
         }
 
@@ -94,21 +92,15 @@ public partial class UiScreen
             var resolver = origin == UiStyleOrigin.Base
                 ? new UiStyleResolver(snapshot, previous.StyleSheets)
                 : new UiStyleResolver(previous.BaseStyleSheets, snapshot);
-            var prepared = UiNode.PrepareStyleSubtreeBatch(
-                new (UiNode? Root, UiStyleResolver Resolver)[] { (root, resolver) });
             lock (_stateSync)
                 _styleResolver = resolver;
-            prepared.Commit();
-            lock (_stateSync)
-                _isPreparingStyleSheets = false;
-            prepared.Notify();
+            root?.InvalidateStyleSubtree();
         }
         finally
         {
             lock (_stateSync)
             {
                 _isPreparingStyleSheets = false;
-                _isApplyingStyleSheets = false;
             }
         }
     }

@@ -83,6 +83,7 @@ public sealed class UiCssVariableTests
                                .child { --a: 8px; padding: var(--b); margin: var(--a); }
                                """)
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), child.Padding);
         Assert.Equal(new Thickness(8), child.Margin);
     }
@@ -102,6 +103,7 @@ public sealed class UiCssVariableTests
                                .child { --a: var(--missing); padding: var(--a, 8px); }
                                """)
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(8), child.Padding);
     }
 
@@ -116,6 +118,7 @@ public sealed class UiCssVariableTests
                                .absent { padding: var(--missing); }
                                """)
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(Thickness.Zero, panel.Padding);
     }
 
@@ -135,6 +138,7 @@ public sealed class UiCssVariableTests
                                Panel { padding: var(--n, 0); }
                                """)
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), first.Padding);
         Assert.Equal(new Thickness(8), second.Padding);
     }
@@ -148,10 +152,13 @@ public sealed class UiCssVariableTests
         var panel = new Panel();
         var screen = new UiScreen(panel);
         screen.SetStyleSheets([UiStyleSheet.Parse(css)]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(inactive), panel.Padding);
         panel.SetHovered(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(active), panel.Padding);
         panel.SetHovered(false);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(inactive), panel.Padding);
     }
 
@@ -164,8 +171,10 @@ public sealed class UiCssVariableTests
         screen.SetStyleSheets([
             UiStyleSheet.Parse("Panel { --n: 4px; } Panel:hover { padding: var(--n); }")
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), panel.Padding);
         panel.SetHovered(false);
+        screen.Root!.UpdateStyles();
         Assert.Equal(Thickness.Zero, panel.Padding);
     }
 
@@ -179,9 +188,11 @@ public sealed class UiCssVariableTests
                                RawValueNode { --x: 'var(--absent); /* literal */'; raw: var(--x); }
                                """)
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal("'var(--absent); /* literal */'", node.GetValue(RawValueNode.ValueProperty));
 
         screen.SetStyleSheets([UiStyleSheet.Parse("RawValueNode { raw: var(--missing, Arial, sans-serif); }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal("Arial, sans-serif", node.GetValue(RawValueNode.ValueProperty));
     }
 
@@ -191,6 +202,7 @@ public sealed class UiCssVariableTests
         var node = new RawValueNode();
         var screen = new UiScreen(node);
         screen.SetStyleSheets([UiStyleSheet.Parse("RawValueNode { --r: 12; raw: rgb(var(--r), 0, 0); }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal("rgb( 12 , 0, 0)", node.GetValue(RawValueNode.ValueProperty));
     }
 
@@ -204,6 +216,7 @@ public sealed class UiCssVariableTests
             UiStyleSheet.Parse("Panel { --n: 8px; padding: var(--n); }"),
             UiStyleSheet.Parse("Panel { --n: 12px; }")
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(12), panel.Padding);
     }
 
@@ -218,6 +231,7 @@ public sealed class UiCssVariableTests
                                Panel { --n: 0.6; opacity: var(--n); }
                                """, "source.css")
         ]);
+        screen.Root!.UpdateStyles();
         var source = Assert.Single(panel.GetStyleValueSources(UiNode.OpacityProperty));
         Assert.Equal(3, source.DeclarationIndex);
         Assert.Equal(0.6, panel.Opacity);
@@ -228,9 +242,10 @@ public sealed class UiCssVariableTests
     {
         var panel = new Panel();
         var screen = new UiScreen(panel);
-        var error = Assert.Throws<UiStyleParseException>(() => screen.SetStyleSheets([
+        screen.SetStyleSheets([
             UiStyleSheet.Parse("Panel {\r\n --n: var(--n);\r\n padding: var(--n);\r\n}", "diagnostic.css")
-        ]));
+        ]);
+        var error = Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
         Assert.Equal(3, error.Line);
         Assert.Equal(11, error.Column);
         Assert.Contains("--n", error.InnerException!.Message);
@@ -253,8 +268,10 @@ public sealed class UiCssVariableTests
         var node = new RawValueNode();
         var screen = new UiScreen(node);
         screen.SetStyleSheets([UiStyleSheet.Parse("RawValueNode { --empty: ; raw: var(--empty, fallback); }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal("", node.GetValue(RawValueNode.ValueProperty));
         screen.SetStyleSheets([UiStyleSheet.Parse("RawValueNode { raw: var(--missing,); }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal("", node.GetValue(RawValueNode.ValueProperty));
     }
 
@@ -267,6 +284,7 @@ public sealed class UiCssVariableTests
         var node = new RawValueNode();
         var screen = new UiScreen(node);
         screen.SetStyleSheets([UiStyleSheet.Parse($"RawValueNode {{ raw: {value}; }}")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(expected, node.GetValue(RawValueNode.ValueProperty));
     }
 
@@ -281,6 +299,7 @@ public sealed class UiCssVariableTests
                                .absent { --a: var(--missing); --cycle: var(--cycle); }
                                """)
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(Thickness.Zero, panel.Padding);
     }
 
@@ -298,10 +317,13 @@ public sealed class UiCssVariableTests
                                #child { padding: var(--n); }
                                """)
         ]);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), child.Padding);
         root.SetHovered(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(8), child.Padding);
         root.SetHovered(false);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), child.Padding);
     }
 
@@ -313,6 +335,7 @@ public sealed class UiCssVariableTests
         screen.SetStyleSheets([UiStyleSheet.Parse("Panel { --alpha: 0.4; } Panel:hover { opacity: var(--alpha); }")]);
         Assert.Equal(1d, panel.Opacity);
         panel.SetHovered(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(0.4, panel.Opacity);
     }
 
@@ -342,6 +365,7 @@ public sealed class UiCssVariableTests
         var node = new RawValueNode();
         var screen = new UiScreen(node);
         screen.SetStyleSheets([UiStyleSheet.Parse("RawValueNode { raw: 'first\\\r\nsecond'; }")]);
+        screen.Root!.UpdateStyles();
         Assert.Equal("'first\\\r\nsecond'", node.GetValue(RawValueNode.ValueProperty));
     }
 
@@ -350,6 +374,7 @@ public sealed class UiCssVariableTests
         var panel = new Panel();
         var screen = new UiScreen(panel);
         screen.SetStyleSheets([UiStyleSheet.Parse($"Panel {{ {declarations} }}", "variables.css")]);
+        screen.Root!.UpdateStyles();
         return panel;
     }
 

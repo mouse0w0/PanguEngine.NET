@@ -44,6 +44,7 @@ public sealed class UiShowcaseStyleTests
         var example = ShowcaseTestSupport.FindExample(examples, "class、id 与通配选择器");
         var screen = new UiScreen(example.Content);
         screen.SetStyleSheets([showcase]);
+        screen.Root!.UpdateStyles();
 
         var root = example.Content;
         var plain = ShowcaseTestSupport.FindById<Button>(root, "showcase-selector-plain");
@@ -92,6 +93,7 @@ public sealed class UiShowcaseStyleTests
         var example = ShowcaseTestSupport.FindExample(examples, "默认外观与交互状态");
         var screen = new UiScreen(example.Content);
         screen.SetStyleSheets([showcase]);
+        screen.Root!.UpdateStyles();
 
         var target = ShowcaseTestSupport.FindById<Button>(example.Content, "showcase-state-target");
         var editor = ShowcaseTestSupport.FindById<TextBox>(example.Content, "showcase-state-textbox");
@@ -101,16 +103,20 @@ public sealed class UiShowcaseStyleTests
         Assert.Equal("Button", ShowcaseTestSupport.Source(target).SelectorText);
         Assert.True(editor.IsEnabled);
         editor.SetHovered(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal("TextBox:hover", editor.GetStyleValueSources(Region.BorderBrushProperty).Single().SelectorText);
         editor.SetFocused(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal("TextBox:focus", editor.GetStyleValueSources(Region.BorderBrushProperty).Single().SelectorText);
         editor.SetHovered(false);
         editor.SetFocused(false);
 
         target.SetHovered(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(0x43, 0x49, 0x50), target.Background);
         Assert.Equal("Button:hover", ShowcaseTestSupport.Source(target).SelectorText);
         target.SetHovered(false);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(48, 54, 62), target.Background);
 
         ShowcaseTestSupport.Click(toggle);
@@ -139,6 +145,7 @@ public sealed class UiShowcaseStyleTests
         var example = ShowcaseTestSupport.FindExample(examples, "Author 覆盖与本地值");
         screen = new UiScreen(example.Content);
         screen.SetStyleSheets([showcase]);
+        screen.Root!.UpdateStyles();
 
         var root = example.Content;
         var target = ShowcaseTestSupport.FindById<Button>(root, "showcase-author-target");
@@ -198,6 +205,7 @@ public sealed class UiShowcaseStyleTests
         var example = ShowcaseTestSupport.FindExample(examples, "状态组合伪类");
         var screen = new UiScreen(example.Content);
         screen.SetStyleSheets([showcase]);
+        screen.Root!.UpdateStyles();
 
         var target = ShowcaseTestSupport.FindById<Button>(example.Content, "showcase-combo-target");
         var sourceLabel = ShowcaseTestSupport.FindById<Text>(example.Content, "showcase-combo-source");
@@ -207,12 +215,14 @@ public sealed class UiShowcaseStyleTests
 
         target.SetHovered(true);
         target.SetFocused(true);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(0x7A, 0x4A, 0x1F), target.Background);
         Assert.Equal("Button.showcase-combo:focus:hover", ShowcaseTestSupport.Source(target).SelectorText);
         Assert.Contains("Button.showcase-combo:focus:hover", sourceLabel.Content);
 
         target.SetHovered(false);
         target.SetFocused(false);
+        screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(0x3A, 0x3F, 0x47), target.Background);
         Assert.Equal("Button.showcase-combo", ShowcaseTestSupport.Source(target).SelectorText);
     }
@@ -334,13 +344,16 @@ internal static class ShowcaseTestSupport
     internal static UiStyleValueSource Source(UiNode node) =>
         node.GetStyleValueSources(Region.BackgroundProperty).Single();
 
-    internal static void Click(Button button) =>
+    internal static void Click(Button button)
+    {
         button.RaisePointerClicked(new UiPointerButtonEventArgs(
             button,
             new Point(0, 0),
             MouseButton.Left,
             KeyModifiers.None,
             Array.Empty<UiHitPathEntry>()));
+        button.GetStyleRoot().UpdateStyles();
+    }
 
     private static UiNode FindById(UiNode root, string id) =>
         FindByIdOrNull(root, id) ?? throw new InvalidOperationException($"Node '{id}' was not found.");

@@ -94,9 +94,9 @@ public abstract partial class UiNode
             Visibility.Visible,
             onChanged: static (node, _, newValue) =>
             {
+                node.InvalidateMeasure();
                 if (newValue != Visibility.Visible)
                     node.Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
-                node.InvalidateMeasure();
             });
 
     private Size _lastMeasureConstraint;
@@ -235,6 +235,7 @@ public abstract partial class UiNode
     public void Measure(Size availableSize)
     {
         VerifyLayoutMutationAccess();
+        VerifyNotUpdatingStyles();
         VerifyLayoutProperties();
         var screen = Screen;
         var useLayoutRounding = screen?.UseLayoutRounding ?? true;
@@ -318,6 +319,7 @@ public abstract partial class UiNode
     public void Arrange(Rect finalRect)
     {
         VerifyLayoutMutationAccess();
+        VerifyNotUpdatingStyles();
         VerifyLayoutProperties();
         var screen = Screen;
         var useLayoutRounding = screen?.UseLayoutRounding ?? true;
@@ -443,6 +445,12 @@ public abstract partial class UiNode
 
     private void VerifyLayoutMutationAccess() =>
         Screen?.VerifyTreeMutationAccess();
+
+    private void VerifyNotUpdatingStyles()
+    {
+        if (IsUpdatingStyles)
+            throw new InvalidOperationException("Layout cannot run while styles are being updated.");
+    }
 
     /// <inheritdoc />
     protected override void VerifyMutationAccess() =>

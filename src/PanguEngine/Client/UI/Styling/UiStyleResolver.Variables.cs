@@ -15,8 +15,9 @@ internal sealed partial class UiStyleResolver
         }
     }
 
-    private UiCssVariableEnvironment ResolveVariables(UiNode node, UiCssVariableEnvironment parent)
+    private UiCssVariableEnvironment ResolveVariables(UiNode node)
     {
+        var parent = node.Parent is { } ancestor ? ResolveVariables(ancestor) : UiCssVariableEnvironment.Empty;
         var winners =
             new Dictionary<string, (CascadeKey Key, UiStyleRule.CssDeclaration Declaration)>(StringComparer.Ordinal);
         foreach (var entry in _variableRules)
@@ -43,22 +44,5 @@ internal sealed partial class UiStyleResolver
 
         return UiCssVariableEnvironment.Create(parent,
             winners.ToDictionary(pair => pair.Key, pair => pair.Value.Declaration, StringComparer.Ordinal));
-    }
-
-    /// <summary>Provides consistent variable environments during a style preparation batch.</summary>
-    internal sealed class VariableContext
-    {
-        private readonly Dictionary<(UiStyleResolver Resolver, UiNode Node), UiCssVariableEnvironment> _environments =
-            [];
-
-        internal UiCssVariableEnvironment Get(UiStyleResolver resolver, UiNode node)
-        {
-            if (_environments.TryGetValue((resolver, node), out var environment))
-                return environment;
-            var parent = node.Parent is { } ancestor ? Get(resolver, ancestor) : UiCssVariableEnvironment.Empty;
-            environment = resolver.ResolveVariables(node, parent);
-            _environments.Add((resolver, node), environment);
-            return environment;
-        }
     }
 }

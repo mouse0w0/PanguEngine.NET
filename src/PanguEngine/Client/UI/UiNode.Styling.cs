@@ -7,20 +7,17 @@ public abstract partial class UiNode
 {
     private UiStyleSnapshot? _styleSnapshot;
     private List<UiPseudoClass>? _pseudoClasses;
-    private bool _isStyleRecomputing;
-    private bool _hasPendingStyleRecompute;
-    private bool _isResolvingStyle;
 
-    /// <summary>
-    /// Throws when this node or an ancestor is preparing styles.
-    /// </summary>
-    internal void VerifyStylePreparationIdle()
+    internal bool IsStyleValid { get; private set; }
+    internal bool IsStyleSubtreeValid { get; private set; }
+    internal bool IsUpdatingStyles { get; private set; }
+
+    internal UiNode GetStyleRoot()
     {
-        for (var node = this; node is not null; node = node.Parent)
-        {
-            if (node._isResolvingStyle)
-                throw new InvalidOperationException("The node cannot change while its styles are being prepared.");
-        }
+        var root = this;
+        while (root.Parent is { } parent)
+            root = parent;
+        return root;
     }
 
     /// <summary>Gets or sets the optional ASCII identifier used by style selectors, or null for no id.</summary>
@@ -35,10 +32,8 @@ public abstract partial class UiNode
             if (value is not null)
                 UiStyleIdentifier.ThrowIfInvalid(value, nameof(StyleId));
             VerifyStyleInputAccess();
-            var previous = field;
-            ChangeStyleInput(
-                () => field = value,
-                () => field = previous);
+            field = value;
+            InvalidateStyle();
         }
     }
 
@@ -50,12 +45,12 @@ public abstract partial class UiNode
     /// <param name="active">Whether the pseudo class should be active on this node.</param>
     /// <remarks>
     /// The collection only changes when the requested membership differs,
-    /// and a no-op does not request a style recompute. A pseudo class
-    /// mirrors real control state, so a style preparation failure does not roll back the updated collection.
+    /// and a no-op does not invalidate styles. A pseudo class mirrors real control state;
+    /// its styles are applied during screen layout.
     /// Requests for <see cref="UiPseudoClass.Root"/> have no effect because root matching depends on tree structure.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the node resolves its styles or the owning screen does not allow style input changes.
+    /// Thrown when the owning screen does not allow style input changes.
     /// </exception>
     protected void SetPseudoClass(UiPseudoClass pseudoClass, bool active)
     {
@@ -78,7 +73,7 @@ public abstract partial class UiNode
         else
             _pseudoClasses!.Remove(pseudoClass);
 
-        RecomputeStyle();
+        InvalidateStyle();
     }
 
     /// <summary>Determines whether this node matches the supplied structural or state pseudo class.</summary>
@@ -87,21 +82,98 @@ public abstract partial class UiNode
     internal bool HasPseudoClass(UiPseudoClass pseudoClass) =>
         pseudoClass == UiPseudoClass.Root ? Parent is null : _pseudoClasses?.Contains(pseudoClass) == true;
 
-    internal void ChangeStyleInput(Action apply, Action rollback)
+    internal void InvalidateStyle()
     {
-        apply();
-        PreparedStyleBatch prepared;
+        var resolver = GetStyleResolver();
+        if (!resolver.HasRelationships && !resolver.HasVariables)
+        {
+            InvalidateStyleState();
+            return;
+        }
+
+        var root = resolver.HasSiblingRelationships ? Parent ?? this : this;
+        root.InvalidateStyleSubtree();
+    }
+
+    private void InvalidateStyleState()
+    {
+        IsStyleValid = false;
+        for (var node = this; node is not null; node = node.Parent)
+            node.IsStyleSubtreeValid = false;
+    }
+
+    internal void InvalidateStyleSubtree()
+    {
+        foreach (var node in PreOrderTraversal(this))
+            node.InvalidateStyleState();
+    }
+
+    internal static void InvalidateStyleSubtreeBatch(
+        IReadOnlyList<UiNode> roots)
+    {
+        foreach (var root in roots)
+            root.InvalidateStyleSubtree();
+    }
+
+    internal void UpdateStyles() => UpdateStylesCore(this);
+
+    private void UpdateStylesCore(UiNode root)
+    {
+        if (IsUpdatingStyles)
+            throw new InvalidOperationException("Styles are already being updated for this node.");
+        if (IsStyleSubtreeValid || !ReferenceEquals(GetStyleRoot(), root))
+            return;
+        IsUpdatingStyles = true;
+        IsStyleSubtreeValid = true;
         try
         {
-            prepared = PrepareStyleChange();
+            if (!IsStyleValid)
+            {
+                IsStyleValid = true;
+                List<(Property Property, object? Old, object? New)> changes;
+                try
+                {
+                    var snapshot = GetStyleResolver().Resolve(this);
+                    changes = ComputeStyleChanges(_styleSnapshot, snapshot);
+                    changes.Sort((a, b) => a.Property.RegistrationOrder.CompareTo(b.Property.RegistrationOrder));
+                    _styleSnapshot = snapshot;
+                }
+                catch
+                {
+                    InvalidateStyleState();
+                    throw;
+                }
+
+                foreach (var (property, oldValue, newValue) in changes)
+                {
+                    if (!ReferenceEquals(GetStyleRoot(), root))
+                        break;
+                    if (!IsStyleValueCurrent(property, newValue))
+                        continue;
+                    property.RaiseEffectiveValueChanged(this, oldValue, newValue);
+                }
+            }
+
+            if (!ReferenceEquals(GetStyleRoot(), root))
+                return;
+            if (this is Parent parent)
+            {
+                foreach (var child in parent.ReadOnlyChildren.ToArray())
+                {
+                    if (ReferenceEquals(child.Parent, this))
+                        child.UpdateStylesCore(root);
+                }
+            }
         }
         catch
         {
-            rollback();
+            IsStyleSubtreeValid = false;
             throw;
         }
-
-        RecomputeStyle(prepared);
+        finally
+        {
+            IsUpdatingStyles = false;
+        }
     }
 
     private UiStyleResolver GetStyleResolver() =>
@@ -112,7 +184,7 @@ public abstract partial class UiNode
     /// </summary>
     /// <param name="property">The property whose style source to query.</param>
     /// <returns>The immutable sources in component order, or an empty list when no style declaration applies.</returns>
-    /// <remarks>During style resolution, returns the last committed source without starting another resolution.</remarks>
+    /// <remarks>Returns only previously applied sources, even when styles are pending or have never been applied.</remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="property"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when the property cannot be stored on this node.</exception>
     public IReadOnlyList<UiStyleValueSource> GetStyleValueSources(Property property)
@@ -121,28 +193,12 @@ public abstract partial class UiNode
         property.VerifyOwner(this);
         if (property.IsDirect)
             return Array.Empty<UiStyleValueSource>();
-        EnsureStyleSnapshot();
         var sources = _styleSnapshot?.GetSources(property) ?? Array.Empty<UiStyleValueSource>();
         var isMasked = HasLocalValue(property);
         return isMasked
             ? Array.AsReadOnly(sources.Select(source => source.WithLocalValueMask(true)).ToArray())
             : sources;
     }
-
-    private void EnsureStyleSnapshot()
-    {
-        if (_styleSnapshot is null && !_isResolvingStyle)
-            _styleSnapshot = ComputeStyleSnapshot();
-    }
-
-    private UiStyleSnapshot ComputeStyleSnapshot() =>
-        ComputeStyleSnapshot(GetStyleResolver());
-
-    internal UiStyleSnapshot ComputeStyleSnapshot(UiStyleResolver resolver) =>
-        PrepareStyle(resolver, trackChanges: false).Snapshot;
-
-    internal void CommitStyleSnapshot(UiStyleSnapshot snapshot) =>
-        _styleSnapshot = snapshot;
 
     private List<(Property Property, object? Old, object? New)> ComputeStyleChanges(
         UiStyleSnapshot? oldSnapshot,
@@ -175,75 +231,19 @@ public abstract partial class UiNode
         return changed;
     }
 
-    internal void VerifyStyleInputAccess()
-    {
-        VerifyStylePreparationIdle();
-        var screen = Screen;
-        if (screen is null)
-            return;
-        screen.VerifyTreeMutationAccess();
-        if (screen.IsUpdatingLayout)
-            throw new InvalidOperationException(
-                "A style selector input cannot change while the UI screen updates layout.");
-        if (screen.IsApplyingStyleSheets)
-            throw new InvalidOperationException(
-                "A style selector input cannot change while the UI screen applies style sheets.");
-    }
-
-    private void RecomputeStyle(PreparedStyleBatch? firstPrepared = null)
-    {
-        if (_isStyleRecomputing)
-        {
-            _hasPendingStyleRecompute = true;
-            return;
-        }
-
-        _isStyleRecomputing = true;
-        var prepared = firstPrepared;
-        try
-        {
-            do
-            {
-                _hasPendingStyleRecompute = false;
-                var currentPrepared = prepared;
-                prepared = null;
-                RecomputeStyleCore(currentPrepared);
-            } while (_hasPendingStyleRecompute);
-        }
-        finally
-        {
-            _isStyleRecomputing = false;
-        }
-    }
-
-    private void RecomputeStyleCore(PreparedStyleBatch? prepared)
-    {
-        var entry = prepared ?? PrepareStyleChange();
-        entry.Commit();
-        entry.Notify();
-    }
-
-    private PreparedStyleBatch PrepareStyleChange()
-    {
-        var resolver = GetStyleResolver();
-        if (!resolver.HasRelationships && !resolver.HasVariables)
-            return new PreparedStyleBatch([PrepareStyle(resolver)]);
-
-        var root = resolver.HasSiblingRelationships ? Parent ?? this : this;
-        return PrepareStyleSubtreeBatch([(root, resolver)]);
-    }
+    internal void VerifyStyleInputAccess() => Screen?.VerifyTreeMutationAccess();
 
     internal static void AddRelationshipRefreshEntry(
-        List<(UiNode? Root, UiStyleResolver Resolver)> entries,
+        List<UiNode> entries,
         UiNode? root,
         UiStyleResolver resolver)
     {
         if (root is not null && resolver.HasRelationships)
-            entries.Add((root, resolver));
+            entries.Add(root);
     }
 
     internal static void AddSubtreeRefreshEntry(
-        List<(UiNode? Root, UiStyleResolver Resolver)> entries,
+        List<UiNode> entries,
         UiNode? node,
         UiStyleResolver previousResolver,
         UiStyleResolver currentResolver,
@@ -255,42 +255,14 @@ public abstract partial class UiNode
                                  currentResolver.HasVariables ||
                                  previousResolver.HasRootPseudoClass || currentResolver.HasRootPseudoClass))
         {
-            entries.Add((node, currentResolver));
-        }
-    }
-
-    private PreparedStyle PrepareStyle(UiStyleResolver resolver, bool trackChanges = true,
-        UiStyleResolver.VariableContext? variableContext = null)
-    {
-        var scope = this;
-        if (resolver.HasRelationships || resolver.HasVariables)
-        {
-            while (scope.Parent is { } parent)
-                scope = parent;
-        }
-
-        var wasResolvingStyle = _isResolvingStyle;
-        var wasScopeResolvingStyle = scope._isResolvingStyle;
-        _isResolvingStyle = true;
-        scope._isResolvingStyle = true;
-        try
-        {
-            var newSnapshot = resolver.Resolve(this, variableContext);
-            var changes = trackChanges ? ComputeStyleChanges(_styleSnapshot, newSnapshot) : [];
-            changes.Sort((a, b) => a.Property.RegistrationOrder.CompareTo(b.Property.RegistrationOrder));
-            return new PreparedStyle(this, newSnapshot, changes);
-        }
-        finally
-        {
-            _isResolvingStyle = wasResolvingStyle;
-            scope._isResolvingStyle = wasScopeResolvingStyle;
+            entries.Add(node);
         }
     }
 
     private static object? GetSnapshotValue(UiStyleSnapshot snapshot, Property property, object? defaultValue) =>
         snapshot.TryGetBoxedValue(property, out var value) ? value : defaultValue;
 
-    private bool IsPreparedValueCurrent(Property property, object? expectedValue)
+    private bool IsStyleValueCurrent(Property property, object? expectedValue)
     {
         if (HasLocalValue(property))
             return false;
@@ -298,50 +270,6 @@ public abstract partial class UiNode
             ? property.DefaultValue
             : GetSnapshotValue(_styleSnapshot, property, property.DefaultValue);
         return property.AreEqual(currentValue, expectedValue);
-    }
-
-    internal static void RecomputeStyleSubtreeBatch(
-        IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries)
-    {
-        var prepared = PrepareStyleSubtreeBatch(entries);
-        prepared.Commit();
-        prepared.Notify();
-    }
-
-    internal static PreparedStyleBatch PrepareStyleSubtreeBatch(
-        IReadOnlyList<(UiNode? Root, UiStyleResolver Resolver)> entries)
-    {
-        var nodes = new List<(UiNode Node, UiStyleResolver Resolver, bool WasResolvingStyle)>();
-        var seen = new HashSet<UiNode>(ReferenceEqualityComparer.Instance);
-        foreach (var (root, resolver) in entries)
-        {
-            if (root is null)
-                continue;
-
-            foreach (var node in PreOrderTraversal(root))
-            {
-                if (!seen.Add(node))
-                    continue;
-                nodes.Add((node, resolver, node._isResolvingStyle));
-            }
-        }
-
-        foreach (var (node, _, _) in nodes)
-            node._isResolvingStyle = true;
-
-        try
-        {
-            var prepared = new List<PreparedStyle>(nodes.Count);
-            var variableContext = new UiStyleResolver.VariableContext();
-            foreach (var (node, resolver, _) in nodes)
-                prepared.Add(node.PrepareStyle(resolver, variableContext: variableContext));
-            return new PreparedStyleBatch(prepared);
-        }
-        finally
-        {
-            foreach (var (node, _, wasResolvingStyle) in nodes)
-                node._isResolvingStyle = wasResolvingStyle;
-        }
     }
 
     private static IEnumerable<UiNode> PreOrderTraversal(UiNode root)
@@ -356,31 +284,4 @@ public abstract partial class UiNode
             }
         }
     }
-
-    internal sealed class PreparedStyleBatch(IReadOnlyList<PreparedStyle> entries)
-    {
-        internal void Commit()
-        {
-            foreach (var entry in entries)
-                entry.Node.CommitStyleSnapshot(entry.Snapshot);
-        }
-
-        internal void Notify()
-        {
-            foreach (var entry in entries)
-            {
-                foreach (var (property, oldValue, newValue) in entry.Changes)
-                {
-                    if (!entry.Node.IsPreparedValueCurrent(property, newValue))
-                        continue;
-                    property.RaiseEffectiveValueChanged(entry.Node, oldValue, newValue);
-                }
-            }
-        }
-    }
-
-    internal readonly record struct PreparedStyle(
-        UiNode Node,
-        UiStyleSnapshot Snapshot,
-        List<(Property Property, object? Old, object? New)> Changes);
 }
