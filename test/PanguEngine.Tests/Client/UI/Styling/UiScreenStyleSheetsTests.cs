@@ -150,12 +150,19 @@ public sealed class UiScreenStyleSheetsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void PreparationRejectsTreeAndLifecycleChangesFromEnumeration(bool open)
+    public void PreparationRejectsTreeAndLifecycleChangesButAllowsClasses(bool open)
     {
         var root = new Panel();
         var screen = new UiScreen(root);
+        screen.Root!.UpdateStyles();
         if (open)
             screen.Open();
+        var collectionNotifications = 0;
+        root.Classes.Changed += (_, _) =>
+        {
+            collectionNotifications++;
+            Assert.False(root.IsStyleValid);
+        };
         Exception? rootError = null;
         Exception? childError = null;
         Exception? lifecycleError = null;
@@ -187,15 +194,68 @@ public sealed class UiScreenStyleSheetsTests
         Assert.IsType<InvalidOperationException>(lifecycleError);
         Assert.IsType<InvalidOperationException>(authorError);
         Assert.IsType<InvalidOperationException>(baseStylesError);
-        Assert.IsType<InvalidOperationException>(classesError);
+        Assert.Null(classesError);
         Assert.IsType<InvalidOperationException>(idError);
         Assert.Same(root, screen.Root);
         Assert.Empty(root.Children);
-        Assert.Empty(root.Classes);
+        Assert.Equal("blocked", Assert.Single(root.Classes));
+        Assert.Equal(1, collectionNotifications);
         Assert.Null(root.StyleId);
         Assert.Equal(open, screen.IsOpen());
         if (open)
             screen.Close();
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void ClassChangesDuringEnumerationRemainPendingWhenConfigurationIsUnchanged(
+        bool baseStyles, bool enumerationFails)
+    {
+        var node = new Panel();
+        var screen = new UiScreen(node);
+        var sheet = UiStyleSheet.Parse(".pending { opacity: 0.4; }");
+        SetSheets(screen, baseStyles, [sheet]);
+        screen.Root!.UpdateStyles();
+        var resolver = screen.StyleResolver;
+        var current = GetSheets(screen, baseStyles);
+        var expected = new InvalidOperationException("enumeration failed");
+        var collectionNotifications = 0;
+        node.Classes.Changed += (_, _) =>
+        {
+            collectionNotifications++;
+            Assert.False(node.IsStyleValid);
+            Assert.Equal(1d, node.Opacity);
+        };
+        IEnumerable<UiStyleSheet> Input()
+        {
+            node.Classes.Add("pending");
+            yield return sheet;
+            if (enumerationFails)
+                throw expected;
+        }
+
+        var error = Record.Exception(() => SetSheets(screen, baseStyles, Input()));
+
+        if (enumerationFails)
+            Assert.Same(expected, error);
+        else
+            Assert.Null(error);
+        Assert.Same(resolver, screen.StyleResolver);
+        Assert.Same(current, GetSheets(screen, baseStyles));
+        Assert.Equal("pending", Assert.Single(node.Classes));
+        Assert.Equal(1, collectionNotifications);
+        Assert.False(node.IsStyleValid);
+        Assert.False(node.IsStyleSubtreeValid);
+        Assert.Equal(1d, node.Opacity);
+
+        screen.Root!.UpdateStyles();
+
+        Assert.Equal(0.4, node.Opacity);
+        Assert.True(node.IsStyleValid);
+        Assert.True(node.IsStyleSubtreeValid);
     }
 
     [Fact]
@@ -248,7 +308,7 @@ public sealed class UiScreenStyleSheetsTests
             Assert.IsType<InvalidOperationException>(errors[1]);
             Assert.Null(errors[2]);
             Assert.Null(errors[3]);
-            Assert.Contains("blocked", node.Classes);
+            Assert.Equal("blocked", Assert.Single(node.Classes));
             Assert.Equal("blocked", node.StyleId);
             Assert.True(node.IsStyleSubtreeValid);
             Assert.Equal(1d, node.GetValue(CallbackNode.ValueProperty));
@@ -286,6 +346,7 @@ public sealed class UiScreenStyleSheetsTests
             Assert.IsType<InvalidOperationException>(authorError);
             Assert.IsType<InvalidOperationException>(baseStylesError);
             Assert.Null(classesError);
+            Assert.Equal("other", Assert.Single(button.Classes));
             Assert.Equal(new SolidColorBrush(1, 2, 3), button.Background);
         }
         finally

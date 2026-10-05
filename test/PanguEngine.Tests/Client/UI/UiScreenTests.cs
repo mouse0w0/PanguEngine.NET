@@ -48,9 +48,9 @@ public sealed class UiScreenTests
         var buttons = panel.Children.OfType<Button>().ToArray();
 
         Assert.Equal(3, buttons.Length);
-        Assert.DoesNotContain("danger", buttons.Single(button => button.Text == "回到游戏").Classes);
+        Assert.DoesNotContain("danger", (IReadOnlySet<string>)buttons.Single(button => button.Text == "回到游戏").Classes);
         var exit = buttons.Single(button => button.Text == "退出游戏");
-        Assert.Contains("danger", exit.Classes);
+        Assert.Contains("danger", (IReadOnlySet<string>)exit.Classes);
         Assert.Equal(new SolidColorBrush(104, 43, 45), exit.Background);
         Assert.Equal(new SolidColorBrush(157, 73, 77), exit.BorderBrush);
         Assert.Equal("Button.danger", Assert.Single(exit.GetStyleValueSources(Region.BackgroundProperty)).SelectorText);
@@ -70,7 +70,7 @@ public sealed class UiScreenTests
             new[] { "回到游戏", "UI 展示", "退出游戏" },
             buttons.Select(button => button.Text).ToArray());
         var showcase = buttons.Single(button => button.Text == "UI 展示");
-        Assert.DoesNotContain("danger", showcase.Classes);
+        Assert.DoesNotContain("danger", (IReadOnlySet<string>)showcase.Classes);
     }
 
     [Fact]

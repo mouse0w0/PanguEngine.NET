@@ -410,6 +410,7 @@ public sealed class UiStyleCombinatorUpdateTests
         screen.Root!.UpdateStyles();
 
         Assert.Equal(0.9, target.Opacity);
+        Assert.True(host.Classes.SetEquals(["host", "extra"]));
         Assert.Equal(2, notifications);
     }
 
@@ -435,8 +436,10 @@ public sealed class UiStyleCombinatorUpdateTests
             GuardedValue.ThrowOnCompare = false;
         }
 
-        Assert.Contains("host", host.Classes);
+        Assert.Contains("host", (IReadOnlySet<string>)host.Classes);
         Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
+        Assert.True(host.Classes.Remove("host"));
+        Assert.Empty(host.Classes);
     }
 
     [Fact]
@@ -621,7 +624,7 @@ public sealed class UiStyleCombinatorUpdateTests
         host.Classes.Add("host");
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
 
-        Assert.Contains("host", host.Classes);
+        Assert.Contains("host", (IReadOnlySet<string>)host.Classes);
         Assert.Equal(0.4, target.Opacity);
         Assert.Single(target.GetStyleValueSources(UiNode.OpacityProperty));
 
@@ -709,7 +712,7 @@ public sealed class UiStyleCombinatorUpdateTests
         Assert.Null(classError);
         Assert.Equal(2, host.Children.Count);
         Assert.Same(node, host.Children[0]);
-        Assert.Contains("blocked", host.Classes);
+        Assert.Contains("blocked", (IReadOnlySet<string>)host.Classes);
         Assert.False(host.IsStyleSubtreeValid);
         screen.Root!.UpdateStyles();
         Assert.True(host.IsStyleSubtreeValid);

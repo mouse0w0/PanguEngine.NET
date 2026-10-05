@@ -1,5 +1,5 @@
 using PanguEngine.ComponentModel;
-using PanguEngine.Client.UI.Styling;
+using PanguEngine.Collections;
 
 namespace PanguEngine.Client.UI;
 
@@ -16,7 +16,8 @@ public abstract partial class UiNode : ObservableObject
     /// </summary>
     protected UiNode()
     {
-        Classes = new UiStyleClassCollection(this);
+        Classes = new ObservableSet<string>(StringComparer.Ordinal);
+        Classes.Changed += (_, _) => InvalidateStyle();
     }
 
     /// <inheritdoc />

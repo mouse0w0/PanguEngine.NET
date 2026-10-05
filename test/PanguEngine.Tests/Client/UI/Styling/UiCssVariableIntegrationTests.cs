@@ -244,7 +244,7 @@ public sealed class UiCssVariableIntegrationTests
     }
 
     [Fact]
-    public void UnmatchedMalformedImportantVariableIsDeferredUntilMatched()
+    public void MatchedMalformedImportantVariableKeepsClassAndOldStyleOnFailure()
     {
         var panel = new Panel();
         var screen = new UiScreen(panel);
@@ -258,7 +258,10 @@ public sealed class UiCssVariableIntegrationTests
         panel.Classes.Add("inactive");
         var error = Assert.Throws<UiStyleParseException>(screen.Root!.UpdateStyles);
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-        Assert.Contains("inactive", panel.Classes);
+        Assert.Contains("inactive", (IReadOnlySet<string>)panel.Classes);
+        Assert.Equal(1d, panel.Opacity);
+        Assert.True(panel.Classes.Remove("inactive"));
+        screen.Root!.UpdateStyles();
         Assert.Equal(1d, panel.Opacity);
     }
 

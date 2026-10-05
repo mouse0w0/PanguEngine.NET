@@ -1,9 +1,9 @@
 using PanguEngine.ComponentModel;
-using System.Reflection;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.Collections;
 
 namespace PanguEngine.Tests.Client.UI.Styling;
 
@@ -397,6 +397,8 @@ public sealed class UiNodeStylingTests
             Rule(Selector<Button>(classes: ["extra"]), Setter(Region.BackgroundProperty, Brush(9))));
 
         var backgroundNotifications = 0;
+        var collectionNotifications = 0;
+        button.Classes.Changed += (_, _) => collectionNotifications++;
         button.PropertyChanged += (_, e) =>
         {
             if (!ReferenceEquals(e.Property, Region.BackgroundProperty))
@@ -414,7 +416,51 @@ public sealed class UiNodeStylingTests
         button.GetStyleRoot().UpdateStyles();
 
         Assert.Equal(Brush(9), button.Background);
+        Assert.True(button.Classes.SetEquals(["x", "extra"]));
         Assert.Equal(2, backgroundNotifications);
+        Assert.Equal(2, collectionNotifications);
+    }
+
+    [Fact]
+    public void UnhandledClassListenerReentrancyStopsNotificationAndKeepsStylesPending()
+    {
+        var button = new Button();
+        ApplyTheme(
+            button,
+            Rule(Selector<Button>(classes: ["x"]), Setter(Region.BackgroundProperty, Brush(5))),
+            Rule(Selector<Button>(classes: ["extra"]), Setter(Region.BackgroundProperty, Brush(9))));
+        var notifications = 0;
+        var collectionNotifications = 0;
+        var attemptReentrancy = true;
+        button.Classes.Changed += (_, _) =>
+        {
+            if (attemptReentrancy)
+                button.Classes.Add("extra");
+        };
+        button.Classes.Changed += (_, _) => collectionNotifications++;
+        button.PropertyChanged += (_, e) =>
+        {
+            if (!ReferenceEquals(e.Property, Region.BackgroundProperty))
+                return;
+            notifications++;
+        };
+
+        Assert.Throws<InvalidOperationException>(() => button.Classes.Add("x"));
+
+        Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
+        Assert.True(button.Classes.SetEquals(["x"]));
+        Assert.Equal(0, notifications);
+        Assert.Equal(0, collectionNotifications);
+        button.GetStyleRoot().UpdateStyles();
+        Assert.Equal(Brush(5), button.Background);
+        Assert.Equal(1, notifications);
+
+        attemptReentrancy = false;
+        button.Classes.Add("extra");
+        button.GetStyleRoot().UpdateStyles();
+        Assert.Equal(Brush(9), button.Background);
+        Assert.Equal(2, notifications);
+        Assert.Equal(1, collectionNotifications);
     }
 
     [Fact]
@@ -446,6 +492,393 @@ public sealed class UiNodeStylingTests
         Assert.Equal(Brush(5), button.Background);
         Assert.True(button.Classes.Contains("extra"));
         Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void ClassSetBatchPublishesOneChangeBeforeStylesAreApplied()
+    {
+        var node = new Canvas();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".primary.wide { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
+        IObservableSet<string> classes = node.Classes;
+        var order = new List<string>();
+        var changes = new List<SetChangedEventArgs<string>>();
+        node.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Property, UiNode.OpacityProperty))
+                order.Add("style");
+        };
+        classes.Changed += (sender, change) =>
+        {
+            Assert.Same(node.Classes, sender);
+            Assert.Equal(1d, node.Opacity);
+            Assert.False(node.IsStyleValid);
+            Assert.True(classes.SetEquals(["primary", "wide"]));
+            order.Add("set");
+            changes.Add(change);
+        };
+
+        classes.UnionWith(["primary", "wide", "primary"]);
+
+        Assert.Equal(new[] { "set" }, order);
+        screen.Root!.UpdateStyles();
+        Assert.Equal(0.4, node.Opacity);
+        Assert.Equal(new[] { "set", "style" }, order);
+        var change = Assert.Single(changes);
+        Assert.True(new HashSet<string>(change.AddedItems).SetEquals(["primary", "wide"]));
+        Assert.Empty(change.RemovedItems);
+        Assert.False(classes.Add("primary"));
+        Assert.Single(changes);
+        Assert.True(node.IsStyleValid);
+        Assert.Same(StringComparer.Ordinal, classes.Comparer);
+    }
+
+    [Fact]
+    public void ClassSetUsesOrdinalMembershipAndProvidesALiveReadOnlyView()
+    {
+        var node = new Canvas();
+        var view = node.Classes.AsReadOnly();
+
+        Assert.True(node.Classes.Add("primary"));
+        Assert.True(node.Classes.Add("Primary"));
+        Assert.False(node.Classes.Add("primary"));
+        Assert.Equal(2, view.Count);
+        Assert.True(view.SetEquals(["primary", "Primary"]));
+        Assert.Same(StringComparer.Ordinal, view.Comparer);
+    }
+
+    [Theory]
+    [InlineData("invalid class")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void ClassSetAcceptsNamesWithoutSelectorValidation(string? className)
+    {
+        var node = new Canvas();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".valid { opacity: 0.4; }")]);
+        node.Classes.Add("kept");
+        var changes = new List<SetChangedEventArgs<string>>();
+        node.Classes.Changed += (_, change) => changes.Add(change);
+
+        node.Classes.UnionWith(["valid", className!]);
+        screen.Root!.UpdateStyles();
+
+        Assert.True(node.Classes.SetEquals(["kept", "valid", className!]));
+        Assert.Equal(0.4, node.Opacity);
+        Assert.True(new HashSet<string>(Assert.Single(changes).AddedItems).SetEquals(["valid", className!]));
+        node.Classes.SymmetricExceptWith(["kept", "valid", className!, className!]);
+        screen.Root!.UpdateStyles();
+        Assert.Empty(node.Classes);
+        Assert.Equal(1d, node.Opacity);
+        Assert.Equal(2, changes.Count);
+    }
+
+    [Fact]
+    public void ClassSetCalculationFailureKeepsTheWholeBatchAndAlreadyPublishedChange()
+    {
+        var node = new GuardedStyleNode();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([new UiStyleSheet([
+            Rule(UiStyleSelector.For<GuardedStyleNode>(),
+                Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
+        ])]);
+        node.Classes.Add("kept");
+        screen.Root!.UpdateStyles();
+        var previousSource = Assert.Single(node.GetStyleValueSources(GuardedStyleNode.ValueProperty));
+        var notifications = 0;
+        node.Classes.Changed += (_, _) => notifications++;
+        GuardedValue.ThrowOnCompare = true;
+        try
+        {
+            node.Classes.UnionWith(["first", "second"]);
+            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+        }
+        finally
+        {
+            GuardedValue.ThrowOnCompare = false;
+        }
+
+        Assert.True(node.Classes.SetEquals(["kept", "first", "second"]));
+        Assert.Equal(1, notifications);
+        Assert.Same(screen, node.Screen);
+        Assert.Same(previousSource, Assert.Single(node.GetStyleValueSources(GuardedStyleNode.ValueProperty)));
+        node.Classes.UnionWith(["first", "second"]);
+        Assert.Equal(1, notifications);
+        Assert.False(node.IsStyleValid);
+        Assert.True(node.Classes.Remove("first"));
+        Assert.Equal(2, notifications);
+        screen.Root!.UpdateStyles();
+        Assert.True(node.IsStyleValid);
+    }
+
+    [Fact]
+    public void ClassSetStyleNotificationFailureKeepsCommittedStateAndPublishedSetChange()
+    {
+        var expected = new InvalidOperationException("style notification failed");
+        var node = new Canvas();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".primary { opacity: 0.4; }")]);
+        var failNotification = true;
+        var collectionNotifications = 0;
+        node.PropertyChanged += (_, e) =>
+        {
+            if (ReferenceEquals(e.Property, UiNode.OpacityProperty) && failNotification)
+                throw expected;
+        };
+        node.Classes.Changed += (_, _) => collectionNotifications++;
+
+        node.Classes.Add("primary");
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+
+        Assert.True(node.Classes.Contains("primary"));
+        Assert.Equal(0.4, node.Opacity);
+        Assert.Equal(1, collectionNotifications);
+        failNotification = false;
+        node.Classes.Remove("primary");
+        screen.Root!.UpdateStyles();
+        Assert.Equal(1d, node.Opacity);
+        Assert.Equal(2, collectionNotifications);
+    }
+
+    [Fact]
+    public void ClassSetListenerFailureLeavesStylesPendingAndReleasesMutationProtection()
+    {
+        var expected = new InvalidOperationException("class listener failed");
+        var node = new Canvas();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".primary { opacity: 0.4; }")]);
+        screen.Root!.UpdateStyles();
+        var laterCalls = 0;
+        EventHandler<SetChangedEventArgs<string>> failing = (_, _) => throw expected;
+        node.Classes.Changed += failing;
+        node.Classes.Changed += (_, _) => laterCalls++;
+
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => node.Classes.Add("primary")));
+
+        Assert.True(node.Classes.Contains("primary"));
+        Assert.Equal(1d, node.Opacity);
+        Assert.False(node.IsStyleValid);
+        Assert.Equal(0, laterCalls);
+        screen.Root!.UpdateStyles();
+        Assert.Equal(0.4, node.Opacity);
+        node.Classes.Changed -= failing;
+        node.Classes.Remove("primary");
+        screen.Root!.UpdateStyles();
+        Assert.Equal(1d, node.Opacity);
+        Assert.Equal(1, laterCalls);
+    }
+
+    [Fact]
+    public void ClassSetListenerCannotReenterEvenForAnUnchangedRequest()
+    {
+        var node = new Canvas();
+        var notifications = 0;
+        Action[] mutations =
+        [
+            () => node.Classes.Add("primary"),
+            () => node.Classes.Add("invalid class"),
+            () => node.Classes.Add(null!),
+            () => node.Classes.Remove("absent"),
+            node.Classes.Clear,
+            () => node.Classes.UnionWith(null!),
+            () => node.Classes.IntersectWith(["primary"]),
+            () => node.Classes.ExceptWith([]),
+            () => node.Classes.SymmetricExceptWith([]),
+            () => ((ICollection<string>)node.Classes).Add("primary")
+        ];
+        node.Classes.Changed += (_, _) =>
+        {
+            notifications++;
+            foreach (var mutation in mutations)
+                Assert.Throws<InvalidOperationException>(mutation);
+        };
+
+        node.Classes.Add("primary");
+
+        Assert.True(node.Classes.SetEquals(["primary"]));
+        Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void StandardCollectionInterfacesUseNormalClassSetSemantics()
+    {
+        var node = new Canvas();
+        ISet<string> set = node.Classes;
+        ICollection<string> collection = node.Classes;
+
+        Assert.True(set.Add("invalid class"));
+        collection.Add(null!);
+        set.UnionWith(["valid", "invalid class"]);
+
+        Assert.True(set.SetEquals(["valid", "invalid class", null!]));
+        set.SymmetricExceptWith(["valid", "invalid class"]);
+        Assert.Null(Assert.Single(set));
+    }
+
+    [Fact]
+    public void ClassSetRemovalOperationsAllowInvalidLookupValues()
+    {
+        var node = new Canvas();
+        node.Classes.UnionWith(["kept", "removed"]);
+        var notifications = 0;
+        node.Classes.Changed += (_, _) => notifications++;
+
+        node.Classes.IntersectWith(["kept", "invalid class", null!]);
+        node.Classes.ExceptWith(["invalid class", null!]);
+        Assert.False(node.Classes.Remove(null!));
+
+        Assert.Equal("kept", Assert.Single(node.Classes));
+        Assert.Equal(1, notifications);
+    }
+
+    [Fact]
+    public void ClassSetInputPreparationCannotReenterTheSet()
+    {
+        var node = new Canvas();
+        node.Classes.Add("kept");
+        IEnumerable<string> Input()
+        {
+            yield return "next";
+            node.Classes.Clear();
+        }
+
+        Assert.Throws<InvalidOperationException>(() => node.Classes.UnionWith(Input()));
+
+        Assert.Equal("kept", Assert.Single(node.Classes));
+        Assert.True(node.Classes.Add("next"));
+    }
+
+    [Fact]
+    public void StyleNotificationSubscriptionChangesAffectSubsequentClassEvents()
+    {
+        var node = new Canvas();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".primary { opacity: 0.4; }")]);
+        var removedCalls = 0;
+        var addedCalls = 0;
+        var changedSubscription = false;
+        EventHandler<SetChangedEventArgs<string>> removed = (_, _) => removedCalls++;
+        EventHandler<SetChangedEventArgs<string>> added = (_, _) => addedCalls++;
+        node.Classes.Changed += removed;
+        node.PropertyChanged += (_, e) =>
+        {
+            if (!ReferenceEquals(e.Property, UiNode.OpacityProperty) || changedSubscription)
+                return;
+            changedSubscription = true;
+            node.Classes.Changed -= removed;
+            node.Classes.Changed += added;
+        };
+
+        node.Classes.Add("primary");
+
+        Assert.Equal(1, removedCalls);
+        Assert.Equal(0, addedCalls);
+        screen.Root!.UpdateStyles();
+        node.Classes.Remove("primary");
+        Assert.Equal(1, removedCalls);
+        Assert.Equal(1, addedCalls);
+    }
+
+    [Fact]
+    public void StyleIdNotificationClassChangeLeavesNestedStylesPending()
+    {
+        var node = new Canvas();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse("#trigger { opacity: 0.4; } #trigger.extra { opacity: 0.9; }")]);
+        var order = new List<(string Kind, double Opacity)>();
+        node.PropertyChanged += (_, e) =>
+        {
+            if (!ReferenceEquals(e.Property, UiNode.OpacityProperty))
+                return;
+            order.Add(("style", node.Opacity));
+            if (!node.Classes.Contains("extra"))
+                node.Classes.Add("extra");
+        };
+        node.Classes.Changed += (_, _) => order.Add(("set", node.Opacity));
+
+        node.StyleId = "trigger";
+        screen.Root!.UpdateStyles();
+
+        Assert.True(node.Classes.Contains("extra"));
+        Assert.Equal(0.4, node.Opacity);
+        Assert.Equal(new[] { ("style", 0.4), ("set", 0.4) }, order);
+        screen.Root!.UpdateStyles();
+        Assert.Equal(0.9, node.Opacity);
+        Assert.Equal(new[] { ("style", 0.4), ("set", 0.4), ("style", 0.9) }, order);
+    }
+
+    [Fact]
+    public void PseudoClassNotificationClassChangePublishesBeforeTheNextStyleUpdate()
+    {
+        var node = new PseudoClassHost();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(":loading { opacity: 0.4; } :loading.extra { opacity: 0.9; }")]);
+        var styleNotifications = 0;
+        var collectionNotifications = 0;
+        node.PropertyChanged += (_, e) =>
+        {
+            if (!ReferenceEquals(e.Property, UiNode.OpacityProperty))
+                return;
+            styleNotifications++;
+            if (!node.Classes.Contains("extra"))
+                node.Classes.Add("extra");
+            else
+                Assert.False(node.Classes.Add("extra"));
+        };
+        node.Classes.Changed += (_, _) =>
+        {
+            Assert.Equal(0.4, node.Opacity);
+            Assert.Equal(1, styleNotifications);
+            collectionNotifications++;
+        };
+
+        node.Set(Loading, true);
+        screen.Root!.UpdateStyles();
+
+        Assert.True(node.Classes.SetEquals(["extra"]));
+        Assert.Equal(0.4, node.Opacity);
+        Assert.Equal(1, styleNotifications);
+        screen.Root!.UpdateStyles();
+        Assert.Equal(0.9, node.Opacity);
+        Assert.Equal(2, styleNotifications);
+        Assert.Equal(1, collectionNotifications);
+    }
+
+    [Fact]
+    public void NestedClassStyleNotificationFailureKeepsCommittedStateAndPublishedSetChange()
+    {
+        var expected = new InvalidOperationException("nested style notification failed");
+        var node = new Canvas();
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse("#trigger { opacity: 0.4; } #trigger.extra { opacity: 0.9; }")]);
+        var reactToNotification = true;
+        var collectionNotifications = 0;
+        node.PropertyChanged += (_, e) =>
+        {
+            if (!ReferenceEquals(e.Property, UiNode.OpacityProperty) || !reactToNotification)
+                return;
+            if (!node.Classes.Contains("extra"))
+                node.Classes.Add("extra");
+            else
+                throw expected;
+        };
+        node.Classes.Changed += (_, _) => collectionNotifications++;
+
+        node.StyleId = "trigger";
+        screen.Root!.UpdateStyles();
+        Assert.Equal(0.4, node.Opacity);
+        Assert.Equal(1, collectionNotifications);
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+
+        Assert.True(node.Classes.SetEquals(["extra"]));
+        Assert.Equal(0.9, node.Opacity);
+        Assert.Equal(1, collectionNotifications);
+        reactToNotification = false;
+        node.Classes.Remove("extra");
+        screen.Root!.UpdateStyles();
+        Assert.Equal(0.4, node.Opacity);
+        Assert.Equal(2, collectionNotifications);
     }
 
     [Fact]
@@ -559,7 +992,7 @@ public sealed class UiNodeStylingTests
         }
 
         Assert.Equal("new", node.StyleId);
-        Assert.Contains("primary", node.Classes);
+        Assert.Equal("primary", Assert.Single(node.Classes));
         Assert.Same(screen, node.Screen);
     }
 
@@ -849,6 +1282,50 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
+    public void PseudoClassStyleNotificationDefersNestedStateChangesUntilNextApplication()
+    {
+        var host = new PseudoClassHost();
+        ApplyTheme(
+            host,
+            Rule(
+                UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                Setter(UiNode.OpacityProperty, 0.4)),
+            Rule(
+                UiStyleSelector.For<PseudoClassHost>(pseudoClasses: [Phantom]),
+                Setter(UiNode.OpacityProperty, 0.7)));
+        var notifications = 0;
+        host.PropertyChanged += (_, e) =>
+        {
+            if (!ReferenceEquals(e.Property, UiNode.OpacityProperty))
+                return;
+            notifications++;
+            if (host.Opacity != 0.4)
+                return;
+
+            host.Set(Phantom, true);
+            host.Set(Loading, false);
+            host.Set(Phantom, true);
+        };
+
+        host.Set(Loading, true);
+        host.GetStyleRoot().UpdateStyles();
+
+        Assert.False(host.IsActive(Loading));
+        Assert.True(host.IsActive(Phantom));
+        Assert.Equal(0.4, host.Opacity);
+        Assert.Equal(1, notifications);
+        Assert.False(host.IsStyleValid);
+        host.GetStyleRoot().UpdateStyles();
+        Assert.Equal(0.7, host.Opacity);
+        Assert.Equal(2, notifications);
+        host.Set(Phantom, false);
+        Assert.False(host.IsActive(Phantom));
+        host.GetStyleRoot().UpdateStyles();
+        Assert.Equal(1d, host.Opacity);
+        Assert.Equal(3, notifications);
+    }
+
+    [Fact]
     public void UnknownNamedPseudoClassIsLegalAndMatchesOnlyWhenActive()
     {
         var host = new PseudoClassHost();
@@ -866,34 +1343,74 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void OpenScreenStyleInputsRejectWrongThreadButAllowNoOps()
+    public void OpenScreenStyleIdRejectsWrongThreadButAllowsNoOps()
     {
         var button = new Button { StyleId = "save" };
-        button.Classes.Add("primary");
         var screen = new UiScreen(button);
         screen.Open();
         Exception? styleIdError = null;
-        Exception? classError = null;
         Exception? noOpError = null;
         var thread = new Thread(() =>
         {
             styleIdError = Record.Exception(() => button.StyleId = "other");
-            classError = Record.Exception(() => button.Classes.Add("wide"));
-            noOpError = Record.Exception(() =>
-            {
-                button.StyleId = "save";
-                Assert.False(button.Classes.Add("primary"));
-            });
+            noOpError = Record.Exception(() => button.StyleId = "save");
         });
 
         thread.Start();
         thread.Join();
 
         Assert.IsType<InvalidOperationException>(styleIdError);
-        Assert.IsType<InvalidOperationException>(classError);
         Assert.Null(noOpError);
         Assert.Equal("save", button.StyleId);
-        Assert.DoesNotContain("wide", button.Classes);
+        screen.Close();
+    }
+
+    [Theory]
+    [InlineData(0, new[] { "kept", "next" })]
+    [InlineData(1, new string[] { })]
+    [InlineData(2, new string[] { })]
+    [InlineData(3, new[] { "kept", "next" })]
+    [InlineData(4, new string[] { })]
+    [InlineData(5, new string[] { })]
+    [InlineData(6, new[] { "kept", "next" })]
+    public void ClassSetMutationsInvalidateStylesBeforeListenersRun(
+        int operation, string[] expected)
+    {
+        var node = new Canvas();
+        node.Classes.Add("kept");
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".next { opacity: 0.4; }")]);
+        screen.Open();
+        screen.Root!.UpdateStyles();
+        Assert.True(node.IsStyleValid);
+        IObservableSet<string> classes = node.Classes;
+        Action[] mutations =
+        [
+            () => classes.Add("next"),
+            () => classes.Remove("kept"),
+            classes.Clear,
+            () => classes.UnionWith(["next"]),
+            () => classes.IntersectWith([]),
+            () => classes.ExceptWith(["kept"]),
+            () => classes.SymmetricExceptWith(["next"])
+        ];
+        var notifications = 0;
+        classes.Changed += (_, _) =>
+        {
+            notifications++;
+            Assert.False(node.IsStyleValid);
+            Assert.False(node.IsStyleSubtreeValid);
+        };
+
+        mutations[operation]();
+
+        Assert.True(classes.SetEquals(expected));
+        Assert.Equal(1d, node.Opacity);
+        Assert.Equal(1, notifications);
+        screen.Root!.UpdateStyles();
+        Assert.Equal(classes.Contains("next") ? 0.4 : 1d, node.Opacity);
+        Assert.True(node.IsStyleValid);
+        Assert.True(node.IsStyleSubtreeValid);
         screen.Close();
     }
 
@@ -970,10 +1487,13 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void StyleInputsCanChangeDuringLayoutButNotDrawing()
+    public void ClassChangesDuringDrawingApplyStylesOnTheNextFrame()
     {
         var node = new StyleMutationNode();
         var screen = new UiScreen(node);
+        screen.SetStyleSheets([UiStyleSheet.Parse(".layout { opacity: 0.4; } .drawing { opacity: 0.7; }")]);
+        var collectionNotifications = 0;
+        node.Classes.Changed += (_, _) => collectionNotifications++;
         Exception? layoutStyleIdError = null;
         Exception? layoutClassError = null;
         Exception? drawingStyleIdError = null;
@@ -996,22 +1516,21 @@ public sealed class UiNodeStylingTests
         Assert.Null(layoutStyleIdError);
         Assert.Null(layoutClassError);
         Assert.IsType<InvalidOperationException>(drawingStyleIdError);
-        Assert.IsType<InvalidOperationException>(drawingClassError);
+        Assert.Null(drawingClassError);
         Assert.Equal("layout", node.StyleId);
-        Assert.Equal(new[] { "layout" }, node.Classes);
+        Assert.True(node.Classes.SetEquals(["layout", "drawing"]));
+        Assert.Equal(0.4, node.Opacity);
+        Assert.Equal(2, collectionNotifications);
+        Assert.False(node.IsStyleValid);
+        Assert.False(node.IsStyleSubtreeValid);
+
+        screen.PrepareFrame(new Size(20, 20), 0);
+
+        Assert.Equal(0.7, node.Opacity);
+        Assert.True(node.IsStyleValid);
+        Assert.True(node.IsStyleSubtreeValid);
+        Assert.Equal(2, collectionNotifications);
         screen.Close();
-    }
-
-    [Fact]
-    public void UiStyleClassCollectionHasNoPublicParameterlessConstructor()
-    {
-        var publicCtor = typeof(UiStyleClassCollection).GetConstructor(
-            BindingFlags.Public | BindingFlags.Instance, null, Type.EmptyTypes, null);
-        Assert.Null(publicCtor);
-
-        var internalCtor = typeof(UiStyleClassCollection).GetConstructor(
-            BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(UiNode) }, null);
-        Assert.NotNull(internalCtor);
     }
 
     [Theory]

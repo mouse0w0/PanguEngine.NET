@@ -1,12 +1,13 @@
 using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.Collections;
 
 namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
     private UiStyleSnapshot? _styleSnapshot;
-    private List<UiPseudoClass>? _pseudoClasses;
+    private readonly ObservableSet<UiPseudoClass> _pseudoClasses = new();
 
     internal bool IsStyleValid { get; private set; }
     internal bool IsStyleSubtreeValid { get; private set; }
@@ -31,14 +32,20 @@ public abstract partial class UiNode
                 return;
             if (value is not null)
                 UiStyleIdentifier.ThrowIfInvalid(value, nameof(StyleId));
-            VerifyStyleInputAccess();
+            Screen?.VerifyTreeMutationAccess();
             field = value;
             InvalidateStyle();
         }
     }
 
-    /// <summary>Gets the read-only collection of style classes applied to this node.</summary>
-    public UiStyleClassCollection Classes { get; }
+    /// <summary>Gets the observable set of style classes applied to this node.</summary>
+    /// <remarks>
+    /// The collection reference is stable. Membership uses Ordinal comparison and names are not validated.
+    /// Actual changes invalidate styles before subsequent collection listeners run.
+    /// Styles are applied during screen layout.
+    /// Callers are responsible for changing classes on the owning UI thread.
+    /// </remarks>
+    public ObservableSet<string> Classes { get; }
 
     /// <summary>Adds or removes an active built-in or custom state pseudo class used for style matching.</summary>
     /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
@@ -57,21 +64,15 @@ public abstract partial class UiNode
         if (pseudoClass == UiPseudoClass.Root)
             return;
 
-        if (active)
-        {
-            if (_pseudoClasses is not null && _pseudoClasses.Contains(pseudoClass))
-                return;
-        }
-        else if (_pseudoClasses is null || !_pseudoClasses.Contains(pseudoClass))
-        {
+        var isActive = _pseudoClasses.Contains(pseudoClass);
+        if (isActive == active)
             return;
-        }
 
-        VerifyStyleInputAccess();
+        Screen?.VerifyTreeMutationAccess();
         if (active)
-            (_pseudoClasses ??= []).Add(pseudoClass);
+            _pseudoClasses.Add(pseudoClass);
         else
-            _pseudoClasses!.Remove(pseudoClass);
+            _pseudoClasses.Remove(pseudoClass);
 
         InvalidateStyle();
     }
@@ -80,7 +81,7 @@ public abstract partial class UiNode
     /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
     /// <returns>true when the node matches the pseudo class; otherwise false.</returns>
     internal bool HasPseudoClass(UiPseudoClass pseudoClass) =>
-        pseudoClass == UiPseudoClass.Root ? Parent is null : _pseudoClasses?.Contains(pseudoClass) == true;
+        pseudoClass == UiPseudoClass.Root ? Parent is null : _pseudoClasses.Contains(pseudoClass);
 
     internal void InvalidateStyle()
     {
@@ -230,8 +231,6 @@ public abstract partial class UiNode
 
         return changed;
     }
-
-    internal void VerifyStyleInputAccess() => Screen?.VerifyTreeMutationAccess();
 
     internal static void AddRelationshipRefreshEntry(
         List<UiNode> entries,
