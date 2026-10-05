@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Diagnostics.CodeAnalysis;
 
 namespace PanguEngine.Collections;
 
@@ -16,7 +15,7 @@ namespace PanguEngine.Collections;
 /// the operation's event themselves. The public entry point publishes after the override returns.
 /// Range operations have separate extension points and do not call the single-item overrides.
 /// </remarks>
-public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
+public class ObservableList<T> : IObservableList<T>
 {
     private readonly List<T> _items;
     private ReadOnlyObservableList<T>? _readOnlyView;
@@ -93,17 +92,10 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
         PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Add, index, newItems: [item]));
     }
 
-    /// <summary>
-    /// Adds a sequence of items to the end of the list.
-    /// </summary>
-    /// <param name="items">The items to append.</param>
+    /// <inheritdoc />
     public void AddRange(IEnumerable<T> items) => InsertRange(Count, items);
 
-    /// <summary>
-    /// Inserts a sequence of items at an index.
-    /// </summary>
-    /// <param name="index">The insertion index, from zero through Count.</param>
-    /// <param name="items">The items to insert.</param>
+    /// <inheritdoc />
     public void InsertRange(int index, IEnumerable<T> items)
     {
         using var mutation = BeginMutation();
@@ -115,10 +107,7 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
         PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Add, index, newItems: additions));
     }
 
-    /// <summary>
-    /// Replaces all items with a sequence.
-    /// </summary>
-    /// <param name="items">The replacement items.</param>
+    /// <inheritdoc />
     public void ReplaceAll(IEnumerable<T> items)
     {
         using var mutation = BeginMutation();
@@ -132,11 +121,7 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
         PublishChange(new ListChangedEventArgs<T>(kind, 0, previous, replacements));
     }
 
-    /// <summary>
-    /// Removes a contiguous range of items.
-    /// </summary>
-    /// <param name="index">The starting index, from zero through Count.</param>
-    /// <param name="count">The number of items to remove.</param>
+    /// <inheritdoc />
     public void RemoveRange(int index, int count)
     {
         using var mutation = BeginMutation();
@@ -148,11 +133,7 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
         PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Remove, index, oldItems: removed));
     }
 
-    /// <summary>
-    /// Moves an item to its final index.
-    /// </summary>
-    /// <param name="oldIndex">The current item index.</param>
-    /// <param name="newIndex">The final item index.</param>
+    /// <inheritdoc />
     public void Move(int oldIndex, int newIndex)
     {
         using var mutation = BeginMutation();
@@ -203,11 +184,7 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
         PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation));
     }
 
-    /// <summary>
-    /// Removes the first occurrence of an item.
-    /// </summary>
-    /// <param name="item">The item to remove.</param>
-    /// <returns>Whether a matching item was removed.</returns>
+    /// <inheritdoc />
     public bool Remove(T? item)
     {
         using var mutation = BeginMutation();
@@ -246,18 +223,10 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
         PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Remove, 0, oldItems: removed));
     }
 
-    /// <summary>
-    /// Determines whether an item exists in the list.
-    /// </summary>
-    /// <param name="item">The item to locate.</param>
-    /// <returns>Whether a matching item exists.</returns>
+    /// <inheritdoc />
     public bool Contains(T? item) => IndexOfItem(item) >= 0;
 
-    /// <summary>
-    /// Finds an item index.
-    /// </summary>
-    /// <param name="item">The item to locate.</param>
-    /// <returns>The first matching index, or -1 when absent.</returns>
+    /// <inheritdoc />
     public int IndexOf(T? item) => IndexOfItem(item);
 
     /// <summary>
@@ -294,7 +263,8 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
     protected IDisposable BeginMutation()
     {
         if (_isMutating)
-            throw new InvalidOperationException("The list cannot be modified during change notification or preparation.");
+            throw new InvalidOperationException(
+                "The list cannot be modified during change notification or preparation.");
         _isMutating = true;
         return new MutationScope(this);
     }
@@ -416,6 +386,7 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
             for (var index = newIndex; index < oldIndex; index++)
                 permutation[index] = index + 1;
         }
+
         MoveItem(oldIndex, newIndex);
         PublishChange(new ListChangedEventArgs<T>(ListChangeKind.Reorder, 0, permutation: permutation));
     }
@@ -473,6 +444,7 @@ public class ObservableList<T> : IList<T>, IReadOnlyObservableList<T>
             else
                 buffer[target++] = entries[right++];
         }
+
         while (left < middle)
             buffer[target++] = entries[left++];
         while (right < end)

@@ -9,22 +9,25 @@ public sealed class ObservableListInheritanceTests
     {
         var derived = new TrackingList();
         ObservableList<int> list = derived;
-        IList<int> items = list;
+        IObservableList<int> items = list;
         items.Add(3);
         items.Insert(0, 1);
         items[0] = 2;
-        list.AddRange([4, 5]);
-        list.InsertRange(1, [6]);
-        list.Move(0, 1);
+        items.AddRange([4, 5]);
+        items.InsertRange(1, [6]);
+        items.Move(0, 1);
         list.Sort();
         list.Reverse();
-        list.RemoveRange(0, 1);
+        items.RemoveRange(0, 1);
         items.RemoveAt(0);
         Assert.True(items.Remove(3));
-        list.ReplaceAll([9]);
+        items.ReplaceAll([9]);
         items.Clear();
-        Assert.Equal(new[] { "insert", "insert", "set", "insert-range", "insert-range", "move",
-            "reorder", "reorder", "remove-range", "remove", "remove", "replace-all", "clear" }, derived.Changes);
+        Assert.Equal(new[]
+        {
+            "insert", "insert", "set", "insert-range", "insert-range", "move",
+            "reorder", "reorder", "remove-range", "remove", "remove", "replace-all", "clear"
+        }, derived.Changes);
         Assert.Empty(list);
     }
 

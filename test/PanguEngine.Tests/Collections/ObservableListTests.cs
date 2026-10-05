@@ -11,16 +11,18 @@ public sealed class ObservableListTests
         var source = new List<string?> { "a", null, "a" };
         var list = new ObservableList<string?>(source);
         source.Clear();
-        IList<string?> mutable = list;
+        IObservableList<string?> mutable = list;
         IReadOnlyList<string?> readOnly = list;
         Assert.False(mutable.IsReadOnly);
+        Assert.Equal(readOnly.Count, mutable.Count);
+        Assert.Equal(readOnly[0], mutable[0]);
         Assert.Equal(3, readOnly.Count);
         Assert.Null(readOnly[1]);
-        Assert.True(list.Contains(null));
-        Assert.Equal(0, list.IndexOf("a"));
-        Assert.Equal(-1, list.IndexOf("missing"));
+        Assert.True(mutable.Contains(null));
+        Assert.Equal(0, mutable.IndexOf("a"));
+        Assert.Equal(-1, mutable.IndexOf("missing"));
         var destination = new string?[5];
-        list.CopyTo(destination, 1);
+        mutable.CopyTo(destination, 1);
         Assert.Equal(new string?[] { null, "a", null, "a", null }, destination);
         Assert.Equal(new string?[] { "a", null, "a" }, ((IEnumerable)list).Cast<string?>());
     }
@@ -50,7 +52,7 @@ public sealed class ObservableListTests
     [Fact]
     public void RemoveDeletesFirstEqualOccurrenceAndAllowsNull()
     {
-        var list = new ObservableList<string?>(["a", null, "a"]);
+        IObservableList<string?> list = new ObservableList<string?>(["a", null, "a"]);
         var changes = Observe(list);
         Assert.True(list.Remove("a"));
         Assert.Equal(new string?[] { null, "a" }, list);
@@ -63,7 +65,7 @@ public sealed class ObservableListTests
     [Fact]
     public void RangeOperationsSendOneEventEach()
     {
-        var list = new ObservableList<int>([1, 4]);
+        IObservableList<int> list = new ObservableList<int>([1, 4]);
         var changes = Observe(list);
         list.InsertRange(1, [2, 3]);
         AssertChange(Assert.Single(changes), ListChangeKind.Add, 1, [], [2, 3]);
@@ -80,7 +82,7 @@ public sealed class ObservableListTests
     [Fact]
     public void ReplaceAllClassifiesEmptyBoundariesAndUnequalLengths()
     {
-        var list = new ObservableList<int>();
+        IObservableList<int> list = new ObservableList<int>();
         var changes = Observe(list);
         list.ReplaceAll([1, 2]);
         AssertChange(changes[^1], ListChangeKind.Add, 0, [], [1, 2]);
@@ -136,7 +138,7 @@ public sealed class ObservableListTests
     [InlineData(1, 2, new[] { 0, 2, 1, 3 }, new[] { 0, 2, 1, 3 })]
     public void MoveUsesFinalIndex(int oldIndex, int newIndex, int[] expected, int[] permutation)
     {
-        var list = new ObservableList<int>([0, 1, 2, 3]);
+        IObservableList<int> list = new ObservableList<int>([0, 1, 2, 3]);
         var changes = Observe(list);
         list.Move(oldIndex, newIndex);
         Assert.Equal(expected, list);
@@ -394,11 +396,13 @@ public sealed class ObservableListTests
         var list = new ObservableList<int>([1, 2]);
         var failure = new Exception("enumeration failed");
         var changes = Observe(list);
+
         IEnumerable<int> Input()
         {
             yield return 3;
             throw failure;
         }
+
         Action apply = operation switch
         {
             0 => () => list.AddRange(Input()),
@@ -419,11 +423,13 @@ public sealed class ObservableListTests
     public void InputEnumerationCannotMutateTheList(int operation)
     {
         var list = new ObservableList<int>([1]);
+
         IEnumerable<int> Input()
         {
             yield return 2;
             list.Clear();
         }
+
         Action apply = operation switch
         {
             0 => () => list.AddRange(Input()),
@@ -560,6 +566,7 @@ public sealed class ObservableListTests
         EventHandler<ListChangedEventArgs<int>> listener = (_, change) => changes.Add(change);
         if (!subscribe)
             list.Changed += listener;
+
         IEnumerable<int> Input()
         {
             yield return 2;
@@ -649,7 +656,19 @@ public sealed class ObservableListTests
         }
     }
 
-    private static List<ListChangedEventArgs<T>> Observe<T>(ObservableList<T> list)
+    [Fact]
+    public void ObservableInterfaceAllowsNullQueriesForNonNullableElements()
+    {
+        IObservableList<string> list = new ObservableList<string>(["a"]);
+        var changes = Observe(list);
+        Assert.False(list.Contains(null));
+        Assert.Equal(-1, list.IndexOf(null));
+        Assert.False(list.Remove(null));
+        Assert.Equal(["a"], list);
+        Assert.Empty(changes);
+    }
+
+    private static List<ListChangedEventArgs<T>> Observe<T>(IObservableList<T> list)
     {
         var changes = new List<ListChangedEventArgs<T>>();
         list.Changed += (sender, change) =>

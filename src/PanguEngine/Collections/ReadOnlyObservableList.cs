@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Diagnostics.CodeAnalysis;
 
 namespace PanguEngine.Collections;
 
@@ -15,15 +14,15 @@ namespace PanguEngine.Collections;
 /// </remarks>
 public sealed class ReadOnlyObservableList<T> : IReadOnlyObservableList<T>
 {
-    private readonly ObservableList<T> _source;
+    private readonly IObservableList<T> _source;
     private EventHandler<ListChangedEventArgs<T>>? _changed;
 
     /// <summary>
-    /// Creates an independent read-only view of the specified list.
+    /// Creates an independent read-only view of a list implementing the observable mutable list contract.
     /// </summary>
     /// <param name="source">The list to observe.</param>
     /// <exception cref="ArgumentNullException">The source is null.</exception>
-    public ReadOnlyObservableList(ObservableList<T> source)
+    public ReadOnlyObservableList(IObservableList<T> source)
     {
         ArgumentNullException.ThrowIfNull(source);
         _source = source;
@@ -67,14 +66,14 @@ public sealed class ReadOnlyObservableList<T> : IReadOnlyObservableList<T>
     /// <summary>
     /// Determines whether an item exists using the source list's matching rules.
     /// </summary>
-    /// <param name="item">The item to locate.</param>
+    /// <param name="item">The item to locate. Reference-type and nullable value-type arguments may be null.</param>
     /// <returns>Whether a matching item exists.</returns>
     public bool Contains(T? item) => _source.Contains(item);
 
     /// <summary>
     /// Finds an item index using the source list's matching rules.
     /// </summary>
-    /// <param name="item">The item to locate.</param>
+    /// <param name="item">The item to locate. Reference-type and nullable value-type arguments may be null.</param>
     /// <returns>The first matching index, or -1 when absent.</returns>
     public int IndexOf(T? item) => _source.IndexOf(item);
 
