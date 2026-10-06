@@ -12,31 +12,6 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiShowcaseStyleTests
 {
     [Fact]
-    public void ShowcaseAssetsParseAndDeclareShellAndExampleSelectors()
-    {
-        var showcase = ShowcaseTestSupport.LoadSheet("pangu/ui/showcase.css", "showcase");
-        var overrides = ShowcaseTestSupport.LoadSheet("pangu/ui/showcase-overrides.css", "showcase-overrides");
-
-        var selectors = showcase.Rules.SelectMany(rule => rule.Selectors).Select(selector => selector.SelectorText).ToArray();
-
-        Assert.Contains(".showcase-nav", selectors);
-        Assert.Contains(".showcase-nav.selected", selectors);
-        Assert.Contains("Text.showcase-heading", selectors);
-        Assert.Contains("Text.showcase-feedback", selectors);
-        Assert.Contains("Text.showcase-warning", selectors);
-        Assert.Contains("Button.showcase-typed", selectors);
-        Assert.Contains(".showcase-classonly", selectors);
-        Assert.Contains("#showcase-id-target", selectors);
-        Assert.Contains(".showcase-wildcard", selectors);
-        Assert.Contains("Button.showcase-combo", selectors);
-        Assert.Contains("Button.showcase-combo:focus:hover", selectors);
-
-        Assert.Equal(
-            new[] { ".showcase-author-target" },
-            overrides.Rules.SelectMany(rule => rule.Selectors).Select(selector => selector.SelectorText).ToArray());
-    }
-
-    [Fact]
     public void SelectorExampleDistinguishesTypeClassIdAndWildcard()
     {
         var showcase = ShowcaseTestSupport.LoadSheet("pangu/ui/showcase.css", "showcase");

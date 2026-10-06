@@ -10,6 +10,21 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class UiShowcaseScreenTests
 {
     [Fact]
+    public void CategoryStripAndSelectedContentUseTheSameHeight()
+    {
+        using var context = new UiTextTestContext();
+        var screen = CreateScreen();
+        screen.Open();
+        screen.PrepareFrame(new Size(800, 600), 0);
+
+        var categories = screen.Shell.CategoryTabs;
+        var strip = Assert.Single(categories.Children.OfType<TabStripPanel>());
+        var content = Assert.Single(categories.Children.OfType<TabContentArea>());
+        Assert.Equal(strip.LayoutBounds.Height, content.LayoutBounds.Height, 3);
+        screen.Close();
+    }
+
+    [Fact]
     public void ConstructorInjectsAuthorSheetsAndPauseBehavior()
     {
         var sheet = ShowcaseTestSupport.LoadSheet("pangu/ui/showcase.css", "showcase");
@@ -25,7 +40,6 @@ public sealed class UiShowcaseScreenTests
         Assert.Single(screen.BaseStyleSheets);
         Assert.Equal(0, screen.CurrentCategory);
         Assert.Equal(0, screen.CurrentExampleIndex);
-        Assert.Equal(4, screen.Shell.CategoryButtons.Count);
         Assert.Equal("返回暂停菜单", screen.Shell.ReturnButton.Text);
     }
 
@@ -50,52 +64,34 @@ public sealed class UiShowcaseScreenTests
     }
 
     [Fact]
-    public void SwitchingCategoryReplacesSingleContentChildAndCachesExample()
-    {
-        var screen = CreateScreen();
-        screen.SelectCategory(0);
-        var first = screen.CurrentExample.Content;
-        Assert.Single(screen.Shell.ContentHost.Children);
-        Assert.Same(first, screen.Shell.ContentHost.Children[0]);
-
-        screen.SelectCategory(1);
-        Assert.Single(screen.Shell.ContentHost.Children);
-        Assert.NotSame(first, screen.Shell.ContentHost.Children[0]);
-
-        screen.SelectCategory(0);
-        Assert.Single(screen.Shell.ContentHost.Children);
-        Assert.Same(first, screen.Shell.ContentHost.Children[0]);
-    }
-
-    [Fact]
     public void NavigationClicksPreserveTwoWayBindingDataAcrossCategories()
     {
         var screen = CreateScreen();
 
-        ShowcaseTestSupport.Click(screen.Shell.CategoryButtons[2]);
+        screen.SelectCategory(2);
         Assert.Equal(2, screen.CurrentCategory);
-        ShowcaseTestSupport.Click((Button)screen.Shell.ExampleSwitches.Children[1]);
+        screen.SelectExample(1);
         Assert.Equal(1, screen.CurrentExampleIndex);
 
         var editor = ShowcaseTestSupport.FindById<TextBox>(
-            screen.Shell.ContentHost,
+            screen.CurrentExample.Content,
             UiShowcaseBindings.TwoWayEditorId);
         var mirror = ShowcaseTestSupport.FindById<Text>(
-            screen.Shell.ContentHost,
+            screen.CurrentExample.Content,
             UiShowcaseBindings.TwoWayMirrorId);
 
         editor.Text = "修改后的文本";
         Assert.Equal("修改后的文本", mirror.Content);
 
-        ShowcaseTestSupport.Click(screen.Shell.CategoryButtons[0]);
-        ShowcaseTestSupport.Click(screen.Shell.CategoryButtons[2]);
-        ShowcaseTestSupport.Click((Button)screen.Shell.ExampleSwitches.Children[1]);
+        screen.SelectCategory(0);
+        screen.SelectCategory(2);
+        screen.SelectExample(1);
 
         var returnedEditor = ShowcaseTestSupport.FindById<TextBox>(
-            screen.Shell.ContentHost,
+            screen.CurrentExample.Content,
             UiShowcaseBindings.TwoWayEditorId);
         var returnedMirror = ShowcaseTestSupport.FindById<Text>(
-            screen.Shell.ContentHost,
+            screen.CurrentExample.Content,
             UiShowcaseBindings.TwoWayMirrorId);
 
         Assert.Same(editor, returnedEditor);
@@ -133,7 +129,7 @@ public sealed class UiShowcaseScreenTests
     }
 
     [Fact]
-    public void CategorySwitchClearsFocusFromRemovedContent()
+    public void CategorySwitchMovesFocusFromHiddenContentToSelectedTab()
     {
         using var context = new UiTextTestContext();
         var screen = CreateScreen();
@@ -142,7 +138,7 @@ public sealed class UiShowcaseScreenTests
         screen.PrepareFrame(new Size(800, 600), 0);
 
         var probe = new Button { Text = "probe" };
-        screen.Shell.ContentHost.Children.Add(probe);
+        Assert.IsAssignableFrom<Panel>(screen.CurrentExample.Content).Children.Add(probe);
         screen.PrepareFrame(new Size(800, 600), 0);
 
         Assert.True(probe.Focus());
@@ -150,7 +146,7 @@ public sealed class UiShowcaseScreenTests
 
         screen.SelectCategory(1);
 
-        Assert.Null(screen.FocusedNode);
+        Assert.Same(screen.Shell.CategoryTabs.Selection.SelectedItem, screen.FocusedNode);
         Assert.False(probe.IsFocused);
         screen.Close();
     }
@@ -169,8 +165,7 @@ public sealed class UiShowcaseScreenTests
 
         Assert.True(screen.Shell.IsCompact);
         Assert.True(screen.Shell.ShowWarning);
-        foreach (var button in screen.Shell.CategoryButtons)
-            AssertReachable(screen, button, 400, 300);
+        Assert.Equal(TabStripPlacement.Left, screen.Shell.CategoryTabs.TabStripPlacement);
         AssertReachable(screen, screen.Shell.ReturnButton, 400, 300);
         foreach (var button in screen.Shell.ScaleButtons)
             AssertReachable(screen, button, 400, 300);
@@ -180,6 +175,38 @@ public sealed class UiShowcaseScreenTests
 
         Assert.False(screen.Shell.IsCompact);
         Assert.False(screen.Shell.ShowWarning);
+        Assert.Equal(TabStripPlacement.Left, screen.Shell.CategoryTabs.TabStripPlacement);
+        screen.Close();
+    }
+
+    [Fact]
+    public void ShortViewportShowsVerticalScrollButtonsAndRestoringHeightHidesThem()
+    {
+        using var context = new UiTextTestContext();
+        var screen = CreateScreen();
+        screen.Scale = 1;
+        screen.Open();
+        screen.PrepareFrame(new Size(800, 600), 0);
+        screen.PrepareFrame(new Size(800, 340), 0);
+        screen.PrepareFrame(new Size(800, 340), 0);
+
+        var tabs = screen.Shell.CategoryTabs;
+        var strip = Assert.Single(tabs.Children.OfType<TabStripPanel>());
+        var viewport = Assert.Single(strip.Children.OfType<TabStripViewport>());
+        var buttons = strip.Children.OfType<TabScrollButton>().ToArray();
+        Assert.Equal(TabStripPlacement.Left, tabs.TabStripPlacement);
+        Assert.True(viewport.HasOverflow);
+        Assert.All(buttons, button =>
+        {
+            Assert.Equal(Visibility.Visible, button.Visibility);
+            Assert.True(button.LayoutBounds.Height > 0);
+        });
+        Assert.True(buttons[1].IsEnabled);
+
+        screen.PrepareFrame(new Size(800, 600), 0);
+        screen.PrepareFrame(new Size(800, 600), 0);
+        Assert.False(viewport.HasOverflow);
+        Assert.All(buttons, button => Assert.Equal(Visibility.Hidden, button.Visibility));
         screen.Close();
     }
 

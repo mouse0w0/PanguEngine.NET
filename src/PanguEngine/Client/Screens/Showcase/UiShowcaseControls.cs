@@ -57,7 +57,8 @@ internal static class UiShowcaseControls
             CreateTextImageExample(report),
             CreateButtonExample(report),
             CreateTextBoxExample(report),
-            CreateStateExample(report)
+            CreateStateExample(report),
+            UiShowcaseTabs.CreateExample()
         ];
     }
 

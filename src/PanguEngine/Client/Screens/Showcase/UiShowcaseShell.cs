@@ -15,9 +15,7 @@ internal sealed class UiShowcaseShell : Region
     internal const double FullWidthThreshold = 800;
     internal const double FullHeightThreshold = 600;
 
-    private const double Gap = 8;
-    private const double CompactNavMinWidth = 72;
-    private const double NormalNavMinWidth = 140;
+    private const double Gap = 10;
 
     private static readonly string[] CategoryLabels = ["基础控件", "样式", "绑定", "布局"];
     private static readonly string[] CompactCategoryLabels = ["控件", "样式", "绑定", "布局"];
@@ -25,13 +23,9 @@ internal sealed class UiShowcaseShell : Region
     private readonly Text _heading;
     private readonly Text _escapeHint;
     private readonly StackPanel _header;
-    private readonly StackPanel _nav;
-    private readonly Button[] _categoryButtons;
-    private readonly Panel _contentClip;
-    private readonly Text _exampleTitle;
-    private readonly Text _exampleInstructions;
-    private readonly StackPanel _exampleSwitches;
-    private readonly Panel _contentHost;
+    private readonly TabView _categoryTabs;
+    private Text[] _categoryHeaders = [];
+    private readonly List<TabView> _exampleTabs = [];
     private readonly Text _feedback;
     private readonly Text _warning;
     private readonly StackPanel _scaleRow;
@@ -62,52 +56,12 @@ internal sealed class UiShowcaseShell : Region
         _header.Children.Add(_heading);
         _header.Children.Add(_escapeHint);
 
-        _categoryButtons = new Button[CategoryLabels.Length];
-        _nav = new StackPanel
+        _categoryTabs = new TabView
         {
-            Orientation = Orientation.Vertical,
-            Spacing = Gap,
-            StyleId = "showcase-nav-list"
+            TabStripPlacement = TabStripPlacement.Left,
+            StyleId = "showcase-category-tabs",
+            CanReorderTabs = false
         };
-        for (var index = 0; index < CategoryLabels.Length; index++)
-        {
-            var button = new Button
-            {
-                Text = CategoryLabels[index],
-                MinWidth = NormalNavMinWidth,
-                MinHeight = 36,
-                StyleId = $"showcase-nav-{index}"
-            };
-            button.Classes.Add("showcase-nav");
-            _categoryButtons[index] = button;
-            _nav.Children.Add(button);
-        }
-
-        _exampleTitle = UiShowcaseWidgets.Label(string.Empty, "showcase-example-title");
-        _exampleInstructions = UiShowcaseWidgets.Label(string.Empty, "showcase-example-instructions");
-        _exampleSwitches = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = Gap,
-            StyleId = "showcase-example-switches"
-        };
-        _contentHost = new Panel { StyleId = "showcase-slot" };
-        var contentPanel = new StackPanel
-        {
-            Orientation = Orientation.Vertical,
-            Spacing = Gap,
-            StyleId = "showcase-content-panel"
-        };
-        contentPanel.Children.Add(_exampleTitle);
-        contentPanel.Children.Add(_exampleInstructions);
-        contentPanel.Children.Add(_exampleSwitches);
-        contentPanel.Children.Add(_contentHost);
-        _contentClip = new Panel
-        {
-            ClipToBounds = true,
-            StyleId = "showcase-content"
-        };
-        _contentClip.Children.Add(contentPanel);
 
         _feedback = CreateClassedText(string.Empty, "showcase-feedback");
         _warning = CreateClassedText("窗口较小，请放大窗口或恢复缩放", "showcase-warning");
@@ -138,8 +92,7 @@ internal sealed class UiShowcaseShell : Region
         _returnButton.Classes.Add("showcase-return");
 
         Children.Add(_header);
-        Children.Add(_nav);
-        Children.Add(_contentClip);
+        Children.Add(_categoryTabs);
         Children.Add(_feedback);
         Children.Add(_warning);
         Children.Add(_scaleRow);
@@ -147,7 +100,7 @@ internal sealed class UiShowcaseShell : Region
         Children.Add(_returnButton);
     }
 
-    internal IReadOnlyList<Button> CategoryButtons => _categoryButtons;
+    internal TabView CategoryTabs => _categoryTabs;
 
     internal IReadOnlyList<Button> ScaleButtons => new[] { _scaleDown, _scaleReset, _scaleUp, _restoreScale };
 
@@ -161,31 +114,57 @@ internal sealed class UiShowcaseShell : Region
 
     internal Button ReturnButton => _returnButton;
 
-    internal Panel ContentHost => _contentHost;
-
-    internal Panel ExampleSwitches => _exampleSwitches;
+    internal IReadOnlyList<TabView> ExampleTabs => _exampleTabs;
 
     internal bool IsCompact => _isCompact;
 
     internal bool ShowWarning => _showWarning;
 
-    internal void SetCategorySelected(int index)
+    internal void SetExamples(IReadOnlyList<UiShowcaseExample[]> categories)
     {
-        for (var position = 0; position < _categoryButtons.Length; position++)
+        _categoryTabs.Items.Clear();
+        _exampleTabs.Clear();
+        _categoryHeaders = new Text[categories.Count];
+
+        for (var categoryIndex = 0; categoryIndex < categories.Count; categoryIndex++)
         {
-            if (position == index)
-                _categoryButtons[position].Classes.Add("selected");
-            else
-                _categoryButtons[position].Classes.Remove("selected");
+            var categoryHeader = CreateTabHeader(CategoryLabels[categoryIndex], "showcase-nav-header");
+            var exampleTabs = new TabView
+            {
+                TabStripPlacement = TabStripPlacement.Top,
+                StyleId = "showcase-example-tabs",
+                CanReorderTabs = false
+            };
+            foreach (var example in categories[categoryIndex])
+            {
+                var exampleHeader = CreateTabHeader(example.Title, "showcase-example-tab-header");
+                var exampleItem = new TabItem
+                {
+                    Header = exampleHeader,
+                    Content = CreateExamplePage(example)
+                };
+                exampleItem.Classes.Add("showcase-example-switch");
+                exampleTabs.Items.Add(exampleItem);
+            }
+
+            var categoryItem = new TabItem
+            {
+                Header = categoryHeader,
+                Content = exampleTabs
+            };
+            categoryItem.Classes.Add("showcase-nav");
+            _categoryHeaders[categoryIndex] = categoryHeader;
+            _exampleTabs.Add(exampleTabs);
+            _categoryTabs.Items.Add(categoryItem);
         }
     }
 
     internal void SetFeedback(string message) => _feedback.Content = message;
 
-    internal void SetExampleHeader(string title, string instructions)
+    internal void SetCategoryLabels(bool compact)
     {
-        _exampleTitle.Content = title;
-        _exampleInstructions.Content = instructions;
+        for (var index = 0; index < _categoryHeaders.Length; index++)
+            _categoryHeaders[index].Content = compact ? CompactCategoryLabels[index] : CategoryLabels[index];
     }
 
     internal void SetScaleValue(string text) => _scaleValue.Content = text;
@@ -197,12 +176,7 @@ internal sealed class UiShowcaseShell : Region
         if (compact != _isCompact)
         {
             _isCompact = compact;
-            _nav.Orientation = compact ? Orientation.Horizontal : Orientation.Vertical;
-            for (var index = 0; index < _categoryButtons.Length; index++)
-            {
-                _categoryButtons[index].Text = compact ? CompactCategoryLabels[index] : CategoryLabels[index];
-                _categoryButtons[index].MinWidth = compact ? CompactNavMinWidth : NormalNavMinWidth;
-            }
+            SetCategoryLabels(compact);
 
             InvalidateMeasure();
         }
@@ -219,19 +193,22 @@ internal sealed class UiShowcaseShell : Region
     {
         var width = availableSize.Width;
         _header.Measure(new Size(width, double.PositiveInfinity));
-        if (_isCompact)
-            _nav.Measure(new Size(width, double.PositiveInfinity));
-        else
-            _nav.Measure(new Size(double.PositiveInfinity, availableSize.Height));
         _feedback.Measure(new Size(width, double.PositiveInfinity));
         _warning.Measure(new Size(width, double.PositiveInfinity));
         _scaleRow.Measure(new Size(width, double.PositiveInfinity));
         _scaleValue.Measure(new Size(width, double.PositiveInfinity));
         _returnButton.Measure(new Size(_isCompact ? width : double.PositiveInfinity, double.PositiveInfinity));
 
-        var navWidth = _isCompact ? 0 : _nav.DesiredSize.Width;
-        var contentWidth = Math.Max(0, width - navWidth - (_isCompact ? 0 : Gap));
-        _contentClip.Measure(new Size(contentWidth, double.PositiveInfinity));
+        var footerHeight = _isCompact
+            ? _returnButton.DesiredSize.Height + _scaleRow.DesiredSize.Height
+            : Math.Max(_returnButton.DesiredSize.Height, _scaleRow.DesiredSize.Height);
+        var reservedHeight = _header.DesiredSize.Height + footerHeight +
+            _scaleValue.DesiredSize.Height + (_showWarning ? _warning.DesiredSize.Height : 0) +
+            _feedback.DesiredSize.Height + Gap * (_isCompact ? 7 : 5);
+        var categoryHeight = double.IsPositiveInfinity(availableSize.Height)
+            ? double.PositiveInfinity
+            : Math.Max(0, availableSize.Height - reservedHeight);
+        _categoryTabs.Measure(new Size(width, categoryHeight));
 
         if (double.IsFinite(width) && double.IsFinite(availableSize.Height))
             return availableSize;
@@ -239,13 +216,12 @@ internal sealed class UiShowcaseShell : Region
         var fallbackWidth = double.IsFinite(width)
             ? width
             : Math.Max(
-                Math.Max(_header.DesiredSize.Width, _contentClip.DesiredSize.Width),
-                Math.Max(_nav.DesiredSize.Width, _scaleRow.DesiredSize.Width));
+                _header.DesiredSize.Width,
+                Math.Max(_categoryTabs.DesiredSize.Width, _scaleRow.DesiredSize.Width));
         return new Size(
             fallbackWidth,
             _header.DesiredSize.Height +
-            _nav.DesiredSize.Height +
-            _contentClip.DesiredSize.Height +
+             _categoryTabs.DesiredSize.Height +
             _feedback.DesiredSize.Height +
             _warning.DesiredSize.Height +
             _scaleRow.DesiredSize.Height +
@@ -304,24 +280,7 @@ internal sealed class UiShowcaseShell : Region
         }
 
         var middleHeight = Math.Max(0, middleBottom - middleTop);
-        if (_isCompact)
-        {
-            var navHeight = _nav.DesiredSize.Height;
-            ArrangeNode(_nav, left, middleTop, width, navHeight);
-            var contentTop = middleTop + navHeight + Gap;
-            ArrangeNode(_contentClip, left, contentTop, width, Math.Max(0, middleBottom - contentTop));
-        }
-        else
-        {
-            var navWidth = Math.Min(_nav.DesiredSize.Width, width);
-            ArrangeNode(_nav, left, middleTop, navWidth, middleHeight);
-            ArrangeNode(
-                _contentClip,
-                left + navWidth + Gap,
-                middleTop,
-                Math.Max(0, width - navWidth - Gap),
-                middleHeight);
-        }
+        ArrangeNode(_categoryTabs, left, middleTop, width, middleHeight);
     }
 
     private static void ArrangeNode(UiNode node, double x, double y, double width, double height) =>
@@ -332,6 +291,24 @@ internal sealed class UiShowcaseShell : Region
         var node = new Text { Content = text, Wrapping = TextWrapping.Wrap };
         node.Classes.Add(cssClass);
         return node;
+    }
+
+    private static Text CreateTabHeader(string text, string cssClass)
+    {
+        var header = new Text { Content = text, Wrapping = TextWrapping.NoWrap };
+        header.Classes.Add(cssClass);
+        return header;
+    }
+
+    private static StackPanel CreateExamplePage(UiShowcaseExample example)
+    {
+        var page = UiShowcaseWidgets.Column(
+            UiShowcaseWidgets.Label(example.Title, "showcase-example-title"),
+            UiShowcaseWidgets.Label(example.Instructions, "showcase-example-instructions"),
+            example.Content);
+        page.Classes.Add("showcase-example-page");
+        page.Padding = new Thickness(12);
+        return page;
     }
 
     private static Button CreateScaleButton(string text, string id) =>

@@ -1,32 +1,28 @@
-.showcase-nav {
-    padding: 6px 10px;
-    background-color: #23272e;
-    border-color: #3c434c;
-    border-thickness: 1px;
-    foreground: #d7dde5;
+.showcase-shell {
+    padding: 16px;
 }
 
-.showcase-nav:hover {
-    background-color: #2c3138;
+#showcase-category-tabs,
+#showcase-example-tabs {
+    padding: 8px;
 }
 
-.showcase-nav.selected {
-    background-color: #2f64a0;
-    border-color: #54a9ff;
-    foreground: #ffffff;
+#showcase-example-tabs {
+    padding: 0 8px;
 }
 
-.showcase-nav.selected:hover {
-    background-color: #356ea8;
+#showcase-category-tabs {
+    vertical-tab-strip-width: 120px;
 }
 
-.showcase-example-switch.selected {
-    background-color: #2f64a0;
-    border-color: #54a9ff;
+Text.showcase-nav-header,
+Text.showcase-example-tab-header {
+    color: #d7dde5;
 }
 
-.showcase-example-switch.selected:hover {
-    background-color: #356ea8;
+TabItem.showcase-nav:selected Text.showcase-nav-header,
+TabItem.showcase-example-switch:selected Text.showcase-example-tab-header {
+    color: #ffffff;
 }
 
 Text.showcase-heading {
@@ -80,4 +76,40 @@ Button.showcase-combo {
 Button.showcase-combo:hover:focus {
     background-color: #7a4a1f;
     border-color: #ffd479;
+}
+
+StackPanel.showcase-tabs-demo {
+    spacing: 8px;
+}
+
+StackPanel.showcase-tabs-actions {
+    orientation: horizontal;
+    spacing: 8px;
+}
+
+TabView.showcase-tabs-view {
+    height: 160px;
+    max-width: 720px;
+    min-tab-width: 120px;
+    max-tab-width: 120px;
+}
+
+StackPanel.showcase-tabs-content {
+    padding: 12px;
+    spacing: 8px;
+}
+
+Text.showcase-tabs-header {
+    wrapping: nowrap;
+}
+
+Text.showcase-tabs-title {
+    font-size: 16px;
+    wrapping: wrap;
+}
+
+Text.showcase-tabs-diagnostic {
+    font-size: 13px;
+    color: #b8c0cb;
+    wrapping: wrap;
 }

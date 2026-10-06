@@ -10,8 +10,6 @@ namespace PanguEngine.Client.Screens;
 /// </summary>
 internal sealed class UiShowcaseScreen : UiScreen
 {
-    private const int CategoryCount = 4;
-
     private readonly UiStyleSheet _sheet;
     private readonly UiStyleSheet _overrides;
     private readonly Action _returnToPause;
@@ -20,8 +18,7 @@ internal sealed class UiShowcaseScreen : UiScreen
     private readonly UiShowcaseExample[] _styles;
     private readonly UiShowcaseExample[] _bindings;
     private readonly UiShowcaseExample[] _layout;
-    private readonly List<Button> _switchButtons = [];
-    private readonly int[] _exampleIndices = new int[CategoryCount];
+    private readonly UiShowcaseExample[][] _categories;
 
     private int _categoryIndex;
     private bool _overridesEnabled;
@@ -40,15 +37,12 @@ internal sealed class UiShowcaseScreen : UiScreen
         _styles = UiShowcaseStyles.CreateExamples(Report, SetOverrides);
         _bindings = UiShowcaseBindings.CreateExamples(Report);
         _layout = UiShowcaseLayout.CreateExamples(Report);
+        _categories = [_controls, _styles, _bindings, _layout];
+        _shell.SetExamples(_categories);
+        _shell.CategoryTabs.SelectionChanged += (_, args) => _categoryIndex = args.NewIndex;
 
         PausesGame = true;
         CloseOnEscape = true;
-
-        for (var index = 0; index < _shell.CategoryButtons.Count; index++)
-        {
-            var category = index;
-            _shell.CategoryButtons[index].Click += (_, _) => SelectCategory(category);
-        }
 
         _shell.ReturnButton.Click += (_, _) => ReturnToPause();
         _shell.ScaleDownButton.Click += (_, _) => SetScaleFactor(0.75);
@@ -65,23 +59,19 @@ internal sealed class UiShowcaseScreen : UiScreen
 
     internal int CurrentCategory => _categoryIndex;
 
-    internal int CurrentExampleIndex => _exampleIndices[_categoryIndex];
+    internal int CurrentExampleIndex => _shell.ExampleTabs[_categoryIndex].Selection.SelectedIndex;
 
     internal UiShowcaseExample CurrentExample =>
-        ExamplesFor(_categoryIndex)[_exampleIndices[_categoryIndex]];
+        ExamplesFor(_categoryIndex)[CurrentExampleIndex];
 
     internal void SelectCategory(int index)
     {
-        _categoryIndex = index;
-        _shell.SetCategorySelected(index);
-        RebuildExampleSwitches();
-        ShowCurrentExample();
+        _shell.CategoryTabs.Selection.SelectedIndex = index;
     }
 
     internal void SelectExample(int index)
     {
-        _exampleIndices[_categoryIndex] = index;
-        ShowCurrentExample();
+        _shell.ExampleTabs[_categoryIndex].Selection.SelectedIndex = index;
     }
 
     internal void SetOverrides(bool enabled)
@@ -128,48 +118,6 @@ internal sealed class UiShowcaseScreen : UiScreen
     }
 
     private void Report(string message) => _shell.SetFeedback(message);
-
-    private void ShowCurrentExample()
-    {
-        var example = ExamplesFor(_categoryIndex)[_exampleIndices[_categoryIndex]];
-        _shell.SetExampleHeader(example.Title, example.Instructions);
-        var host = _shell.ContentHost;
-        host.Children.Clear();
-        host.Children.Add(example.Content);
-        UpdateExampleSwitchSelection();
-    }
-
-    private void RebuildExampleSwitches()
-    {
-        var switches = _shell.ExampleSwitches;
-        switches.Children.Clear();
-        _switchButtons.Clear();
-
-        var examples = ExamplesFor(_categoryIndex);
-        for (var index = 0; index < examples.Length; index++)
-        {
-            var exampleIndex = index;
-            var button = UiShowcaseWidgets.ActionButton(
-                $"showcase-example-{index}",
-                (index + 1).ToString(CultureInfo.InvariantCulture),
-                () => SelectExample(exampleIndex));
-            button.Classes.Add("showcase-example-switch");
-            _switchButtons.Add(button);
-            switches.Children.Add(button);
-        }
-    }
-
-    private void UpdateExampleSwitchSelection()
-    {
-        var selected = _exampleIndices[_categoryIndex];
-        for (var index = 0; index < _switchButtons.Count; index++)
-        {
-            if (index == selected)
-                _switchButtons[index].Classes.Add("selected");
-            else
-                _switchButtons[index].Classes.Remove("selected");
-        }
-    }
 
     private UiShowcaseExample[] ExamplesFor(int category) =>
         category switch

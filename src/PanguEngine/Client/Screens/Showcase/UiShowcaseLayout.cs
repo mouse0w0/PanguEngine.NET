@@ -29,7 +29,9 @@ internal static class UiShowcaseLayout
             StyleId = "showcase-panel-host",
             Width = 240,
             Height = 120,
-            Background = new SolidColorBrush(0x1F, 0x23, 0x29)
+            Background = new SolidColorBrush(0x2A, 0x31, 0x3A),
+            BorderBrush = new SolidColorBrush(0x3C, 0x44, 0x4D),
+            BorderThickness = new Thickness(1)
         };
         var target = new Panel
         {
