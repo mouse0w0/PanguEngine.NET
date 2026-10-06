@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
@@ -155,6 +156,9 @@ public sealed class UiManager
     }
 
     internal void PrepareFrame(Size viewportSize, double alpha)
+        => PrepareFrame(viewportSize, alpha, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
+
+    internal void PrepareFrame(Size viewportSize, double alpha, TimeSpan frameTime)
     {
         VerifyAccess();
         VerifyLifecycleOperation();
@@ -163,8 +167,8 @@ public sealed class UiManager
         _isUpdating = true;
         try
         {
-            Hud.PrepareFrame(viewportSize, alpha);
-            CurrentScreen?.PrepareFrame(viewportSize, alpha);
+            Hud.PrepareFrame(viewportSize, alpha, frameTime);
+            CurrentScreen?.PrepareFrame(viewportSize, alpha, frameTime);
         }
         finally
         {

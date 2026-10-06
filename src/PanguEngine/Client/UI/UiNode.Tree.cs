@@ -69,6 +69,8 @@ public abstract partial class UiNode
 
     internal void SetScreenRecursive(UiScreen? screen)
     {
+        if (!ReferenceEquals(Screen, screen))
+            StopActiveTickers();
         SetValue(ScreenPropertyKey, screen);
         if (this is not Parent parent)
             return;

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using PanguEngine.Client.UI.Styling;
 using PanguEngine.Input;
 
@@ -184,9 +185,11 @@ public partial class UiScreen
     }
 
     internal void PrepareFrame(Size viewportSize, double alpha)
+        => PrepareFrame(viewportSize, alpha, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
+
+    internal void PrepareFrame(Size viewportSize, double alpha, TimeSpan frameTime)
     {
         CreateViewportBounds(viewportSize);
-        VerifyOwnerThread();
         VerifyNotTransitioningOrUpdatingLayout();
         if (IsUpdating)
             throw new InvalidOperationException("The UI screen is already updating.");
@@ -195,9 +198,12 @@ public partial class UiScreen
         IsUpdating = true;
         try
         {
+            var tickers = FreezeTickers();
             DrainPending();
             if (IsScreenActive())
                 OnFrameUpdate(alpha);
+            if (IsScreenActive())
+                AdvanceTickers(tickers, frameTime);
             if (IsScreenActive())
                 UpdateLayout(viewportSize);
         }
@@ -315,7 +321,7 @@ public partial class UiScreen
                 }
 
                 if (sourceScreen is not null && ReferenceEquals(sourceScreen._root, root))
-                    sourceScreen.ClearRootForTransfer();
+                    sourceScreen._root = null;
             }
 
             var oldRoot = _root;
@@ -374,11 +380,6 @@ public partial class UiScreen
             _operationDepth++;
             return true;
         }
-    }
-
-    internal void ClearRootForTransfer()
-    {
-        _root = null;
     }
 
     private void BindOwnerForOpen()
@@ -463,6 +464,8 @@ public partial class UiScreen
             _isInteractionActive = false;
             _pendingActions.Clear();
         }
+
+        StopAllTickers();
     }
 
     internal void StopAcceptingPosts()
@@ -473,11 +476,12 @@ public partial class UiScreen
             _isClosing = true;
             _pendingActions.Clear();
         }
+
+        StopAllTickers();
     }
 
     private void DrainPending()
     {
-        VerifyOwnerThread();
         int batchSize;
         lock (_stateSync)
         {

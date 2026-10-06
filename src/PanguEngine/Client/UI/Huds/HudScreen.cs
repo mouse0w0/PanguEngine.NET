@@ -71,7 +71,8 @@ public sealed class HudScreen
 
     internal void Update() => Screen.Update();
 
-    internal void PrepareFrame(Size viewportSize, double alpha) => Screen.PrepareFrame(viewportSize, alpha);
+    internal void PrepareFrame(Size viewportSize, double alpha, TimeSpan frameTime) =>
+        Screen.PrepareFrame(viewportSize, alpha, frameTime);
 
     internal void Close()
     {
