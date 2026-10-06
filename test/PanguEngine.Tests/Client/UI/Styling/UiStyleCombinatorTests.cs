@@ -417,13 +417,6 @@ public sealed class UiStyleCombinatorTests
     }
 
     [Fact]
-    public void DefaultResolverContainsNoRelationshipRules()
-    {
-        Assert.False(UiStyleResolver.Default.HasRelationships);
-        Assert.False(UiStyleResolver.Default.HasSiblingRelationships);
-    }
-
-    [Fact]
     public void ResolverRelationshipFlagsAggregateAcrossSheets()
     {
         var descendant = new UiStyleResolver([], [UiStyleSheet.Parse(".a .b { opacity: 0.4; }")]);

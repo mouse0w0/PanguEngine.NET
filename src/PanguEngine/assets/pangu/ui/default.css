@@ -75,3 +75,145 @@ TextBox:disabled {
     selection-background: #343a41;
     caret-color: #8b94a0;
 }
+
+TabView {
+    background-color: #1b1f24;
+}
+
+TabItem {
+    padding: 2px 8px;
+    min-height: 24px;
+    background-color: #2b3138;
+    border-color: #3c444d;
+    border-thickness: 1px;
+}
+
+TabItem:hover {
+    background-color: #353c44;
+}
+
+TabItem:focus {
+    border-color: #54a9ff;
+}
+
+TabItem:selected {
+    background-color: #3d4752;
+    border-color: #54a9ff;
+}
+
+TabItem:dragging {
+    background-color: #4a5563;
+    border-color: #8fc4ff;
+}
+
+TabItem:disabled {
+    background-color: #202429;
+    border-color: #2f353c;
+}
+
+.tab-strip {
+    background-color: #171a1e;
+}
+
+.tab-content-area,
+.tab-content-host {
+    background-color: #1f2329;
+}
+
+.tab-close-button {
+    background-color: transparent;
+    border-thickness: 0px;
+}
+
+.tab-close-button:hover {
+    background-color: #ffffff20;
+}
+
+.tab-close-button:pressed {
+    background-color: #ffffff30;
+}
+
+.tab-close-button:disabled {
+    background-color: transparent;
+}
+
+Path.tab-close-icon {
+    width: 8px;
+    height: 8px;
+    data: "M 0 1 L 1 0 L 4 3 L 7 0 L 8 1 L 5 4 L 8 7 L 7 8 L 4 5 L 1 8 L 0 7 L 3 4 Z";
+    fill: #e6eaf0;
+    stroke: none;
+    stretch: uniform;
+}
+
+.tab-close-button:disabled Path.tab-close-icon {
+    fill: #6e7884;
+}
+
+.tab-scroll-button {
+    min-height: 12px;
+    background-color: #2b3138;
+    border-color: #3c444d;
+    border-thickness: 1px;
+}
+
+.tab-scroll-horizontal {
+    width: 12px;
+}
+
+.tab-scroll-vertical {
+    height: 12px;
+}
+
+.tab-scroll-button:hover {
+    background-color: #353c44;
+}
+
+.tab-scroll-button:pressed {
+    background-color: #202429;
+}
+
+.tab-scroll-button:disabled {
+    background-color: #202429;
+    border-color: #2f353c;
+}
+
+.tab-scroll-decrease,
+.tab-scroll-increase {
+    border-color: #3c444d;
+}
+
+Path.tab-scroll-arrow {
+    fill: #e6eaf0;
+    stroke: none;
+    stretch: uniform;
+}
+
+.tab-scroll-button:hover Path.tab-scroll-arrow,
+.tab-scroll-button:pressed Path.tab-scroll-arrow {
+    fill: #ffffff;
+}
+
+.tab-scroll-button:disabled Path.tab-scroll-arrow {
+    fill: #6e7884;
+}
+
+Path.tab-scroll-arrow-left {
+    data: "M 5 8 L 9 4 L 9 12 Z";
+}
+
+Path.tab-scroll-arrow-right {
+    data: "M 9 8 L 5 4 L 5 12 Z";
+}
+
+Path.tab-scroll-arrow-up {
+    data: "M 8 5 L 4 9 L 12 9 Z";
+}
+
+Path.tab-scroll-arrow-down {
+    data: "M 4 7 L 12 7 L 8 11 Z";
+}
+
+.tab-insertion-marker {
+    background-color: #54a9ff;
+}
