@@ -113,3 +113,65 @@ Text.showcase-tabs-diagnostic {
     color: #b8c0cb;
     wrapping: wrap;
 }
+
+ScrollBar.showcase-scroll-horizontal {
+    width: 280px;
+    height: 18px;
+}
+
+ScrollBar.showcase-scroll-vertical {
+    width: 18px;
+    height: 144px;
+}
+
+StackPanel.showcase-scroll-bar-demo {
+    max-width: 280px;
+}
+
+ScrollView.showcase-scroll-view {
+    height: 144px;
+    max-width: 720px;
+}
+
+.showcase-scroll-actions Button {
+    padding: 5px 8px;
+}
+
+Text.showcase-scroll-diagnostic {
+    font-size: 13px;
+    color: #b8c0cb;
+}
+
+StackPanel.showcase-scroll-content {
+    width: 900px;
+    padding: 10px;
+}
+
+StackPanel.showcase-scroll-row {
+    height: 36px;
+    padding: 6px 8px;
+    background-color: #252b34;
+}
+
+StackPanel.showcase-scroll-row-alternate {
+    background-color: #303845;
+}
+
+.showcase-scroll-row Text {
+    font-size: 14px;
+}
+
+Text.showcase-scroll-number {
+    width: 72px;
+    color: #8ebce8;
+}
+
+Text.showcase-scroll-message {
+    width: 660px;
+}
+
+Text.showcase-scroll-marker {
+    width: 100px;
+    color: #ffd479;
+    text-alignment: right;
+}

@@ -58,7 +58,9 @@ internal static class UiShowcaseControls
             CreateButtonExample(report),
             CreateTextBoxExample(report),
             CreateStateExample(report),
-            UiShowcaseTabs.CreateExample()
+            UiShowcaseTabs.CreateExample(),
+            UiShowcaseScroll.CreateScrollBarExample(report),
+            UiShowcaseScroll.CreateScrollViewExample(report)
         ];
     }
 
