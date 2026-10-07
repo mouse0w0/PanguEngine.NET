@@ -236,10 +236,14 @@ public sealed class UiManager
         return CurrentScreen?.ProcessPointerReleased(position, button, modifiers) ?? false;
     }
 
-    internal bool ProcessPointerWheel(Point position, double deltaX, double deltaY)
+    internal bool ProcessPointerWheel(
+        Point position,
+        double deltaX,
+        double deltaY,
+        KeyModifiers modifiers = KeyModifiers.None)
     {
         VerifyAccess();
-        return CurrentScreen?.ProcessPointerWheel(position, deltaX, deltaY) ?? false;
+        return CurrentScreen?.ProcessPointerWheel(position, deltaX, deltaY, modifiers) ?? false;
     }
 
     internal bool ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)

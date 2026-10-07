@@ -284,14 +284,15 @@ public sealed class InputManager
         _router.BeginInputEvent();
         var topologyVersion = _uiTopologyVersion;
         var mousePosition = _window.MousePosition;
+        var modifiers = _window.KeyModifiers;
         var handled = TryRoutePointer(
             mousePosition.X,
             mousePosition.Y,
-            (manager, point) => manager.ProcessPointerWheel(point, args.X, args.Y));
+            (manager, point) => manager.ProcessPointerWheel(point, args.X, args.Y, modifiers));
         _router.RouteSample(
             InputSource.MouseWheel,
             new Vector2D<double>(args.X, args.Y),
-            _window.KeyModifiers,
+            modifiers,
             handled || topologyVersion != _uiTopologyVersion);
         _router.EndInputEvent();
     }

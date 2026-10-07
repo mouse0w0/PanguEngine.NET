@@ -263,7 +263,11 @@ public partial class UiScreen
         }
     }
 
-    internal bool ProcessPointerWheel(Point position, double deltaX, double deltaY)
+    internal bool ProcessPointerWheel(
+        Point position,
+        double deltaX,
+        double deltaY,
+        KeyModifiers modifiers = KeyModifiers.None)
     {
         BeginInputRouting(deltaX, deltaY);
         try
@@ -279,6 +283,7 @@ public partial class UiScreen
                 logicalPosition,
                 deltaX,
                 deltaY,
+                modifiers,
                 path);
             Bubble(
                 path,
