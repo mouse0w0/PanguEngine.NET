@@ -153,8 +153,6 @@ Path.tab-close-icon {
 .tab-scroll-button {
     min-height: 12px;
     background-color: #2b3138;
-    border-color: #3c444d;
-    border-thickness: 1px;
 }
 
 .tab-scroll-horizontal {
@@ -175,12 +173,6 @@ Path.tab-close-icon {
 
 .tab-scroll-button:disabled {
     background-color: #202429;
-    border-color: #2f353c;
-}
-
-.tab-scroll-decrease,
-.tab-scroll-increase {
-    border-color: #3c444d;
 }
 
 Path.tab-scroll-arrow {
@@ -216,4 +208,98 @@ Path.tab-scroll-arrow-down {
 
 .tab-insertion-marker {
     background-color: #54a9ff;
+}
+
+ScrollView {
+    background-color: #1f2329;
+    border-color: #5c6774;
+    border-thickness: 1px;
+}
+
+ScrollView .scrollview-corner {
+    background-color: #30363e;
+}
+
+ScrollBar {
+    background-color: #1f2329;
+}
+
+ScrollBar:focus {
+    border-color: #54a9ff;
+    border-thickness: 1px;
+}
+
+ScrollBar .scrollbar-track {
+    background-color: #1f2329;
+}
+
+ScrollBar .scrollbar-thumb {
+    background-color: #5c6774;
+}
+
+ScrollBar .scrollbar-thumb:hover {
+    background-color: #6e7884;
+}
+
+ScrollBar .scrollbar-thumb:pressed {
+    background-color: #49515c;
+}
+
+ScrollBar .scrollbar-thumb:disabled,
+ScrollBar:disabled .scrollbar-thumb,
+:disabled ScrollBar .scrollbar-thumb {
+    background-color: #3d4652;
+}
+
+ScrollBar .scrollbar-decrease,
+ScrollBar .scrollbar-increase {
+    background-color: #30363e;
+}
+
+ScrollBar .scrollbar-decrease:hover,
+ScrollBar .scrollbar-increase:hover {
+    background-color: #434950;
+}
+
+ScrollBar .scrollbar-decrease:pressed,
+ScrollBar .scrollbar-increase:pressed {
+    background-color: #252a30;
+}
+
+ScrollBar .scrollbar-decrease:disabled,
+ScrollBar .scrollbar-increase:disabled,
+ScrollBar:disabled .scrollbar-decrease,
+ScrollBar:disabled .scrollbar-increase,
+:disabled ScrollBar .scrollbar-decrease,
+:disabled ScrollBar .scrollbar-increase {
+    background-color: #1b1e23;
+}
+
+ScrollBar Path.scrollbar-arrow {
+    fill: #f2f4f7;
+    stroke: none;
+    stretch: uniform;
+}
+
+ScrollBar .scrollbar-decrease:disabled Path.scrollbar-arrow,
+ScrollBar .scrollbar-increase:disabled Path.scrollbar-arrow,
+ScrollBar:disabled Path.scrollbar-arrow,
+:disabled ScrollBar Path.scrollbar-arrow {
+    fill: #8b94a0;
+}
+
+ScrollBar:vertical .scrollbar-decrease .scrollbar-arrow {
+    data: "M 8 5 L 4 9 L 12 9 Z";
+}
+
+ScrollBar:vertical .scrollbar-increase .scrollbar-arrow {
+    data: "M 4 7 L 12 7 L 8 11 Z";
+}
+
+ScrollBar:horizontal .scrollbar-decrease .scrollbar-arrow {
+    data: "M 5 8 L 9 4 L 9 12 Z";
+}
+
+ScrollBar:horizontal .scrollbar-increase .scrollbar-arrow {
+    data: "M 9 8 L 5 4 L 5 12 Z";
 }
