@@ -38,6 +38,8 @@ public sealed class UiLayoutValueTests
         Assert.Equal(-2.25, rect.Y);
         Assert.Equal(10, rect.Width);
         Assert.Equal(20, rect.Height);
+        Assert.Equal(new Size(10, 20), rect.Size);
+        Assert.Equal(Size.Zero, Rect.Zero.Size);
         Assert.Equal(new Rect(0, 0, 0, 0), Rect.Zero);
 
         Assert.Throws<ArgumentOutOfRangeException>(() =>

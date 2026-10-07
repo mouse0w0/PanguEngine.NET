@@ -62,6 +62,11 @@ public readonly record struct Rect
     public double Height { get; }
 
     /// <summary>
+    /// Gets the width and height as a size in logical pixels.
+    /// </summary>
+    public Size Size => new(Width, Height);
+
+    /// <summary>
     /// Gets the zero rectangle.
     /// </summary>
     public static Rect Zero => default;
