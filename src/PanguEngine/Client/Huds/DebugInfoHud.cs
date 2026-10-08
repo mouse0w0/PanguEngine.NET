@@ -1,8 +1,9 @@
 using System.Globalization;
+using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.World.Chunking;
 
-namespace PanguEngine.Client.UI.Huds;
+namespace PanguEngine.Client.Huds;
 
 /// <summary>
 /// Provides the built-in client debug information HUD component.

@@ -1,6 +1,6 @@
 using PanguEngine.Registries;
 
-namespace PanguEngine.Client.UI.Huds;
+namespace PanguEngine.Client.Huds;
 
 /// <summary>
 /// Provides the built-in HUD component definitions.

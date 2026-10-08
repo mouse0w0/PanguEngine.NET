@@ -1,10 +1,10 @@
+using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
-using PanguEngine.Client.UI.Huds;
 using PanguEngine.Registries;
 
-namespace PanguEngine.Tests.Client.UI.Huds;
+namespace PanguEngine.Tests.Client.Huds;
 
 public sealed class HudRegistrationTests
 {
@@ -20,8 +20,7 @@ public sealed class HudRegistrationTests
             manager.InitializeHud(definitions);
 
             Assert.Empty(HudRoot(manager).Children);
-            Assert.Throws<KeyNotFoundException>(
-                () => manager.Hud.Get(ResourceKey.Create("pangu", "missing")));
+            Assert.Throws<KeyNotFoundException>(() => manager.Hud.Get(ResourceKey.Create("pangu", "missing")));
             Assert.False(manager.Hud.TryGet(ResourceKey.Create("pangu", "missing"), out var hud));
             Assert.Null(hud);
         }
@@ -235,10 +234,10 @@ public sealed class HudRegistrationTests
     {
         var events = new List<string>();
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
-        definitions.Register(ResourceKey.Create("test", "first"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "first")));
-        definitions.Register(ResourceKey.Create("test", "second"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "second")));
+        definitions.Register(ResourceKey.Create("test", "first"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "first")));
+        definitions.Register(ResourceKey.Create("test", "second"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "second")));
         definitions.Freeze();
         var manager = new UiManager();
 
@@ -305,12 +304,12 @@ public sealed class HudRegistrationTests
     {
         var events = new List<string>();
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
-        definitions.Register(ResourceKey.Create("test", "first"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "first")));
-        definitions.Register(ResourceKey.Create("test", "second"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "second")));
-        definitions.Register(ResourceKey.Create("test", "third"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "third")));
+        definitions.Register(ResourceKey.Create("test", "first"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "first")));
+        definitions.Register(ResourceKey.Create("test", "second"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "second")));
+        definitions.Register(ResourceKey.Create("test", "third"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "third")));
         definitions.Freeze();
         var manager = new UiManager();
         manager.InitializeHud(definitions);
@@ -327,15 +326,15 @@ public sealed class HudRegistrationTests
         var events = new List<string>();
         var expected = new InvalidOperationException("destroy failure");
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
-        definitions.Register(ResourceKey.Create("test", "first"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "first")));
-        definitions.Register(ResourceKey.Create("test", "second"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "second")
+        definitions.Register(ResourceKey.Create("test", "first"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "first")));
+        definitions.Register(ResourceKey.Create("test", "second"), new HudDefinition(() =>
+            new RecordingHud(events: events, name: "second")
             {
                 DestroyAction = () => throw expected
             }));
-        definitions.Register(ResourceKey.Create("test", "third"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "third")));
+        definitions.Register(ResourceKey.Create("test", "third"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "third")));
         definitions.Freeze();
         var manager = new UiManager();
         manager.InitializeHud(definitions);
@@ -398,12 +397,14 @@ public sealed class HudRegistrationTests
         var events = new List<string>();
         var manager = new UiManager();
         var screen = new GameScreen(new Panel());
+
         void Check()
         {
             Assert.Throws<InvalidOperationException>(() => manager.Open(new GameScreen()));
             Assert.Throws<InvalidOperationException>(manager.Close);
             Assert.Throws<InvalidOperationException>(manager.Destroy);
         }
+
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
         definitions.Register(ResourceKey.Create("test", "first"), new HudDefinition(() =>
             new RecordingHud(events: events, name: "first")
@@ -411,8 +412,8 @@ public sealed class HudRegistrationTests
                 FixedAction = Check,
                 FrameAction = _ => Check()
             }));
-        definitions.Register(ResourceKey.Create("test", "second"), new HudDefinition(
-            () => new RecordingHud(events: events, name: "second")));
+        definitions.Register(ResourceKey.Create("test", "second"),
+            new HudDefinition(() => new RecordingHud(events: events, name: "second")));
         definitions.Freeze();
 
         try

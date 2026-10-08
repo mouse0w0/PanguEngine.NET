@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
+using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
-using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 
@@ -162,8 +162,10 @@ public sealed class UiTickerTests
             screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.02));
             screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.05));
             Assert.Equal(5, distance, 8);
-            Assert.Equal([TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10.02),
-                TimeSpan.FromSeconds(10.05)], times);
+            Assert.Equal([
+                TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10.02),
+                TimeSpan.FromSeconds(10.05)
+            ], times);
 
             ticker.Stop();
             previous = null;
@@ -518,6 +520,7 @@ public sealed class UiTickerTests
                 case 3: screen.Root = new Panel(); break;
                 case 4: otherScreen.Root = root; break;
             }
+
             Assert.False(ticker.IsActive);
             Assert.False(childTicker.IsActive);
             if (transfer == 3)
@@ -838,6 +841,7 @@ public sealed class UiTickerTests
                 ticker.Start();
                 Assert.True(ticker.IsActive);
             }
+
             if (args.Property == UiNode.ScreenProperty && node.Screen is null)
             {
                 notifications.Add("node:screen");

@@ -1,6 +1,6 @@
 using System.Diagnostics;
+using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI.Drawing;
-using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 

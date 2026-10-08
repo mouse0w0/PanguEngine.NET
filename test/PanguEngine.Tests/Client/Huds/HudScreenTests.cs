@@ -1,12 +1,12 @@
+using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
-using PanguEngine.Client.UI.Huds;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 
-namespace PanguEngine.Tests.Client.UI.Huds;
+namespace PanguEngine.Tests.Client.Huds;
 
 public sealed class HudScreenTests
 {
@@ -192,6 +192,7 @@ public sealed class HudScreenTests
             {
                 manager.Open(new GameScreen(node));
             }
+
             manager.UpdateFrame(new Size(200, 100), 0);
             manager.Hud.Post(() => postedActionExecuted = true);
 

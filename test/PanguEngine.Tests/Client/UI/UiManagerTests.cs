@@ -1,8 +1,8 @@
 using System.Runtime.ExceptionServices;
+using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
-using PanguEngine.Client.UI.Huds;
 using PanguEngine.Registries;
 using PanguEngine.Threading;
 
@@ -1250,8 +1250,10 @@ public sealed class UiManagerTests
             events.Clear();
             manager.UpdateFrame(new Size(100, 100), 0.5, TimeSpan.FromSeconds(11));
             Assert.Equal(
-                ["first-frame", "later-frame", "hud-post", "hud-ticker", "hud-layout",
-                    "screen-frame", "screen-post", "screen-ticker", "screen-layout"],
+                [
+                    "first-frame", "later-frame", "hud-post", "hud-ticker", "hud-layout",
+                    "screen-frame", "screen-post", "screen-ticker", "screen-layout"
+                ],
                 events);
         }
         finally

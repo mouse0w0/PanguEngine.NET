@@ -1,6 +1,6 @@
 using PanguEngine.Client.UI.Controls;
 
-namespace PanguEngine.Client.UI.Huds;
+namespace PanguEngine.Client.Huds;
 
 /// <summary>
 /// Provides the built-in crosshair HUD component.
