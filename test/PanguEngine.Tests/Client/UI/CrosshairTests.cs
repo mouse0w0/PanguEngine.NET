@@ -234,18 +234,14 @@ public sealed class CrosshairTests
     [InlineData("Gap")]
     [InlineData("OutlineThickness")]
     [InlineData("CenterDotSize")]
-    public void InvalidDimensionsFailDuringLayout(string propertyName)
+    public void InvalidDimensionsFailOnWrite(string propertyName)
     {
         foreach (var value in new[] { -1d, double.NaN, double.PositiveInfinity })
         {
             var crosshair = new Crosshair();
-            ApplyValue(crosshair, propertyName, value);
-            var screen = new UiScreen(crosshair);
-            screen.Open();
-
-            Assert.Throws<InvalidOperationException>(() => screen.PrepareFrame(new Size(200, 100)));
-
-            screen.Close();
+            var error = Assert.Throws<ArgumentException>(() => ApplyValue(crosshair, propertyName, value));
+            Assert.Equal("value", error.ParamName);
+            Assert.Contains(propertyName, error.Message);
         }
     }
 

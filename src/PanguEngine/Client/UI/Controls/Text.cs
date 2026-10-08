@@ -17,7 +17,9 @@ public sealed class Text : UiNode
         Property.Register<Text, string>(
             nameof(Content),
             string.Empty,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "Content cannot be null.");
 
     /// <summary>
     /// Identifies the <see cref="Font"/> property.
@@ -26,7 +28,9 @@ public sealed class Text : UiNode
         Property.Register<Text, Font>(
             nameof(Font),
             new Font(string.Empty),
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "Font cannot be null.");
 
     /// <summary>
     /// Identifies the <see cref="FontSize"/> property.
@@ -35,7 +39,9 @@ public sealed class Text : UiNode
         Property.Register<Text, double>(
             nameof(FontSize),
             16,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFinitePositive,
+            validationMessage: "FontSize must be positive and finite.");
 
     /// <summary>
     /// Identifies the <see cref="Color"/> property.
@@ -52,7 +58,9 @@ public sealed class Text : UiNode
         Property.Register<Text, double>(
             nameof(LineHeight),
             1,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFinitePositive,
+            validationMessage: "LineHeight must be positive and finite.");
 
     /// <summary>
     /// Identifies the <see cref="Wrapping"/> property.
@@ -100,6 +108,7 @@ public sealed class Text : UiNode
     /// <summary>
     /// Gets or sets the plain UTF-16 text content.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
     public string Content
     {
         get => GetValue(ContentProperty);
@@ -109,6 +118,7 @@ public sealed class Text : UiNode
     /// <summary>
     /// Gets or sets the preferred font request.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
     public Font Font
     {
         get => GetValue(FontProperty);
@@ -118,6 +128,7 @@ public sealed class Text : UiNode
     /// <summary>
     /// Gets or sets the font size in logical pixels.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);
@@ -136,6 +147,7 @@ public sealed class Text : UiNode
     /// <summary>
     /// Gets or sets the natural line height multiplier.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
     public double LineHeight
     {
         get => GetValue(LineHeightProperty);

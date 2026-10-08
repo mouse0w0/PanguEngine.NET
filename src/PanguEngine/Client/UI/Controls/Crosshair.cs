@@ -20,21 +20,27 @@ public sealed class Crosshair : UiNode
         Property.Register<Crosshair, double>(
             nameof(Length),
             8,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "Crosshair Length must be finite and non-negative.");
 
     /// <summary>Identifies the <see cref="Thickness"/> property.</summary>
     public static readonly Property<double> ThicknessProperty =
         Property.Register<Crosshair, double>(
             nameof(Thickness),
             2,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "Crosshair Thickness must be finite and non-negative.");
 
     /// <summary>Identifies the <see cref="Gap"/> property.</summary>
     public static readonly Property<double> GapProperty =
         Property.Register<Crosshair, double>(
             nameof(Gap),
             3,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "Crosshair Gap must be finite and non-negative.");
 
     /// <summary>Identifies the <see cref="OutlineColor"/> property.</summary>
     public static readonly Property<Color> OutlineColorProperty =
@@ -47,7 +53,9 @@ public sealed class Crosshair : UiNode
         Property.Register<Crosshair, double>(
             nameof(OutlineThickness),
             1,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "Crosshair OutlineThickness must be finite and non-negative.");
 
     /// <summary>Identifies the <see cref="Shape"/> property.</summary>
     public static readonly Property<CrosshairShape> ShapeProperty =
@@ -68,7 +76,9 @@ public sealed class Crosshair : UiNode
         Property.Register<Crosshair, double>(
             nameof(CenterDotSize),
             2,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "Crosshair CenterDotSize must be finite and non-negative.");
 
     /// <summary>Identifies the <see cref="UseUiScale"/> property.</summary>
     public static readonly Property<bool> UseUiScaleProperty =
@@ -99,6 +109,7 @@ public sealed class Crosshair : UiNode
     }
 
     /// <summary>Gets or sets the length of each crosshair arm.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double Length
     {
         get => GetValue(LengthProperty);
@@ -106,6 +117,7 @@ public sealed class Crosshair : UiNode
     }
 
     /// <summary>Gets or sets the crosshair arm thickness.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double Thickness
     {
         get => GetValue(ThicknessProperty);
@@ -113,6 +125,7 @@ public sealed class Crosshair : UiNode
     }
 
     /// <summary>Gets or sets the distance between the center and each arm.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double Gap
     {
         get => GetValue(GapProperty);
@@ -127,6 +140,7 @@ public sealed class Crosshair : UiNode
     }
 
     /// <summary>Gets or sets the outline thickness.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double OutlineThickness
     {
         get => GetValue(OutlineThicknessProperty);
@@ -148,6 +162,7 @@ public sealed class Crosshair : UiNode
     }
 
     /// <summary>Gets or sets the center dot side length.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double CenterDotSize
     {
         get => GetValue(CenterDotSizeProperty);
@@ -167,7 +182,6 @@ public sealed class Crosshair : UiNode
     /// <inheritdoc />
     protected override Size MeasureCore(Size availableSize)
     {
-        ValidateGeometry();
         var halfExtent = Math.Max(
             Gap + Length + OutlineThickness,
             (ShowCenterDot ? CenterDotSize / 2 : 0) + OutlineThickness);
@@ -179,7 +193,6 @@ public sealed class Crosshair : UiNode
     /// <inheritdoc />
     protected override void DrawCore(UiDrawingContext context)
     {
-        ValidateGeometry();
         using var origin = context.PushTranslate(
             new Point(LayoutBounds.Width / 2, LayoutBounds.Height / 2));
         using var scale = UseUiScale ? default : context.SetScale(1);
@@ -223,23 +236,5 @@ public sealed class Crosshair : UiNode
             bounds.Height + OutlineThickness * 2);
         context.FillRectangle(outline, OutlineColor);
         context.FillRectangle(bounds, Color);
-    }
-
-    private void ValidateGeometry()
-    {
-        ValidateDimension(Length, nameof(Length));
-        ValidateDimension(Thickness, nameof(Thickness));
-        ValidateDimension(Gap, nameof(Gap));
-        ValidateDimension(OutlineThickness, nameof(OutlineThickness));
-        ValidateDimension(CenterDotSize, nameof(CenterDotSize));
-    }
-
-    private static void ValidateDimension(double value, string propertyName)
-    {
-        if (!double.IsFinite(value) || value < 0)
-        {
-            throw new InvalidOperationException(
-                $"Crosshair {propertyName} must be finite and non-negative.");
-        }
     }
 }

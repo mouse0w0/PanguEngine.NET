@@ -246,43 +246,51 @@ public sealed class ButtonTests
     }
 
     [Theory]
-    [InlineData(double.NaN)]
-    [InlineData(-1d)]
-    [InlineData(double.PositiveInfinity)]
-    public void InvalidIconSizeFailsBeforeMeasuringChildren(double value)
+    [InlineData(double.NaN, false)]
+    [InlineData(double.NaN, true)]
+    [InlineData(-1d, false)]
+    [InlineData(-1d, true)]
+    [InlineData(double.PositiveInfinity, false)]
+    [InlineData(double.PositiveInfinity, true)]
+    [InlineData(double.NegativeInfinity, false)]
+    [InlineData(double.NegativeInfinity, true)]
+    public void InvalidIconSizePreservesValueAndValidLayout(double value, bool hasIcon)
     {
         var button = new Button
         {
-            Icon = CreateImage(4, 4),
-            IconSize = value
+            Icon = hasIcon ? CreateImage(4, 4) : null,
+            IconSize = 20
         };
-        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
+        button.UpdateStyles();
+        button.Measure(Size.Infinite);
+        button.Arrange(new Rect(0, 0, button.DesiredSize));
+        var previousValue = button.IconSize;
+        var previousSize = button.DesiredSize;
+        var previousBounds = button.LayoutBounds;
+        var notifications = 0;
+        using var subscription = button.Subscribe(Button.IconSizeProperty, (_, _) => notifications++);
 
-        Assert.Throws<InvalidOperationException>(() => button.Measure(Size.Infinite));
+        var error = Assert.Throws<ArgumentException>(() => button.IconSize = value);
 
-        Assert.False(button.IsMeasureValid);
-        Assert.False(button.IsArrangeValid);
-        Assert.False(image.IsMeasureValid);
+        Assert.Equal("value", error.ParamName);
+        Assert.Equal(previousValue, button.IconSize);
+        Assert.Equal(previousSize, button.DesiredSize);
+        Assert.Equal(previousBounds, button.LayoutBounds);
+        Assert.Equal(0, notifications);
+        Assert.True(button.IsMeasureValid);
+        Assert.True(button.IsArrangeValid);
     }
 
     [Theory]
     [InlineData(double.NaN)]
     [InlineData(-1d)]
     [InlineData(double.PositiveInfinity)]
-    public void InvalidSpacingFailsBeforeMeasuringChildren(double value)
+    public void InvalidSpacingIsRejectedOnWrite(double value)
     {
-        var button = new Button
-        {
-            Icon = CreateImage(4, 4),
-            Spacing = value
-        };
-        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
-
-        Assert.Throws<InvalidOperationException>(() => button.Measure(Size.Infinite));
-
-        Assert.False(button.IsMeasureValid);
-        Assert.False(button.IsArrangeValid);
-        Assert.False(image.IsMeasureValid);
+        var button = new Button();
+        var previous = button.Spacing;
+        Assert.Throws<ArgumentException>(() => button.Spacing = value);
+        Assert.Equal(previous, button.Spacing);
     }
 
     [Fact]

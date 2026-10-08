@@ -24,7 +24,9 @@ public sealed class StackPanel : Panel
     public static readonly Property<double> SpacingProperty =
         Property.Register<StackPanel, double>(
             nameof(Spacing),
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "Spacing must be a finite non-negative value.");
 
     static StackPanel()
     {
@@ -48,6 +50,7 @@ public sealed class StackPanel : Panel
     /// <summary>
     /// Gets or sets the finite non-negative spacing between participating children.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double Spacing
     {
         get => GetValue(SpacingProperty);
@@ -127,8 +130,6 @@ public sealed class StackPanel : Panel
     {
         var orientation = Orientation;
         var spacing = Spacing;
-        if (!double.IsFinite(spacing) || spacing < 0)
-            throw new InvalidOperationException("Spacing must be a finite non-negative value.");
 
         var screen = Screen;
         if (screen?.UseLayoutRounding ?? true)

@@ -385,15 +385,8 @@ public sealed class UiNodeLayoutTests
     }
 
     [Fact]
-    public void InvalidPropertyStateAndCoreResultDoNotValidateThePass()
+    public void InvalidCoreResultDoesNotValidateThePass()
     {
-        var invalidWidth = new TestNode { Width = -1 };
-
-        Assert.Throws<InvalidOperationException>(() =>
-            invalidWidth.Measure(new Size(100, 100)));
-        Assert.Equal(0, invalidWidth.MeasureCoreCalls);
-        Assert.False(invalidWidth.IsMeasureValid);
-
         var infiniteResult = new TestNode { CoreDesiredSize = Size.Infinite };
         Assert.Throws<InvalidOperationException>(() =>
             infiniteResult.Measure(Size.Infinite));
@@ -655,19 +648,6 @@ public sealed class UiNodeLayoutTests
         Assert.Equal(Rect.Zero, node.LayoutBounds);
         Assert.True(node.IsArrangeValid);
         Assert.Equal(1, node.ArrangeCoreCalls);
-    }
-
-    [Fact]
-    public void CollapsedStillRejectsInvalidDimensionsBeforeCoreMethods()
-    {
-        var invalidWidth = new TestNode
-        {
-            Visibility = Visibility.Collapsed,
-            Width = -1
-        };
-        Assert.Throws<InvalidOperationException>(() =>
-            invalidWidth.Measure(new Size(100, 100)));
-        Assert.Equal(0, invalidWidth.MeasureCoreCalls);
     }
 
     [Fact]

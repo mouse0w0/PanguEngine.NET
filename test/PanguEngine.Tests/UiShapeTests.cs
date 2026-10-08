@@ -405,24 +405,19 @@ public sealed class UiShapeTests
     }
 
     [Fact]
-    public void UnsupportedBrushThrowsWhileDrawing()
+    public void UnsupportedBrushIsRejectedBeforePropertyCommit()
     {
         var image = UiImage.FromRgba(new byte[4], 1, 1);
         var rectangle = new Rectangle
         {
             Width = 10,
-            Height = 10,
-            Fill = new ImageBrush(image)
+            Height = 10
         };
-        var screen = CreateScreen(rectangle);
-        try
-        {
-            Assert.Throws<NotSupportedException>(() => screen.CreateDrawCommandList());
-        }
-        finally
-        {
-            screen.Close();
-        }
+        var previous = rectangle.Fill;
+        Assert.Throws<ArgumentException>(() => rectangle.Fill = new ImageBrush(image));
+        Assert.Same(previous, rectangle.Fill);
+        Assert.Throws<ArgumentException>(() => rectangle.Stroke = new ImageBrush(image));
+        Assert.Null(rectangle.Stroke);
     }
 
     [Fact]

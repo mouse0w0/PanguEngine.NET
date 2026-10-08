@@ -13,7 +13,9 @@ public abstract partial class UiNode
         Property.Register<UiNode, double>(
             nameof(Width),
             double.NaN,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsRequestedDimensionValid,
+            validationMessage: "Width must be Auto or a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="Height"/> property.
@@ -22,7 +24,9 @@ public abstract partial class UiNode
         Property.Register<UiNode, double>(
             nameof(Height),
             double.NaN,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsRequestedDimensionValid,
+            validationMessage: "Height must be Auto or a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="MinWidth"/> property.
@@ -30,7 +34,9 @@ public abstract partial class UiNode
     public static readonly Property<double> MinWidthProperty =
         Property.Register<UiNode, double>(
             nameof(MinWidth),
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "MinWidth must be a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="MinHeight"/> property.
@@ -38,7 +44,9 @@ public abstract partial class UiNode
     public static readonly Property<double> MinHeightProperty =
         Property.Register<UiNode, double>(
             nameof(MinHeight),
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "MinHeight must be a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="MaxWidth"/> property.
@@ -47,7 +55,9 @@ public abstract partial class UiNode
         Property.Register<UiNode, double>(
             nameof(MaxWidth),
             double.PositiveInfinity,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsMaximumDimensionValid,
+            validationMessage: "MaxWidth must be non-negative or positive infinity.");
 
     /// <summary>
     /// Identifies the <see cref="MaxHeight"/> property.
@@ -56,7 +66,9 @@ public abstract partial class UiNode
         Property.Register<UiNode, double>(
             nameof(MaxHeight),
             double.PositiveInfinity,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsMaximumDimensionValid,
+            validationMessage: "MaxHeight must be non-negative or positive infinity.");
 
     /// <summary>
     /// Identifies the <see cref="Margin"/> property.
@@ -74,7 +86,9 @@ public abstract partial class UiNode
         Property.Register<UiNode, HorizontalAlignment>(
             nameof(HorizontalAlignment),
             HorizontalAlignment.Stretch,
-            onChanged: static (node, _, _) => node.InvalidateArrange());
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: static value => value is HorizontalAlignment.Left or HorizontalAlignment.Center or HorizontalAlignment.Right or HorizontalAlignment.Stretch,
+            validationMessage: "HorizontalAlignment has an undefined value.");
 
     /// <summary>
     /// Identifies the <see cref="VerticalAlignment"/> property.
@@ -83,7 +97,9 @@ public abstract partial class UiNode
         Property.Register<UiNode, VerticalAlignment>(
             nameof(VerticalAlignment),
             VerticalAlignment.Stretch,
-            onChanged: static (node, _, _) => node.InvalidateArrange());
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: static value => value is VerticalAlignment.Top or VerticalAlignment.Center or VerticalAlignment.Bottom or VerticalAlignment.Stretch,
+            validationMessage: "VerticalAlignment has an undefined value.");
 
     /// <summary>
     /// Identifies the <see cref="Visibility"/> property.
@@ -110,6 +126,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets the requested width, or NaN for automatic sizing.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is neither NaN nor finite and non-negative.</exception>
     public double Width
     {
         get => GetValue(WidthProperty);
@@ -119,6 +136,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets the requested height, or NaN for automatic sizing.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is neither NaN nor finite and non-negative.</exception>
     public double Height
     {
         get => GetValue(HeightProperty);
@@ -128,6 +146,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets the minimum width.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double MinWidth
     {
         get => GetValue(MinWidthProperty);
@@ -137,6 +156,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets the minimum height.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double MinHeight
     {
         get => GetValue(MinHeightProperty);
@@ -146,6 +166,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets the maximum width.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is NaN or negative.</exception>
     public double MaxWidth
     {
         get => GetValue(MaxWidthProperty);
@@ -155,6 +176,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets the maximum height.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is NaN or negative.</exception>
     public double MaxHeight
     {
         get => GetValue(MaxHeightProperty);
@@ -173,6 +195,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets horizontal positioning within the allocated slot.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is undefined.</exception>
     public HorizontalAlignment HorizontalAlignment
     {
         get => GetValue(HorizontalAlignmentProperty);
@@ -182,6 +205,7 @@ public abstract partial class UiNode
     /// <summary>
     /// Gets or sets vertical positioning within the allocated slot.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is undefined.</exception>
     public VerticalAlignment VerticalAlignment
     {
         get => GetValue(VerticalAlignmentProperty);
@@ -229,14 +253,12 @@ public abstract partial class UiNode
     /// </summary>
     /// <param name="availableSize">The available size, which may contain positive infinity.</param>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open screen is accessed from another thread, or when a layout property or
-    /// measured result has an invalid value.
+    /// Thrown when layout mutation is prohibited, or when measurement produces an invalid result.
     /// </exception>
     public void Measure(Size availableSize)
     {
         VerifyLayoutMutationAccess();
         VerifyNotUpdatingStyles();
-        VerifyLayoutProperties();
         var screen = Screen;
         var useLayoutRounding = screen?.UseLayoutRounding ?? true;
         var scale = screen?.Scale ?? 1;
@@ -313,14 +335,12 @@ public abstract partial class UiNode
     /// </summary>
     /// <param name="finalRect">The final slot in parent or caller coordinates.</param>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open screen is accessed from another thread, measurement is invalid, or a
-    /// layout property has an invalid value.
+    /// Thrown when layout mutation is prohibited, measurement is invalid, or arrangement produces an invalid result.
     /// </exception>
     public void Arrange(Rect finalRect)
     {
         VerifyLayoutMutationAccess();
         VerifyNotUpdatingStyles();
-        VerifyLayoutProperties();
         var screen = Screen;
         var useLayoutRounding = screen?.UseLayoutRounding ?? true;
         var scale = screen?.Scale ?? 1;
@@ -514,16 +534,6 @@ public abstract partial class UiNode
             node._isHitTestLayoutValid = true;
     }
 
-    private void VerifyLayoutProperties()
-    {
-        VerifyRequestedDimension(Width, nameof(Width));
-        VerifyRequestedDimension(Height, nameof(Height));
-        VerifyMinimumDimension(MinWidth, nameof(MinWidth));
-        VerifyMinimumDimension(MinHeight, nameof(MinHeight));
-        VerifyMaximumDimension(MaxWidth, nameof(MaxWidth));
-        VerifyMaximumDimension(MaxHeight, nameof(MaxHeight));
-    }
-
     private double GetHorizontalOffset(double remaining) =>
         HorizontalAlignment switch
         {
@@ -605,23 +615,18 @@ public abstract partial class UiNode
             throw new InvalidOperationException(message);
     }
 
-    private static void VerifyRequestedDimension(double value, string propertyName)
-    {
-        if (!double.IsNaN(value) && (!double.IsFinite(value) || value < 0))
-            throw new InvalidOperationException($"{propertyName} must be Auto or a finite non-negative value.");
-    }
+    private static bool IsRequestedDimensionValid(double value) =>
+        double.IsNaN(value) || IsFiniteNonNegative(value);
 
-    private static void VerifyMinimumDimension(double value, string propertyName)
-    {
-        if (!double.IsFinite(value) || value < 0)
-            throw new InvalidOperationException($"{propertyName} must be a finite non-negative value.");
-    }
+    /// <summary>Determines whether a numeric value is finite and non-negative.</summary>
+    private protected static bool IsFiniteNonNegative(double value) =>
+        double.IsFinite(value) && value >= 0;
 
-    private static void VerifyMaximumDimension(double value, string propertyName)
-    {
-        if (double.IsNaN(value) || value < 0 || double.IsNegativeInfinity(value))
-            throw new InvalidOperationException($"{propertyName} must be non-negative or positive infinity.");
-    }
+    /// <summary>Determines whether a numeric value is finite and positive.</summary>
+    private protected static bool IsFinitePositive(double value) =>
+        double.IsFinite(value) && value > 0;
+
+    private static bool IsMaximumDimensionValid(double value) => value >= 0;
 
     partial void OnTreeStructureInvalidated()
     {

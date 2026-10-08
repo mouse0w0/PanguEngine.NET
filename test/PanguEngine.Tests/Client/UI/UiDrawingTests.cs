@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
@@ -972,43 +971,6 @@ public sealed class UiDrawingTests
     }
 
     [Fact]
-    public void InvalidNodeOpacityFailsBeforeItsDrawCore()
-    {
-        var drawCalls = 0;
-        var propertyNode = new DrawingNode
-        {
-            Opacity = -1,
-            DrawAction = _ => drawCalls++
-        };
-        var propertyScreen = new UiScreen(propertyNode);
-        Arrange(propertyNode, new Rect(0, 0, 10, 10));
-
-        Assert.Throws<InvalidOperationException>(propertyScreen.CreateDrawCommandList);
-
-        var setValueNode = new DrawingNode
-        {
-            DrawAction = _ => drawCalls++
-        };
-        var setValueScreen = new UiScreen(setValueNode);
-        Arrange(setValueNode, new Rect(0, 0, 10, 10));
-        setValueNode.SetValue(UiNode.OpacityProperty, double.NaN);
-
-        Assert.Throws<InvalidOperationException>(setValueScreen.CreateDrawCommandList);
-
-        var bindingNode = new DrawingNode
-        {
-            DrawAction = _ => drawCalls++
-        };
-        var bindingScreen = new UiScreen(bindingNode);
-        Arrange(bindingNode, new Rect(0, 0, 10, 10));
-        var source = new OpacitySource { Opacity = double.PositiveInfinity };
-        bindingNode.Bind(UiNode.OpacityProperty, source, item => item.Opacity);
-
-        Assert.Throws<InvalidOperationException>(bindingScreen.CreateDrawCommandList);
-        Assert.Equal(0, drawCalls);
-    }
-
-    [Fact]
     public void PushOpacityRejectsInvalidValuesWithoutLosingCurrentState()
     {
         var errors = new List<Exception?>();
@@ -1505,21 +1467,4 @@ public sealed class UiDrawingTests
             DrawAction?.Invoke(context);
     }
 
-    private sealed class OpacitySource : INotifyPropertyChanged
-    {
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        public double Opacity
-        {
-            get => field;
-            set
-            {
-                if (field.Equals(value))
-                    return;
-
-                field = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Opacity)));
-            }
-        }
-    }
 }

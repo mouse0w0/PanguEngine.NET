@@ -37,21 +37,27 @@ public sealed partial class TabView : Control
         Property.Register<TabView, double>(
             nameof(MinTabWidth),
             96d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "MinTabWidth must be a finite non-negative value.");
 
     /// <summary>Identifies the <see cref="MaxTabWidth"/> property.</summary>
     public static readonly Property<double> MaxTabWidthProperty =
         Property.Register<TabView, double>(
             nameof(MaxTabWidth),
             240d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "MaxTabWidth must be a finite non-negative value.");
 
     /// <summary>Identifies the <see cref="VerticalTabStripWidth"/> property.</summary>
     public static readonly Property<double> VerticalTabStripWidthProperty =
         Property.Register<TabView, double>(
             nameof(VerticalTabStripWidth),
             200d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "VerticalTabStripWidth must be a finite non-negative value.");
 
     static TabView()
     {
@@ -112,6 +118,7 @@ public sealed partial class TabView : Control
     }
 
     /// <summary>Gets or sets the minimum horizontal tab slot width in logical pixels.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double MinTabWidth
     {
         get => GetValue(MinTabWidthProperty);
@@ -119,6 +126,7 @@ public sealed partial class TabView : Control
     }
 
     /// <summary>Gets or sets the maximum horizontal tab slot width in logical pixels.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double MaxTabWidth
     {
         get => GetValue(MaxTabWidthProperty);
@@ -126,6 +134,7 @@ public sealed partial class TabView : Control
     }
 
     /// <summary>Gets or sets the preferred width of a vertical tab strip in logical pixels.</summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double VerticalTabStripWidth
     {
         get => GetValue(VerticalTabStripWidthProperty);
@@ -156,10 +165,6 @@ public sealed partial class TabView : Control
     {
         var min = MinTabWidth;
         var max = MaxTabWidth;
-        if (!double.IsFinite(min) || min < 0)
-            throw new InvalidOperationException("MinTabWidth must be a finite non-negative value.");
-        if (!double.IsFinite(max) || max < 0)
-            throw new InvalidOperationException("MaxTabWidth must be a finite non-negative value.");
         if (max < min)
             throw new InvalidOperationException("MaxTabWidth must be greater than or equal to MinTabWidth.");
         return (min, max);
@@ -168,8 +173,6 @@ public sealed partial class TabView : Control
     internal double ResolveVerticalStripWidth(double availableWidth)
     {
         var preferred = VerticalTabStripWidth;
-        if (!double.IsFinite(preferred) || preferred < 0)
-            throw new InvalidOperationException("VerticalTabStripWidth must be a finite non-negative value.");
         return double.IsPositiveInfinity(availableWidth)
             ? preferred
             : Math.Min(preferred, availableWidth);

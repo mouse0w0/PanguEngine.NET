@@ -225,15 +225,12 @@ public sealed class StackPanelTests
     [InlineData(double.PositiveInfinity)]
     [InlineData(double.NegativeInfinity)]
     [InlineData(-1)]
-    public void InvalidSpacingFailsBeforeMeasuringChildren(double spacing)
+    public void InvalidSpacingIsRejectedOnWrite(double spacing)
     {
-        var panel = new StackPanel { Spacing = spacing };
-        var child = new TestNode();
-        panel.Children.Add(child);
-
-        Assert.Throws<InvalidOperationException>(() => panel.Measure(new Size(100, 100)));
-        Assert.Equal(0, child.MeasureCount);
-        Assert.False(panel.IsMeasureValid);
+        var panel = new StackPanel();
+        var previous = panel.Spacing;
+        Assert.Throws<ArgumentException>(() => panel.Spacing = spacing);
+        Assert.Equal(previous, panel.Spacing);
     }
 
     [Fact]

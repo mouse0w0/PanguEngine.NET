@@ -11,11 +11,14 @@ public abstract partial class UiNode
     public static readonly Property<double> OpacityProperty =
         Property.Register<UiNode, double>(
             nameof(Opacity),
-            1);
+            1,
+            validate: static value => IsFiniteNonNegative(value) && value <= 1,
+            validationMessage: "Opacity must be finite and between zero and one.");
 
     /// <summary>
     /// Gets or sets the opacity applied to this node and its descendants.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite or is outside the range from zero to one.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when this property is modified while the owning screen is generating drawing commands.
     /// </exception>
@@ -45,9 +48,6 @@ public abstract partial class UiNode
         }
 
         var opacity = Opacity;
-        if (!double.IsFinite(opacity) || opacity < 0 || opacity > 1)
-            throw new InvalidOperationException("Opacity must be finite and between zero and one.");
-
         var combinedOpacity = inheritedOpacity * opacity;
         if (combinedOpacity == 0)
             return;

@@ -19,7 +19,9 @@ public sealed class Button : Control
         Property.Register<Button, string>(
             nameof(Text),
             string.Empty,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "Text cannot be null.");
 
     /// <summary>
     /// Identifies the <see cref="Font"/> property.
@@ -28,7 +30,9 @@ public sealed class Button : Control
         Property.Register<Button, Font>(
             nameof(Font),
             new Font(string.Empty),
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "Font cannot be null.");
 
     /// <summary>
     /// Identifies the <see cref="FontSize"/> property.
@@ -37,7 +41,9 @@ public sealed class Button : Control
         Property.Register<Button, double>(
             nameof(FontSize),
             16d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFinitePositive,
+            validationMessage: "FontSize must be positive and finite.");
 
     /// <summary>
     /// Identifies the <see cref="Foreground"/> property.
@@ -63,7 +69,9 @@ public sealed class Button : Control
         Property.Register<Button, double>(
             nameof(IconSize),
             16d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "IconSize must be a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="Spacing"/> property.
@@ -72,7 +80,9 @@ public sealed class Button : Control
         Property.Register<Button, double>(
             nameof(Spacing),
             6d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "Spacing must be a finite non-negative value.");
 
     static Button()
     {
@@ -99,6 +109,7 @@ public sealed class Button : Control
     /// <summary>
     /// Gets or sets the plain text displayed by this button.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
     public string Text
     {
         get => GetValue(TextProperty);
@@ -108,6 +119,7 @@ public sealed class Button : Control
     /// <summary>
     /// Gets or sets the preferred font request for the button text.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
     public Font Font
     {
         get => GetValue(FontProperty);
@@ -117,6 +129,7 @@ public sealed class Button : Control
     /// <summary>
     /// Gets or sets the button text size in logical pixels.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);
@@ -144,6 +157,7 @@ public sealed class Button : Control
     /// <summary>
     /// Gets or sets the square icon slot size in logical pixels.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double IconSize
     {
         get => GetValue(IconSizeProperty);
@@ -153,6 +167,7 @@ public sealed class Button : Control
     /// <summary>
     /// Gets or sets the spacing between the icon and text in logical pixels.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double Spacing
     {
         get => GetValue(SpacingProperty);
@@ -407,12 +422,7 @@ public sealed class Button : Control
 
     private double GetLayoutSpacing()
     {
-        var iconSize = IconSize;
         var spacing = Spacing;
-        if (!double.IsFinite(iconSize) || iconSize < 0)
-            throw new InvalidOperationException("IconSize must be a finite non-negative value.");
-        if (!double.IsFinite(spacing) || spacing < 0)
-            throw new InvalidOperationException("Spacing must be a finite non-negative value.");
 
         var screen = Screen;
         if (screen?.UseLayoutRounding ?? true)

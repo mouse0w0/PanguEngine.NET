@@ -180,9 +180,9 @@ public sealed class CanvasTests
         var canvas = new Canvas();
         var child = new TestNode { CoreDesiredSize = new Size(10, 5) };
         Canvas.SetLeft(child, 7);
-        Canvas.SetRight(child, double.PositiveInfinity);
+        Canvas.SetRight(child, 20);
         Canvas.SetTop(child, 9);
-        Canvas.SetBottom(child, double.NegativeInfinity);
+        Canvas.SetBottom(child, 30);
         canvas.Children.Add(child);
         canvas.Measure(new Size(100, 50));
 
@@ -190,6 +190,28 @@ public sealed class CanvasTests
 
         Assert.Equal(new Rect(7, 9, 10, 5), child.LayoutBounds);
         Assert.Equal(new Size(10, 5), child.LastArrangeSize);
+    }
+
+    [Fact]
+    public void InvalidTrailingPositionIsRejectedEvenWhenLeadingPositionTakesPriority()
+    {
+        var canvas = new Canvas();
+        var child = new TestNode { CoreDesiredSize = new Size(10, 5) };
+        Canvas.SetLeft(child, 7);
+        Canvas.SetTop(child, 9);
+        canvas.Children.Add(child);
+        canvas.Measure(new Size(100, 50));
+        canvas.Arrange(new Rect(0, 0, 100, 50));
+        var previousBounds = child.LayoutBounds;
+
+        Assert.Throws<ArgumentException>(() => Canvas.SetRight(child, double.PositiveInfinity));
+        Assert.Throws<ArgumentException>(() => Canvas.SetBottom(child, double.NegativeInfinity));
+
+        Assert.True(double.IsNaN(Canvas.GetRight(child)));
+        Assert.True(double.IsNaN(Canvas.GetBottom(child)));
+        Assert.Equal(previousBounds, child.LayoutBounds);
+        Assert.True(child.IsArrangeValid);
+        Assert.True(canvas.IsArrangeValid);
     }
 
     [Fact]
@@ -213,23 +235,17 @@ public sealed class CanvasTests
     [InlineData(true, double.NegativeInfinity)]
     [InlineData(false, double.PositiveInfinity)]
     [InlineData(false, double.NegativeInfinity)]
-    public void SelectedNonFiniteTrailingPositionFailsBeforeAnyChildArrange(
+    public void NonFiniteTrailingPositionFailsOnWrite(
         bool horizontal,
         double position)
     {
-        var canvas = new Canvas();
-        var child = new TestNode { CoreDesiredSize = new Size(10, 10) };
+        var child = new TestNode();
         if (horizontal)
-            Canvas.SetRight(child, position);
+            Assert.Throws<ArgumentException>(() => Canvas.SetRight(child, position));
         else
-            Canvas.SetBottom(child, position);
-        canvas.Children.Add(child);
-        canvas.Measure(new Size(100, 100));
-
-        Assert.Throws<InvalidOperationException>(() =>
-            canvas.Arrange(new Rect(0, 0, 100, 100)));
-
-        Assert.Equal(0, child.ArrangeCount);
+            Assert.Throws<ArgumentException>(() => Canvas.SetBottom(child, position));
+        Assert.True(double.IsNaN(Canvas.GetRight(child)));
+        Assert.True(double.IsNaN(Canvas.GetBottom(child)));
     }
 
     [Theory]
@@ -237,27 +253,17 @@ public sealed class CanvasTests
     [InlineData(false, double.NegativeInfinity)]
     [InlineData(true, double.PositiveInfinity)]
     [InlineData(true, double.NegativeInfinity)]
-    public void InitialNonFiniteLeadingPositionFailsBeforeAnyChildArrange(
+    public void NonFiniteLeadingPositionFailsOnWrite(
         bool vertical,
         double position)
     {
-        var canvas = new Canvas();
-        var first = new TestNode { CoreDesiredSize = new Size(10, 10) };
-        var second = new TestNode { CoreDesiredSize = new Size(10, 10) };
+        var child = new TestNode();
         if (vertical)
-            Canvas.SetTop(second, position);
+            Assert.Throws<ArgumentException>(() => Canvas.SetTop(child, position));
         else
-            Canvas.SetLeft(second, position);
-        canvas.Children.Add(first);
-        canvas.Children.Add(second);
-        canvas.Measure(new Size(100, 100));
-
-        Assert.Throws<InvalidOperationException>(() =>
-            canvas.Arrange(new Rect(0, 0, 100, 100)));
-
-        Assert.Equal(0, first.ArrangeCount);
-        Assert.Equal(0, second.ArrangeCount);
-        Assert.False(canvas.IsArrangeValid);
+            Assert.Throws<ArgumentException>(() => Canvas.SetLeft(child, position));
+        Assert.True(double.IsNaN(Canvas.GetLeft(child)));
+        Assert.True(double.IsNaN(Canvas.GetTop(child)));
     }
 
     [Fact]
@@ -299,7 +305,7 @@ public sealed class CanvasTests
     }
 
     [Fact]
-    public void PositionChangedByEarlierChildIsRecheckedBeforeLaterArrange()
+    public void InvalidPositionWriteByEarlierChildFailsBeforeLaterArrange()
     {
         var canvas = new Canvas();
         var first = new TestNode { CoreDesiredSize = new Size(10, 10) };
@@ -309,7 +315,7 @@ public sealed class CanvasTests
         canvas.Children.Add(second);
         canvas.Measure(new Size(100, 100));
 
-        Assert.Throws<InvalidOperationException>(() =>
+        Assert.Throws<ArgumentException>(() =>
             canvas.Arrange(new Rect(0, 0, 100, 100)));
 
         Assert.Equal(1, first.ArrangeCount);
@@ -324,17 +330,17 @@ public sealed class CanvasTests
         var first = new TestNode { CoreDesiredSize = new Size(10, 10) };
         var second = new TestNode { CoreDesiredSize = new Size(10, 10) };
         Canvas.SetLeft(second, 5);
-        Canvas.SetRight(second, double.PositiveInfinity);
+        Canvas.SetRight(second, 20);
         first.ArrangeAction = () => second.ClearValue(Canvas.LeftProperty);
         canvas.Children.Add(first);
         canvas.Children.Add(second);
         canvas.Measure(new Size(100, 100));
 
-        Assert.Throws<InvalidOperationException>(() =>
-            canvas.Arrange(new Rect(0, 0, 100, 100)));
+        canvas.Arrange(new Rect(0, 0, 100, 100));
 
         Assert.Equal(1, first.ArrangeCount);
-        Assert.Equal(0, second.ArrangeCount);
+        Assert.Equal(1, second.ArrangeCount);
+        Assert.Equal(70, second.LayoutBounds.X);
     }
 
     [Fact]

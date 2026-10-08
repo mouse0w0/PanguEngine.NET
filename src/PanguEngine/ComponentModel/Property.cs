@@ -65,15 +65,20 @@ public abstract class Property
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
     /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications. Defaults and unchanged effective values do not invoke it.</param>
-    /// <remarks>A callback failure preserves the committed value and skips that change's host notifications.</remarks>
+    /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
+    /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
+    /// <remarks>The default is validated before registration. Validation failures occur before value commit; onChanged failures preserve the committed value and skip host notifications.</remarks>
     /// <returns>The registered property descriptor.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="defaultValue"/> is rejected by <paramref name="validate"/>.</exception>
     public static Property<TValue> Register<TOwner, TValue>(
         string name,
         TValue defaultValue = default!,
-        Action<TOwner, TValue, TValue>? onChanged = null)
+        Action<TOwner, TValue, TValue>? onChanged = null,
+        Func<TValue, bool>? validate = null,
+        string? validationMessage = null)
         where TOwner : ObservableObject
     {
         var property = new Property<TValue>(
@@ -84,7 +89,9 @@ public abstract class Property
             isReadOnly: false,
             onChanged: onChanged is null
                 ? null
-                : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue));
+                : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue),
+            validate: validate,
+            validationMessage: validationMessage);
         property.PublishDescriptor();
         return property;
     }
@@ -97,15 +104,20 @@ public abstract class Property
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
     /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications. Defaults and unchanged effective values do not invoke it.</param>
-    /// <remarks>A callback failure preserves the committed value and skips that change's host notifications.</remarks>
+    /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
+    /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
+    /// <remarks>The default is validated before registration. Validation failures occur before value commit; onChanged failures preserve the committed value and skip host notifications.</remarks>
     /// <returns>The key that grants owner access to the registered property.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="defaultValue"/> is rejected by <paramref name="validate"/>.</exception>
     public static PropertyKey<TValue> RegisterReadOnly<TOwner, TValue>(
         string name,
         TValue defaultValue = default!,
-        Action<TOwner, TValue, TValue>? onChanged = null)
+        Action<TOwner, TValue, TValue>? onChanged = null,
+        Func<TValue, bool>? validate = null,
+        string? validationMessage = null)
         where TOwner : ObservableObject
     {
         var property = new Property<TValue>(
@@ -116,7 +128,9 @@ public abstract class Property
             isReadOnly: true,
             onChanged: onChanged is null
                 ? null
-                : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue));
+                : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue),
+            validate: validate,
+            validationMessage: validationMessage);
         property.PublishDescriptor();
         return new PropertyKey<TValue>(property);
     }
@@ -130,14 +144,24 @@ public abstract class Property
     /// <param name="name">The unique property name for the owner type.</param>
     /// <param name="defaultValue">The value used when no local value exists.</param>
     /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications.</param>
+    /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
+    /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
+    /// <remarks>
+    /// The effective value is committed before <paramref name="onChanged"/> runs; if that callback fails,
+    /// the committed value remains and host notifications are skipped. The default is validated before registration;
+    /// validation failures happen before value commit.
+    /// </remarks>
     /// <returns>The registered property descriptor.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or whitespace.</exception>
     /// <exception cref="InvalidOperationException">Thrown when the owner/name pair is already registered.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="defaultValue"/> is rejected by <paramref name="validate"/>.</exception>
     public static Property<TValue> RegisterAttached<TOwner, TTarget, TValue>(
         string name,
         TValue defaultValue = default!,
-        Action<TTarget, TValue, TValue>? onChanged = null)
+        Action<TTarget, TValue, TValue>? onChanged = null,
+        Func<TValue, bool>? validate = null,
+        string? validationMessage = null)
         where TOwner : ObservableObject
         where TTarget : ObservableObject
     {
@@ -149,7 +173,9 @@ public abstract class Property
             isReadOnly: false,
             onChanged: onChanged is null
                 ? null
-                : (target, oldValue, newValue) => onChanged((TTarget)target, oldValue, newValue));
+                : (target, oldValue, newValue) => onChanged((TTarget)target, oldValue, newValue),
+            validate: validate,
+            validationMessage: validationMessage);
         property.PublishDescriptor();
         return property;
     }
@@ -221,6 +247,8 @@ public abstract class Property
     internal abstract void RaiseEffectiveValueChanged(ObservableObject host, object? oldValue, object? newValue);
 
     internal abstract bool AreEqual(object? left, object? right);
+
+    internal abstract ArgumentException? GetBoxedValidationError(object? value);
 }
 
 /// <summary>
@@ -230,6 +258,8 @@ public abstract class Property
 public class Property<T> : Property
 {
     private readonly Action<ObservableObject, T, T>? _onChanged;
+    private readonly Func<T, bool>? _validate;
+    private readonly string? _validationMessage;
 
     internal Property(
         string name,
@@ -237,11 +267,16 @@ public class Property<T> : Property
         Type targetType,
         T defaultValue,
         bool isReadOnly,
-        Action<ObservableObject, T, T>? onChanged = null)
+        Action<ObservableObject, T, T>? onChanged = null,
+        Func<T, bool>? validate = null,
+        string? validationMessage = null)
         : base(name, ownerType, targetType, typeof(T), defaultValue, isReadOnly)
     {
         DefaultValue = defaultValue;
         _onChanged = onChanged;
+        _validate = validate;
+        _validationMessage = validationMessage;
+        ValidateValue(defaultValue, nameof(defaultValue));
     }
 
     /// <summary>Gets the strongly typed fallback value, or the reset value for a direct property.</summary>
@@ -257,4 +292,23 @@ public class Property<T> : Property
         EqualityComparer<T>.Default.Equals(
             left is null ? default! : (T)left,
             right is null ? default! : (T)right);
+
+    internal void ValidateValue(T value)
+    {
+        ValidateValue(value, nameof(value));
+    }
+
+    private void ValidateValue(T value, string parameterName)
+    {
+        if (GetValidationError(value, parameterName) is { } error)
+            throw error;
+    }
+
+    private ArgumentException? GetValidationError(T value, string parameterName) =>
+        _validate?.Invoke(value) == false
+            ? new ArgumentException(_validationMessage ?? $"Value is not valid for property '{Name}'.", parameterName)
+            : null;
+
+    internal override ArgumentException? GetBoxedValidationError(object? value) =>
+        GetValidationError((T)value!, nameof(value));
 }

@@ -24,6 +24,39 @@ internal sealed class UiStyleSnapshot
 
     internal IEnumerable<Property> StyledProperties => _values.Keys;
 
+    /// <summary>Validates the resolved property values and reports CSS rejection with declaration sources.</summary>
+    /// <exception cref="ArgumentException">Thrown when a value from C# declarations is rejected.</exception>
+    /// <exception cref="UiStyleParseException">Thrown when a value with CSS declarations is rejected.</exception>
+    internal void ValidateValues()
+    {
+        foreach (var (property, value) in _values)
+        {
+            var error = property.GetBoxedValidationError(value);
+            if (error is null)
+                continue;
+
+            var sources = GetSources(property);
+            var cssSource = sources.FirstOrDefault(static source => source.CssPropertyName is not null);
+            if (cssSource is not { SourceLocation: { } location })
+                throw error;
+
+            var declarations = string.Join(Environment.NewLine, sources.Select(source =>
+                source.CssPropertyName is { } cssName && source.SourceLocation is { } sourceLocation
+                    ? $"  {cssName} at {sourceLocation.SourceName ?? source.SheetSourceName}({sourceLocation.Line}:{sourceLocation.Column})"
+                    : $"  {property.Name} ({source.Component}) from C# selector '{source.SelectorText}'").Distinct());
+            throw new UiStyleParseException(
+                UiStyleParseError.InvalidValue,
+                location.SourceName ?? cssSource.SheetSourceName,
+                location.Line,
+                location.Column,
+                location.Length,
+                error,
+                $"Reason: {error.Message}{Environment.NewLine}" +
+                $"Winning declarations:{Environment.NewLine}{declarations}",
+                propertyName: property.Name);
+        }
+    }
+
     /// <summary>Gets the resolved style value for a property, or its descriptor default when no rule applies.</summary>
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The property descriptor.</param>

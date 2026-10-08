@@ -74,6 +74,7 @@ public sealed class UiStyleResolverTests
     public void DefaultBaseStyleSheetsDefineBuiltInButtonRules()
     {
         Assert.Single(UiStyleResolver.Default.BaseStyleSheets);
+        Assert.Equal("pangu/ui/default.css", UiStyleResolver.Default.BaseStyleSheets[0].SourceName);
         Assert.Empty(UiStyleResolver.Default.StyleSheets);
         var result = UiStyleResolver.Default.Resolve(new Button());
 
@@ -83,11 +84,12 @@ public sealed class UiStyleResolverTests
         Assert.Equal(new Thickness(1), result.GetValue(Region.BorderThicknessProperty));
         Assert.Equal(new Color(242, 244, 247), result.GetValue(Button.ForegroundProperty));
         var source = Assert.Single(result.GetSources(Region.BackgroundProperty));
-        Assert.Equal("pangu-default", source.SheetSourceName);
+        Assert.Equal("pangu/ui/default.css", source.SheetSourceName);
         Assert.Equal(UiStyleOrigin.Base, source.Origin);
         Assert.Equal(0, source.SheetIndex);
         Assert.Equal("background-color", source.CssPropertyName);
         Assert.NotNull(source.SourceLocation);
+        Assert.Equal("pangu/ui/default.css", source.SourceLocation!.SourceName);
     }
 
     [Fact]

@@ -220,9 +220,10 @@ internal sealed partial class UiStyleResolver
 
     private static UiStyleSheet CreateDefaultStyleSheet()
     {
+        const string resourcePath = "pangu/ui/default.css";
         using var source = new DirectoryResourceSource(AppContext.BaseDirectory);
-        using var stream = source.Open("pangu/ui/default.css");
-        return UiStyleSheet.Parse(stream, "pangu-default");
+        using var stream = source.Open(resourcePath);
+        return UiStyleSheet.Parse(stream, resourcePath);
     }
 
     private readonly record struct RuleEntry(

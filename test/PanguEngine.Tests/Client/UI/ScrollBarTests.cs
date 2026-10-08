@@ -251,8 +251,8 @@ public sealed class ScrollBarTests
 
         Assert.Throws<ArgumentOutOfRangeException>(() => bar.Value = double.NaN);
         Assert.Throws<ArgumentOutOfRangeException>(() => bar.Minimum = double.PositiveInfinity);
-        Assert.Throws<ArgumentOutOfRangeException>(() => bar.SmallChange = -1);
-        Assert.Throws<ArgumentOutOfRangeException>(() => bar.BarThickness = double.NaN);
+        Assert.Throws<ArgumentException>(() => bar.SmallChange = -1);
+        Assert.Throws<ArgumentException>(() => bar.BarThickness = double.NaN);
 
         Assert.Equal(25, bar.Value);
     }
@@ -1169,10 +1169,24 @@ public sealed class ScrollBarTests
         manager.Open(screen);
         manager.UpdateFrame(new Size(16, 200), 0);
 
-        screen.SetStyleSheets([UiStyleSheet.Parse($"ScrollBar {{ {propertyName}: -4; }}")]);
+        var oldThickness = bar.BarThickness;
+        var oldThumbLength = bar.MinimumThumbLength;
+        screen.SetStyleSheets([UiStyleSheet.Parse($"ScrollBar {{ {propertyName}: -4; }}", "scrollbar.css")]);
         var error = Assert.Throws<UiStyleParseException>(() => manager.UpdateFrame(new Size(16, 200), 0));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        Assert.Equal("scrollbar.css", error.SourceName);
+        Assert.Equal(1, error.Line);
+        Assert.Equal(13, error.Column);
+        Assert.Equal(propertyName.Length, error.Length);
+        Assert.Contains("scrollbar.css(1:13)", error.Message);
+        Assert.Contains(propertyName, error.Message);
+        Assert.Equal("value", Assert.IsType<ArgumentException>(error.InnerException).ParamName);
+        Assert.Equal(oldThickness, bar.BarThickness);
+        Assert.Equal(oldThumbLength, bar.MinimumThumbLength);
+        screen.SetStyleSheets([UiStyleSheet.Parse($"ScrollBar {{ {propertyName}: 0; }}")]);
+        manager.UpdateFrame(new Size(16, 200), 0);
+        Assert.Equal(0, propertyName == "bar-thickness" ? bar.BarThickness : bar.MinimumThumbLength);
         manager.Close();
     }
 

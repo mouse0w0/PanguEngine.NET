@@ -80,7 +80,9 @@ public sealed partial class ScrollView : Control
     public static readonly Property<double> SmallChangeProperty =
         Property.Register<ScrollView, double>(
             nameof(SmallChange),
-            16);
+            16,
+            validate: IsFiniteNonNegative,
+            validationMessage: "SmallChange must be a finite non-negative value.");
 
     private static readonly PropertyKey<Size> ExtentPropertyKey =
         Property.RegisterReadOnly<ScrollView, Size>(
@@ -238,16 +240,11 @@ public sealed partial class ScrollView : Control
     /// <summary>
     /// Gets or sets the finite non-negative single-step distance in logical pixels.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double SmallChange
     {
         get => GetValue(SmallChangeProperty);
-        set
-        {
-            if (!double.IsFinite(value) || value < 0)
-                throw new ArgumentOutOfRangeException(nameof(SmallChange), "SmallChange must be a finite non-negative value.");
-
-            SetValue(SmallChangeProperty, value);
-        }
+        set => SetValue(SmallChangeProperty, value);
     }
 
     /// <summary>

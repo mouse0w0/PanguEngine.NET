@@ -68,7 +68,7 @@ public sealed class TextBoxTests
             Assert.All(node.GetStyleValueSources(property), source =>
             {
                 Assert.Equal(UiStyleOrigin.Base, source.Origin);
-                Assert.Equal("pangu-default", source.SheetSourceName);
+                Assert.Equal("pangu/ui/default.css", source.SheetSourceName);
                 Assert.False(source.IsMaskedByLocalValue);
             });
             Assert.NotEmpty(node.GetStyleValueSources(property));

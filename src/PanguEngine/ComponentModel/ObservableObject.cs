@@ -42,10 +42,12 @@ public abstract partial class ObservableObject
     /// <remarks>
     /// Assignment preserves an existing binding. One-way bindings do not write back; two-way bindings
     /// observe property change notifications and synchronize the current target value to their source.
+    /// Ordinary property values are validated before they are committed.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the property is read-only or the host's write-access policy rejects the operation.
     /// </exception>
+    /// <exception cref="ArgumentException">Thrown when the property validator rejects <paramref name="value"/>.</exception>
     public void SetValue<T>(Property<T> property, T value)
     {
         ArgumentNullException.ThrowIfNull(property);
@@ -122,7 +124,7 @@ public abstract partial class ObservableObject
     /// <param name="propertyKey">The property key.</param>
     /// <param name="value">The new local value.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="propertyKey"/> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when the property does not target this host.</exception>
+    /// <exception cref="ArgumentException">Thrown when the property does not target this host or its validator rejects <paramref name="value"/>.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the host's write-access policy rejects the operation.
     /// </exception>
@@ -201,6 +203,7 @@ public abstract partial class ObservableObject
     /// <typeparam name="T">The property value type.</typeparam>
     /// <param name="property">The property to resolve.</param>
     /// <returns>The descriptor default unless a derived host supplies another fallback.</returns>
+    /// <remarks>Overrides must return fallback values accepted by the descriptor's validator.</remarks>
     protected virtual T GetFallbackValue<T>(Property<T> property) =>
         property.DefaultValue;
 
@@ -232,6 +235,7 @@ public abstract partial class ObservableObject
             return;
         }
 
+        property.ValidateValue(value);
         var oldValue = GetValueCore(property);
         _localValues ??= [];
         _localValues[property] = value;

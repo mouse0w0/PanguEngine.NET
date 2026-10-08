@@ -58,14 +58,14 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
-    public void SmallChangeRejectsNegativeAndNonFiniteValuesWithThePropertyParameter()
+    public void SmallChangeRejectsNegativeAndNonFiniteValuesWithTheValueParameter()
     {
         var view = new ScrollView();
 
-        var negative = Assert.Throws<ArgumentOutOfRangeException>(() => view.SmallChange = -1);
-        Assert.Equal(nameof(ScrollView.SmallChange), negative.ParamName);
-        Assert.Throws<ArgumentOutOfRangeException>(() => view.SmallChange = double.PositiveInfinity);
-        Assert.Throws<ArgumentOutOfRangeException>(() => view.SmallChange = double.NaN);
+        var negative = Assert.Throws<ArgumentException>(() => view.SmallChange = -1);
+        Assert.Equal("value", negative.ParamName);
+        Assert.Throws<ArgumentException>(() => view.SmallChange = double.PositiveInfinity);
+        Assert.Throws<ArgumentException>(() => view.SmallChange = double.NaN);
         Assert.Equal(16d, view.SmallChange);
     }
 

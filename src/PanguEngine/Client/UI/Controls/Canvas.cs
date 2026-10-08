@@ -15,7 +15,9 @@ public sealed class Canvas : Panel
         Property.RegisterAttached<Canvas, UiNode, double>(
             "Left",
             double.NaN,
-            onChanged: static (node, _, _) => node.InvalidateArrange());
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: IsPositionValid,
+            validationMessage: "Canvas Left must be finite or unspecified.");
 
     /// <summary>
     /// Identifies the attached vertical position property.
@@ -24,7 +26,9 @@ public sealed class Canvas : Panel
         Property.RegisterAttached<Canvas, UiNode, double>(
             "Top",
             double.NaN,
-            onChanged: static (node, _, _) => node.InvalidateArrange());
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: IsPositionValid,
+            validationMessage: "Canvas Top must be finite or unspecified.");
 
     /// <summary>
     /// Identifies the attached horizontal position from the right content edge.
@@ -33,7 +37,9 @@ public sealed class Canvas : Panel
         Property.RegisterAttached<Canvas, UiNode, double>(
             "Right",
             double.NaN,
-            onChanged: static (node, _, _) => node.InvalidateArrange());
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: IsPositionValid,
+            validationMessage: "Canvas Right must be finite or unspecified.");
 
     /// <summary>
     /// Identifies the attached vertical position from the bottom content edge.
@@ -42,7 +48,9 @@ public sealed class Canvas : Panel
         Property.RegisterAttached<Canvas, UiNode, double>(
             "Bottom",
             double.NaN,
-            onChanged: static (node, _, _) => node.InvalidateArrange());
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: IsPositionValid,
+            validationMessage: "Canvas Bottom must be finite or unspecified.");
 
     static Canvas()
     {
@@ -71,6 +79,7 @@ public sealed class Canvas : Panel
     /// <param name="node">The node whose position to set.</param>
     /// <param name="value">The horizontal position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
     public static void SetLeft(UiNode node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -95,6 +104,7 @@ public sealed class Canvas : Panel
     /// <param name="node">The node whose position to set.</param>
     /// <param name="value">The vertical position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
     public static void SetTop(UiNode node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -119,6 +129,7 @@ public sealed class Canvas : Panel
     /// <param name="node">The node whose position to set.</param>
     /// <param name="value">The horizontal position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
     public static void SetRight(UiNode node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -143,6 +154,7 @@ public sealed class Canvas : Panel
     /// <param name="node">The node whose position to set.</param>
     /// <param name="value">The vertical position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
     public static void SetBottom(UiNode node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
@@ -175,17 +187,13 @@ public sealed class Canvas : Panel
             contentBounds.Width,
             child.DesiredSize.Width,
             GetLeft(child),
-            GetRight(child),
-            "Left",
-            "Right");
+            GetRight(child));
         var y = ResolveAxis(
             contentBounds.Y,
             contentBounds.Height,
             child.DesiredSize.Height,
             GetTop(child),
-            GetBottom(child),
-            "Top",
-            "Bottom");
+            GetBottom(child));
         return new Rect(x, y, child.DesiredSize);
     }
 
@@ -194,16 +202,12 @@ public sealed class Canvas : Panel
         double extent,
         double childExtent,
         double leading,
-        double trailing,
-        string leadingName,
-        string trailingName)
+        double trailing)
     {
         if (!double.IsNaN(leading))
-            return ResolveLeadingPosition(origin, leading, leadingName);
+            return ResolveLeadingPosition(origin, leading);
         if (double.IsNaN(trailing))
             return origin;
-        if (!double.IsFinite(trailing))
-            throw new InvalidOperationException($"Canvas {trailingName} must be finite or unspecified.");
 
         var result = origin + extent - trailing - childExtent;
         if (!double.IsFinite(result))
@@ -212,15 +216,14 @@ public sealed class Canvas : Panel
         return result;
     }
 
-    private static double ResolveLeadingPosition(double origin, double value, string propertyName)
+    private static double ResolveLeadingPosition(double origin, double value)
     {
-        if (!double.IsFinite(value))
-            throw new InvalidOperationException($"Canvas {propertyName} must be finite or unspecified.");
-
         var result = origin + value;
         if (!double.IsFinite(result))
             throw new InvalidOperationException("Canvas positioning produced a non-finite child slot origin.");
 
         return result;
     }
+
+    private static bool IsPositionValid(double value) => double.IsNaN(value) || double.IsFinite(value);
 }

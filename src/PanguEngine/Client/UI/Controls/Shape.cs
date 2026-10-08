@@ -19,7 +19,9 @@ public abstract partial class Shape : UiNode
     public static readonly Property<Brush?> FillProperty =
         Property.Register<Shape, Brush?>(
             nameof(Fill),
-            new SolidColorBrush(new Color(0, 0, 0)));
+            new SolidColorBrush(new Color(0, 0, 0)),
+            validate: IsShapeBrushSupported,
+            validationMessage: "Shape Fill must be a solid color brush or null.");
 
     /// <summary>
     /// Identifies the <see cref="Stroke"/> property.
@@ -28,7 +30,9 @@ public abstract partial class Shape : UiNode
         Property.Register<Shape, Brush?>(
             nameof(Stroke),
             defaultValue: null,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsShapeBrushSupported,
+            validationMessage: "Shape Stroke must be a solid color brush or null.");
 
     /// <summary>
     /// Identifies the <see cref="StrokeThickness"/> property.
@@ -37,7 +41,9 @@ public abstract partial class Shape : UiNode
         Property.Register<Shape, double>(
             nameof(StrokeThickness),
             1,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "StrokeThickness must be a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="StrokeLineCap"/> property.
@@ -64,7 +70,9 @@ public abstract partial class Shape : UiNode
         Property.Register<Shape, double>(
             nameof(StrokeMiterLimit),
             4,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => double.IsFinite(value) && value >= 1,
+            validationMessage: "StrokeMiterLimit must be a finite value of at least one.");
 
     private ShapeGeometry? _geometry;
     private ShapeGeometryKey _geometryKey;
@@ -79,6 +87,7 @@ public abstract partial class Shape : UiNode
     /// <summary>
     /// Gets or sets the brush used to fill the shape geometry, or null for no fill.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is neither null nor a solid color brush.</exception>
     public Brush? Fill
     {
         get => GetValue(FillProperty);
@@ -88,6 +97,7 @@ public abstract partial class Shape : UiNode
     /// <summary>
     /// Gets or sets the brush used to stroke the shape outline, or null for no stroke.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is neither null nor a solid color brush.</exception>
     public Brush? Stroke
     {
         get => GetValue(StrokeProperty);
@@ -97,6 +107,7 @@ public abstract partial class Shape : UiNode
     /// <summary>
     /// Gets or sets the non-negative stroke width in logical pixels. A width of zero draws no stroke.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double StrokeThickness
     {
         get => GetValue(StrokeThicknessProperty);
@@ -124,6 +135,7 @@ public abstract partial class Shape : UiNode
     /// <summary>
     /// Gets or sets the miter length limit as a multiple of the stroke width. Values below one are rejected.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite or is below one.</exception>
     public double StrokeMiterLimit
     {
         get => GetValue(StrokeMiterLimitProperty);
@@ -131,11 +143,7 @@ public abstract partial class Shape : UiNode
     }
 
     /// <inheritdoc />
-    protected sealed override Size MeasureCore(Size availableSize)
-    {
-        ValidateStrokeParameters();
-        return MeasureShapeCore(availableSize);
-    }
+    protected sealed override Size MeasureCore(Size availableSize) => MeasureShapeCore(availableSize);
 
     /// <inheritdoc />
     protected sealed override bool ContainsCore(Point localPoint)
@@ -149,8 +157,8 @@ public abstract partial class Shape : UiNode
     /// <inheritdoc />
     protected sealed override void DrawCore(UiDrawingContext context)
     {
-        var fillColor = ResolveBrushColor(Fill, nameof(Fill));
-        var strokeColor = ResolveBrushColor(Stroke, nameof(Stroke));
+        var fillColor = ((SolidColorBrush?)Fill)?.Color;
+        var strokeColor = ((SolidColorBrush?)Stroke)?.Color;
         if (fillColor is null && strokeColor is null)
             return;
 
@@ -353,22 +361,7 @@ public abstract partial class Shape : UiNode
     private static double GetAxisScale(double source, double target) =>
         source > 0 ? target / source : 1;
 
-    private static Color? ResolveBrushColor(Brush? brush, string propertyName) =>
-        brush switch
-        {
-            null => null,
-            SolidColorBrush solidColorBrush => solidColorBrush.Color,
-            _ => throw new NotSupportedException(
-                $"Brush type '{brush.GetType().FullName}' is not supported for shape {propertyName}.")
-        };
-
-    private void ValidateStrokeParameters()
-    {
-        if (!double.IsFinite(StrokeThickness) || StrokeThickness < 0)
-            throw new InvalidOperationException("StrokeThickness must be a finite non-negative value.");
-        if (!double.IsFinite(StrokeMiterLimit) || StrokeMiterLimit < 1)
-            throw new InvalidOperationException("StrokeMiterLimit must be a finite value of at least one.");
-    }
+    private static bool IsShapeBrushSupported(Brush? brush) => brush is null or SolidColorBrush;
 
     /// <summary>
     /// Describes every value that affects a shape's generated geometry.

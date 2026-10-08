@@ -22,7 +22,9 @@ public sealed class TextBox : Control
         Property.Register<TextBox, string>(
             nameof(Text),
             string.Empty,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "Text cannot be null.");
 
     /// <summary>
     /// Identifies the <see cref="Placeholder"/> property.
@@ -31,7 +33,9 @@ public sealed class TextBox : Control
         Property.Register<TextBox, string>(
             nameof(Placeholder),
             string.Empty,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "Placeholder cannot be null.");
 
     /// <summary>
     /// Identifies the <see cref="Font"/> property.
@@ -40,7 +44,9 @@ public sealed class TextBox : Control
         Property.Register<TextBox, Font>(
             nameof(Font),
             new Font(string.Empty),
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "Font cannot be null.");
 
     /// <summary>
     /// Identifies the <see cref="FontSize"/> property.
@@ -49,7 +55,9 @@ public sealed class TextBox : Control
         Property.Register<TextBox, double>(
             nameof(FontSize),
             16d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFinitePositive,
+            validationMessage: "FontSize must be positive and finite.");
 
     /// <summary>
     /// Identifies the <see cref="Foreground"/> property.
@@ -239,6 +247,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Gets or sets the plain UTF-16 text value.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
     public string Text
     {
         get => GetValue(TextProperty);
@@ -248,6 +257,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Gets or sets the text displayed while <see cref="Text"/> is empty.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
     public string Placeholder
     {
         get => GetValue(PlaceholderProperty);
@@ -257,6 +267,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Gets or sets the preferred font request.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
     public Font Font
     {
         get => GetValue(FontProperty);
@@ -266,6 +277,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Gets or sets the text size in logical pixels.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
     public double FontSize
     {
         get => GetValue(FontSizeProperty);

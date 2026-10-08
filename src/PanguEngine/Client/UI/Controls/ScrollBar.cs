@@ -69,7 +69,9 @@ public sealed partial class ScrollBar : Control
     public static readonly Property<double> SmallChangeProperty =
         Property.Register<ScrollBar, double>(
             nameof(SmallChange),
-            16d);
+            16d,
+            validate: IsFiniteNonNegative,
+            validationMessage: "SmallChange must be a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="LargeChange"/> property.
@@ -77,7 +79,9 @@ public sealed partial class ScrollBar : Control
     public static readonly Property<double> LargeChangeProperty =
         Property.Register<ScrollBar, double>(
             nameof(LargeChange),
-            100d);
+            100d,
+            validate: IsFiniteNonNegative,
+            validationMessage: "LargeChange must be a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="ShowArrows"/> property.
@@ -102,7 +106,9 @@ public sealed partial class ScrollBar : Control
         Property.Register<ScrollBar, double>(
             nameof(BarThickness),
             16d,
-            onChanged: static (bar, _, _) => bar.InvalidateMeasure());
+            onChanged: static (bar, _, _) => bar.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "BarThickness must be a finite non-negative value.");
 
     /// <summary>
     /// Identifies the <see cref="MinimumThumbLength"/> property.
@@ -111,7 +117,9 @@ public sealed partial class ScrollBar : Control
         Property.Register<ScrollBar, double>(
             nameof(MinimumThumbLength),
             16d,
-            onChanged: static (bar, _, _) => bar.InvalidateMeasure());
+            onChanged: static (bar, _, _) => bar.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "MinimumThumbLength must be a finite non-negative value.");
 
     static ScrollBar()
     {
@@ -127,11 +135,11 @@ public sealed partial class ScrollBar : Control
         UiCssRegistry.RegisterProperty<ScrollBar, double>(
             "bar-thickness",
             BarThicknessProperty,
-            ParseNonNegativeLength);
+            UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<ScrollBar, double>(
             "minimum-thumb-length",
             MinimumThumbLengthProperty,
-            ParseNonNegativeLength);
+            UiCssValueConverters.ParseLength);
     }
 
     private readonly ScrollBarPart _track;
@@ -210,27 +218,21 @@ public sealed partial class ScrollBar : Control
     /// <summary>
     /// Gets or sets the finite non-negative distance moved by one arrow step.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double SmallChange
     {
         get => GetValue(SmallChangeProperty);
-        set
-        {
-            EnsureNonNegative(value, nameof(SmallChange));
-            SetValue(SmallChangeProperty, value);
-        }
+        set => SetValue(SmallChangeProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the finite non-negative distance moved by one track page.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double LargeChange
     {
         get => GetValue(LargeChangeProperty);
-        set
-        {
-            EnsureNonNegative(value, nameof(LargeChange));
-            SetValue(LargeChangeProperty, value);
-        }
+        set => SetValue(LargeChangeProperty, value);
     }
 
     /// <summary>
@@ -254,27 +256,21 @@ public sealed partial class ScrollBar : Control
     /// <summary>
     /// Gets or sets the finite non-negative preferred cross-axis size.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double BarThickness
     {
         get => GetValue(BarThicknessProperty);
-        set
-        {
-            EnsureNonNegative(value, nameof(BarThickness));
-            SetValue(BarThicknessProperty, value);
-        }
+        set => SetValue(BarThicknessProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the finite non-negative minimum thumb length.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
     public double MinimumThumbLength
     {
         get => GetValue(MinimumThumbLengthProperty);
-        set
-        {
-            EnsureNonNegative(value, nameof(MinimumThumbLength));
-            SetValue(MinimumThumbLengthProperty, value);
-        }
+        set => SetValue(MinimumThumbLengthProperty, value);
     }
 
     private void SetMinimum(double value)
@@ -657,16 +653,8 @@ public sealed partial class ScrollBar : Control
 
     private static void EnsureNonNegative(double value, string propertyName)
     {
-        if (!double.IsFinite(value) || value < 0)
+        if (!IsFiniteNonNegative(value))
             throw new ArgumentOutOfRangeException(propertyName, "The value must be finite and non-negative.");
-    }
-
-    private static double ParseNonNegativeLength(string value)
-    {
-        var length = UiCssValueConverters.ParseLength(value);
-        if (length < 0)
-            throw new FormatException($"Value '{value}' must be a finite non-negative length.");
-        return length;
     }
 
     private readonly record struct BarPlan(

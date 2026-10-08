@@ -1,7 +1,7 @@
 namespace PanguEngine.Client.UI.Styling;
 
 /// <summary>
-/// Identifies the category of a CSS syntax or property binding failure.
+/// Identifies the category of a CSS syntax, property binding, or value validation failure.
 /// </summary>
 public enum UiStyleParseError
 {
@@ -17,7 +17,7 @@ public enum UiStyleParseError
     /// <summary>A selector specified more than one id.</summary>
     DuplicateId,
 
-    /// <summary>A declaration value could not be converted or contained an invalid CSS important marker.</summary>
+    /// <summary>A declaration value could not be converted, contained an invalid CSS important marker, or was rejected by a property validator.</summary>
     InvalidValue,
 
     /// <summary>A declaration value was not terminated by a semicolon.</summary>

@@ -38,7 +38,9 @@ public sealed class Path : Shape
         Property.Register<Path, PathStretch>(
             nameof(Stretch),
             PathStretch.Uniform,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is PathStretch.None or PathStretch.Fill or PathStretch.Uniform,
+            validationMessage: "PathStretch has an undefined value.");
 
     static Path()
     {
@@ -76,6 +78,7 @@ public sealed class Path : Shape
     /// <summary>
     /// Gets or sets how the path and its stroke fit the arranged bounds.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is undefined.</exception>
     public PathStretch Stretch
     {
         get => GetValue(StretchProperty);

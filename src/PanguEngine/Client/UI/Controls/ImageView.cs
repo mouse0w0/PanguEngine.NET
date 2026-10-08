@@ -25,7 +25,9 @@ public sealed class ImageView : UiNode
         Property.Register<ImageView, ImageStretch>(
             nameof(Stretch),
             ImageStretch.Uniform,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is ImageStretch.None or ImageStretch.Fill or ImageStretch.Uniform or ImageStretch.UniformToFill,
+            validationMessage: "Image stretch has an undefined value.");
 
     /// <summary>
     /// Identifies the source region property.
@@ -76,6 +78,7 @@ public sealed class ImageView : UiNode
     /// <summary>
     /// Gets or sets how the image is fitted into the arranged bounds.
     /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is undefined.</exception>
     public ImageStretch Stretch
     {
         get => GetValue(StretchProperty);
