@@ -2,110 +2,51 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 
-namespace PanguEngine.Client.Screens;
+namespace PanguEngine.Client.Screens.Showcase;
 
 /// <summary>
-/// Builds the style and cascade showcase examples backed by the showcase CSS assets.
+/// Builds comparable style, cascade and image brush samples.
 /// </summary>
 internal static class UiShowcaseStyles
 {
     /// <summary>
-    /// Creates the style showcase examples.
+    /// Creates the ordered style gallery examples.
     /// </summary>
-    /// <param name="report">Receives a short feedback message for the most recent operation.</param>
-    /// <param name="setOverrides">Switches the optional Author override sheet on or off.</param>
-    /// <returns>The ordered style examples.</returns>
-    internal static UiShowcaseExample[] CreateExamples(Action<string> report, Action<bool> setOverrides) =>
+    /// <returns>The style examples.</returns>
+    internal static UiShowcaseExample[] CreateExamples() =>
     [
-        CreateDefaultStateExample(report),
-        CreateAuthorLocalExample(report, setOverrides),
-        CreateSelectorExample(report),
-        CreateComboStateExample()
+        CreateAuthorLocalExample(),
+        CreateSelectorExample(),
+        CreatePaletteExample(),
+        CreateNineSliceExample()
     ];
 
-    private static UiShowcaseExample CreateDefaultStateExample(Action<string> report)
+    private static UiShowcaseExample CreateAuthorLocalExample()
     {
-        var target = new Button { StyleId = "showcase-state-target", Text = "状态目标" };
-        var editor = new TextBox { StyleId = "showcase-state-textbox", Placeholder = "悬停或点击聚焦", Width = 280 };
-        var status = UiShowcaseWidgets.Label("当前: 可用", "showcase-state-value");
-        var toggle = UiShowcaseWidgets.ActionButton("showcase-state-toggle-enabled", "切换禁用", () =>
-        {
-            target.IsEnabled = !target.IsEnabled;
-            editor.IsEnabled = target.IsEnabled;
-            status.Content = target.IsEnabled ? "当前: 可用" : "当前: 已禁用";
-            report(target.IsEnabled ? "已启用状态目标" : "已禁用状态目标");
-        });
-
-        var content = UiShowcaseWidgets.Column(
-            UiShowcaseWidgets.Row(target, toggle),
-            editor,
-            status);
-        return new UiShowcaseExample(
-            "默认外观与交互状态",
-            "悬停、聚焦或禁用按钮与文本框，按住按钮观察按下样式。",
-            content);
-    }
-
-    private static UiShowcaseExample CreateAuthorLocalExample(Action<string> report, Action<bool> setOverrides)
-    {
-        var target = new Button { StyleId = "showcase-author-target", Text = "覆盖目标" };
-        target.Classes.Add("showcase-author-target");
-        var value = UiShowcaseWidgets.Label("有效背景: -", "showcase-author-value");
-        var source = UiShowcaseWidgets.Label("来源: -", "showcase-author-source");
-        var overridesEnabled = false;
-
-        void Refresh()
-        {
-            value.Content = $"有效背景: {FormatBrush(target.Background)}";
-            var styleSource = target.GetStyleValueSources(Region.BackgroundProperty).SingleOrDefault();
-            source.Content = styleSource is null
-                ? "来源: 无"
-                : $"来源: {styleSource.Origin}[{styleSource.SheetIndex}] {styleSource.SelectorText} 遮蔽:{(styleSource.IsMaskedByLocalValue ? "是" : "否")}";
-        }
-
-        target.PropertyChanged += (_, eventArgs) =>
-        {
-            if (ReferenceEquals(eventArgs.Property, Region.BackgroundProperty))
-                Refresh();
-        };
-
-        var toggle = UiShowcaseWidgets.ActionButton("showcase-author-toggle-overrides", "切换 Author 覆盖", () =>
-        {
-            overridesEnabled = !overridesEnabled;
-            setOverrides(overridesEnabled);
-            Refresh();
-            report(overridesEnabled ? "已启用 Author 覆盖" : "已恢复基础 Author 样式");
-        });
-        var setLocal = UiShowcaseWidgets.ActionButton("showcase-author-set-local", "设置本地背景", () =>
-        {
-            target.SetValue(Region.BackgroundProperty, new SolidColorBrush(0x3F, 0x8F, 0x4F));
-            Refresh();
-            report("已设置本地背景");
-        });
-        var clearLocal = UiShowcaseWidgets.ActionButton("showcase-author-clear-local", "清除本地背景", () =>
-        {
-            target.ClearValue(Region.BackgroundProperty);
-            Refresh();
-            report("已清除本地背景");
-        });
-
-        Refresh();
-
-        var content = UiShowcaseWidgets.Column(
-            target,
-            UiShowcaseWidgets.Row(toggle, setLocal, clearLocal),
-            value,
-            source);
+        var basis = AuthorButton("showcase-author-target", "基础样式");
+        var overridden = AuthorButton("showcase-author-override", "覆盖样式");
+        overridden.Classes.Add("showcase-author-override");
+        var local = AuthorButton("showcase-author-local", "本地值");
+        local.SetValue(Region.BackgroundProperty, new SolidColorBrush(0x3F, 0x8F, 0x4F));
         return new UiShowcaseExample(
             "Author 覆盖与本地值",
-            "切换 Author 覆盖，设置或清除本地背景，观察有效值与来源变化。",
-            content);
+            "基础规则、额外样式表与控件本地值的结果同时展示。",
+            UiShowcaseWidgets.Samples(
+                UiShowcaseWidgets.Sample("基础规则", basis),
+                UiShowcaseWidgets.Sample("额外规则覆盖", overridden),
+                UiShowcaseWidgets.Sample("本地值优先", local)));
     }
 
-    private static UiShowcaseExample CreateSelectorExample(Action<string> report)
+    private static Button AuthorButton(string id, string text)
+    {
+        var button = new Button { StyleId = id, Text = text };
+        button.Classes.Add("showcase-author-target");
+        return button;
+    }
+
+    private static UiShowcaseExample CreateSelectorExample()
     {
         var plain = new Button { StyleId = "showcase-selector-plain", Text = "默认" };
-        plain.Classes.Add("showcase-plain");
         var typed = new Button { StyleId = "showcase-selector-typed", Text = "类型" };
         typed.Classes.Add("showcase-typed");
         var classOnly = new Button { StyleId = "showcase-selector-classonly", Text = "类" };
@@ -113,79 +54,101 @@ internal static class UiShowcaseStyles
         var idTarget = new Button { StyleId = "showcase-id-target", Text = "id" };
         var wildcard = new Button { StyleId = "showcase-selector-wildcard", Text = "通配" };
         wildcard.Classes.Add("showcase-wildcard");
-        var status = UiShowcaseWidgets.Label(string.Empty, "showcase-selector-report");
-
-        void Refresh()
-        {
-            var targets = new[] { plain, typed, classOnly, idTarget, wildcard };
-            status.Content = string.Join("\n", targets.Select(node =>
-                $"{node.Text}: {node.GetStyleValueSources(Region.BackgroundProperty).SingleOrDefault()?.SelectorText ?? "无"}"));
-        }
-
-        foreach (var node in new[] { plain, typed, classOnly, idTarget, wildcard })
-            node.PropertyChanged += (_, args) =>
-            {
-                if (ReferenceEquals(args.Property, Region.BackgroundProperty))
-                    Refresh();
-            };
-        Refresh();
-
-        var toggleTyped = UiShowcaseWidgets.ActionButton("showcase-selector-toggle-typed", "切换类型 class", () =>
-        {
-            if (!typed.Classes.Remove("showcase-typed"))
-                typed.Classes.Add("showcase-typed");
-            Refresh();
-            report("已切换类型 class");
-        });
-        var toggleWildcard = UiShowcaseWidgets.ActionButton("showcase-selector-toggle-wildcard", "切换通配 class", () =>
-        {
-            if (!wildcard.Classes.Remove("showcase-wildcard"))
-                wildcard.Classes.Add("showcase-wildcard");
-            Refresh();
-            report("已切换通配 class");
-        });
-
-        var content = UiShowcaseWidgets.Column(
-            UiShowcaseWidgets.Row(plain, typed, classOnly, idTarget, wildcard),
-            UiShowcaseWidgets.Row(toggleTyped, toggleWildcard),
-            status);
         return new UiShowcaseExample(
             "class、id 与通配选择器",
-            "切换目标 class，比较具名类型、无类型 class、id 与通配规则的匹配。",
-            content);
+            "不同规则作用于独立样本，可直接比较匹配结果。",
+            UiShowcaseWidgets.Samples(
+                UiShowcaseWidgets.Sample("默认类型", plain),
+                UiShowcaseWidgets.Sample("类型 + class", typed),
+                UiShowcaseWidgets.Sample("class", classOnly),
+                UiShowcaseWidgets.Sample("id", idTarget),
+                UiShowcaseWidgets.Sample("通配 + class", wildcard)));
     }
 
-    private static UiShowcaseExample CreateComboStateExample()
+    internal static UiShowcaseExample CreateComboStateExample()
     {
-        var target = new Button { StyleId = "showcase-combo-target", Text = "组合目标" };
-        target.Classes.Add("showcase-combo");
-        var source = UiShowcaseWidgets.Label("来源: -", "showcase-combo-source");
-
-        void Refresh()
-        {
-            var styleSource = target.GetStyleValueSources(Region.BackgroundProperty).SingleOrDefault();
-            source.Content = styleSource is null
-                ? "来源: 无"
-                : $"来源: {styleSource.SelectorText}";
-        }
-
-        target.PropertyChanged += (_, eventArgs) =>
-        {
-            if (ReferenceEquals(eventArgs.Property, Region.BackgroundProperty))
-                Refresh();
-        };
-
-        Refresh();
-
-        var content = UiShowcaseWidgets.Column(target, source);
+        var button = new Button { StyleId = "showcase-combo-target", Text = "悬停并点击聚焦" };
+        button.Classes.Add("showcase-combo");
         return new UiShowcaseExample(
             "状态组合伪类",
-            "让按钮同时处于悬停与焦点，观察 :hover:focus 组合规则，条件消失后恢复。",
-            content);
+            "同时悬停与聚焦时显示强调色，移开鼠标后恢复。",
+            UiShowcaseWidgets.Preview(button));
     }
 
-    private static string FormatBrush(Brush? brush) =>
-        brush is SolidColorBrush solid
-            ? $"#{solid.Color.R:X2}{solid.Color.G:X2}{solid.Color.B:X2}"
-            : "无";
+    private static UiShowcaseExample CreatePaletteExample()
+    {
+        var palette = new[]
+        {
+            ("强调蓝", new Color(79, 141, 245)),
+            ("成功绿", new Color(63, 143, 79)),
+            ("提示黄", new Color(255, 180, 84)),
+            ("危险红", new Color(157, 73, 77)),
+            ("卡片背景", new Color(26, 32, 43)),
+            ("边框", new Color(47, 57, 73))
+        };
+        return new UiShowcaseExample(
+            "配色与表面",
+            "统一强调色、语义色与深色表面层次。",
+            UiShowcaseWidgets.Samples(palette.Select(entry => UiShowcaseWidgets.Sample(entry.Item1,
+                UiShowcaseWidgets.Column(
+                    new Panel { Height = 36, Background = new SolidColorBrush(entry.Item2) },
+                    UiShowcaseWidgets.Caption($"#{entry.Item2.R:X2}{entry.Item2.G:X2}{entry.Item2.B:X2}")))).ToArray()));
+    }
+
+    internal static UiShowcaseExample CreateTypographyExample()
+    {
+        var heading = UiShowcaseWidgets.Label("页面标题 · Heading");
+        heading.Classes.Add("showcase-type-heading");
+        var section = UiShowcaseWidgets.Label("分组标题 · Section");
+        section.Classes.Add("showcase-type-section");
+        var body = UiShowcaseWidgets.Label("正文用于说明内容和引导操作，保持清晰的阅读层次。");
+        body.Classes.Add("showcase-type-body");
+        return new UiShowcaseExample(
+            "文本",
+            "标题、正文和辅助信息使用不同字号与颜色。",
+            UiShowcaseWidgets.Preview(heading, section, body, UiShowcaseWidgets.Caption("辅助说明 · Caption · 0123456789")));
+    }
+
+    private static UiShowcaseExample CreateNineSliceExample()
+    {
+        var source = CreateFrameImage();
+        var brush = new NineSliceImageBrush(source, new ImageSlice(4));
+        var small = new Panel { StyleId = "showcase-nine-slice-small", Width = 72, Height = 48, Background = brush };
+        var wide = new Panel { StyleId = "showcase-nine-slice-wide", MaxWidth = 180, Height = 48, Background = brush };
+        var tall = new Panel { StyleId = "showcase-nine-slice-tall", Width = 80, Height = 100, Background = brush };
+        return new UiShowcaseExample(
+            "九宫格图像画刷",
+            "蓝色角部固定，绿色横边与紫色竖边随尺寸拉伸，中心填充剩余空间。",
+            UiShowcaseWidgets.Column(
+                UiShowcaseWidgets.Sample("原图（放大）", new ImageView { Source = source, Stretch = ImageStretch.Fill, Width = 64, Height = 64 }),
+                UiShowcaseWidgets.Samples(
+                    UiShowcaseWidgets.Sample("小尺寸", small),
+                    UiShowcaseWidgets.Sample("横向拉伸", wide),
+                    UiShowcaseWidgets.Sample("纵向拉伸", tall))));
+    }
+
+    private static UiImage CreateFrameImage()
+    {
+        const int size = 16;
+        var pixels = new byte[size * size * 4];
+        for (var y = 0; y < size; y++)
+        for (var x = 0; x < size; x++)
+        {
+            var horizontalEdge = y < 4 || y >= 12;
+            var verticalEdge = x < 4 || x >= 12;
+            var color = (horizontalEdge, verticalEdge) switch
+            {
+                (true, true) => new Color(79, 141, 245),
+                (true, false) => new Color(63, 143, 79),
+                (false, true) => new Color(139, 107, 191),
+                _ => new Color(26, 32, 43)
+            };
+            var offset = (y * size + x) * 4;
+            pixels[offset] = color.R;
+            pixels[offset + 1] = color.G;
+            pixels[offset + 2] = color.B;
+            pixels[offset + 3] = color.A;
+        }
+        return UiImage.FromRgba(pixels, size, size);
+    }
 }

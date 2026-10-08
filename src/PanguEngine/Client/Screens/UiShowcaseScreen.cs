@@ -1,45 +1,31 @@
 using System.Globalization;
+using PanguEngine.Client.Screens.Showcase;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.Screens;
 
 /// <summary>
-/// Hosts the interactive UI showcase with four categories and one visible example at a time.
+/// Hosts component tabs with comparable UI controls, styles, bindings and layouts.
 /// </summary>
 internal sealed class UiShowcaseScreen : GameScreen
 {
-    private readonly UiStyleSheet _sheet;
-    private readonly UiStyleSheet _overrides;
     private readonly Action _returnToPause;
     private readonly UiShowcaseShell _shell;
-    private readonly UiShowcaseExample[] _controls;
-    private readonly UiShowcaseExample[] _styles;
-    private readonly UiShowcaseExample[] _bindings;
-    private readonly UiShowcaseExample[] _layout;
-    private readonly UiShowcaseExample[][] _categories;
 
-    private int _categoryIndex;
-    private bool _overridesEnabled;
     private double _openingScale;
 
     internal UiShowcaseScreen(UiStyleSheet sheet, UiStyleSheet overrides, Action returnToPause)
     {
-        _sheet = sheet;
-        _overrides = overrides;
         _returnToPause = returnToPause;
 
         _shell = new UiShowcaseShell();
-        SetStyleSheets(new[] { sheet });
-
-        _controls = UiShowcaseControls.CreateExamples(Report);
-        _styles = UiShowcaseStyles.CreateExamples(Report, SetOverrides);
-        _bindings = UiShowcaseBindings.CreateExamples(Report);
-        _layout = UiShowcaseLayout.CreateExamples(Report);
-        _categories = [_controls, _styles, _bindings, _layout];
-        _shell.SetExamples(_categories);
-        _shell.CategoryTabs.SelectionChanged += (_, args) => _categoryIndex = args.NewIndex;
+        SetStyleSheets([sheet, overrides]);
+        _shell.SetPages([
+            .. UiShowcaseControls.CreateExamples(Report),
+            new UiShowcaseExample("样式", "比较规则、配色和图像画刷。", UiShowcaseWidgets.Examples(UiShowcaseStyles.CreateExamples())),
+            new UiShowcaseExample("绑定", "直接编辑输入，体验数据同步。", UiShowcaseWidgets.Examples(UiShowcaseBindings.CreateExamples(Report))),
+            new UiShowcaseExample("布局", "并列比较对齐、排列、位置与可见性。", UiShowcaseWidgets.Examples(UiShowcaseLayout.CreateExamples()))]);
 
         PausesGame = true;
         CloseOnEscape = true;
@@ -51,37 +37,10 @@ internal sealed class UiShowcaseScreen : GameScreen
         _shell.RestoreScaleButton.Click += (_, _) => SetScaleFactor(1);
 
         Root = _shell;
-        SelectCategory(0);
         UpdateScaleDisplay();
     }
 
     internal UiShowcaseShell Shell => _shell;
-
-    internal int CurrentCategory => _categoryIndex;
-
-    internal int CurrentExampleIndex => _shell.ExampleTabs[_categoryIndex].Selection.SelectedIndex;
-
-    internal UiShowcaseExample CurrentExample =>
-        ExamplesFor(_categoryIndex)[CurrentExampleIndex];
-
-    internal void SelectCategory(int index)
-    {
-        _shell.CategoryTabs.Selection.SelectedIndex = index;
-    }
-
-    internal void SelectExample(int index)
-    {
-        _shell.ExampleTabs[_categoryIndex].Selection.SelectedIndex = index;
-    }
-
-    internal void SetOverrides(bool enabled)
-    {
-        if (_overridesEnabled == enabled)
-            return;
-
-        _overridesEnabled = enabled;
-        SetStyleSheets(enabled ? new[] { _sheet, _overrides } : new[] { _sheet });
-    }
 
     internal void SetScaleFactor(double factor)
     {
@@ -118,16 +77,6 @@ internal sealed class UiShowcaseScreen : GameScreen
     }
 
     private void Report(string message) => _shell.SetFeedback(message);
-
-    private UiShowcaseExample[] ExamplesFor(int category) =>
-        category switch
-        {
-            0 => _controls,
-            1 => _styles,
-            2 => _bindings,
-            3 => _layout,
-            _ => throw new ArgumentOutOfRangeException(nameof(category))
-        };
 
     private void UpdateScaleDisplay() =>
         _shell.SetScaleValue(string.Create(CultureInfo.InvariantCulture, $"缩放 {Scale:0.##}x"));

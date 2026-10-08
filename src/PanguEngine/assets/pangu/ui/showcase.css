@@ -2,37 +2,83 @@
     padding: 16px;
 }
 
-#showcase-category-tabs,
-#showcase-example-tabs {
+#showcase-component-tabs {
     padding: 8px;
-}
-
-#showcase-example-tabs {
-    padding: 0 8px;
-}
-
-#showcase-category-tabs {
     vertical-tab-strip-width: 120px;
+    background-color: transparent;
 }
 
-Text.showcase-nav-header,
-Text.showcase-example-tab-header {
-    color: #d7dde5;
+#showcase-component-tabs > .tab-strip,
+#showcase-component-tabs > .tab-content-area,
+#showcase-component-tabs > .tab-content-area > .tab-content-host {
+    background-color: transparent;
 }
 
-TabItem.showcase-nav:selected Text.showcase-nav-header,
-TabItem.showcase-example-switch:selected Text.showcase-example-tab-header {
+TabItem.showcase-nav {
+    padding: 5px 10px;
+    min-height: 36px;
+    background-color: #151b25;
+    border-color: #252f3f;
+}
+
+TabItem.showcase-nav:hover {
+    background-color: #202c3d;
+}
+
+TabItem.showcase-nav:selected {
+    background-color: #243b5f;
+    border-color: #4f8df5;
+}
+
+Text.showcase-nav-header {
+    font-size: 15px;
+    color: #a9b6ca;
+}
+
+TabItem.showcase-nav:selected Text.showcase-nav-header {
     color: #ffffff;
 }
 
-Text.showcase-heading {
-    font-size: 20px;
-    color: #f2f4f7;
+ScrollView.showcase-gallery-view {
+    background-color: transparent;
+    border-thickness: 0px;
 }
 
+.showcase-example-page {
+    background-color: #1a202b;
+    border-color: #2f3949;
+    border-thickness: 1px;
+}
+
+.showcase-preview {
+    background-color: #11161f;
+    border-color: #252f3f;
+    border-thickness: 1px;
+}
+
+Text.showcase-heading,
+Text.showcase-type-heading {
+    font-size: 26px;
+    color: #f2f5fc;
+}
+
+Text.showcase-example-title,
+Text.showcase-type-section {
+    font-size: 19px;
+    color: #e8eef9;
+}
+
+Text.showcase-type-body {
+    font-size: 16px;
+    color: #ccd7e8;
+}
+
+Text.showcase-example-instructions,
+Text.showcase-caption,
+Text.showcase-hint,
 Text.showcase-feedback {
     font-size: 13px;
-    color: #b8c0cb;
+    color: #93a3bc;
 }
 
 Text.showcase-warning {
@@ -40,13 +86,83 @@ Text.showcase-warning {
     color: #ffb454;
 }
 
-/* Style example: Author override and local value target. */
+.showcase-shell.showcase-compact {
+    padding: 10px;
+}
+
+.showcase-compact Text.showcase-heading {
+    font-size: 20px;
+}
+
+.showcase-compact TabItem.showcase-nav {
+    padding: 4px 8px;
+    min-height: 30px;
+}
+
+.showcase-compact Text.showcase-nav-header,
+.showcase-compact Text.showcase-warning {
+    font-size: 12px;
+}
+
+.showcase-example-page TextBox {
+    min-width: 0px;
+}
+
+Button.showcase-primary {
+    background-color: #356fd4;
+    border-color: #4f8df5;
+    foreground: #ffffff;
+}
+
+Button.showcase-primary:hover {
+    background-color: #447fe2;
+}
+
+Button.showcase-primary:pressed {
+    background-color: #285bb5;
+}
+
+Button.showcase-primary:focus {
+    border-color: #a5c7ff;
+}
+
+Button.showcase-primary:disabled {
+    background-color: #25364d;
+    border-color: #3b4b63;
+    foreground: #7d8da6;
+}
+
+Button.showcase-outline {
+    background-color: transparent;
+    border-color: #4f8df5;
+    foreground: #94bbff;
+}
+
+Button.showcase-outline:hover {
+    background-color: #1e3250;
+}
+
+Button.showcase-outline:pressed {
+    background-color: #172740;
+}
+
+Button.showcase-outline:focus {
+    border-color: #a5c7ff;
+}
+
+Button.showcase-outline:disabled {
+    background-color: transparent;
+    border-color: #3b4b63;
+    foreground: #7d8da6;
+}
+
+/* Style example: Author rules shared by the three comparison samples. */
 .showcase-author-target {
     background-color: #2f5b7a;
     border-color: #6fa8dc;
 }
 
-/* Style example: selector kinds. The default target keeps the base Button rule. */
+/* Style example: selector kinds. */
 Button.showcase-typed {
     background-color: #2b4a6f;
     border-color: #6fa8dc;
@@ -67,7 +183,6 @@ Button.showcase-typed {
     border-color: #7fc08f;
 }
 
-/* Style example: combined pseudo classes. */
 Button.showcase-combo {
     background-color: #3a3f47;
     border-color: #6b7480;
@@ -78,7 +193,14 @@ Button.showcase-combo:hover:focus {
     border-color: #ffd479;
 }
 
-StackPanel.showcase-tabs-demo {
+.showcase-layout-host {
+    background-color: #11161f;
+    border-color: #2f3949;
+    border-thickness: 1px;
+}
+
+StackPanel.showcase-tabs-demo,
+StackPanel.showcase-tabs-content {
     spacing: 8px;
 }
 
@@ -96,7 +218,6 @@ TabView.showcase-tabs-view {
 
 StackPanel.showcase-tabs-content {
     padding: 12px;
-    spacing: 8px;
 }
 
 Text.showcase-tabs-header {
@@ -110,68 +231,35 @@ Text.showcase-tabs-title {
 
 Text.showcase-tabs-diagnostic {
     font-size: 13px;
-    color: #b8c0cb;
+    color: #93a3bc;
     wrapping: wrap;
 }
 
 ScrollBar.showcase-scroll-horizontal {
-    width: 280px;
     height: 18px;
 }
 
 ScrollBar.showcase-scroll-vertical {
     width: 18px;
-    height: 144px;
-}
-
-StackPanel.showcase-scroll-bar-demo {
-    max-width: 280px;
+    height: 112px;
 }
 
 ScrollView.showcase-scroll-view {
     height: 144px;
-    max-width: 720px;
-}
-
-.showcase-scroll-actions Button {
-    padding: 5px 8px;
-}
-
-Text.showcase-scroll-diagnostic {
-    font-size: 13px;
-    color: #b8c0cb;
-}
-
-StackPanel.showcase-scroll-content {
-    width: 900px;
-    padding: 10px;
+    border-color: #2f3949;
 }
 
 StackPanel.showcase-scroll-row {
-    height: 36px;
+    height: 32px;
     padding: 6px 8px;
-    background-color: #252b34;
+    background-color: #202938;
 }
 
 StackPanel.showcase-scroll-row-alternate {
-    background-color: #303845;
+    background-color: #283448;
 }
 
 .showcase-scroll-row Text {
-    font-size: 14px;
-}
-
-Text.showcase-scroll-number {
-    width: 72px;
-    color: #8ebce8;
-}
-
-Text.showcase-scroll-message {
-    width: 660px;
-}
-
-Text.showcase-scroll-marker {
-    width: 100px;
-    color: #ffd479;
-    text-alignment: right;
+    font-size: 13px;
+    color: #ccd7e8;
 }

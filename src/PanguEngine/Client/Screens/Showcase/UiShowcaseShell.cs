@@ -3,10 +3,10 @@ using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Graphics.Text;
 
-namespace PanguEngine.Client.Screens;
+namespace PanguEngine.Client.Screens.Showcase;
 
 /// <summary>
-/// Provides the private layout and visual structure of the UI showcase page.
+/// Provides component navigation and a scrollable page with persistent controls.
 /// </summary>
 internal sealed class UiShowcaseShell : Region
 {
@@ -14,18 +14,11 @@ internal sealed class UiShowcaseShell : Region
     internal const double CompactHeightThreshold = 460;
     internal const double FullWidthThreshold = 800;
     internal const double FullHeightThreshold = 600;
-
     private const double Gap = 10;
 
-    private static readonly string[] CategoryLabels = ["基础控件", "样式", "绑定", "布局"];
-    private static readonly string[] CompactCategoryLabels = ["控件", "样式", "绑定", "布局"];
-
-    private readonly Text _heading;
     private readonly Text _escapeHint;
     private readonly StackPanel _header;
-    private readonly TabView _categoryTabs;
-    private Text[] _categoryHeaders = [];
-    private readonly List<TabView> _exampleTabs = [];
+    private readonly TabView _pageTabs;
     private readonly Text _feedback;
     private readonly Text _warning;
     private readonly StackPanel _scaleRow;
@@ -35,7 +28,6 @@ internal sealed class UiShowcaseShell : Region
     private readonly Button _scaleUp;
     private readonly Button _restoreScale;
     private readonly Button _returnButton;
-
     private bool _isCompact;
     private bool _showWarning;
 
@@ -44,55 +36,31 @@ internal sealed class UiShowcaseShell : Region
         Classes.Add("showcase-shell");
         ClipToBounds = true;
         Background = new SolidColorBrush(12, 14, 18);
-
-        _heading = CreateClassedText("UI Showcase", "showcase-heading");
-        _escapeHint = CreateClassedText("Esc：回到游戏", "showcase-hint");
-        _header = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = 12,
-            StyleId = "showcase-header"
-        };
-        _header.Children.Add(_heading);
-        _header.Children.Add(_escapeHint);
-
-        _categoryTabs = new TabView
+        _escapeHint = CreateClassedText("选择组件，直接体验控件 · Esc 回到游戏", "showcase-hint");
+        _header = UiShowcaseWidgets.Column(CreateClassedText("UI 控件展示", "showcase-heading"), _escapeHint);
+        _header.Spacing = 4;
+        _pageTabs = new TabView
         {
             TabStripPlacement = TabStripPlacement.Left,
-            StyleId = "showcase-category-tabs",
+            StyleId = "showcase-component-tabs",
             CanReorderTabs = false
         };
-
-        _feedback = CreateClassedText(string.Empty, "showcase-feedback");
-        _warning = CreateClassedText("窗口较小，请放大窗口或恢复缩放", "showcase-warning");
+        _feedback = CreateClassedText("悬停、点击、输入或滚动，体验真实交互。", "showcase-feedback");
+        _warning = CreateClassedText("窗口较小，可缩小 UI 或放大窗口", "showcase-warning");
         _warning.Visibility = Visibility.Collapsed;
-
         _scaleDown = CreateScaleButton("0.75x", "showcase-scale-down");
         _scaleReset = CreateScaleButton("1x", "showcase-scale-reset");
         _scaleUp = CreateScaleButton("1.25x", "showcase-scale-up");
         _restoreScale = CreateScaleButton("恢复", "showcase-scale-restore");
         _scaleValue = UiShowcaseWidgets.Label(string.Empty, "showcase-scale-value");
-        _scaleRow = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Spacing = Gap,
-            StyleId = "showcase-scale"
-        };
+        _scaleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Gap };
         _scaleRow.Children.Add(_scaleDown);
         _scaleRow.Children.Add(_scaleReset);
         _scaleRow.Children.Add(_scaleUp);
         _scaleRow.Children.Add(_restoreScale);
-
-        _returnButton = new Button
-        {
-            Text = "返回暂停菜单",
-            MinHeight = 36,
-            StyleId = "showcase-return"
-        };
-        _returnButton.Classes.Add("showcase-return");
-
+        _returnButton = new Button { Text = "返回暂停菜单", MinHeight = 36, StyleId = "showcase-return" };
         Children.Add(_header);
-        Children.Add(_categoryTabs);
+        Children.Add(_pageTabs);
         Children.Add(_feedback);
         Children.Add(_warning);
         Children.Add(_scaleRow);
@@ -100,73 +68,37 @@ internal sealed class UiShowcaseShell : Region
         Children.Add(_returnButton);
     }
 
-    internal TabView CategoryTabs => _categoryTabs;
-
+    internal TabView PageTabs => _pageTabs;
     internal IReadOnlyList<Button> ScaleButtons => new[] { _scaleDown, _scaleReset, _scaleUp, _restoreScale };
-
     internal Button ScaleDownButton => _scaleDown;
-
     internal Button ScaleResetButton => _scaleReset;
-
     internal Button ScaleUpButton => _scaleUp;
-
     internal Button RestoreScaleButton => _restoreScale;
-
     internal Button ReturnButton => _returnButton;
-
-    internal IReadOnlyList<TabView> ExampleTabs => _exampleTabs;
-
     internal bool IsCompact => _isCompact;
-
     internal bool ShowWarning => _showWarning;
 
-    internal void SetExamples(IReadOnlyList<UiShowcaseExample[]> categories)
+    internal void SetPages(IReadOnlyList<UiShowcaseExample> pages)
     {
-        _categoryTabs.Items.Clear();
-        _exampleTabs.Clear();
-        _categoryHeaders = new Text[categories.Count];
-
-        for (var categoryIndex = 0; categoryIndex < categories.Count; categoryIndex++)
+        _pageTabs.Items.Clear();
+        foreach (var page in pages)
         {
-            var categoryHeader = CreateTabHeader(CategoryLabels[categoryIndex], "showcase-nav-header");
-            var exampleTabs = new TabView
+            var header = new Text { Content = page.Title, Wrapping = TextWrapping.NoWrap };
+            header.Classes.Add("showcase-nav-header");
+            var view = new ScrollView
             {
-                TabStripPlacement = TabStripPlacement.Top,
-                StyleId = "showcase-example-tabs",
-                CanReorderTabs = false
+                Content = UiShowcaseWidgets.ExampleCard(page),
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                ShowArrows = false
             };
-            foreach (var example in categories[categoryIndex])
-            {
-                var exampleHeader = CreateTabHeader(example.Title, "showcase-example-tab-header");
-                var exampleItem = new TabItem
-                {
-                    Header = exampleHeader,
-                    Content = CreateExamplePage(example)
-                };
-                exampleItem.Classes.Add("showcase-example-switch");
-                exampleTabs.Items.Add(exampleItem);
-            }
-
-            var categoryItem = new TabItem
-            {
-                Header = categoryHeader,
-                Content = exampleTabs
-            };
-            categoryItem.Classes.Add("showcase-nav");
-            _categoryHeaders[categoryIndex] = categoryHeader;
-            _exampleTabs.Add(exampleTabs);
-            _categoryTabs.Items.Add(categoryItem);
+            view.Classes.Add("showcase-gallery-view");
+            var item = new TabItem { Header = header, Content = view };
+            item.Classes.Add("showcase-nav");
+            _pageTabs.Items.Add(item);
         }
     }
 
     internal void SetFeedback(string message) => _feedback.Content = message;
-
-    internal void SetCategoryLabels(bool compact)
-    {
-        for (var index = 0; index < _categoryHeaders.Length; index++)
-            _categoryHeaders[index].Content = compact ? CompactCategoryLabels[index] : CategoryLabels[index];
-    }
-
     internal void SetScaleValue(string text) => _scaleValue.Content = text;
 
     internal void ApplyViewportMode(Size viewport)
@@ -176,11 +108,23 @@ internal sealed class UiShowcaseShell : Region
         if (compact != _isCompact)
         {
             _isCompact = compact;
-            SetCategoryLabels(compact);
-
+            var supplementalVisibility = compact ? Visibility.Collapsed : Visibility.Visible;
+            _escapeHint.Visibility = supplementalVisibility;
+            _feedback.Visibility = supplementalVisibility;
+            _scaleValue.Visibility = supplementalVisibility;
+            _restoreScale.Visibility = supplementalVisibility;
+            if (compact)
+            {
+                Classes.Add("showcase-compact");
+                _pageTabs.VerticalTabStripWidth = 76;
+            }
+            else
+            {
+                Classes.Remove("showcase-compact");
+                _pageTabs.ClearValue(TabView.VerticalTabStripWidthProperty);
+            }
             InvalidateMeasure();
         }
-
         if (warning != _showWarning)
         {
             _showWarning = warning;
@@ -192,42 +136,22 @@ internal sealed class UiShowcaseShell : Region
     protected override Size MeasureContent(Size availableSize)
     {
         var width = availableSize.Width;
-        _header.Measure(new Size(width, double.PositiveInfinity));
-        _feedback.Measure(new Size(width, double.PositiveInfinity));
-        _warning.Measure(new Size(width, double.PositiveInfinity));
-        _scaleRow.Measure(new Size(width, double.PositiveInfinity));
-        _scaleValue.Measure(new Size(width, double.PositiveInfinity));
-        _returnButton.Measure(new Size(_isCompact ? width : double.PositiveInfinity, double.PositiveInfinity));
-
+        foreach (var node in new UiNode[] { _header, _feedback, _warning, _scaleRow, _scaleValue, _returnButton })
+            node.Measure(new Size(width, double.PositiveInfinity));
         var footerHeight = _isCompact
-            ? _returnButton.DesiredSize.Height + _scaleRow.DesiredSize.Height
+            ? _returnButton.DesiredSize.Height + Gap + _scaleRow.DesiredSize.Height
             : Math.Max(_returnButton.DesiredSize.Height, _scaleRow.DesiredSize.Height);
-        var reservedHeight = _header.DesiredSize.Height + footerHeight +
-            _scaleValue.DesiredSize.Height + (_showWarning ? _warning.DesiredSize.Height : 0) +
-            _feedback.DesiredSize.Height + Gap * (_isCompact ? 7 : 5);
-        var categoryHeight = double.IsPositiveInfinity(availableSize.Height)
+        var informationHeight = _showWarning ? _warning.DesiredSize.Height + Gap : 0;
+        if (!_isCompact)
+            informationHeight += _feedback.DesiredSize.Height + _scaleValue.DesiredSize.Height + Gap * 2;
+        var reservedHeight = _header.DesiredSize.Height + footerHeight + informationHeight + Gap * 2;
+        var pageHeight = double.IsPositiveInfinity(availableSize.Height)
             ? double.PositiveInfinity
             : Math.Max(0, availableSize.Height - reservedHeight);
-        _categoryTabs.Measure(new Size(width, categoryHeight));
-
-        if (double.IsFinite(width) && double.IsFinite(availableSize.Height))
-            return availableSize;
-
-        var fallbackWidth = double.IsFinite(width)
-            ? width
-            : Math.Max(
-                _header.DesiredSize.Width,
-                Math.Max(_categoryTabs.DesiredSize.Width, _scaleRow.DesiredSize.Width));
+        _pageTabs.Measure(new Size(width, pageHeight));
         return new Size(
-            fallbackWidth,
-            _header.DesiredSize.Height +
-             _categoryTabs.DesiredSize.Height +
-            _feedback.DesiredSize.Height +
-            _warning.DesiredSize.Height +
-            _scaleRow.DesiredSize.Height +
-            _scaleValue.DesiredSize.Height +
-            _returnButton.DesiredSize.Height +
-            Gap * 7);
+            double.IsFinite(width) ? width : Math.Max(_header.DesiredSize.Width, Math.Max(_pageTabs.DesiredSize.Width, _scaleRow.DesiredSize.Width)),
+            double.IsFinite(availableSize.Height) ? availableSize.Height : _pageTabs.DesiredSize.Height + reservedHeight);
     }
 
     /// <inheritdoc />
@@ -237,50 +161,44 @@ internal sealed class UiShowcaseShell : Region
         var top = contentBounds.Y;
         var width = contentBounds.Width;
         var bottom = top + contentBounds.Height;
-
-        var headerHeight = _header.DesiredSize.Height;
-        ArrangeNode(_header, left, top, width, headerHeight);
-        var middleTop = top + headerHeight + Gap;
-
-        var returnHeight = _returnButton.DesiredSize.Height;
-        var scaleHeight = _scaleRow.DesiredSize.Height;
-        var valueHeight = _scaleValue.DesiredSize.Height;
-        var warningHeight = _showWarning ? _warning.DesiredSize.Height : 0;
-        var feedbackHeight = _feedback.DesiredSize.Height;
-
+        ArrangeNode(_header, left, top, width, _header.DesiredSize.Height);
+        var middleTop = top + _header.DesiredSize.Height + Gap;
         double middleBottom;
         if (_isCompact)
         {
-            var returnTop = bottom - returnHeight;
-            var scaleTop = returnTop - Gap - scaleHeight;
-            var valueTop = scaleTop - Gap - valueHeight;
-            var warningTop = valueTop - Gap - warningHeight;
-            var feedbackTop = warningTop - Gap - feedbackHeight;
-            ArrangeNode(_returnButton, left, returnTop, width, returnHeight);
-            ArrangeNode(_scaleRow, left, scaleTop, width, scaleHeight);
-            ArrangeNode(_scaleValue, left, valueTop, width, valueHeight);
-            ArrangeNode(_warning, left, warningTop, width, warningHeight);
-            ArrangeNode(_feedback, left, feedbackTop, width, feedbackHeight);
-            middleBottom = feedbackTop - Gap;
+            var returnTop = bottom - _returnButton.DesiredSize.Height;
+            var scaleTop = returnTop - Gap - _scaleRow.DesiredSize.Height;
+            ArrangeNode(_returnButton, left, returnTop, width, _returnButton.DesiredSize.Height);
+            ArrangeNode(_scaleRow, left, scaleTop, width, _scaleRow.DesiredSize.Height);
+            _feedback.Arrange(Rect.Zero);
+            _scaleValue.Arrange(Rect.Zero);
+            middleBottom = scaleTop - Gap;
         }
         else
         {
-            var footerHeight = Math.Max(returnHeight, scaleHeight);
-            var footerTop = bottom - footerHeight;
+            var footerTop = bottom - Math.Max(_returnButton.DesiredSize.Height, _scaleRow.DesiredSize.Height);
             var returnWidth = Math.Min(_returnButton.DesiredSize.Width, width);
-            ArrangeNode(_scaleRow, left, footerTop, width, scaleHeight);
-            ArrangeNode(_returnButton, left + Math.Max(0, width - returnWidth), footerTop, returnWidth, returnHeight);
-            var valueTop = footerTop - Gap - valueHeight;
-            var warningTop = valueTop - Gap - warningHeight;
-            var feedbackTop = warningTop - Gap - feedbackHeight;
-            ArrangeNode(_scaleValue, left, valueTop, width, valueHeight);
-            ArrangeNode(_warning, left, warningTop, width, warningHeight);
-            ArrangeNode(_feedback, left, feedbackTop, width, feedbackHeight);
-            middleBottom = feedbackTop - Gap;
+            ArrangeNode(_scaleRow, left, footerTop, width, _scaleRow.DesiredSize.Height);
+            ArrangeNode(_returnButton, left + width - returnWidth, footerTop, returnWidth, _returnButton.DesiredSize.Height);
+            var valueTop = footerTop - Gap - _scaleValue.DesiredSize.Height;
+            ArrangeNode(_scaleValue, left, valueTop, width, _scaleValue.DesiredSize.Height);
+            middleBottom = valueTop - Gap;
         }
-
-        var middleHeight = Math.Max(0, middleBottom - middleTop);
-        ArrangeNode(_categoryTabs, left, middleTop, width, middleHeight);
+        if (_showWarning)
+        {
+            middleBottom -= _warning.DesiredSize.Height;
+            ArrangeNode(_warning, left, middleBottom, width, _warning.DesiredSize.Height);
+            middleBottom -= Gap;
+        }
+        else
+            _warning.Arrange(Rect.Zero);
+        if (!_isCompact)
+        {
+            middleBottom -= _feedback.DesiredSize.Height;
+            ArrangeNode(_feedback, left, middleBottom, width, _feedback.DesiredSize.Height);
+            middleBottom -= Gap;
+        }
+        ArrangeNode(_pageTabs, left, middleTop, width, Math.Max(0, middleBottom - middleTop));
     }
 
     private static void ArrangeNode(UiNode node, double x, double y, double width, double height) =>
@@ -293,29 +211,5 @@ internal sealed class UiShowcaseShell : Region
         return node;
     }
 
-    private static Text CreateTabHeader(string text, string cssClass)
-    {
-        var header = new Text { Content = text, Wrapping = TextWrapping.NoWrap };
-        header.Classes.Add(cssClass);
-        return header;
-    }
-
-    private static StackPanel CreateExamplePage(UiShowcaseExample example)
-    {
-        var page = UiShowcaseWidgets.Column(
-            UiShowcaseWidgets.Label(example.Title, "showcase-example-title"),
-            UiShowcaseWidgets.Label(example.Instructions, "showcase-example-instructions"),
-            example.Content);
-        page.Classes.Add("showcase-example-page");
-        page.Padding = new Thickness(12);
-        return page;
-    }
-
-    private static Button CreateScaleButton(string text, string id) =>
-        new()
-        {
-            Text = text,
-            MinHeight = 32,
-            StyleId = id
-        };
+    private static Button CreateScaleButton(string text, string id) => new() { Text = text, MinHeight = 32, StyleId = id };
 }

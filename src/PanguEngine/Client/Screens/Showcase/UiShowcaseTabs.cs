@@ -1,7 +1,7 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 
-namespace PanguEngine.Client.Screens;
+namespace PanguEngine.Client.Screens.Showcase;
 
 internal static class UiShowcaseTabs
 {
@@ -72,7 +72,7 @@ internal static class UiShowcaseTabs
         Reset();
 
         return new UiShowcaseExample(
-            "TabView 交互",
+            "标签页",
             "拖拽标签排序；× 关闭；标签栏滚轮或箭头滚动。聚焦本视图后：Ctrl+Tab / Ctrl+Shift+Tab 切换，" +
             "方向键及 Home / End 移动焦点，Enter / Space 选中，Ctrl+F4 关闭。",
             CreateStack("showcase-tabs-demo",
