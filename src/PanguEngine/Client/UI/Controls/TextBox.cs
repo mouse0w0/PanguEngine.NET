@@ -380,9 +380,9 @@ public sealed class TextBox : Control
     }
 
     /// <summary>
-    /// Copies the selected text to the client clipboard.
+    /// Copies the selected text to the shared system clipboard.
     /// </summary>
-    public void Copy() => Copy(ClientEngine.Current.Clipboard);
+    public void Copy() => Copy(UiToolkit.Clipboard);
 
     internal void Copy(Clipboard? clipboard)
     {
@@ -395,7 +395,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Copies and removes the selected text when editing is enabled.
     /// </summary>
-    public void Cut() => Cut(ClientEngine.Current.Clipboard);
+    public void Cut() => Cut(UiToolkit.Clipboard);
 
     internal void Cut(Clipboard? clipboard)
     {
@@ -412,9 +412,9 @@ public sealed class TextBox : Control
     }
 
     /// <summary>
-    /// Replaces the selection with text from the client clipboard.
+    /// Replaces the selection with text from the shared system clipboard.
     /// </summary>
-    public void Paste() => Paste(ClientEngine.Current.Clipboard);
+    public void Paste() => Paste(UiToolkit.Clipboard);
 
     internal void Paste(Clipboard? clipboard)
     {
@@ -488,7 +488,7 @@ public sealed class TextBox : Control
         else
             layoutText = " ";
 
-        _layout = TextServices.TextLayoutEngine.Layout(new TextLayoutRequest(
+        _layout = UiToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
             layoutText,
             Font,
             FontSize,

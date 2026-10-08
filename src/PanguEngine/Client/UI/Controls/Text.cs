@@ -163,7 +163,7 @@ public sealed class Text : UiNode
     /// <inheritdoc />
     protected override Size MeasureCore(Size availableSize)
     {
-        var layout = TextServices.TextLayoutEngine.Layout(new TextLayoutRequest(
+        var layout = UiToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
             Content,
             Font,
             FontSize,

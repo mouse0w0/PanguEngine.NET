@@ -15,7 +15,7 @@ namespace PanguEngine.Client.UI.Controls;
 public sealed partial class TabView : Control
 {
     internal const double DragThreshold = 6;
-    internal const double WheelScrollStep = 48;
+    internal const double WheelSmallChange = 16;
     internal const double AutoScrollEdge = 24;
     internal const double AutoScrollSpeed = 360;
 

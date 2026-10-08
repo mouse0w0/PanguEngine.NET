@@ -115,12 +115,16 @@ public sealed partial class ScrollBar
         if (!IsWheelScrollingEnabled || !IsEnabled || eventArgs.Handled)
             return;
 
+        var lines = UiToolkit.WheelScrollLines;
+        if (lines == 0)
+            return;
+
         var delta = GetWheelDelta(eventArgs);
         if (delta == 0)
             return;
 
         var previous = Value;
-        Step(-delta * 3 * SmallChange);
+        Step(-delta * UiToolkit.GetWheelScrollStep(lines, SmallChange, LargeChange));
         eventArgs.Handled = Value != previous;
     }
 

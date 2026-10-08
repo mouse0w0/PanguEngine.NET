@@ -2,43 +2,43 @@ using PanguEngine.Client.UI;
 
 namespace PanguEngine.Tests.Client.UI;
 
-[Collection(UiSettingsCollection.Name)]
-public sealed class UiSettingsTests
+[Collection(UiToolkitCollection.Name)]
+public sealed class UiToolkitScaleTests
 {
     [Fact]
     public void DefaultScaleDefaultsToOneAndRejectsInvalidValuesWithoutChangingState()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         try
         {
             Assert.Equal(1, original);
-            UiSettings.DefaultScale = 1.5;
+            UiToolkit.DefaultScale = 1.5;
 
-            Assert.Throws<ArgumentOutOfRangeException>(() => UiSettings.DefaultScale = double.NaN);
-            Assert.Throws<ArgumentOutOfRangeException>(() => UiSettings.DefaultScale = double.PositiveInfinity);
-            Assert.Throws<ArgumentOutOfRangeException>(() => UiSettings.DefaultScale = 0);
-            Assert.Throws<ArgumentOutOfRangeException>(() => UiSettings.DefaultScale = -1);
+            Assert.Throws<ArgumentOutOfRangeException>(() => UiToolkit.DefaultScale = double.NaN);
+            Assert.Throws<ArgumentOutOfRangeException>(() => UiToolkit.DefaultScale = double.PositiveInfinity);
+            Assert.Throws<ArgumentOutOfRangeException>(() => UiToolkit.DefaultScale = 0);
+            Assert.Throws<ArgumentOutOfRangeException>(() => UiToolkit.DefaultScale = -1);
 
-            Assert.Equal(1.5, UiSettings.DefaultScale);
+            Assert.Equal(1.5, UiToolkit.DefaultScale);
         }
         finally
         {
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 
     [Fact]
     public void ScreenUsesCurrentDefaultScaleAtConstructionAndOpening()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         UiScreen? screen = null;
         try
         {
-            UiSettings.DefaultScale = 1.25;
+            UiToolkit.DefaultScale = 1.25;
             screen = new UiScreen();
             Assert.Equal(1.25, screen.Scale);
 
-            UiSettings.DefaultScale = 1.5;
+            UiToolkit.DefaultScale = 1.5;
             screen.Open();
 
             Assert.Equal(1.5, screen.Scale);
@@ -46,25 +46,25 @@ public sealed class UiSettingsTests
         finally
         {
             screen?.Close();
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 
     [Fact]
     public void UnoverriddenScreenReflowsWhenDefaultScaleChanges()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         var manager = new UiManager();
         try
         {
-            UiSettings.DefaultScale = 1;
+            UiToolkit.DefaultScale = 1;
             var root = new LayoutNode();
             var screen = new UiScreen(root);
             manager.Open(screen);
             manager.PrepareFrame(new Size(100, 80), 0);
             Assert.Equal(new Size(100, 80), root.LastMeasureConstraint);
 
-            UiSettings.DefaultScale = 2;
+            UiToolkit.DefaultScale = 2;
             manager.PrepareFrame(new Size(100, 80), 0);
 
             Assert.Equal(2, screen.Scale);
@@ -75,22 +75,22 @@ public sealed class UiSettingsTests
         {
             if (manager.CurrentScreen is not null)
                 manager.Close();
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 
     [Fact]
     public void ExplicitScaleEqualToCurrentValueStopsFollowingDefaultScale()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         var manager = new UiManager();
         try
         {
-            UiSettings.DefaultScale = 1;
+            UiToolkit.DefaultScale = 1;
             var screen = new UiScreen { Scale = 1 };
             manager.Open(screen);
 
-            UiSettings.DefaultScale = 2;
+            UiToolkit.DefaultScale = 2;
             manager.PrepareFrame(new Size(100, 80), 0);
 
             Assert.Equal(1, screen.Scale);
@@ -99,22 +99,22 @@ public sealed class UiSettingsTests
         {
             if (manager.CurrentScreen is not null)
                 manager.Close();
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 
     [Fact]
     public void FailedExplicitScaleAssignmentDoesNotStopFollowingDefaultScale()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         UiScreen? screen = null;
         try
         {
-            UiSettings.DefaultScale = 1;
+            UiToolkit.DefaultScale = 1;
             screen = new UiScreen();
             Assert.Throws<ArgumentOutOfRangeException>(() => screen.Scale = 0);
 
-            UiSettings.DefaultScale = 2;
+            UiToolkit.DefaultScale = 2;
             screen.Open();
 
             Assert.Equal(2, screen.Scale);
@@ -122,23 +122,23 @@ public sealed class UiSettingsTests
         finally
         {
             screen?.Close();
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 
     [Fact]
     public void UnoverriddenScreenUsesLatestDefaultScaleWhenReopened()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         UiScreen? screen = null;
         try
         {
-            UiSettings.DefaultScale = 1;
+            UiToolkit.DefaultScale = 1;
             screen = new UiScreen();
             screen.Open();
             screen.Close();
 
-            UiSettings.DefaultScale = 2;
+            UiToolkit.DefaultScale = 2;
             screen.Open();
 
             Assert.Equal(2, screen.Scale);
@@ -146,23 +146,23 @@ public sealed class UiSettingsTests
         finally
         {
             screen?.Close();
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 
     [Fact]
     public void ExplicitScalePersistsWhenScreenReopens()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         UiScreen? screen = null;
         try
         {
-            UiSettings.DefaultScale = 1;
+            UiToolkit.DefaultScale = 1;
             screen = new UiScreen { Scale = 1.25 };
             screen.Open();
             screen.Close();
 
-            UiSettings.DefaultScale = 2;
+            UiToolkit.DefaultScale = 2;
             screen.Open();
 
             Assert.Equal(1.25, screen.Scale);
@@ -170,7 +170,7 @@ public sealed class UiSettingsTests
         finally
         {
             screen?.Close();
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 

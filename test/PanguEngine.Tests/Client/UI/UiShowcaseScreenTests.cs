@@ -233,16 +233,16 @@ public sealed class UiShowcaseScreenTests
     }
 }
 
-[Collection(UiSettingsCollection.Name)]
+[Collection(UiToolkitCollection.Name)]
 public sealed class UiShowcaseScreenScaleTests
 {
     [Fact]
     public void ExplicitScaleFactorsUseOpeningScaleWithoutChangingGlobalSettings()
     {
-        var original = UiSettings.DefaultScale;
+        var original = UiToolkit.DefaultScale;
         try
         {
-            UiSettings.DefaultScale = 2;
+            UiToolkit.DefaultScale = 2;
             var screen = CreateScreen();
             screen.Open();
             Assert.Equal(2, screen.Scale);
@@ -254,15 +254,15 @@ public sealed class UiShowcaseScreenScaleTests
             screen.SetScaleFactor(1.25);
             Assert.Equal(2.5, screen.Scale);
 
-            UiSettings.DefaultScale = 3;
+            UiToolkit.DefaultScale = 3;
             screen.SetScaleFactor(1);
             Assert.Equal(2, screen.Scale);
-            Assert.Equal(3, UiSettings.DefaultScale);
+            Assert.Equal(3, UiToolkit.DefaultScale);
             screen.Close();
         }
         finally
         {
-            UiSettings.DefaultScale = original;
+            UiToolkit.DefaultScale = original;
         }
     }
 

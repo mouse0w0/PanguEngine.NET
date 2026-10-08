@@ -11,7 +11,7 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class TextTests
 {
     [Fact]
-    public void NewMeasurementRequiresInitializedTextServices()
+    public void NewMeasurementRequiresInitializedToolkitServices()
     {
         var text = new Text { Content = "Hello" };
 
@@ -19,7 +19,7 @@ public sealed class TextTests
     }
 
     [Fact]
-    public void DetachedAndScreenOwnedTextUseStaticTextServices()
+    public void DetachedAndScreenOwnedTextUseSharedToolkitServices()
     {
         using var context = new UiTextTestContext();
         var detached = new Text { Content = "Detached" };

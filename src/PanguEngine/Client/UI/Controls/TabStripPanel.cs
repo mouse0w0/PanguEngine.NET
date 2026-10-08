@@ -140,13 +140,18 @@ internal sealed class TabStripPanel : Control
         if (eventArgs.Handled || !_viewport.HasOverflow)
             return;
 
+        var lines = UiToolkit.WheelScrollLines;
+        if (lines == 0)
+            return;
+
         var delta = _owner.IsHorizontalPlacement
             ? (eventArgs.DeltaX != 0 ? eventArgs.DeltaX : eventArgs.DeltaY)
             : eventArgs.DeltaY;
         if (delta == 0)
             return;
 
-        _viewport.ScrollBy(-delta * TabView.WheelScrollStep);
+        var step = UiToolkit.GetWheelScrollStep(lines, TabView.WheelSmallChange, _viewport.ViewportLength);
+        _viewport.ScrollBy(-delta * step);
         eventArgs.Handled = true;
     }
 

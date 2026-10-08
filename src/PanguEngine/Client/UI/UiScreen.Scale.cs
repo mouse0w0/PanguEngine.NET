@@ -45,7 +45,7 @@ public partial class UiScreen
 
     private void SetScale(double value)
     {
-        UiSettings.ValidateScale(value, nameof(value));
+        UiToolkit.ValidateScale(value, nameof(value));
 
         lock (_stateSync)
         {
@@ -79,7 +79,7 @@ public partial class UiScreen
             if (_hasExplicitScale)
                 return;
 
-            var scale = UiSettings.DefaultScale;
+            var scale = UiToolkit.DefaultScale;
             // ReSharper disable once CompareOfFloatsByEqualityOperator
             if (_scale == scale)
                 return;

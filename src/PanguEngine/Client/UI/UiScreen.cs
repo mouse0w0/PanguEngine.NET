@@ -32,7 +32,7 @@ public partial class UiScreen
     /// <param name="root">The initial root node, or null to create an empty screen.</param>
     public UiScreen(UiNode? root = null)
     {
-        _scale = UiSettings.DefaultScale;
+        _scale = UiToolkit.DefaultScale;
         Root = root;
     }
 

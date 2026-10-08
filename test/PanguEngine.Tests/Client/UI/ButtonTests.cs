@@ -156,7 +156,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void IconUsesAStableSquareSlotWithoutTextServices()
+    public void IconUsesAStableSquareSlotWithoutToolkitServices()
     {
         var button = new Button
         {
@@ -175,7 +175,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void TextMeasurementRequiresInitializedTextServices()
+    public void TextMeasurementRequiresInitializedToolkitServices()
     {
         var button = new Button { Text = "Text" };
 

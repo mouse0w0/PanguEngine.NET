@@ -2,6 +2,8 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
+using PanguEngine.Desktop;
+using PanguEngine.Desktop.Sdl;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
@@ -24,6 +26,7 @@ internal sealed class UiBatchScene : IClientTestScene
     private UiManager _uiManager = null!;
     private UiBatchNode _root = null!;
     private UiScreen _screen = null!;
+    private Clipboard _clipboard = null!;
     private UiImage _firstImage = null!;
     private UiImage _secondImage = null!;
     private UiImage _thirdImage = null!;
@@ -39,16 +42,18 @@ internal sealed class UiBatchScene : IClientTestScene
     {
         _presenter = window.Presenter;
         TextServices.Initialize();
-        try
-        {
-            TextServices.FontManager.RegisterResources(Engine.ResourceManager);
-            TextServices.FontManager.DefaultFont = new Font("Source Han Sans CN");
-        }
-        catch
-        {
-            TextServices.Shutdown();
-            throw;
-        }
+        TextServices.FontManager.RegisterResources(Engine.ResourceManager);
+        TextServices.FontManager.DefaultFont = new Font("Source Han Sans CN");
+        _clipboard = new SdlClipboard();
+        var monitor = window.Monitor ?? throw new InvalidOperationException(
+            "UI scale initialization requires a current monitor.");
+        UiToolkit.Initialize(
+            TextServices.FontManager,
+            TextServices.TextLayoutEngine,
+            _clipboard,
+            Log.CreateLogger("UI"),
+            monitor.ContentScale,
+            3);
 
         _renderer = new UiRenderer(
             ClientTestApp.Current.Device,
@@ -78,21 +83,11 @@ internal sealed class UiBatchScene : IClientTestScene
 
     public void Destroy()
     {
-        try
-        {
-            _uiManager.Destroy();
-        }
-        finally
-        {
-            try
-            {
-                _renderer.Destroy();
-            }
-            finally
-            {
-                TextServices.Shutdown();
-            }
-        }
+        _uiManager.Destroy();
+        _renderer.Destroy();
+        UiToolkit.Shutdown();
+        TextServices.Shutdown();
+        _clipboard.Destroy();
     }
 
     private void PrepareFrame(double alpha)

@@ -177,7 +177,13 @@ public sealed class ClientEngine
         Clipboard = new SdlClipboard();
         var monitor = PrimaryWindow.Monitor ?? throw new InvalidOperationException(
             "UI scale initialization requires a current monitor.");
-        UiSettings.DefaultScale = monitor.ContentScale;
+        UiToolkit.Initialize(
+            TextServices.FontManager,
+            TextServices.TextLayoutEngine,
+            Clipboard,
+            Log.CreateLogger("UI"),
+            monitor.ContentScale,
+            3);
         Ui = new UiManager();
         Ui.InitializeHud(Engine.RegistryManager.Get<HudDefinition>(RegistryKeys.Hud));
         Input = new InputManager(
@@ -309,6 +315,7 @@ public sealed class ClientEngine
         Input.Destroy();
         Game.Destroy();
         Renderer.Destroy();
+        UiToolkit.Shutdown();
         Audio.Destroy();
         TextServices.Shutdown();
         Clipboard.Destroy();
@@ -322,15 +329,7 @@ public sealed class ClientEngine
     private static void InitializeTextServices()
     {
         TextServices.Initialize();
-        try
-        {
-            TextServices.FontManager.RegisterResources(Engine.ResourceManager);
-            TextServices.FontManager.DefaultFont = new Font("Source Han Sans CN");
-        }
-        catch
-        {
-            TextServices.Shutdown();
-            throw;
-        }
+        TextServices.FontManager.RegisterResources(Engine.ResourceManager);
+        TextServices.FontManager.DefaultFont = new Font("Source Han Sans CN");
     }
 }

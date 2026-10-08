@@ -50,7 +50,7 @@ internal sealed class UiRenderer
             fontManager,
             _descriptorSetLayout,
             frameSlotCount,
-            Log.CreateLogger("UI"));
+            UiToolkit.Logger);
         _pipeline = CreatePipeline(
             device,
             colorFormat,

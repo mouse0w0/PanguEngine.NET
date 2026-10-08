@@ -1,4 +1,7 @@
 using System.Text;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using PanguEngine.Client.UI;
 using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Tests.Client.UI;
@@ -6,6 +9,8 @@ namespace PanguEngine.Tests.Client.UI;
 internal sealed class UiTextTestContext : IDisposable
 {
     private const string SourceFamily = "Source Han Sans CN";
+    private readonly double _originalScale = UiToolkit.DefaultScale;
+    private readonly int _originalWheelScrollLines = UiToolkit.WheelScrollLines;
 
     private static readonly string FontPath = Path.Combine(
         AppContext.BaseDirectory,
@@ -14,25 +19,26 @@ internal sealed class UiTextTestContext : IDisposable
         "SourceHanSansCN-Regular.otf");
 
     internal UiTextTestContext()
+        : this(NullLogger.Instance)
     {
+    }
+
+    internal UiTextTestContext(ILogger logger)
+    {
+        Logger = logger;
         TextServices.Initialize();
-        try
-        {
-            using var stream = File.OpenRead(FontPath);
-            var font = Assert.Single(FontManager.Register(stream, 0));
-            FontManager.DefaultFont = font;
-            DefaultFace = FontManager.Match(font);
-        }
-        catch
-        {
-            TextServices.Shutdown();
-            throw;
-        }
+        using var stream = File.OpenRead(FontPath);
+        var font = Assert.Single(FontManager.Register(stream, 0));
+        FontManager.DefaultFont = font;
+        DefaultFace = FontManager.Match(font);
+        UiToolkit.Initialize(FontManager, LayoutEngine, Clipboard, Logger, 1, 3);
     }
 
     internal FontManager FontManager => TextServices.FontManager;
     internal TextLayoutEngine LayoutEngine => TextServices.TextLayoutEngine;
     internal FontFace DefaultFace { get; }
+    internal MemoryClipboard Clipboard { get; } = new();
+    internal ILogger Logger { get; }
 
     internal Font RegisterAlias(string familyName = "Testxx Han Sans CN")
     {
@@ -56,5 +62,12 @@ internal sealed class UiTextTestContext : IDisposable
         return Assert.Single(FontManager.Register(stream, 0));
     }
 
-    public void Dispose() => TextServices.Shutdown();
+    public void Dispose()
+    {
+        UiToolkit.Shutdown();
+        TextServices.Shutdown();
+        Clipboard.Destroy();
+        UiToolkit.DefaultScale = _originalScale;
+        UiToolkit.WheelScrollLines = _originalWheelScrollLines;
+    }
 }
