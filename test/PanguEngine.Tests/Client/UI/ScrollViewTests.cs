@@ -185,7 +185,7 @@ public sealed class ScrollViewTests
             Assert.Equal([expected], changes);
 
             view.SetValue(property, ScrollBarVisibility.Visible);
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
             Assert.Equal(expected, view.Offset);
             Assert.Equal(expected, source.Offset);
             Assert.Equal(0, bar.Value);
@@ -267,7 +267,7 @@ public sealed class ScrollViewTests
         Assert.Equal(400, view.Offset.Y);
 
         content.Height = 100;
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.Equal(new Size(400, 100), view.Extent);
         Assert.Equal(new Size(200, 200), view.Viewport);
@@ -288,7 +288,7 @@ public sealed class ScrollViewTests
         view.ScrollTo(0, 9999);
 
         content.Height = 1200;
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.Equal(new Size(50, 1200), view.Extent);
         Assert.Equal(400, view.Offset.Y);
@@ -428,13 +428,13 @@ public sealed class ScrollViewTests
             view.Bind(ScrollView.OffsetProperty, source, item => item.Offset);
 
             content.Height = 250;
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
             Assert.Equal(50, view.Offset.Y);
             Assert.Equal(350, source.Offset.Y);
             Assert.True(view.IsBound(ScrollView.OffsetProperty));
 
             content.Height = 600;
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
             Assert.Equal(50, view.Offset.Y);
             Assert.Equal(350, source.Offset.Y);
 
@@ -492,7 +492,7 @@ public sealed class ScrollViewTests
             Height = 600,
             Visibility = Visibility.Collapsed
         };
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.Equal(Size.Zero, view.Extent);
         Assert.Equal(Point.Zero, view.Offset);
@@ -536,7 +536,7 @@ public sealed class ScrollViewTests
         Assert.Same(other, content.Parent);
         Assert.Contains(content, other.Children);
 
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.Equal(Size.Zero, view.Extent);
         manager.Close();
@@ -563,7 +563,7 @@ public sealed class ScrollViewTests
         Assert.Same(view, content.Parent!.Parent);
         Assert.DoesNotContain(content, other.Children);
 
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.Equal(new Size(50, 600), view.Extent);
         manager.Close();
@@ -579,12 +579,12 @@ public sealed class ScrollViewTests
         Assert.True(view.IsArrangeValid);
 
         content.Height = 800;
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.True(view.IsMeasureValid);
         Assert.True(view.IsArrangeValid);
 
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.True(view.IsMeasureValid);
         Assert.True(view.IsArrangeValid);
@@ -637,7 +637,7 @@ public sealed class ScrollViewTests
         Assert.True(manager.ProcessPointerWheel(new Point(50, 50), 0, -0.5, KeyModifiers.None));
         Assert.Equal(24, view.Offset.Y);
 
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         var verticalBar = view.Children.OfType<ScrollBar>()
             .Single(bar => bar.Orientation == Orientation.Vertical);
@@ -660,7 +660,7 @@ public sealed class ScrollViewTests
         };
         var (chainedManager, _, _) = OpenScene(chained, new Size(200, 200));
         chained.ScrollTo(0, 400);
-        chainedManager.PrepareFrame(new Size(200, 200), 0);
+        chainedManager.UpdateFrame(new Size(200, 200), 0);
         chainedManager.ProcessPointerMoved(new Point(50, 50));
 
         Assert.False(chainedManager.ProcessPointerWheel(new Point(50, 50), 0, -1, KeyModifiers.None));
@@ -674,7 +674,7 @@ public sealed class ScrollViewTests
         };
         var (blockingManager, _, _) = OpenScene(blocking, new Size(200, 200));
         blocking.ScrollTo(0, 400);
-        blockingManager.PrepareFrame(new Size(200, 200), 0);
+        blockingManager.UpdateFrame(new Size(200, 200), 0);
         blockingManager.ProcessPointerMoved(new Point(50, 50));
 
         Assert.True(blockingManager.ProcessPointerWheel(new Point(50, 50), 0, -1, KeyModifiers.None));
@@ -735,7 +735,7 @@ public sealed class ScrollViewTests
         Assert.Same(child, view.HitTest(new Point(5, 105)));
 
         view.ScrollTo(0, 50);
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.Same(child, view.HitTest(new Point(5, 55)));
         Assert.NotSame(child, view.HitTest(new Point(190, 5)));
@@ -761,7 +761,7 @@ public sealed class ScrollViewTests
         Assert.Equal(100, view.Offset.Y);
         Assert.False(view.IsArrangeValid);
 
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.True(view.IsArrangeValid);
         Assert.True(content.IsArrangeValid);
@@ -815,13 +815,13 @@ public sealed class ScrollViewTests
         Assert.Equal(1d, bar.Opacity);
 
         content.Height = 100;
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.False(bar.IsHitTestVisible);
         Assert.Equal(0d, bar.Opacity);
 
         content.Height = 600;
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.True(bar.IsHitTestVisible);
         Assert.Equal(1d, bar.Opacity);
@@ -839,18 +839,18 @@ public sealed class ScrollViewTests
         var root = new Canvas { Width = 300, Height = 200 };
         root.Children.Add(scroll);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         screen.SetBaseStyleSheets([]);
         manager.Open(screen);
 
-        manager.PrepareFrame(new Size(300, 200), 0);
+        manager.UpdateFrame(new Size(300, 200), 0);
 
         Assert.True(scroll.IsMeasureValid);
         Assert.True(scroll.IsArrangeValid);
         Assert.Equal(new Size(50, 600), scroll.Viewport);
         Assert.Equal(Point.Zero, scroll.Offset);
 
-        manager.PrepareFrame(new Size(300, 200), 0);
+        manager.UpdateFrame(new Size(300, 200), 0);
 
         Assert.True(scroll.IsMeasureValid);
         Assert.True(scroll.IsArrangeValid);
@@ -902,7 +902,7 @@ public sealed class ScrollViewTests
         Assert.True(notificationRaised);
         Assert.Null(view.Content);
 
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         Assert.Same(replacement, view.Content);
         Assert.NotNull(replacement.Parent);
@@ -931,7 +931,7 @@ public sealed class ScrollViewTests
         var (manager, _, _) = OpenScene(outer, new Size(300, 300));
 
         inner.ScrollTo(0, 500);
-        manager.PrepareFrame(new Size(300, 300), 0);
+        manager.UpdateFrame(new Size(300, 300), 0);
         Assert.Equal(500, inner.Offset.Y);
 
         manager.ProcessPointerMoved(new Point(100, 150));
@@ -973,7 +973,7 @@ public sealed class ScrollViewTests
         };
         var (manager, screen, _) = OpenScene(view, new Size(200, 200));
         view.ScrollTo(0, 100);
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.UpdateFrame(new Size(200, 200), 0);
 
         var local = new Point(5, 105);
         var screenPoint = content.LocalToScreen(local);
@@ -1015,7 +1015,7 @@ public sealed class ScrollViewTests
         screen.Scale = scale;
         screen.UseLayoutRounding = useLayoutRounding;
         screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { bar-thickness: 16.5px; }")]);
-        manager.PrepareFrame(new Size(200 * scale, 200 * scale), 0);
+        manager.UpdateFrame(new Size(200 * scale, 200 * scale), 0);
         try
         {
             var horizontal = view.Children.OfType<ScrollBar>().Single(node => node.Orientation == Orientation.Horizontal);
@@ -1051,15 +1051,15 @@ public sealed class ScrollViewTests
         return false;
     }
 
-    private static (UiManager Manager, UiScreen Screen, ScrollView View) OpenScene(
+    private static (UiManager Manager, GameScreen Screen, ScrollView View) OpenScene(
         ScrollView view,
         Size viewport)
     {
         var manager = new UiManager();
-        var screen = new UiScreen(view);
+        var screen = new GameScreen(view);
         screen.SetBaseStyleSheets([]);
         manager.Open(screen);
-        manager.PrepareFrame(viewport, 0);
+        manager.UpdateFrame(viewport, 0);
         return (manager, screen, view);
     }
 

@@ -222,7 +222,7 @@ public sealed class UiKeyBindingsTests
         }
     }
 
-    private static (UiManager Manager, UiScreen Screen, TNode Node) Open<TNode>(TNode node)
+    private static (UiManager Manager, GameScreen Screen, TNode Node) Open<TNode>(TNode node)
         where TNode : UiNode
     {
         node.Focusable = true;
@@ -230,10 +230,10 @@ public sealed class UiKeyBindingsTests
         node.Height = 40;
         var root = new Canvas();
         root.Children.Add(node);
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         return (manager, screen, node);
     }
 

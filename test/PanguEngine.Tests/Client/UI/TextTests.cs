@@ -60,11 +60,11 @@ public sealed class TextTests
     {
         using var context = new UiTextTestContext();
         var text = new Text { Content = "Hello" };
-        var screen = new UiScreen(text) { UseLayoutRounding = false };
+        var screen = new GameScreen(text) { UseLayoutRounding = false };
         var manager = new UiManager();
         manager.Open(screen);
 
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var first = GetCommand(screen);
         var second = GetCommand(screen);
 
@@ -80,11 +80,11 @@ public sealed class TextTests
     {
         using var context = new UiTextTestContext();
         var text = new Text();
-        var screen = new UiScreen(text);
+        var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
 
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
 
         Assert.Equal(Size.Zero, text.DesiredSize);
         Assert.Empty(screen.CreateDrawCommandList());
@@ -101,11 +101,11 @@ public sealed class TextTests
             Font = new Font("Missing Family"),
             Wrapping = TextWrapping.Wrap
         };
-        var screen = new UiScreen(text);
+        var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
 
-        manager.PrepareFrame(new Size(60, 200), 0);
+        manager.UpdateFrame(new Size(60, 200), 0);
         var command = GetCommand(screen);
 
         Assert.True(command.Layout.Lines.Count > 1);
@@ -120,10 +120,10 @@ public sealed class TextTests
     {
         using var context = new UiTextTestContext();
         var text = new Text { Content = "Hello" };
-        var screen = new UiScreen(text);
+        var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var before = GetCommand(screen);
 
         text.Color = new Color(10, 20, 30);
@@ -140,10 +140,10 @@ public sealed class TextTests
     {
         using var context = new UiTextTestContext();
         var text = new Text { Content = "Hello world" };
-        var screen = new UiScreen(text);
+        var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var previous = GetCommand(screen).Layout;
 
         ReplaceAfter(() => text.Content = "Changed");
@@ -154,7 +154,7 @@ public sealed class TextTests
         ReplaceAfter(() => text.Wrapping = TextWrapping.Wrap);
         ReplaceAfter(() => text.Alignment = TextAlignment.Center);
 
-        manager.PrepareFrame(new Size(300, 200), 0);
+        manager.UpdateFrame(new Size(300, 200), 0);
         var widthChanged = GetCommand(screen).Layout;
         Assert.NotSame(previous, widthChanged);
         previous = widthChanged;
@@ -164,7 +164,7 @@ public sealed class TextTests
         void ReplaceAfter(Action change)
         {
             change();
-            manager.PrepareFrame(new Size(400, 200), 0);
+            manager.UpdateFrame(new Size(400, 200), 0);
             var current = GetCommand(screen).Layout;
             Assert.NotSame(previous, current);
             previous = current;
@@ -177,20 +177,20 @@ public sealed class TextTests
         using var context = new UiTextTestContext();
         var requestedFont = new Font("Testxx Han Sans CN");
         var text = new Text { Content = "Hello", Font = requestedFont };
-        var screen = new UiScreen(text);
+        var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var initial = GetCommand(screen).Layout;
         Assert.Same(context.DefaultFace, initial.Lines[0].GlyphRuns[0].FontFace);
 
         var registered = context.RegisterAlias();
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
 
         Assert.Same(initial, GetCommand(screen).Layout);
 
         text.Content = "Changed";
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var refreshed = GetCommand(screen).Layout;
         Assert.NotSame(initial, refreshed);
         Assert.Same(
@@ -204,20 +204,20 @@ public sealed class TextTests
     {
         using var context = new UiTextTestContext();
         var text = new Text { Content = "Hello" };
-        var screen = new UiScreen(text);
+        var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var initial = GetCommand(screen).Layout;
         var replacement = context.RegisterAlias();
 
         context.FontManager.DefaultFont = replacement;
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
 
         Assert.Same(initial, GetCommand(screen).Layout);
 
         text.Content = "Changed";
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var refreshed = GetCommand(screen).Layout;
         Assert.NotSame(initial, refreshed);
         Assert.Same(
@@ -231,19 +231,19 @@ public sealed class TextTests
     {
         using var context = new UiTextTestContext();
         var text = new Text { Content = "Hello" };
-        var screen = new UiScreen(text);
+        var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(400, 200), 0);
+        manager.UpdateFrame(new Size(400, 200), 0);
         var initial = GetCommand(screen).Layout;
 
         screen.Scale = 2;
-        manager.PrepareFrame(new Size(800, 400), 0);
+        manager.UpdateFrame(new Size(800, 400), 0);
         var scaled = GetCommand(screen).Layout;
         Assert.NotSame(initial, scaled);
 
         screen.UseLayoutRounding = false;
-        manager.PrepareFrame(new Size(800, 400), 0);
+        manager.UpdateFrame(new Size(800, 400), 0);
         Assert.NotSame(scaled, GetCommand(screen).Layout);
         manager.Destroy();
     }

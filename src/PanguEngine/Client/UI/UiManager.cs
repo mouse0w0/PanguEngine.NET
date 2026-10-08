@@ -13,7 +13,7 @@ namespace PanguEngine.Client.UI;
 public sealed class UiManager
 {
     private readonly int _ownerThreadId;
-    private readonly Queue<UiScreen?> _pendingScreens = [];
+    private readonly Queue<GameScreen?> _pendingScreens = [];
     private bool _isTransitioning;
     private bool _isDestroying;
     private bool _isInitializingHud;
@@ -35,9 +35,9 @@ public sealed class UiManager
     /// <summary>
     /// Gets the current screen, or null when no screen is open.
     /// </summary>
-    public UiScreen? CurrentScreen { get; private set; }
+    public GameScreen? CurrentScreen { get; private set; }
 
-    internal event Action<UiScreen?, UiScreen?>? CurrentScreenChanged;
+    internal event Action<GameScreen?, GameScreen?>? CurrentScreenChanged;
 
     internal void InitializeHud(IRegistry<HudDefinition> definitions)
     {
@@ -76,7 +76,7 @@ public sealed class UiManager
     /// updating, updating layout, or generating drawing commands.
     /// </exception>
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
-    public void Open(UiScreen screen)
+    public void Open(GameScreen screen)
     {
         ArgumentNullException.ThrowIfNull(screen);
         RequestScreenChange(screen);
@@ -99,7 +99,7 @@ public sealed class UiManager
     /// <exception cref="ObjectDisposedException">Thrown when the manager is shut down.</exception>
     public void Close() => RequestScreenChange(null);
 
-    private void RequestScreenChange(UiScreen? screen)
+    private void RequestScreenChange(GameScreen? screen)
     {
         VerifyAccess();
         VerifyLifecycleOperation(allowQueuedChange: true);
@@ -155,10 +155,27 @@ public sealed class UiManager
         }
     }
 
-    internal void PrepareFrame(Size viewportSize, double alpha)
-        => PrepareFrame(viewportSize, alpha, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
+    /// <summary>Updates the HUD and current screen and prepares their UI for drawing.</summary>
+    /// <remarks>
+    /// Runs on the UI owner thread before drawing, completing the HUD before the current screen.
+    /// Each screen's game frame callback precedes UI preparation, which processes posted actions,
+    /// advances tickers, and updates layout.
+    /// </remarks>
+    /// <param name="viewportSize">The output viewport size.</param>
+    /// <param name="alpha">The interpolation factor between fixed updates.</param>
+    internal void UpdateFrame(Size viewportSize, double alpha)
+        => UpdateFrame(viewportSize, alpha, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
 
-    internal void PrepareFrame(Size viewportSize, double alpha, TimeSpan frameTime)
+    /// <summary>Updates the HUD and current screen and prepares their UI for drawing.</summary>
+    /// <remarks>
+    /// Runs on the UI owner thread before drawing, completing the HUD before the current screen.
+    /// Each screen's game frame callback precedes UI preparation, which processes posted actions,
+    /// advances tickers, and updates layout.
+    /// </remarks>
+    /// <param name="viewportSize">The output viewport size.</param>
+    /// <param name="alpha">The interpolation factor between fixed updates.</param>
+    /// <param name="frameTime">The absolute monotonic time shared by tickers in this frame.</param>
+    internal void UpdateFrame(Size viewportSize, double alpha, TimeSpan frameTime)
     {
         VerifyAccess();
         VerifyLifecycleOperation();
@@ -167,8 +184,15 @@ public sealed class UiManager
         _isUpdating = true;
         try
         {
-            Hud.PrepareFrame(viewportSize, alpha, frameTime);
-            CurrentScreen?.PrepareFrame(viewportSize, alpha, frameTime);
+            Hud.UpdateFrame(alpha);
+            if (Hud.Screen.IsOpen())
+                Hud.PrepareFrame(viewportSize, frameTime);
+            if (CurrentScreen is { } screen)
+            {
+                screen.UpdateFrame(alpha);
+                if (screen.IsOpen())
+                    screen.PrepareFrame(viewportSize, frameTime);
+            }
         }
         finally
         {
@@ -270,7 +294,7 @@ public sealed class UiManager
         CurrentScreen?.ProcessFocusChanged(focused);
     }
 
-    private void NotifyCurrentScreenChanged(UiScreen? oldScreen)
+    private void NotifyCurrentScreenChanged(GameScreen? oldScreen)
     {
         var newScreen = CurrentScreen;
         if (!ReferenceEquals(oldScreen, newScreen))

@@ -85,9 +85,9 @@ public sealed class UiTabInfrastructureTests
         var root = new Canvas();
         var node = Place(root, new NoBaseControl { Focusable = true }, 0, 0, 40, 40);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(node.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);

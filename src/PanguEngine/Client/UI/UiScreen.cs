@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using PanguEngine.Client.UI.Styling;
-using PanguEngine.Input;
 
 namespace PanguEngine.Client.UI;
 
@@ -35,21 +34,6 @@ public partial class UiScreen
         _scale = UiToolkit.DefaultScale;
         Root = root;
     }
-
-    /// <summary>
-    /// Gets the input context active while this screen is current.
-    /// </summary>
-    public InputContext InputContext { get; init; } = BuiltinInputContexts.Ui;
-
-    /// <summary>
-    /// Gets whether the game host pauses the game while this screen is current.
-    /// </summary>
-    public bool PausesGame { get; init; }
-
-    /// <summary>
-    /// Gets whether the game host closes this screen when Escape is pressed.
-    /// </summary>
-    public bool CloseOnEscape { get; init; }
 
     /// <summary>
     /// Gets or sets the root node of this screen.
@@ -117,17 +101,6 @@ public partial class UiScreen
     {
     }
 
-    /// <summary>Updates the screen at the client's fixed update frequency.</summary>
-    protected virtual void OnFixedUpdate()
-    {
-    }
-
-    /// <summary>Updates the screen before layout for a client frame.</summary>
-    /// <param name="alpha">The interpolation factor between fixed updates.</param>
-    protected virtual void OnFrameUpdate(double alpha)
-    {
-    }
-
     internal void Open()
     {
         BindOwnerForOpen();
@@ -163,45 +136,17 @@ public partial class UiScreen
 
     internal bool IsUpdating { get; private set; }
 
-    internal void Update()
-    {
-        VerifyOwnerThread();
-        VerifyNotTransitioningOrUpdatingLayout();
-        if (IsUpdating)
-            throw new InvalidOperationException("The UI screen is already updating.");
+    internal void PrepareFrame(Size viewportSize)
+        => PrepareFrame(viewportSize, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
 
-        BeginRuntimeOperation();
-        IsUpdating = true;
-        try
-        {
-            if (IsScreenActive())
-                OnFixedUpdate();
-        }
-        finally
-        {
-            IsUpdating = false;
-            EndRuntimeOperation();
-        }
-    }
-
-    internal void PrepareFrame(Size viewportSize, double alpha)
-        => PrepareFrame(viewportSize, alpha, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
-
-    internal void PrepareFrame(Size viewportSize, double alpha, TimeSpan frameTime)
+    internal void PrepareFrame(Size viewportSize, TimeSpan frameTime)
     {
         CreateViewportBounds(viewportSize);
-        VerifyNotTransitioningOrUpdatingLayout();
-        if (IsUpdating)
-            throw new InvalidOperationException("The UI screen is already updating.");
-
-        BeginRuntimeOperation();
-        IsUpdating = true;
+        BeginUpdate();
         try
         {
             var tickers = FreezeTickers();
             DrainPending();
-            if (IsScreenActive())
-                OnFrameUpdate(alpha);
             if (IsScreenActive())
                 AdvanceTickers(tickers, frameTime);
             if (IsScreenActive())
@@ -209,9 +154,26 @@ public partial class UiScreen
         }
         finally
         {
-            IsUpdating = false;
-            EndRuntimeOperation();
+            EndUpdate();
         }
+    }
+
+    /// <summary>Begins an update operation on this screen.</summary>
+    private protected void BeginUpdate()
+    {
+        VerifyNotTransitioningOrUpdatingLayout();
+        if (IsUpdating)
+            throw new InvalidOperationException("The UI screen is already updating.");
+
+        BeginRuntimeOperation();
+        IsUpdating = true;
+    }
+
+    /// <summary>Ends the current update operation.</summary>
+    private protected void EndUpdate()
+    {
+        IsUpdating = false;
+        EndRuntimeOperation();
     }
 
     private void UpdateLayout(Size viewportSize)

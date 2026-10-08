@@ -291,9 +291,9 @@ public sealed class ButtonTests
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 80, 32);
         var manager = new UiManager();
-        var screen = new UiScreen(root) { UseLayoutRounding = false };
+        var screen = new GameScreen(root) { UseLayoutRounding = false };
         manager.Open(screen);
-        manager.PrepareFrame(new Size(120, 80), 0);
+        manager.UpdateFrame(new Size(120, 80), 0);
 
         var normalCommands = screen.CreateDrawCommandList();
         var normal = normalCommands.OfType<UiFillRectangleCommand>().ToArray();
@@ -345,9 +345,9 @@ public sealed class ButtonTests
             80,
             32);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(120, 80), 0);
+        manager.UpdateFrame(new Size(120, 80), 0);
 
         manager.ProcessPointerMoved(new Point(20, 20));
         Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
@@ -380,9 +380,9 @@ public sealed class ButtonTests
         var button = Place(root, new Button(), 10, 10, 80, 32);
         button.Classes.Add("danger");
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(120, 80), 0);
+        manager.UpdateFrame(new Size(120, 80), 0);
 
         Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
         Assert.Equal(new SolidColorBrush(157, 73, 77), button.BorderBrush);
@@ -460,9 +460,9 @@ public sealed class ButtonTests
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 80, 32);
         var manager = new UiManager();
-        var screen = new UiScreen(root) { UseLayoutRounding = false };
+        var screen = new GameScreen(root) { UseLayoutRounding = false };
         manager.Open(screen);
-        manager.PrepareFrame(new Size(120, 80), 0);
+        manager.UpdateFrame(new Size(120, 80), 0);
         var originalBounds = GetFills(screen).Select(command => command.Bounds).ToArray();
         Assert.True(button.Focus());
 
@@ -525,9 +525,9 @@ public sealed class ButtonTests
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 40, 20);
         var manager = new UiManager();
-        var screen = new UiScreen(root) { Scale = 0.25 };
+        var screen = new GameScreen(root) { Scale = 0.25 };
         manager.Open(screen);
-        manager.PrepareFrame(new Size(30, 20), 0);
+        manager.UpdateFrame(new Size(30, 20), 0);
         Assert.True(button.Focus());
 
         Assert.DoesNotContain(
@@ -542,9 +542,9 @@ public sealed class ButtonTests
         var root = new Canvas();
         var button = Place(root, new Button { BorderThickness = Thickness.Zero }, 10, 10, 80, 32);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(120, 80), 0);
+        manager.UpdateFrame(new Size(120, 80), 0);
 
         Assert.True(button.Focus());
 
@@ -566,9 +566,9 @@ public sealed class ButtonTests
             100,
             40);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(140, 80), 0);
+        manager.UpdateFrame(new Size(140, 80), 0);
 
         var commands = screen.CreateDrawCommandList();
         var imageCommand = Assert.Single(commands.OfType<UiDrawImageCommand>());
@@ -596,13 +596,13 @@ public sealed class ButtonTests
             100,
             40);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         UiNode? source = null;
         var clicks = 0;
         button.PointerClicked += (_, eventArgs) => source = eventArgs.Source;
         button.Click += (_, _) => clicks++;
         manager.Open(screen);
-        manager.PrepareFrame(new Size(140, 80), 0);
+        manager.UpdateFrame(new Size(140, 80), 0);
 
         Click(manager, new Point(60, 30), MouseButton.Left);
 
@@ -618,13 +618,13 @@ public sealed class ButtonTests
         _ = Place(root, new Button(), 0, 0, 80, 32);
         var button = Assert.IsType<Button>(root.Children[0]);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var calls = new List<string>();
         button.PointerClicked += (_, eventArgs) => calls.Add($"raw:{eventArgs.Handled}");
         button.Click += (_, _) => calls.Add("click");
         root.PointerClicked += (_, _) => calls.Add("root");
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
 
         Click(manager, new Point(5, 5), MouseButton.Left);
 
@@ -676,16 +676,16 @@ public sealed class ButtonTests
         var firstRoot = new Canvas();
         var button = Place(firstRoot, new Button(), 0, 0, 40, 40);
         var firstManager = new UiManager();
-        var firstScreen = new UiScreen(firstRoot);
+        var firstScreen = new GameScreen(firstRoot);
         var secondRoot = new Canvas();
         var secondManager = new UiManager();
-        var secondScreen = new UiScreen(secondRoot);
+        var secondScreen = new GameScreen(secondRoot);
         var clicks = 0;
         button.Click += (_, _) => clicks++;
         firstManager.Open(firstScreen);
         secondManager.Open(secondScreen);
-        firstManager.PrepareFrame(new Size(100, 100), 0);
-        secondManager.PrepareFrame(new Size(100, 100), 0);
+        firstManager.UpdateFrame(new Size(100, 100), 0);
+        secondManager.UpdateFrame(new Size(100, 100), 0);
 
         firstManager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         firstManager.ProcessPointerReleased(new Point(80, 80), MouseButton.Left, KeyModifiers.None);
@@ -1070,14 +1070,14 @@ public sealed class ButtonTests
         manager.Close();
     }
 
-    private static (UiManager Manager, UiScreen Screen, Canvas Root, Button Button) OpenButtonScene()
+    private static (UiManager Manager, GameScreen Screen, Canvas Root, Button Button) OpenButtonScene()
     {
         var manager = new UiManager();
         var root = new Canvas();
         var button = Place(root, new Button(), 0, 0, 80, 32);
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         return (manager, screen, root, button);
     }
 

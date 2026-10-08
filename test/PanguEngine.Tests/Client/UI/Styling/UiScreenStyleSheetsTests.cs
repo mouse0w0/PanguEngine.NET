@@ -301,7 +301,7 @@ public sealed class UiScreenStyleSheetsTests
         try
         {
             screen.SetStyleSheets([UiStyleSheet.Parse("CallbackNode { callback-value: 1; }")]);
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
 
             Assert.Equal(4, errors.Count);
             Assert.IsType<InvalidOperationException>(errors[0]);
@@ -341,7 +341,7 @@ public sealed class UiScreenStyleSheetsTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
 
             Assert.IsType<InvalidOperationException>(authorError);
             Assert.IsType<InvalidOperationException>(baseStylesError);

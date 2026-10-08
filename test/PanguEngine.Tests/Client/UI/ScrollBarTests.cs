@@ -371,7 +371,7 @@ public sealed class ScrollBarTests
             Assert.Equal(100, bar.Value);
             manager.ProcessPointerReleased(new Point(8, 120), MouseButton.Left, KeyModifiers.None);
 
-            manager.PrepareFrame(new Size(240, 320), 0);
+            manager.UpdateFrame(new Size(240, 320), 0);
             manager.ProcessPointerMoved(new Point(8, 40));
             manager.ProcessPointerPressed(new Point(8, 40), MouseButton.Left, KeyModifiers.None);
             Assert.Equal(0, bar.Value);
@@ -424,7 +424,7 @@ public sealed class ScrollBarTests
             Assert.Equal(98, bar.Value);
 
             bar.Value = 100;
-            manager.PrepareFrame(new Size(240, 320), 0);
+            manager.UpdateFrame(new Size(240, 320), 0);
             manager.ProcessPointerMoved(new Point(8, 100));
             Assert.False(manager.ProcessPointerWheel(new Point(8, 100), 0, -1, KeyModifiers.None));
             Assert.Equal(100, bar.Value);
@@ -462,7 +462,7 @@ public sealed class ScrollBarTests
         try
         {
             bar.Value = 50;
-            manager.PrepareFrame(new Size(240, 320), 0);
+            manager.UpdateFrame(new Size(240, 320), 0);
             manager.ProcessPointerMoved(new Point(8, 100));
 
             Assert.False(manager.ProcessPointerWheel(new Point(8, 100), 0, -1, KeyModifiers.None));
@@ -546,9 +546,9 @@ public sealed class ScrollBarTests
     {
         var bar = new ScrollBar { Width = 100, Height = 200 };
         var manager = new UiManager();
-        var screen = new UiScreen(bar);
+        var screen = new GameScreen(bar);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 200), 0);
+        manager.UpdateFrame(new Size(100, 200), 0);
 
         var before = bar.Children
             .Select(child => child.Classes.ToArray())
@@ -556,7 +556,7 @@ public sealed class ScrollBarTests
         Assert.True(bar.HasPseudoClass(VerticalPseudoClass));
 
         screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
-        manager.PrepareFrame(new Size(100, 200), 0);
+        manager.UpdateFrame(new Size(100, 200), 0);
 
         Assert.Equal(Orientation.Horizontal, bar.Orientation);
         Assert.True(bar.HasPseudoClass(HorizontalPseudoClass));
@@ -579,7 +579,7 @@ public sealed class ScrollBarTests
             Assert.True(thumb.IsPressed);
 
             screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
-            manager.PrepareFrame(new Size(100, 200), 0);
+            manager.UpdateFrame(new Size(100, 200), 0);
 
             Assert.Equal(Orientation.Horizontal, bar.Orientation);
             var value = bar.Value;
@@ -605,13 +605,13 @@ public sealed class ScrollBarTests
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
 
             screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { visibility: hidden; }")]);
-            manager.PrepareFrame(new Size(16, 200), 0);
+            manager.UpdateFrame(new Size(16, 200), 0);
 
             Assert.False(thumb.IsPressed);
             Assert.False(thumb.IsHovered);
             var value = bar.Value;
-            manager.PrepareFrame(new Size(16, 200), 0, TimeSpan.FromMilliseconds(1000));
-            manager.PrepareFrame(new Size(16, 200), 0, TimeSpan.FromMilliseconds(1400));
+            manager.UpdateFrame(new Size(16, 200), 0, TimeSpan.FromMilliseconds(1000));
+            manager.UpdateFrame(new Size(16, 200), 0, TimeSpan.FromMilliseconds(1400));
             Assert.Equal(value, bar.Value);
         }
         finally
@@ -645,9 +645,9 @@ public sealed class ScrollBarTests
     {
         var bar = new ScrollBar { Width = 16, Height = 200 };
         var manager = new UiManager();
-        var screen = new UiScreen(bar);
+        var screen = new GameScreen(bar);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(16, 200), 0);
+        manager.UpdateFrame(new Size(16, 200), 0);
 
         var thumb = FindPart(bar, "thumb");
         Assert.Equal(new SolidColorBrush(92, 103, 116), thumb.Background);
@@ -656,7 +656,7 @@ public sealed class ScrollBarTests
         Assert.Equal(Thickness.Zero, thumb.BorderThickness);
 
         Assert.True(bar.Focus());
-        manager.PrepareFrame(new Size(16, 200), 0);
+        manager.UpdateFrame(new Size(16, 200), 0);
 
         Assert.Equal(new SolidColorBrush(84, 169, 255), bar.BorderBrush);
         Assert.Equal(new Thickness(1), bar.BorderThickness);
@@ -664,20 +664,20 @@ public sealed class ScrollBarTests
 
         var thumbPosition = thumb.LocalToScreen(new Point(2, 2));
         manager.ProcessPointerMoved(thumbPosition);
-        manager.PrepareFrame(new Size(16, 200), 0);
+        manager.UpdateFrame(new Size(16, 200), 0);
         Assert.Equal(new SolidColorBrush(110, 120, 132), thumb.Background);
 
         manager.ProcessPointerPressed(thumbPosition, MouseButton.Left, KeyModifiers.None);
-        manager.PrepareFrame(new Size(16, 200), 0);
+        manager.UpdateFrame(new Size(16, 200), 0);
         Assert.Equal(new SolidColorBrush(73, 81, 92), thumb.Background);
 
         manager.ProcessPointerReleased(thumbPosition, MouseButton.Left, KeyModifiers.None);
-        manager.PrepareFrame(new Size(16, 200), 0);
+        manager.UpdateFrame(new Size(16, 200), 0);
         Assert.Equal(new SolidColorBrush(110, 120, 132), thumb.Background);
 
         screen.ClearFocus();
         manager.ProcessPointerMoved(new Point(-1, -1));
-        manager.PrepareFrame(new Size(16, 200), 0);
+        manager.UpdateFrame(new Size(16, 200), 0);
         Assert.False(bar.IsFocused);
         Assert.Null(bar.BorderBrush);
         Assert.Equal(Thickness.Zero, bar.BorderThickness);
@@ -700,15 +700,15 @@ public sealed class ScrollBarTests
             Value = 40
         };
         var manager = new UiManager();
-        manager.Open(new UiScreen(bar));
-        manager.PrepareFrame(size, 0);
+        manager.Open(new GameScreen(bar));
+        manager.UpdateFrame(size, 0);
         try
         {
             var thumb = FindPart(bar, "thumb");
             var point = thumb.LocalToScreen(new Point(2, 2));
             Assert.False(bar.IsFocused);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
-            manager.PrepareFrame(size, 0);
+            manager.UpdateFrame(size, 0);
 
             Assert.True(bar.IsFocused);
             Assert.Equal(new Thickness(1), bar.BorderThickness);
@@ -739,7 +739,7 @@ public sealed class ScrollBarTests
         var bar = new ScrollBar { Orientation = orientation, ViewportSize = 17, Value = 100, Focusable = false };
         var (manager, screen, _) = OpenBarScene(bar, vertical ? 16 : 200, vertical ? 200 : 16);
         screen.Scale = scale;
-        manager.PrepareFrame(new Size(240, 320), 0);
+        manager.UpdateFrame(new Size(240, 320), 0);
         try
         {
             var track = FindPart(bar, "track");
@@ -786,8 +786,8 @@ public sealed class ScrollBarTests
         var host = new Panel();
         host.Children.Add(view);
         var manager = new UiManager();
-        manager.Open(new UiScreen(host));
-        manager.PrepareFrame(new Size(200, 200), 0);
+        manager.Open(new GameScreen(host));
+        manager.UpdateFrame(new Size(200, 200), 0);
         try
         {
             view.ScrollTo(0, 50);
@@ -797,7 +797,7 @@ public sealed class ScrollBarTests
             var increase = FindPart(bar, "increase");
             UiNode disabledNode = disabledLevel switch { 0 => bar, 1 => view, _ => host };
             disabledNode.IsEnabled = false;
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
 
             Assert.Equal(new SolidColorBrush(61, 70, 82), thumb.Background);
             Assert.Equal(new SolidColorBrush(27, 30, 35), decrease.Background);
@@ -806,7 +806,7 @@ public sealed class ScrollBarTests
             Assert.Equal(new SolidColorBrush(139, 148, 160), Assert.IsType<Path>(increase.Children.Single()).Fill);
 
             disabledNode.IsEnabled = true;
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
 
             Assert.Equal(new SolidColorBrush(92, 103, 116), thumb.Background);
             Assert.Equal(new SolidColorBrush(48, 54, 62), decrease.Background);
@@ -832,12 +832,12 @@ public sealed class ScrollBarTests
             Assert.Equal(66, bar.Value);
 
             manager.ProcessPointerMoved(new Point(8, 195));
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
             Assert.Equal(82, bar.Value);
 
             manager.ProcessPointerReleased(new Point(8, 195), MouseButton.Left, KeyModifiers.None);
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1800));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1800));
             Assert.Equal(82, bar.Value);
         }
         finally
@@ -860,8 +860,8 @@ public sealed class ScrollBarTests
             manager.ProcessPointerMoved(new Point(8, 195));
             bar.IsEnabled = false;
 
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
             Assert.Equal(66, bar.Value);
         }
         finally
@@ -885,18 +885,18 @@ public sealed class ScrollBarTests
             var value = bar.Value;
             Assert.Equal(track ? 150 : 66, value);
 
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.Zero);
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(350));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.Zero);
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(350));
             Assert.Equal(value, bar.Value);
 
             manager.ProcessPointerMoved(new Point(100, 150));
             manager.ProcessPointerMoved(inside);
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(400));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(400));
             Assert.Equal(value, bar.Value);
 
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(799));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(799));
             Assert.Equal(value, bar.Value);
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(800));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(800));
             Assert.Equal(value + (track ? 100 : 16), bar.Value);
         }
         finally
@@ -961,12 +961,12 @@ public sealed class ScrollBarTests
             manager.ProcessPointerMoved(new Point(8, 195));
             host.IsEnabled = false;
 
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
             Assert.Equal(66, bar.Value);
 
             host.IsEnabled = true;
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1800));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1800));
             Assert.Equal(66, bar.Value);
         }
         finally
@@ -989,12 +989,12 @@ public sealed class ScrollBarTests
             manager.ProcessPointerMoved(new Point(8, 195));
             host.Visibility = Visibility.Hidden;
 
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1000));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
             Assert.Equal(66, bar.Value);
 
             host.Visibility = Visibility.Visible;
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1800));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1800));
             Assert.Equal(66, bar.Value);
         }
         finally
@@ -1021,7 +1021,7 @@ public sealed class ScrollBarTests
             Assert.Equal(value, bar.Value);
 
             host.IsEnabled = true;
-            manager.PrepareFrame(new Size(240, 320), 0);
+            manager.UpdateFrame(new Size(240, 320), 0);
             manager.ProcessPointerMoved(new Point(8, 150));
             Assert.Equal(value, bar.Value);
         }
@@ -1045,9 +1045,9 @@ public sealed class ScrollBarTests
             var value = bar.Value;
 
             Assert.True(host.Children.Remove(bar));
-            manager.PrepareFrame(new Size(240, 320), 0);
+            manager.UpdateFrame(new Size(240, 320), 0);
             host.Children.Add(bar);
-            manager.PrepareFrame(new Size(240, 320), 0);
+            manager.UpdateFrame(new Size(240, 320), 0);
 
             manager.ProcessPointerMoved(new Point(8, 150));
             Assert.Equal(value, bar.Value);
@@ -1072,7 +1072,7 @@ public sealed class ScrollBarTests
             Assert.Equal(0, bar.Value);
 
             bar.Height = 300;
-            manager.PrepareFrame(new Size(240, 320), 0);
+            manager.UpdateFrame(new Size(240, 320), 0);
             Assert.Equal(0, bar.Value);
 
             manager.ProcessPointerMoved(new Point(8, 150));
@@ -1121,11 +1121,11 @@ public sealed class ScrollBarTests
             Assert.Equal(66, bar.Value);
 
             manager.ProcessPointerMoved(new Point(8, 195));
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(0));
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(5000));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(0));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(5000));
             Assert.Equal(82, bar.Value);
 
-            manager.PrepareFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(5016));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(5016));
             Assert.Equal(82, bar.Value);
         }
         finally
@@ -1143,11 +1143,11 @@ public sealed class ScrollBarTests
         {
             var thumb = FindPart(bar, "thumb");
             screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar:focus { minimum-thumb-length: 60; }")]);
-            manager.PrepareFrame(new Size(16, 200), 0);
+            manager.UpdateFrame(new Size(16, 200), 0);
             Assert.Equal(16, thumb.LayoutBounds.Height);
 
             Assert.True(bar.Focus());
-            manager.PrepareFrame(new Size(16, 200), 0);
+            manager.UpdateFrame(new Size(16, 200), 0);
 
             Assert.Equal(60, thumb.LayoutBounds.Height);
             Assert.True(bar.IsArrangeValid);
@@ -1165,12 +1165,12 @@ public sealed class ScrollBarTests
     {
         var bar = new ScrollBar();
         var manager = new UiManager();
-        var screen = new UiScreen(bar);
+        var screen = new GameScreen(bar);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(16, 200), 0);
+        manager.UpdateFrame(new Size(16, 200), 0);
 
         screen.SetStyleSheets([UiStyleSheet.Parse($"ScrollBar {{ {propertyName}: -4; }}")]);
-        var error = Assert.Throws<UiStyleParseException>(() => manager.PrepareFrame(new Size(16, 200), 0));
+        var error = Assert.Throws<UiStyleParseException>(() => manager.UpdateFrame(new Size(16, 200), 0));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
         manager.Close();
@@ -1195,7 +1195,7 @@ public sealed class ScrollBarTests
         }
     }
 
-    private static (UiManager Manager, UiScreen Screen, ScrollBar Bar) OpenBarScene(
+    private static (UiManager Manager, GameScreen Screen, ScrollBar Bar) OpenBarScene(
         ScrollBar bar,
         double width,
         double height)
@@ -1204,15 +1204,15 @@ public sealed class ScrollBarTests
         bar.Height = height;
         bar.HorizontalAlignment = HorizontalAlignment.Left;
         bar.VerticalAlignment = VerticalAlignment.Top;
-        var screen = new UiScreen(bar);
+        var screen = new GameScreen(bar);
         screen.SetBaseStyleSheets([]);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(240, 320), 0);
+        manager.UpdateFrame(new Size(240, 320), 0);
         return (manager, screen, bar);
     }
 
-    private static (UiManager Manager, UiScreen Screen, Panel Host) OpenHostedBarScene(
+    private static (UiManager Manager, GameScreen Screen, Panel Host) OpenHostedBarScene(
         ScrollBar bar,
         double width,
         double height)
@@ -1223,11 +1223,11 @@ public sealed class ScrollBarTests
         bar.VerticalAlignment = VerticalAlignment.Top;
         var host = new Panel();
         host.Children.Add(bar);
-        var screen = new UiScreen(host);
+        var screen = new GameScreen(host);
         screen.SetBaseStyleSheets([]);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(new Size(240, 320), 0);
+        manager.UpdateFrame(new Size(240, 320), 0);
         return (manager, screen, host);
     }
 

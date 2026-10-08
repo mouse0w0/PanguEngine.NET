@@ -452,13 +452,13 @@ public sealed class UiShapeTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(200, 100), 0);
+            screen.PrepareFrame(new Size(200, 100));
 
             Assert.True(rectangle.Contains(new Point(10, 10)));
             Assert.False(rectangle.Contains(new Point(-1, 10)));
 
             screen.Scale = 2;
-            screen.PrepareFrame(new Size(200, 100), 0);
+            screen.PrepareFrame(new Size(200, 100));
 
             Assert.True(rectangle.Contains(new Point(10, 10)));
             Assert.False(rectangle.Contains(new Point(-1, 10)));
@@ -481,7 +481,7 @@ public sealed class UiShapeTests
         root.Children.Add(child);
         var screen = new UiScreen(root) { UseLayoutRounding = false };
         screen.Open();
-        screen.PrepareFrame(new Size(200, 100), 0);
+        screen.PrepareFrame(new Size(200, 100));
         return screen;
     }
 }

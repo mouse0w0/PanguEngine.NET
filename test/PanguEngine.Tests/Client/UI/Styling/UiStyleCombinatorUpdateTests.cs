@@ -525,7 +525,7 @@ public sealed class UiStyleCombinatorUpdateTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
             Assert.True(target.IsMeasureValid);
             Assert.True(target.IsArrangeValid);
             Assert.Equal(Thickness.Zero, target.Padding);

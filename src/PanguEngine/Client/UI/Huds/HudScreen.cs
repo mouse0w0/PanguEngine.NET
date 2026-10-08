@@ -16,7 +16,7 @@ public sealed class HudScreen
     internal HudScreen()
     {
         _root = new Panel();
-        Screen = new HudUiScreen(this, _root);
+        Screen = new HudGameScreen(this, _root);
     }
 
     /// <summary>
@@ -59,7 +59,7 @@ public sealed class HudScreen
         return _hudsByKey.TryGetValue(key, out hud);
     }
 
-    internal UiScreen Screen { get; }
+    internal GameScreen Screen { get; }
 
     internal void Open() => Screen.Open();
 
@@ -71,8 +71,10 @@ public sealed class HudScreen
 
     internal void Update() => Screen.Update();
 
-    internal void PrepareFrame(Size viewportSize, double alpha, TimeSpan frameTime) =>
-        Screen.PrepareFrame(viewportSize, alpha, frameTime);
+    internal void UpdateFrame(double alpha) => Screen.UpdateFrame(alpha);
+
+    internal void PrepareFrame(Size viewportSize, TimeSpan frameTime) =>
+        Screen.PrepareFrame(viewportSize, frameTime);
 
     internal void Close()
     {
@@ -109,7 +111,7 @@ public sealed class HudScreen
             hud.UpdateFrame(alpha);
     }
 
-    private sealed class HudUiScreen(HudScreen owner, Panel root) : UiScreen(root)
+    private sealed class HudGameScreen(HudScreen owner, Panel root) : GameScreen(root)
     {
         protected override void OnFixedUpdate() => owner.DispatchFixedUpdate();
 

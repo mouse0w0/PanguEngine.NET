@@ -80,7 +80,7 @@ public sealed class ControlTests
         var child = new TestNode();
         control.Add(child);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var states = new List<bool>();
         using var subscription = control.Subscribe(
             Control.IsPressedProperty,
@@ -107,7 +107,7 @@ public sealed class ControlTests
                 leftEvents.Add($"clicked:{control.IsPressed}");
         };
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.True(control.IsPressed);
@@ -151,13 +151,13 @@ public sealed class ControlTests
         var first = Place(content, new TestControl(), 0, 0, 20, 20);
         var second = Place(content, new TestControl(), 30, 0, 20, 20);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var outerStates = new List<bool>();
         using var subscription = outer.Subscribe(
             Control.IsPressedProperty,
             (_, args) => outerStates.Add(args.NewValue));
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
@@ -189,16 +189,16 @@ public sealed class ControlTests
         var child = new TestNode();
         oldControl.Add(child);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
         newControl.Add(child);
 
         Assert.False(oldControl.IsPressed);
         Assert.False(newControl.IsPressed);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         Assert.False(oldControl.IsPressed);
         Assert.False(newControl.IsPressed);
 
@@ -218,11 +218,11 @@ public sealed class ControlTests
         var child = new TestNode { Focusable = true };
         oldControl.Add(child);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var releaseCalls = 0;
         child.PointerReleased += (_, _) => releaseCalls++;
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.True(oldControl.IsPressed);
         Assert.Same(child, screen.FocusedNode);
@@ -232,7 +232,7 @@ public sealed class ControlTests
         Assert.False(oldControl.IsPressed);
         Assert.Null(screen.FocusedNode);
 
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
 
         Assert.False(oldControl.IsPressed);
         Assert.Null(screen.FocusedNode);
@@ -249,11 +249,11 @@ public sealed class ControlTests
         var child = new TestNode();
         control.Add(child);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var releaseCalls = 0;
         child.PointerReleased += (_, _) => releaseCalls++;
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
         Assert.True(root.Children.Remove(control));
@@ -273,7 +273,7 @@ public sealed class ControlTests
         var child = new TestNode();
         control.Add(child);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var backgroundEnters = 0;
         var childReleases = 0;
         var childClicks = 0;
@@ -296,7 +296,7 @@ public sealed class ControlTests
                 Assert.Equal(0, backgroundEnters);
             });
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(control.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -316,7 +316,7 @@ public sealed class ControlTests
         Assert.Equal(0, childReleases);
         Assert.Equal(0, childClicks);
 
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         Assert.Equal(1, backgroundEnters);
 
         control.IsEnabled = true;
@@ -325,7 +325,7 @@ public sealed class ControlTests
         Assert.False(control.IsFocused);
         Assert.Null(screen.FocusedNode);
 
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         Assert.True(control.IsHovered);
         manager.Close();
     }
@@ -338,7 +338,7 @@ public sealed class ControlTests
         var inner = new TestControl();
         outer.Add(inner);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var innerError = new InvalidOperationException("inner pressed");
         var outerError = new InvalidOperationException("outer pressed");
         using var innerSubscription = inner.Subscribe(
@@ -360,7 +360,7 @@ public sealed class ControlTests
         inner.PointerReleased += (_, _) => releaseCalls++;
         inner.PointerClicked += (_, _) => clickCalls++;
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
         var actual = Assert.Throws<InvalidOperationException>(() =>
@@ -384,7 +384,7 @@ public sealed class ControlTests
         var inner = new TestControl { Focusable = true };
         outer.Add(inner);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var focusedError = new InvalidOperationException("focused");
         var innerPressedError = new InvalidOperationException("inner pressed");
         var outerPressedError = new InvalidOperationException("outer pressed");
@@ -430,7 +430,7 @@ public sealed class ControlTests
         };
         outer.PointerExited += (_, _) => events.Add("outer-exit");
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.True(inner.IsFocused);
@@ -457,7 +457,7 @@ public sealed class ControlTests
         var root = new Canvas();
         var control = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         var cleanupError = new InvalidOperationException("cleanup");
         var enabledError = new InvalidOperationException("enabled");
         _ = control.Subscribe(Control.IsPressedProperty, (_, args) =>
@@ -471,7 +471,7 @@ public sealed class ControlTests
                 throw enabledError;
         };
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(control.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -493,7 +493,7 @@ public sealed class ControlTests
         var root = new Canvas();
         var control = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         screen.SetStyleSheets([
             new UiStyleSheet([
                 new UiStyleRule(UiStyleSelector.For<TestControl>(pseudoClasses: [UiPseudoClass.Disabled]), [
@@ -521,7 +521,7 @@ public sealed class ControlTests
             }
         };
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(control.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -543,9 +543,9 @@ public sealed class ControlTests
         var manager = new UiManager();
         var root = new Canvas();
         var control = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(control.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -559,7 +559,7 @@ public sealed class ControlTests
         Assert.Null(screen.FocusedNode);
 
         manager.Open(screen);
-        manager.PrepareFrame(new Size(100, 100), 0);
+        manager.UpdateFrame(new Size(100, 100), 0);
 
         Assert.False(control.IsHovered);
         Assert.False(control.IsPressed);
@@ -574,9 +574,9 @@ public sealed class ControlTests
         var firstManager = new UiManager();
         var firstRoot = new Canvas();
         var control = Place(firstRoot, new TestControl { Focusable = true }, 0, 0, 40, 40);
-        var firstScreen = new UiScreen(firstRoot);
+        var firstScreen = new GameScreen(firstRoot);
         firstManager.Open(firstScreen);
-        firstManager.PrepareFrame(new Size(100, 100), 0);
+        firstManager.UpdateFrame(new Size(100, 100), 0);
         firstManager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(control.Focus());
         firstManager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -590,11 +590,11 @@ public sealed class ControlTests
 
         var secondManager = new UiManager();
         var secondRoot = new Canvas();
-        var secondScreen = new UiScreen(secondRoot);
+        var secondScreen = new GameScreen(secondRoot);
         secondManager.Open(secondScreen);
-        secondManager.PrepareFrame(new Size(100, 100), 0);
+        secondManager.UpdateFrame(new Size(100, 100), 0);
         firstScreen.Root = firstRoot;
-        firstManager.PrepareFrame(new Size(100, 100), 0);
+        firstManager.UpdateFrame(new Size(100, 100), 0);
         firstManager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(control.Focus());
         firstManager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);

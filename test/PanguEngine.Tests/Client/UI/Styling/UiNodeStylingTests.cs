@@ -1448,7 +1448,7 @@ public sealed class UiNodeStylingTests
         node.DrawAction = () => drawingError = Record.Exception(() => node.Set(Loading, false));
         screen.Open();
 
-        screen.PrepareFrame(new Size(20, 20), 0);
+        screen.PrepareFrame(new Size(20, 20));
         _ = screen.CreateDrawCommandList();
 
         Assert.Null(layoutError);
@@ -1510,7 +1510,7 @@ public sealed class UiNodeStylingTests
         };
         screen.Open();
 
-        screen.PrepareFrame(new Size(20, 20), 0);
+        screen.PrepareFrame(new Size(20, 20));
         _ = screen.CreateDrawCommandList();
 
         Assert.Null(layoutStyleIdError);
@@ -1524,7 +1524,7 @@ public sealed class UiNodeStylingTests
         Assert.False(node.IsStyleValid);
         Assert.False(node.IsStyleSubtreeValid);
 
-        screen.PrepareFrame(new Size(20, 20), 0);
+        screen.PrepareFrame(new Size(20, 20));
 
         Assert.Equal(0.7, node.Opacity);
         Assert.True(node.IsStyleValid);
@@ -1556,7 +1556,7 @@ public sealed class UiNodeStylingTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
 
             Assert.Equal(new[] { 10d, 20d }, measuredWidths);
             Assert.Equal(duringArrange ? new[] { 10d, 20d } : new[] { 20d }, arrangedWidths);
@@ -1625,7 +1625,7 @@ public sealed class UiNodeStylingTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
 
             Assert.True(visited);
             Assert.False(screen.IsUpdatingLayout);

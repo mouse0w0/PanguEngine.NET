@@ -4,7 +4,7 @@ using PanguEngine.Client.UI.Drawing;
 
 namespace PanguEngine.Client.Screens;
 
-internal sealed class PauseScreen : UiScreen
+internal sealed class PauseScreen : GameScreen
 {
     internal PauseScreen()
         : base(CreateRoot())

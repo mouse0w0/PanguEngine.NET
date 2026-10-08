@@ -260,7 +260,7 @@ public sealed class ClientEngine
         Ui.Update();
     }
 
-    private void OnCurrentScreenChanged(UiScreen? oldScreen, UiScreen? newScreen)
+    private void OnCurrentScreenChanged(GameScreen? oldScreen, GameScreen? newScreen)
     {
         if (newScreen?.PausesGame == true)
             Game.Pause();

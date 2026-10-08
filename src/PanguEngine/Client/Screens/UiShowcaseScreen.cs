@@ -8,7 +8,7 @@ namespace PanguEngine.Client.Screens;
 /// <summary>
 /// Hosts the interactive UI showcase with four categories and one visible example at a time.
 /// </summary>
-internal sealed class UiShowcaseScreen : UiScreen
+internal sealed class UiShowcaseScreen : GameScreen
 {
     private readonly UiStyleSheet _sheet;
     private readonly UiStyleSheet _overrides;

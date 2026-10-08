@@ -83,12 +83,12 @@ public sealed class UiDrawingTests
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
         var screen = new UiScreen(node);
         screen.Open();
-        screen.PrepareFrame(new Size(100, 100), 0);
+        screen.PrepareFrame(new Size(100, 100));
         var before = screen.CreateDrawCommandList();
 
         screen.Scale = 2;
         var pending = screen.CreateDrawCommandList();
-        screen.PrepareFrame(new Size(100, 100), 0);
+        screen.PrepareFrame(new Size(100, 100));
         var after = screen.CreateDrawCommandList();
 
         Assert.Single(before.OfType<UiFillRectangleCommand>());
@@ -105,12 +105,12 @@ public sealed class UiDrawingTests
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
         var screen = new UiScreen(node);
         screen.Open();
-        screen.PrepareFrame(new Size(100, 100), 0);
+        screen.PrepareFrame(new Size(100, 100));
         var before = screen.CreateDrawCommandList();
 
         screen.UseLayoutRounding = false;
         var pending = screen.CreateDrawCommandList();
-        screen.PrepareFrame(new Size(100, 100), 0);
+        screen.PrepareFrame(new Size(100, 100));
         var after = screen.CreateDrawCommandList();
 
         Assert.Single(before.OfType<UiFillRectangleCommand>());
@@ -124,7 +124,7 @@ public sealed class UiDrawingTests
     {
         var screen = new UiScreen { Scale = 2 };
         screen.Open();
-        screen.PrepareFrame(new Size(100, 100), 0);
+        screen.PrepareFrame(new Size(100, 100));
 
         var commands = screen.CreateDrawCommandList();
 
@@ -1145,7 +1145,7 @@ public sealed class UiDrawingTests
         Arrange(first, new Rect(0, 0, 10, 10));
         Arrange(second, new Rect(20, 0, 10, 10));
         screen.Open();
-        screen.PrepareFrame(new Size(100, 100), 0);
+        screen.PrepareFrame(new Size(100, 100));
         var errors = new List<Exception?>();
         root.DrawAction = _ =>
         {
@@ -1220,13 +1220,13 @@ public sealed class UiDrawingTests
     {
         var manager = new UiManager();
         var root = new DrawingNode();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
         Arrange(root, new Rect(0, 0, 10, 10));
         var errors = new List<Exception?>();
         root.DrawAction = _ =>
         {
-            errors.Add(Record.Exception(() => manager.Open(new UiScreen())));
+            errors.Add(Record.Exception(() => manager.Open(new GameScreen())));
             errors.Add(Record.Exception(manager.Close));
             errors.Add(Record.Exception(manager.Destroy));
         };
@@ -1243,7 +1243,7 @@ public sealed class UiDrawingTests
     {
         var manager = new UiManager();
         var node = new DrawingNode();
-        var screen = new UiScreen(node);
+        var screen = new GameScreen(node);
         Arrange(node, new Rect(0, 0, 10, 10));
         Exception? openError = null;
         node.DrawAction = _ =>
@@ -1285,7 +1285,7 @@ public sealed class UiDrawingTests
         _ = screen.CreateDrawCommandList();
         Assert.Equal(0, calls);
 
-        screen.PrepareFrame(new Size(10, 10), 0);
+        screen.PrepareFrame(new Size(10, 10));
         Assert.Equal(1, calls);
         screen.Close();
     }

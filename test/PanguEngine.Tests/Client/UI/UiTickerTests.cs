@@ -158,9 +158,9 @@ public sealed class UiTickerTests
         try
         {
             ticker.Start();
-            screen.PrepareFrame(Viewport, 0.9, TimeSpan.FromSeconds(10));
-            screen.PrepareFrame(Viewport, 0.1, TimeSpan.FromSeconds(10.02));
-            screen.PrepareFrame(Viewport, 0.5, TimeSpan.FromSeconds(10.05));
+            screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10));
+            screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.02));
+            screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.05));
             Assert.Equal(5, distance, 8);
             Assert.Equal([TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10.02),
                 TimeSpan.FromSeconds(10.05)], times);
@@ -267,7 +267,7 @@ public sealed class UiTickerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void TasksStartedByPostsOrFrameUpdatesWaitUntilNextFrame(bool fromPost)
+    public void TickersStartedByFrameUpdatesRunImmediatelyAndPostsWaitUntilNextFrame(bool fromPost)
     {
         var node = new TickingNode();
         var calls = 0;
@@ -281,9 +281,33 @@ public sealed class UiTickerTests
             else
                 screen.FrameAction = ticker.Start;
             Prepare(screen, 10);
-            Assert.Equal(0, calls);
+            Assert.Equal(fromPost ? 0 : 1, calls);
             Prepare(screen, 11);
-            Assert.Equal(1, calls);
+            Assert.Equal(fromPost ? 1 : 2, calls);
+        }
+        finally
+        {
+            screen.Close();
+        }
+    }
+
+    [Fact]
+    public void TickerStartedByPostFromFrameUpdateWaitsUntilNextFrame()
+    {
+        var node = new TickingNode();
+        var calls = new List<TimeSpan>();
+        var ticker = node.AddTicker(calls.Add);
+        var screen = new CallbackScreen(node);
+        screen.FrameAction = () => screen.Post(ticker.Start);
+        screen.Open();
+        try
+        {
+            Prepare(screen, 10);
+            Assert.True(ticker.IsActive);
+            Assert.Empty(calls);
+
+            Prepare(screen, 11);
+            Assert.Equal([TimeSpan.FromSeconds(11)], calls);
         }
         finally
         {
@@ -297,7 +321,7 @@ public sealed class UiTickerTests
         var manager = new UiManager();
         var hudNode = MountHudNode(manager);
         var screenNode = new TickingNode();
-        var screen = new UiScreen(screenNode);
+        var screen = new GameScreen(screenNode);
         manager.Open(screen);
         var calls = new List<(string Name, TimeSpan Time)>();
         var regular = screenNode.AddTicker(now => calls.Add(("screen", now)));
@@ -325,7 +349,7 @@ public sealed class UiTickerTests
         var manager = new UiManager();
         var hudNode = MountHudNode(manager);
         var screenNode = new TickingNode();
-        manager.Open(new UiScreen(screenNode));
+        manager.Open(new GameScreen(screenNode));
         var source = fromHud ? hudNode : screenNode;
         var target = fromHud ? screenNode : hudNode;
         var calls = new List<TimeSpan>();
@@ -360,7 +384,7 @@ public sealed class UiTickerTests
         var manager = new UiManager();
         var hudNode = MountHudNode(manager);
         var screenNode = new TickingNode();
-        var screen = new UiScreen(screenNode);
+        var screen = new GameScreen(screenNode);
         manager.Open(screen);
         var expected = new InvalidOperationException("tick failed");
         var failure = hudNode.AddTicker(_ => throw expected);
@@ -406,7 +430,7 @@ public sealed class UiTickerTests
             screen.Post(() => events.Add("post"));
             ticker.Start();
             Prepare(screen, 10);
-            Assert.Equal(["post", "frame", "tick", "measure", "measure", "measure"], events);
+            Assert.Equal(["frame", "post", "tick", "measure", "measure", "measure"], events);
             Assert.Equal(40, node.LayoutBounds.Width);
             Assert.True(node.IsArrangeValid);
         }
@@ -886,10 +910,16 @@ public sealed class UiTickerTests
     }
 
     private static void Prepare(UiScreen screen, double seconds) =>
-        screen.PrepareFrame(Viewport, 0, TimeSpan.FromSeconds(seconds));
+        screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(seconds));
+
+    private static void Prepare(GameScreen screen, double seconds)
+    {
+        screen.UpdateFrame(0);
+        screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(seconds));
+    }
 
     private static void Prepare(UiManager manager, double seconds) =>
-        manager.PrepareFrame(Viewport, 0, TimeSpan.FromSeconds(seconds));
+        manager.UpdateFrame(Viewport, 0, TimeSpan.FromSeconds(seconds));
 
     private static TickingNode MountHudNode(UiManager manager)
     {
@@ -925,7 +955,7 @@ public sealed class UiTickerTests
         }
     }
 
-    private sealed class CallbackScreen(UiNode root) : UiScreen(root)
+    private sealed class CallbackScreen(UiNode root) : GameScreen(root)
     {
         internal Action? OpeningAction { get; init; }
         internal Action? FrameAction { get; set; }

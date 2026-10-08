@@ -66,7 +66,7 @@ public sealed class DirectPropertyStyleTests
         node.DrawAction = () => error = Record.Exception(() => node.Value = 9);
         screen.Open();
 
-        screen.PrepareFrame(new Size(20, 20), 0);
+        screen.PrepareFrame(new Size(20, 20));
         _ = screen.CreateDrawCommandList();
 
         Assert.IsType<InvalidOperationException>(error);

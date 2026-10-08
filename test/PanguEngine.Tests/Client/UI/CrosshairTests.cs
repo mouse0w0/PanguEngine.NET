@@ -130,7 +130,7 @@ public sealed class CrosshairTests
         var screen = new UiScreen(root) { UseLayoutRounding = false, Scale = 2 };
         screen.Open();
 
-        screen.PrepareFrame(new Size(240, 160), 0);
+        screen.PrepareFrame(new Size(240, 160));
 
         Assert.Equal(60, crosshair.LayoutBounds.X + crosshair.LayoutBounds.Width / 2);
         Assert.Equal(40, crosshair.LayoutBounds.Y + crosshair.LayoutBounds.Height / 2);
@@ -147,7 +147,7 @@ public sealed class CrosshairTests
         var screen = new UiScreen(root) { UseLayoutRounding = false, Scale = 2 };
         screen.Open();
 
-        screen.PrepareFrame(new Size(240, 160), 0);
+        screen.PrepareFrame(new Size(240, 160));
 
         Assert.Equal(12, crosshair.DesiredSize.Width);
         Assert.Equal(12, crosshair.DesiredSize.Height);
@@ -170,7 +170,7 @@ public sealed class CrosshairTests
         var screen = new UiScreen(root) { UseLayoutRounding = false, Scale = 2 };
         screen.Open();
 
-        screen.PrepareFrame(new Size(240, 160), 0);
+        screen.PrepareFrame(new Size(240, 160));
 
         Assert.Equal(24, crosshair.DesiredSize.Width);
         Assert.Equal(24, crosshair.DesiredSize.Height);
@@ -210,7 +210,7 @@ public sealed class CrosshairTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(240, 160), 0);
+            screen.PrepareFrame(new Size(240, 160));
             var builder = new UiDrawBuilder();
 
             builder.Build(screen.CreateDrawCommandList(), 240, 160, false);
@@ -243,7 +243,7 @@ public sealed class CrosshairTests
             var screen = new UiScreen(crosshair);
             screen.Open();
 
-            Assert.Throws<InvalidOperationException>(() => screen.PrepareFrame(new Size(200, 100), 0));
+            Assert.Throws<InvalidOperationException>(() => screen.PrepareFrame(new Size(200, 100)));
 
             screen.Close();
         }
@@ -277,7 +277,7 @@ public sealed class CrosshairTests
         root.Children.Add(crosshair);
         var screen = new UiScreen(root) { UseLayoutRounding = false };
         screen.Open();
-        screen.PrepareFrame(new Size(200, 100), 0);
+        screen.PrepareFrame(new Size(200, 100));
         return screen;
     }
 }

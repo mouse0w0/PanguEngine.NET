@@ -172,7 +172,7 @@ public sealed class UiHitTestTests
         var leaf = new TestNode();
         root.Add(branch);
         branch.Add(leaf);
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
 
         Assert.Same(screen, leaf.Screen);
 
@@ -225,7 +225,7 @@ public sealed class UiHitTestTests
         var root = new TestParent();
         var leaf = new TestNode();
         root.Add(leaf);
-        manager.Open(new UiScreen(root));
+        manager.Open(new GameScreen(root));
         Arrange(root, new Rect(double.MaxValue, 0, 1, 1));
         Arrange(leaf, new Rect(double.MaxValue, 0, 1, 1));
 

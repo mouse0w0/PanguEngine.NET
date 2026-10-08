@@ -161,7 +161,7 @@ public sealed class TextBoxTests
         using var context = new UiTextTestContext();
         var (manager, screen, node) = OpenTextBox();
         node.BorderThickness = Thickness.Zero;
-        manager.PrepareFrame(new Size(240, 80), 0);
+        manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(node.Focus());
 
         Assert.DoesNotContain(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
@@ -598,7 +598,7 @@ public sealed class TextBoxTests
         using var context = new UiTextTestContext();
         var (manager, screen, textBox) = OpenTextBox("A long value that exceeds the viewport");
         textBox.Width = 80;
-        manager.PrepareFrame(new Size(240, 80), 0);
+        manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
 
         var commands = screen.CreateDrawCommandList();
@@ -628,7 +628,7 @@ public sealed class TextBoxTests
         using var context = new UiTextTestContext();
         var (manager, screen, textBox) = OpenTextBox();
         textBox.Placeholder = "hint";
-        manager.PrepareFrame(new Size(240, 80), 0);
+        manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
         screen.Root!.UpdateStyles();
 
@@ -667,14 +667,14 @@ public sealed class TextBoxTests
         Assert.True(textBox.Focus());
         manager.ProcessTextInput("a");
         screen.ClearFocus();
-        manager.PrepareFrame(new Size(240, 80), 0);
+        manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
         manager.ProcessTextInput("b");
 
         textBox.Undo();
 
         Assert.Equal("a", textBox.Text);
-        manager.PrepareFrame(new Size(240, 80), 0);
+        manager.UpdateFrame(new Size(240, 80), 0);
         textBox.SelectAll();
         Assert.Contains(
             screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
@@ -685,7 +685,7 @@ public sealed class TextBoxTests
             command => command.Color == textBox.SelectionBackground);
     }
 
-    private static (UiManager Manager, UiScreen Screen, TextBox TextBox) OpenTextBox(
+    private static (UiManager Manager, GameScreen Screen, TextBox TextBox) OpenTextBox(
         string text = "",
         TextBox? textBox = null)
     {
@@ -695,9 +695,9 @@ public sealed class TextBoxTests
         textBox.Width = 200;
         textBox.Height = 40;
         root.Children.Add(textBox);
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(240, 80), 0);
+        manager.UpdateFrame(new Size(240, 80), 0);
         return (manager, screen, textBox);
     }
 

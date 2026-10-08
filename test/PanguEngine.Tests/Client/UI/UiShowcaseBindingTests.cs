@@ -282,16 +282,16 @@ public sealed class UiShowcaseBindingTests
         internal ShowcaseHost(UiNode content, Size viewport)
         {
             _viewport = viewport;
-            Screen = new UiScreen(content) { UseLayoutRounding = false, Scale = 1 };
+            Screen = new GameScreen(content) { UseLayoutRounding = false, Scale = 1 };
             _manager.Open(Screen);
-            _manager.PrepareFrame(_viewport, 0);
+            _manager.UpdateFrame(_viewport, 0);
         }
 
-        internal UiScreen Screen { get; }
+        internal GameScreen Screen { get; }
 
         internal void Click(UiNode node)
         {
-            _manager.PrepareFrame(_viewport, 0);
+            _manager.UpdateFrame(_viewport, 0);
             var center = node.LocalToScreen(new Point(
                 node.LayoutBounds.Width / 2,
                 node.LayoutBounds.Height / 2));

@@ -25,7 +25,7 @@ internal sealed class UiBatchScene : IClientTestScene
     private UiRenderer _renderer = null!;
     private UiManager _uiManager = null!;
     private UiBatchNode _root = null!;
-    private UiScreen _screen = null!;
+    private GameScreen _screen = null!;
     private Clipboard _clipboard = null!;
     private UiImage _firstImage = null!;
     private UiImage _secondImage = null!;
@@ -74,7 +74,7 @@ internal sealed class UiBatchScene : IClientTestScene
             _fourthImage,
             _nineSliceImage,
             _oversizedImage);
-        _screen = new UiScreen(_root) { Scale = UiScale };
+        _screen = new GameScreen(_root) { Scale = UiScale };
         _uiManager = new UiManager();
         _uiManager.Open(_screen);
         window.PreRender += (_, alpha) => PrepareFrame(alpha);
@@ -93,7 +93,7 @@ internal sealed class UiBatchScene : IClientTestScene
     private void PrepareFrame(double alpha)
     {
         _root.Dense = _completedFrames >= _presenter.MaxFramesInFlight;
-        _uiManager.PrepareFrame(new Size(_presenter.Width, _presenter.Height), alpha);
+        _uiManager.UpdateFrame(new Size(_presenter.Width, _presenter.Height), alpha);
         if (!_buttonStatesInitialized)
         {
             _root.EstablishButtonStates(_uiManager);

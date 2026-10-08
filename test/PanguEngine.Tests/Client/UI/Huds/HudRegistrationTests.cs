@@ -35,7 +35,7 @@ public sealed class HudRegistrationTests
     public void FactoryCannotReenterManagerLifecycleOperations()
     {
         var manager = new UiManager();
-        var screen = new UiScreen(new Panel());
+        var screen = new GameScreen(new Panel());
         manager.Open(screen);
         var key = ResourceKey.Create("test", "hud");
         var calls = 0;
@@ -44,11 +44,11 @@ public sealed class HudRegistrationTests
         {
             calls++;
             Assert.Throws<InvalidOperationException>(() => manager.InitializeHud(definitions));
-            Assert.Throws<InvalidOperationException>(() => manager.Open(new UiScreen()));
+            Assert.Throws<InvalidOperationException>(() => manager.Open(new GameScreen()));
             Assert.Throws<InvalidOperationException>(manager.Close);
             Assert.Throws<InvalidOperationException>(manager.Destroy);
             Assert.Throws<InvalidOperationException>(manager.Update);
-            Assert.Throws<InvalidOperationException>(() => manager.PrepareFrame(new Size(10, 10), 0));
+            Assert.Throws<InvalidOperationException>(() => manager.UpdateFrame(new Size(10, 10), 0));
             Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
             return new RecordingHud();
         }));
@@ -62,7 +62,7 @@ public sealed class HudRegistrationTests
             Assert.Same(screen, manager.CurrentScreen);
             Assert.IsType<RecordingHud>(manager.Hud.Get(key));
             manager.Update();
-            manager.PrepareFrame(new Size(10, 10), 0);
+            manager.UpdateFrame(new Size(10, 10), 0);
             Assert.True(screen.Root!.IsArrangeValid);
         }
         finally
@@ -247,7 +247,7 @@ public sealed class HudRegistrationTests
             manager.InitializeHud(definitions);
 
             manager.Update();
-            manager.PrepareFrame(new Size(200, 100), 0.5);
+            manager.UpdateFrame(new Size(200, 100), 0.5);
 
             Assert.Equal(
                 ["first:fixed", "second:fixed", "first:frame:0.5", "second:frame:0.5"],
@@ -277,7 +277,7 @@ public sealed class HudRegistrationTests
             component.Root.Visibility = Visibility.Hidden;
 
             manager.Update();
-            manager.PrepareFrame(new Size(200, 100), 0);
+            manager.UpdateFrame(new Size(200, 100), 0);
 
             Assert.Contains("hud:fixed", events);
             Assert.Contains("hud:frame:0", events);
@@ -288,7 +288,7 @@ public sealed class HudRegistrationTests
             events.Clear();
 
             manager.Update();
-            manager.PrepareFrame(new Size(200, 100), 0);
+            manager.UpdateFrame(new Size(200, 100), 0);
 
             Assert.Contains("hud:fixed", events);
             Assert.Contains("hud:frame:0", events);
@@ -397,10 +397,10 @@ public sealed class HudRegistrationTests
     {
         var events = new List<string>();
         var manager = new UiManager();
-        var screen = new UiScreen(new Panel());
+        var screen = new GameScreen(new Panel());
         void Check()
         {
-            Assert.Throws<InvalidOperationException>(() => manager.Open(new UiScreen()));
+            Assert.Throws<InvalidOperationException>(() => manager.Open(new GameScreen()));
             Assert.Throws<InvalidOperationException>(manager.Close);
             Assert.Throws<InvalidOperationException>(manager.Destroy);
         }
@@ -423,7 +423,7 @@ public sealed class HudRegistrationTests
             if (fixedUpdate)
                 manager.Update();
             else
-                manager.PrepareFrame(new Size(100, 100), 0);
+                manager.UpdateFrame(new Size(100, 100), 0);
 
             Assert.Same(screen, manager.CurrentScreen);
             string[] expected = fixedUpdate

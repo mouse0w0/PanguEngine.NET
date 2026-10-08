@@ -15,7 +15,7 @@ public sealed class UiShowcaseScreenTests
         using var context = new UiTextTestContext();
         var screen = CreateScreen();
         screen.Open();
-        screen.PrepareFrame(new Size(800, 600), 0);
+        Prepare(screen, new Size(800, 600));
 
         var categories = screen.Shell.CategoryTabs;
         var strip = Assert.Single(categories.Children.OfType<TabStripPanel>());
@@ -135,11 +135,11 @@ public sealed class UiShowcaseScreenTests
         var screen = CreateScreen();
         screen.Scale = 1;
         screen.Open();
-        screen.PrepareFrame(new Size(800, 600), 0);
+        Prepare(screen, new Size(800, 600));
 
         var probe = new Button { Text = "probe" };
         Assert.IsAssignableFrom<Panel>(screen.CurrentExample.Content).Children.Add(probe);
-        screen.PrepareFrame(new Size(800, 600), 0);
+        Prepare(screen, new Size(800, 600));
 
         Assert.True(probe.Focus());
         Assert.Same(probe, screen.FocusedNode);
@@ -159,9 +159,9 @@ public sealed class UiShowcaseScreenTests
         screen.Scale = 1;
         screen.Open();
 
-        screen.PrepareFrame(new Size(800, 600), 0);
-        screen.PrepareFrame(new Size(400, 300), 0);
-        screen.PrepareFrame(new Size(400, 300), 0);
+        Prepare(screen, new Size(800, 600));
+        Prepare(screen, new Size(400, 300));
+        Prepare(screen, new Size(400, 300));
 
         Assert.True(screen.Shell.IsCompact);
         Assert.True(screen.Shell.ShowWarning);
@@ -170,8 +170,8 @@ public sealed class UiShowcaseScreenTests
         foreach (var button in screen.Shell.ScaleButtons)
             AssertReachable(screen, button, 400, 300);
 
-        screen.PrepareFrame(new Size(800, 600), 0);
-        screen.PrepareFrame(new Size(800, 600), 0);
+        Prepare(screen, new Size(800, 600));
+        Prepare(screen, new Size(800, 600));
 
         Assert.False(screen.Shell.IsCompact);
         Assert.False(screen.Shell.ShowWarning);
@@ -186,9 +186,9 @@ public sealed class UiShowcaseScreenTests
         var screen = CreateScreen();
         screen.Scale = 1;
         screen.Open();
-        screen.PrepareFrame(new Size(800, 600), 0);
-        screen.PrepareFrame(new Size(800, 340), 0);
-        screen.PrepareFrame(new Size(800, 340), 0);
+        Prepare(screen, new Size(800, 600));
+        Prepare(screen, new Size(800, 340));
+        Prepare(screen, new Size(800, 340));
 
         var tabs = screen.Shell.CategoryTabs;
         var strip = Assert.Single(tabs.Children.OfType<TabStripPanel>());
@@ -203,11 +203,17 @@ public sealed class UiShowcaseScreenTests
         });
         Assert.True(buttons[1].IsEnabled);
 
-        screen.PrepareFrame(new Size(800, 600), 0);
-        screen.PrepareFrame(new Size(800, 600), 0);
+        Prepare(screen, new Size(800, 600));
+        Prepare(screen, new Size(800, 600));
         Assert.False(viewport.HasOverflow);
         Assert.All(buttons, button => Assert.Equal(Visibility.Hidden, button.Visibility));
         screen.Close();
+    }
+
+    private static void Prepare(UiShowcaseScreen screen, Size viewportSize)
+    {
+        screen.UpdateFrame(0);
+        screen.PrepareFrame(viewportSize);
     }
 
     private static UiShowcaseScreen CreateScreen(Action? returnToPause = null)

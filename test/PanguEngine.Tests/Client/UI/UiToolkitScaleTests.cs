@@ -59,13 +59,13 @@ public sealed class UiToolkitScaleTests
         {
             UiToolkit.DefaultScale = 1;
             var root = new LayoutNode();
-            var screen = new UiScreen(root);
+            var screen = new GameScreen(root);
             manager.Open(screen);
-            manager.PrepareFrame(new Size(100, 80), 0);
+            manager.UpdateFrame(new Size(100, 80), 0);
             Assert.Equal(new Size(100, 80), root.LastMeasureConstraint);
 
             UiToolkit.DefaultScale = 2;
-            manager.PrepareFrame(new Size(100, 80), 0);
+            manager.UpdateFrame(new Size(100, 80), 0);
 
             Assert.Equal(2, screen.Scale);
             Assert.Equal(new Size(50, 40), root.LastMeasureConstraint);
@@ -87,11 +87,11 @@ public sealed class UiToolkitScaleTests
         try
         {
             UiToolkit.DefaultScale = 1;
-            var screen = new UiScreen { Scale = 1 };
+            var screen = new GameScreen { Scale = 1 };
             manager.Open(screen);
 
             UiToolkit.DefaultScale = 2;
-            manager.PrepareFrame(new Size(100, 80), 0);
+            manager.UpdateFrame(new Size(100, 80), 0);
 
             Assert.Equal(1, screen.Scale);
         }

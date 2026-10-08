@@ -89,7 +89,7 @@ public sealed class TabViewInputTests
     {
         var (manager, _, view, items) = OpenScene(2, closable: true);
         view.Selection.SelectedItem = items[1];
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(items[1].Focus());
         var requested = new List<TabItem>();
         view.TabCloseRequested += (_, args) => requested.Add(args.Item);
@@ -165,9 +165,9 @@ public sealed class TabViewInputTests
         Canvas.SetTop(other, 200);
         root.Children.Add(other);
         var manager = new UiManager();
-        var screen = new UiScreen(root);
+        var screen = new GameScreen(root);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(600, 300), 0);
+        manager.UpdateFrame(new Size(600, 300), 0);
         Assert.True(other.Focus());
         var selected = view.Selection.SelectedItem;
 
@@ -186,7 +186,7 @@ public sealed class TabViewInputTests
         Assert.True(items[1].Focus());
 
         view.Items.Remove(items[1]);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(items[2], view.Selection.SelectedItem);
         Assert.Same(items[2], screen.FocusedNode);
@@ -211,7 +211,7 @@ public sealed class TabViewInputTests
     {
         var (manager, _, view, items) = OpenScene(2, closable: true);
         view.Selection.SelectedItem = items[1];
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         var close = Assert.Single(items[0].Children.OfType<TabCloseButton>());
         var target = CloseCenter(close);
         Assert.Same(close, manager.CurrentScreen!.HitTest(target));
@@ -238,7 +238,7 @@ public sealed class TabViewInputTests
 
         manager.ProcessPointerPressed(start, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(end);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(items[0].IsDragging);
         Assert.True(items[0].HasPseudoClass(DraggingPseudoClass));
         manager.ProcessPointerReleased(end, MouseButton.Left, KeyModifiers.None);
@@ -318,7 +318,7 @@ public sealed class TabViewInputTests
 
         manager.ProcessFocusChanged(true);
         manager.ProcessPointerReleased(end, MouseButton.Left, KeyModifiers.None);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Equal(1, reorderCount);
         Assert.Equal(0, clickCount);
@@ -347,7 +347,7 @@ public sealed class TabViewInputTests
         Assert.Equal(0, clickCount);
 
         manager.Open(screen);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.False(items[0].IsDragging);
         Assert.Equal(1, reorderCount);
         manager.Close();
@@ -363,7 +363,7 @@ public sealed class TabViewInputTests
         var (manager, screen, view, items) = OpenScene(2);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[0].Content = content;
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(content.Focus());
         var replacement = new TabItem { Header = new Panel { Width = 40, Height = 20 } };
         view.Items[0] = replacement;
@@ -380,7 +380,7 @@ public sealed class TabViewInputTests
             manager.ProcessFocusChanged(false);
             manager.ProcessFocusChanged(true);
         }
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(replacement, view.Selection.SelectedItem);
         Assert.Null(screen.FocusedNode);
@@ -433,7 +433,7 @@ public sealed class TabViewInputTests
         var child = new TestControl { Focusable = true, Width = 20, Height = 20 };
         content.Children.Add(child);
         items[0].Content = content;
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(child.Focus());
         Assert.Same(child, screen.FocusedNode);
 
@@ -454,18 +454,18 @@ public sealed class TabViewInputTests
         manager.ProcessPointerPressed(start, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(edge);
         var before = viewport.ScrollOffset;
-        manager.PrepareFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(1));
+        manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(1));
         Assert.Equal(before, viewport.ScrollOffset, 3);
 
         for (var frame = 1; frame <= 3; frame++)
         {
-            manager.PrepareFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(1 + frame * 0.03));
+            manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(1 + frame * 0.03));
         }
 
         var scrolled = viewport.ScrollOffset;
         manager.ProcessPointerReleased(new Point(260, 200), MouseButton.Left, KeyModifiers.None);
         var settled = viewport.ScrollOffset;
-        manager.PrepareFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(2));
+        manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(2));
 
         Assert.True(viewport.HasOverflow);
         Assert.Equal(before + TabView.AutoScrollSpeed * 0.09, scrolled, 3);
@@ -484,7 +484,7 @@ public sealed class TabViewInputTests
 
         manager.ProcessPointerPressed(start, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(end);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         manager.ProcessPointerReleased(end, MouseButton.Left, KeyModifiers.None);
 
         Assert.IsType<InvalidOperationException>(error);
@@ -513,7 +513,7 @@ public sealed class TabViewInputTests
         var (manager, screen, view, items) = OpenScene(2, canReorder: true);
         var header = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[1].Header = header;
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         var point = header.LocalToScreen(new Point(10, 10));
 
         manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
@@ -537,7 +537,7 @@ public sealed class TabViewInputTests
         if (crossDragThreshold)
             manager.ProcessPointerMoved(moved);
         manager.ProcessKeyDown(Key.Escape, KeyModifiers.None);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         manager.ProcessPointerReleased(start, MouseButton.Left, KeyModifiers.None);
 
         Assert.Same(items[0], view.Selection.SelectedItem);
@@ -556,11 +556,11 @@ public sealed class TabViewInputTests
         var (manager, _, view, items) = OpenScene(6, width: 300);
         var viewport = Assert.IsType<TabStripPanel>(view.Children[0]).Viewport;
         view.Selection.SelectedItem = items[^1];
-        manager.PrepareFrame(new Size(300, 100), 0);
+        manager.UpdateFrame(new Size(300, 100), 0);
         Assert.True(viewport.ScrollOffset > 0);
 
         view.Selection.SelectedItem = items[1];
-        manager.PrepareFrame(new Size(300, 100), 0);
+        manager.UpdateFrame(new Size(300, 100), 0);
 
         Assert.True(items[1].LayoutBounds.X >= 0);
         Assert.True(items[1].LayoutBounds.X + items[1].LayoutBounds.Width <= viewport.ViewportLength);
@@ -573,14 +573,14 @@ public sealed class TabViewInputTests
         var (manager, screen, view, items) = OpenScene(2);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[0].Content = content;
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(content.Focus());
         var replacement = new TabItem { Header = new Panel { Width = 40, Height = 20 } };
 
         view.Items[0] = replacement;
         Assert.False(replacement.IsArrangeValid);
         Assert.Same(replacement, screen.FocusedNode);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(replacement, view.Selection.SelectedItem);
         Assert.Same(replacement, screen.FocusedNode);
@@ -593,7 +593,7 @@ public sealed class TabViewInputTests
         var (manager, screen, view, items) = OpenScene(2);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[0].Content = content;
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(content.Focus());
         var replacement = new TabItem { Header = new Panel { Width = 40, Height = 20 } };
 
@@ -601,7 +601,7 @@ public sealed class TabViewInputTests
         Assert.False(replacement.IsArrangeValid);
         Assert.Same(replacement, screen.FocusedNode);
         Assert.True(items[1].Focus());
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(items[1], screen.FocusedNode);
         manager.Close();
@@ -614,12 +614,12 @@ public sealed class TabViewInputTests
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[1].Content = content;
         view.Selection.SelectedItem = items[1];
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(content.Focus());
         Assert.Same(content, screen.FocusedNode);
 
         view.Items.Remove(items[1]);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(items[2], view.Selection.SelectedItem);
         Assert.Same(items[2], screen.FocusedNode);
@@ -634,19 +634,19 @@ public sealed class TabViewInputTests
         var destination = new Panel();
         items[1].Content = content;
         view.Selection.SelectedItem = items[1];
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(content.Focus());
         Assert.Same(content, screen.FocusedNode);
 
         destination.Children.Add(items[1]);
-        manager.PrepareFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(items[2], view.Selection.SelectedItem);
         Assert.Same(items[2], screen.FocusedNode);
         manager.Close();
     }
 
-    private static (UiManager Manager, UiScreen Screen, TabView View, List<TabItem> Items) OpenScene(
+    private static (UiManager Manager, GameScreen Screen, TabView View, List<TabItem> Items) OpenScene(
         int itemCount,
         bool closable = false,
         bool canReorder = false,
@@ -672,9 +672,9 @@ public sealed class TabViewInputTests
         }
 
         var manager = new UiManager();
-        var screen = new UiScreen(view);
+        var screen = new GameScreen(view);
         manager.Open(screen);
-        manager.PrepareFrame(new Size(width, height), 0);
+        manager.UpdateFrame(new Size(width, height), 0);
         return (manager, screen, view, items);
     }
 

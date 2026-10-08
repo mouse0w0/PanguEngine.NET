@@ -310,7 +310,7 @@ public sealed class InputManager
             _uiManager.ProcessFocusChanged(focused);
     }
 
-    private void OnCurrentScreenChanged(UiScreen? oldScreen, UiScreen? newScreen)
+    private void OnCurrentScreenChanged(GameScreen? oldScreen, GameScreen? newScreen)
     {
         _router.BeginInputEvent();
         _router.NotifyUiTopologyChanged(oldScreen?.InputContext);

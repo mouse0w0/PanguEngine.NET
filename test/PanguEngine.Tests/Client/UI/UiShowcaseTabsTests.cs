@@ -183,14 +183,14 @@ public sealed class UiShowcaseTabsTests
         {
             var example = UiShowcaseControls.CreateExamples(_ => { })[4];
             _content = example.Content;
-            var screen = new UiScreen(_content) { UseLayoutRounding = false, Scale = 1 };
+            var screen = new GameScreen(_content) { UseLayoutRounding = false, Scale = 1 };
             screen.SetStyleSheets([ShowcaseTestSupport.LoadSheet("pangu/ui/showcase.css", "showcase")]);
             Manager.Open(screen);
             Prepare();
             View = ShowcaseTestSupport.FindById<TabView>(_content, UiShowcaseTabs.ViewId);
         }
 
-        internal void Prepare() => Manager.PrepareFrame(new Size(800, 600), 0);
+        internal void Prepare() => Manager.UpdateFrame(new Size(800, 600), 0);
 
         internal string Text(string id) => ShowcaseTestSupport.FindById<Text>(_content, id).Content;
 

@@ -64,7 +64,7 @@ public sealed class UiWheelSettingsTests
             Assert.True(manager.ProcessPointerWheel(new Point(50, 50), 0, -1, KeyModifiers.None));
             Assert.Equal(80, view.Offset.Y);
             UiToolkit.WheelScrollLines = 2;
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
             Assert.True(manager.ProcessPointerWheel(new Point(50, 50), 0, -1, KeyModifiers.None));
             Assert.Equal(112, view.Offset.Y);
 
@@ -90,7 +90,7 @@ public sealed class UiWheelSettingsTests
         try
         {
             view.ScrollTo(0, 200);
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
 
             Assert.True(manager.ProcessPointerWheel(new Point(50, 50), 0, delta, KeyModifiers.None));
             Assert.Equal(200 + distance, view.Offset.Y);
@@ -133,7 +133,7 @@ public sealed class UiWheelSettingsTests
         try
         {
             inner.ScrollTo(0, 800);
-            manager.PrepareFrame(new Size(200, 200), 0);
+            manager.UpdateFrame(new Size(200, 200), 0);
 
             Assert.True(manager.ProcessPointerWheel(new Point(50, 50), 0, -0.5, KeyModifiers.None));
             Assert.Equal(800, inner.Offset.Y);
@@ -211,11 +211,11 @@ public sealed class UiWheelSettingsTests
 
     private static UiManager Open(UiNode root, Size size)
     {
-        var screen = new UiScreen(root) { Scale = 1 };
+        var screen = new GameScreen(root) { Scale = 1 };
         screen.SetBaseStyleSheets([]);
         var manager = new UiManager();
         manager.Open(screen);
-        manager.PrepareFrame(size, 0);
+        manager.UpdateFrame(size, 0);
         return manager;
     }
 

@@ -852,7 +852,9 @@ public partial class UiScreen
         }
     }
 
-    private bool IsScreenActive()
+    /// <summary>Gets whether this screen is open and active.</summary>
+    /// <returns>Whether the screen can process updates and input.</returns>
+    private protected bool IsScreenActive()
     {
         lock (_stateSync)
             return _ownerThreadId is not null && _isInteractionActive && !_isClosing;

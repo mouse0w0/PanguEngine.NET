@@ -27,7 +27,8 @@ public sealed class UiScreenLayoutStabilityTests
             screen.ProcessPointerMoved(new Point(10, 10));
             var posts = 0;
             screen.Post(() => posts++);
-            screen.PrepareFrame(new Size(400, 300), 0);
+            screen.UpdateFrame(0);
+            screen.PrepareFrame(new Size(400, 300));
 
             Assert.Equal("after hover", label.Content);
             Assert.True(root.IsMeasureValid);
@@ -54,7 +55,8 @@ public sealed class UiScreenLayoutStabilityTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(400, 300), 0);
+            screen.UpdateFrame(0);
+            screen.PrepareFrame(new Size(400, 300));
             Assert.Equal(invalidations + 1, root.Measures);
             Assert.True(root.IsMeasureValid);
             Assert.True(root.IsArrangeValid);
@@ -74,8 +76,9 @@ public sealed class UiScreenLayoutStabilityTests
         screen.Open();
         try
         {
+            screen.UpdateFrame(0);
             var error = Assert.Throws<InvalidOperationException>(() =>
-                screen.PrepareFrame(new Size(400, 300), 0));
+                screen.PrepareFrame(new Size(400, 300)));
             Assert.Equal(16, root.Measures);
             Assert.Contains(nameof(CountingScreen), error.Message);
             Assert.Contains("16", error.Message);
@@ -103,7 +106,8 @@ public sealed class UiScreenLayoutStabilityTests
         try
         {
             screen.ProcessPointerMoved(new Point(10, 10));
-            screen.PrepareFrame(new Size(400, 300), 0);
+            screen.UpdateFrame(0);
+            screen.PrepareFrame(new Size(400, 300));
             Assert.Same(replacement, screen.Root);
             Assert.True(replacement.IsArrangeValid);
             Assert.Equal(200, replacement.LayoutBounds.Width);
@@ -138,8 +142,9 @@ public sealed class UiScreenLayoutStabilityTests
         try
         {
             screen.ProcessPointerMoved(new Point(10, 10));
+            screen.UpdateFrame(0);
             var error = Assert.Throws<InvalidOperationException>(() =>
-                screen.PrepareFrame(new Size(400, 300), 0));
+                screen.PrepareFrame(new Size(400, 300)));
             Assert.Equal(16, transitions);
             Assert.Contains("16", error.Message);
             Assert.Contains("Style", error.Message);
@@ -154,7 +159,7 @@ public sealed class UiScreenLayoutStabilityTests
         }
     }
 
-    private sealed class CountingScreen(UiNode root) : UiScreen(root)
+    private sealed class CountingScreen(UiNode root) : GameScreen(root)
     {
         internal int Updates { get; private set; }
 

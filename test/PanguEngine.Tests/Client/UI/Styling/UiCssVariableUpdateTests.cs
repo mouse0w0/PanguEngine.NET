@@ -19,7 +19,7 @@ public sealed class UiCssVariableUpdateTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsMeasureValid);
             Assert.True(child.IsArrangeValid);
 
@@ -29,7 +29,7 @@ public sealed class UiCssVariableUpdateTests
             Assert.Equal(new Thickness(8), child.Padding);
             Assert.False(child.IsMeasureValid);
             Assert.False(child.IsArrangeValid);
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsMeasureValid);
             Assert.True(child.IsArrangeValid);
 
@@ -39,7 +39,7 @@ public sealed class UiCssVariableUpdateTests
             Assert.Equal(Thickness.Zero, child.Padding);
             Assert.False(child.IsMeasureValid);
             Assert.False(child.IsArrangeValid);
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsMeasureValid);
             Assert.True(child.IsArrangeValid);
         }
@@ -60,13 +60,13 @@ public sealed class UiCssVariableUpdateTests
         screen.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
             child.SetHovered(true);
             screen.Root!.UpdateStyles();
             Assert.Equal(8d, child.GetValue(Canvas.LeftProperty));
             Assert.True(child.IsMeasureValid);
             Assert.False(child.IsArrangeValid);
-            screen.PrepareFrame(new Size(100, 100), 0);
+            screen.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsArrangeValid);
 
             child.SetHovered(false);
