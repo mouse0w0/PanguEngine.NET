@@ -400,7 +400,7 @@ public abstract partial class UiNode
         var originalCount = path.Count;
         path.Add(new UiHitPathEntry(this, localPoint));
         if (this is Parent parent &&
-            (!parent.ClipToBounds || IsWithinLayoutBounds(localPoint)))
+            (!parent.ClipToBounds || parent.ContainsDescendantClip(localPoint)))
         {
             for (var index = parent.ReadOnlyChildren.Count - 1; index >= 0; index--)
             {

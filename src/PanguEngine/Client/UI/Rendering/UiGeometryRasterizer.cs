@@ -21,19 +21,32 @@ internal readonly record struct UiCoverageQuad(int X, int Y, uint Width, uint He
 internal sealed class UiGeometryRasterizer
 {
     private readonly ConditionalWeakTable<UiTriangleMesh, CacheEntry> _cache = new();
+    private readonly ConditionalWeakTable<UiTriangleMesh, ClippedMeshEntry> _clippedMeshes = new();
 
-    internal int CacheHits { get; private set; }
-
-    internal int CacheMisses { get; private set; }
+    internal long CellCoverageEvaluations { get; private set; }
 
     internal IReadOnlyList<UiCoverageQuad> Rasterize(
         UiTriangleMesh mesh,
         double scale,
         double translateX,
         double translateY,
-        UiScissor clip)
+        UiScissor clip,
+        UiConvexClip? geometryClip = null)
     {
         ArgumentNullException.ThrowIfNull(mesh);
+        if (geometryClip is not null)
+        {
+            if (!_clippedMeshes.TryGetValue(mesh, out var clipped) ||
+                clipped.Scale != scale || clipped.X != translateX || clipped.Y != translateY ||
+                (!ReferenceEquals(clipped.Clip, geometryClip) && !clipped.Clip.ContentEquals(geometryClip)))
+            {
+                clipped = new ClippedMeshEntry(scale, translateX, translateY, geometryClip,
+                    geometryClip.Apply(mesh, scale, translateX, translateY));
+                _clippedMeshes.Remove(mesh);
+                _clippedMeshes.Add(mesh, clipped);
+            }
+            return Rasterize(clipped.Mesh, 1, 0, 0, clip);
+        }
         var originX = (long)Math.Floor(translateX);
         var originY = (long)Math.Floor(translateY);
         var fractionX = translateX - originX;
@@ -48,13 +61,11 @@ internal sealed class UiGeometryRasterizer
         if (_cache.TryGetValue(mesh, out var entry) &&
             entry.Matches(scale, fractionX, fractionY, relativeLeft, relativeTop, relativeRight, relativeBottom))
         {
-            CacheHits++;
             return entry.OriginX == originX && entry.OriginY == originY
                 ? entry.Quads
                 : Offset(entry.Quads, (int)(originX - entry.OriginX), (int)(originY - entry.OriginY));
         }
 
-        CacheMisses++;
         var clipLeft = clip.X;
         var clipTop = clip.Y;
         var clipRight = clipLeft + (int)clip.Width;
@@ -77,7 +88,9 @@ internal sealed class UiGeometryRasterizer
         return quads;
     }
 
-    private static UiCoverageQuad[] Compute(
+    private sealed record ClippedMeshEntry(double Scale, double X, double Y, UiConvexClip Clip, UiTriangleMesh Mesh);
+
+    private UiCoverageQuad[] Compute(
         UiTriangleMesh mesh,
         double scale,
         double translateX,
@@ -89,7 +102,7 @@ internal sealed class UiGeometryRasterizer
     {
         var vertices = mesh.Vertices;
         var indices = mesh.Indices;
-        var cells = new Dictionary<long, double>();
+        var rows = new SortedDictionary<int, CoverageRow>();
         Span<double> polygonAx = stackalloc double[8];
         Span<double> polygonAy = stackalloc double[8];
         Span<double> polygonBx = stackalloc double[8];
@@ -147,80 +160,104 @@ internal sealed class UiGeometryRasterizer
 
                 var startX = Math.Max(clipLeft, (int)Math.Floor(scanLeft));
                 var endX = Math.Min(clipRight - 1, (int)Math.Ceiling(scanRight) - 1);
-
-                for (var x = startX; x <= endX; x++)
+                var fullStart = startX;
+                var fullEnd = startX;
+                if (minY <= y && maxY >= y + 1d)
                 {
-                    var area = CellCoverage(
-                        ax,
-                        ay,
-                        bx,
-                        by,
-                        cx,
-                        cy,
-                        x,
-                        y,
-                        polygonAx,
-                        polygonAy,
-                        polygonBx,
-                        polygonBy);
-                    if (area <= 0)
-                        continue;
-
-                    var key = CellKey(x, y);
-                    cells.TryGetValue(key, out var existing);
-                    var total = existing + area;
-                    cells[key] = total > 1 ? 1 : total;
+                    var topLeft = double.PositiveInfinity;
+                    var topRight = double.NegativeInfinity;
+                    var bottomLeft = double.PositiveInfinity;
+                    var bottomRight = double.NegativeInfinity;
+                    SliceTriangle(ax, ay, bx, by, cx, cy, y, ref topLeft, ref topRight);
+                    SliceTriangle(ax, ay, bx, by, cx, cy, y + 1d, ref bottomLeft, ref bottomRight);
+                    fullStart = (int)Math.Ceiling(Math.Clamp(Math.Max(topLeft, bottomLeft), startX, endX + 1d));
+                    fullEnd = (int)Math.Floor(Math.Clamp(Math.Min(topRight, bottomRight), startX, endX + 1d));
+                    if (fullEnd < fullStart)
+                        fullStart = fullEnd = startX;
                 }
+
+                if (!rows.TryGetValue(y, out var row))
+                    rows.Add(y, row = new CoverageRow());
+                if (fullEnd > fullStart)
+                    row.AddSpan(fullStart, fullEnd);
+                for (var x = startX; x < fullStart; x++)
+                    AddBoundaryCell(row, ax, ay, bx, by, cx, cy, x, y,
+                        polygonAx, polygonAy, polygonBx, polygonBy);
+                for (var x = fullEnd; x <= endX; x++)
+                    AddBoundaryCell(row, ax, ay, bx, by, cx, cy, x, y,
+                        polygonAx, polygonAy, polygonBx, polygonBy);
             }
         }
-
-        if (cells.Count == 0)
-            return [];
-
-        var items = new List<Cell>(cells.Count);
-        foreach (var pair in cells)
-        {
-            var coverage = pair.Value;
-            if (coverage <= 0)
-                continue;
-            if (coverage >= 1 - 1e-9)
-                coverage = 1;
-            items.Add(new Cell((int)(pair.Key & 0xffffffff), (int)(pair.Key >> 32), coverage));
-        }
-
-        if (items.Count == 0)
-            return [];
-
-        items.Sort(static (first, second) =>
-            first.Y != second.Y ? first.Y.CompareTo(second.Y) : first.X.CompareTo(second.X));
 
         var quads = new List<UiCoverageQuad>();
+        foreach (var (y, row) in rows)
+            row.Emit(y, quads);
+        return MergeRows(quads);
+    }
+
+    private static UiCoverageQuad[] MergeRows(List<UiCoverageQuad> rows)
+    {
+        var merged = new List<UiCoverageQuad>();
+        var previous = new Dictionary<(int X, uint Width, float Coverage), int>();
+        var current = new Dictionary<(int X, uint Width, float Coverage), int>();
+        var previousY = int.MinValue;
         var position = 0;
-        while (position < items.Count)
+        while (position < rows.Count)
         {
-            var row = items[position].Y;
-            var startX = items[position].X;
-            var endX = startX;
-            var coverage = items[position].Coverage;
-            position++;
-            while (position < items.Count &&
-                   items[position].Y == row &&
-                   items[position].X == endX + 1 &&
-                   items[position].Coverage == coverage)
+            var y = rows[position].Y;
+            current.Clear();
+            do
             {
-                endX = items[position].X;
-                position++;
-            }
-
-            quads.Add(new UiCoverageQuad(
-                startX,
-                row,
-                (uint)(endX - startX + 1),
-                1,
-                (float)coverage));
+                var quad = rows[position++];
+                var key = (quad.X, quad.Width, quad.Coverage);
+                int index;
+                if ((long)previousY + 1 == y && previous.TryGetValue(key, out index))
+                    merged[index] = merged[index] with { Height = merged[index].Height + quad.Height };
+                else
+                {
+                    index = merged.Count;
+                    merged.Add(quad);
+                }
+                current.Add(key, index);
+            } while (position < rows.Count && rows[position].Y == y);
+            (previous, current) = (current, previous);
+            previousY = y;
         }
+        return [.. merged];
+    }
 
-        return [.. quads];
+    private void AddBoundaryCell(
+        CoverageRow row, double ax, double ay, double bx, double by, double cx, double cy, int x, int y,
+        Span<double> polygonAx, Span<double> polygonAy, Span<double> polygonBx, Span<double> polygonBy)
+    {
+        CellCoverageEvaluations++;
+        var area = CellCoverage(ax, ay, bx, by, cx, cy, x, y, polygonAx, polygonAy, polygonBx, polygonBy);
+        if (area > 0)
+            row.AddCell(x, area);
+    }
+
+    private static void SliceTriangle(
+        double ax, double ay, double bx, double by, double cx, double cy, double y,
+        ref double left, ref double right)
+    {
+        SliceEdge(ax, ay, bx, by, y, ref left, ref right);
+        SliceEdge(bx, by, cx, cy, y, ref left, ref right);
+        SliceEdge(cx, cy, ax, ay, y, ref left, ref right);
+    }
+
+    private static void SliceEdge(double ax, double ay, double bx, double by, double y, ref double left, ref double right)
+    {
+        if (y < Math.Min(ay, by) || y > Math.Max(ay, by))
+            return;
+        if (ay == by)
+        {
+            left = Math.Min(left, Math.Min(ax, bx));
+            right = Math.Max(right, Math.Max(ax, bx));
+            return;
+        }
+        var x = ax + (bx - ax) * ((y - ay) / (by - ay));
+        left = Math.Min(left, x);
+        right = Math.Max(right, x);
     }
 
     private static double CellCoverage(
@@ -354,9 +391,61 @@ internal sealed class UiGeometryRasterizer
         return result;
     }
 
-    private static long CellKey(int x, int y) => ((long)y << 32) | (uint)x;
+    private readonly record struct SpanEvent(int X, int Delta);
 
-    private readonly record struct Cell(int X, int Y, double Coverage);
+    private sealed class CoverageRow
+    {
+        private readonly List<SpanEvent> _events = [];
+        private readonly Dictionary<int, double> _cells = [];
+
+        internal void AddSpan(int first, int end)
+        {
+            _events.Add(new SpanEvent(first, 1));
+            _events.Add(new SpanEvent(end, -1));
+        }
+
+        internal void AddCell(int x, double coverage)
+        {
+            if (_cells.TryGetValue(x, out var previous))
+                _cells[x] = Math.Min(1, previous + coverage);
+            else
+            {
+                _cells.Add(x, coverage);
+                _events.Add(new SpanEvent(x, 0));
+                _events.Add(new SpanEvent(x + 1, 0));
+            }
+        }
+
+        internal void Emit(int y, List<UiCoverageQuad> quads)
+        {
+            _events.Sort(static (a, b) => a.X.CompareTo(b.X));
+            var position = 0;
+            var depth = 0;
+            while (position < _events.Count)
+            {
+                var x = _events[position].X;
+                do
+                {
+                    depth += _events[position++].Delta;
+                } while (position < _events.Count && _events[position].X == x);
+                if (position == _events.Count)
+                    break;
+                _cells.TryGetValue(x, out var partial);
+                var coverage = Math.Min(1, depth + partial);
+                if (coverage <= 0)
+                    continue;
+                if (coverage >= 1 - 1e-9)
+                    coverage = 1;
+                var width = (uint)(_events[position].X - x);
+                var alpha = (float)coverage;
+                if (quads.Count > 0 && quads[^1] is var last && last.Y == y &&
+                    last.X + (long)last.Width == x && last.Coverage == alpha)
+                    quads[^1] = last with { Width = last.Width + width };
+                else
+                    quads.Add(new UiCoverageQuad(x, y, width, 1, alpha));
+            }
+        }
+    }
 
     private sealed class CacheEntry
     {

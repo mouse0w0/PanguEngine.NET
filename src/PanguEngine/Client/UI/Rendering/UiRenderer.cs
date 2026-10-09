@@ -15,6 +15,7 @@ internal sealed class UiRenderer
     private readonly UiResourceManager _resourceManager;
     private readonly GraphicsPipeline _pipeline;
     private readonly DescriptorSetLayout _descriptorSetLayout;
+    private readonly DescriptorSetLayout _drawDataLayout;
     private bool _destroyed;
 
     internal UiRenderer(
@@ -45,6 +46,11 @@ internal sealed class UiRenderer
             new DescriptorSetLayoutBinding(1, DescriptorType.Sampler, ShaderStageFlags.Fragment),
             new DescriptorSetLayoutBinding(2, DescriptorType.Sampler, ShaderStageFlags.Fragment)
         ]));
+        _drawDataLayout = device.CreateDescriptorSetLayout(new DescriptorSetLayoutDescription(
+        [
+            new DescriptorSetLayoutBinding(0, DescriptorType.StorageBuffer, ShaderStageFlags.Fragment),
+            new DescriptorSetLayoutBinding(1, DescriptorType.StorageBuffer, ShaderStageFlags.Fragment)
+        ]));
         _resourceManager = new UiResourceManager(
             device,
             fontManager,
@@ -59,7 +65,8 @@ internal sealed class UiRenderer
             "pangu/shaders/ui.frag",
             "ui.vert",
             "ui.frag",
-            _descriptorSetLayout);
+            _descriptorSetLayout,
+            _drawDataLayout);
     }
 
     internal void PrepareFrame(Frame frame)
@@ -91,14 +98,18 @@ internal sealed class UiRenderer
 
         var resources = _frameResources[checked((int)frame.FrameSlot)];
         EnsureCapacity(resources, _builder.VertexCount, _builder.IndexCount);
+        EnsureDrawDataCapacity(resources, _builder.DrawData.Length, _builder.ClipData.Length);
         var vertexBuffer = resources.VertexBuffer!;
         var indexBuffer = resources.IndexBuffer!;
         vertexBuffer.Write(_builder.Vertices);
         indexBuffer.Write(_builder.Indices);
+        resources.DrawDataBuffer!.Write(_builder.DrawData);
+        resources.ClipDataBuffer!.Write(_builder.ClipData);
 
         var commandList = frame.CommandList;
         commandList.SetGraphicsPipeline(_pipeline);
         commandList.SetDescriptorSet(0, _resourceManager.GetTextureDescriptorSet(frame.FrameSlot));
+        commandList.SetDescriptorSet(1, resources.DrawDataDescriptorSet!);
         commandList.SetViewport(0, 0, frame.Width, frame.Height);
         commandList.SetVertexBuffer(0, vertexBuffer);
         commandList.SetIndexBuffer(indexBuffer, IndexFormat.UInt32);
@@ -124,11 +135,15 @@ internal sealed class UiRenderer
         _resourceManager.Destroy();
         foreach (var frame in _frameResources)
         {
+            frame.DrawDataDescriptorSet?.Destroy();
+            frame.ClipDataBuffer?.Destroy();
+            frame.DrawDataBuffer?.Destroy();
             frame.IndexBuffer?.Destroy();
             frame.VertexBuffer?.Destroy();
         }
 
         _pipeline.Destroy();
+        _drawDataLayout.Destroy();
         _descriptorSetLayout.Destroy();
     }
 
@@ -140,7 +155,8 @@ internal sealed class UiRenderer
         string fragmentPath,
         string vertexName,
         string fragmentName,
-        DescriptorSetLayout descriptorSetLayout)
+        DescriptorSetLayout descriptorSetLayout,
+        DescriptorSetLayout drawDataLayout)
     {
         var vertexSource = Engine.ResourceManager.ReadAllText(vertexPath);
         var fragmentSource = Engine.ResourceManager.ReadAllText(fragmentPath);
@@ -160,7 +176,7 @@ internal sealed class UiRenderer
                 Shaders = [vertexShader, fragmentShader],
                 VertexInput = UiVertex.VertexInput,
                 ColorAttachmentFormats = [colorFormat],
-                DescriptorSetLayouts = [descriptorSetLayout],
+                DescriptorSetLayouts = [descriptorSetLayout, drawDataLayout],
                 PushConstantRanges =
                     [new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, UiProjection.SizeInBytes)],
                 Rasterizer = new RasterizerDescription { CullMode = CullMode.None },
@@ -212,6 +228,45 @@ internal sealed class UiRenderer
         }
     }
 
+    private void EnsureDrawDataCapacity(FrameResources frame, int drawCount, int clipCount)
+    {
+        var growDrawData = frame.DrawDataCapacity < drawCount;
+        var growClipData = frame.ClipDataCapacity < clipCount;
+        if (!growDrawData && !growClipData)
+            return;
+
+        var previousDrawBuffer = frame.DrawDataBuffer;
+        var previousClipBuffer = frame.ClipDataBuffer;
+        var previousDescriptorSet = frame.DrawDataDescriptorSet;
+        if (growDrawData)
+        {
+            frame.DrawDataCapacity = UiDrawBuilder.GrowCapacity(frame.DrawDataCapacity, drawCount);
+            frame.DrawDataBuffer = _device.CreateBuffer(new BufferDescription(
+                checked((ulong)frame.DrawDataCapacity * UiGpuDrawData.SizeInBytes),
+                BufferUsage.Storage, MemoryUsage.CpuToGpu));
+        }
+        if (growClipData)
+        {
+            frame.ClipDataCapacity = UiDrawBuilder.GrowCapacity(frame.ClipDataCapacity, clipCount);
+            frame.ClipDataBuffer = _device.CreateBuffer(new BufferDescription(
+                checked((ulong)frame.ClipDataCapacity * UiGpuClipData.SizeInBytes),
+                BufferUsage.Storage, MemoryUsage.CpuToGpu));
+        }
+        var drawBuffer = frame.DrawDataBuffer!;
+        var clipBuffer = frame.ClipDataBuffer!;
+        frame.DrawDataDescriptorSet = _device.CreateDescriptorSet(new DescriptorSetDescription(
+            _drawDataLayout,
+            [
+                DescriptorSetBinding.StorageBuffer(0, drawBuffer, 0, drawBuffer.Size),
+                DescriptorSetBinding.StorageBuffer(1, clipBuffer, 0, clipBuffer.Size)
+            ]));
+        previousDescriptorSet?.Destroy();
+        if (growClipData)
+            previousClipBuffer?.Destroy();
+        if (growDrawData)
+            previousDrawBuffer?.Destroy();
+    }
+
     [StructLayout(LayoutKind.Sequential)]
     private readonly struct UiProjection(float clipScaleX, float clipScaleY)
     {
@@ -226,5 +281,10 @@ internal sealed class UiRenderer
         internal GraphicsBuffer? IndexBuffer { get; set; }
         internal int VertexCapacity { get; set; }
         internal int IndexCapacity { get; set; }
+        internal GraphicsBuffer? DrawDataBuffer { get; set; }
+        internal GraphicsBuffer? ClipDataBuffer { get; set; }
+        internal DescriptorSet? DrawDataDescriptorSet { get; set; }
+        internal int DrawDataCapacity { get; set; }
+        internal int ClipDataCapacity { get; set; }
     }
 }

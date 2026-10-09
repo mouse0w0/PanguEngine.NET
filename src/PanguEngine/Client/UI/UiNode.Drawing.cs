@@ -70,8 +70,7 @@ public abstract partial class UiNode
         if (this is Parent parent)
         {
             var clipIndex = parent.ClipToBounds
-                ? UiDrawingContext.PushCommand(commands, new UiPushClipCommand(
-                    new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height)))
+                ? UiDrawingContext.PushCommand(commands, parent.CreateDescendantClip())
                 : -1;
             foreach (var child in parent.ReadOnlyChildren)
                 child.AppendDrawCommands(commands, combinedOpacity);

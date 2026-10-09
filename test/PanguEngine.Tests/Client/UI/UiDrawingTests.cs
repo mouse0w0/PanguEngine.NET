@@ -404,7 +404,9 @@ public sealed class UiDrawingTests
 
         var builder = new UiDrawBuilder();
         builder.Build(list, 100, 100, false);
-        Assert.Equal(new UiScissor(10, 20, 30, 30), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(new UiScissor(0, 0, 100, 100), Assert.Single(builder.Batches.ToArray()).Scissor);
+        var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+        Assert.Equal(new System.Numerics.Vector4(10, 20, 40, 50), builder.ClipData[(int)data.ClipIndex].Bounds);
         Assert.Equal(0.25f, builder.Vertices[0].A);
     }
 
@@ -717,7 +719,10 @@ public sealed class UiDrawingTests
             false,
             _ => new UiImageRenderBinding(1, 12, 12, new UiImageAtlasRegion(0, 0, 12, 12)));
         Assert.Equal(4, builder.RectangleCount);
-        Assert.Equal(new UiScissor(10, 20, 30, 30), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(new UiScissor(0, 0, 200, 200), Assert.Single(builder.Batches.ToArray()).Scissor);
+        var clipped = builder.Vertices.ToArray().First(vertex => vertex.DrawDataIndex != 0);
+        var data = builder.DrawData[(int)clipped.DrawDataIndex];
+        Assert.Equal(new System.Numerics.Vector4(10, 20, 40, 50), builder.ClipData[(int)data.ClipIndex].Bounds);
         Assert.Equal(0.25f, builder.Vertices[0].A);
     }
 
@@ -823,7 +828,11 @@ public sealed class UiDrawingTests
 
         var builder = new UiDrawBuilder();
         builder.Build(list, 200, 200, false);
-        Assert.Equal(new UiScissor(35, 45, 5, 5), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(new UiScissor(0, 0, 200, 200), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(35f, builder.Vertices[0].X);
+        Assert.Equal(45f, builder.Vertices[0].Y);
+        Assert.Equal(40f, builder.Vertices[2].X);
+        Assert.Equal(50f, builder.Vertices[2].Y);
     }
 
     [Fact]

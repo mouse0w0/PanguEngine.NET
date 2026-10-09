@@ -1,5 +1,6 @@
 using PanguEngine.ComponentModel;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Drawing.Geometry;
 using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Client.UI.Controls;
@@ -46,10 +47,28 @@ public abstract class Region : Parent
     private Rect _committedDecorationBounds;
     private Rect _committedBorderInnerBounds;
     private Rect _committedContentBounds;
+    private UiRoundedClipGeometry? _roundedBackground;
+    private UiRoundedClipGeometry? _roundedBorder;
+    private UiRoundedClipGeometry? _roundedDescendantClip;
+
+    /// <summary>Identifies the <see cref="CornerRadius"/> property.</summary>
+    public static readonly Property<CornerRadius> CornerRadiusProperty =
+        Property.Register<Region, CornerRadius>(nameof(CornerRadius), CornerRadius.Zero);
+
+    /// <summary>
+    /// Gets or sets the outer decoration radii. Descendants follow these corners only when clipping is enabled.
+    /// </summary>
+    public CornerRadius CornerRadius
+    {
+        get => GetValue(CornerRadiusProperty);
+        set => SetValue(CornerRadiusProperty, value);
+    }
 
     static Region()
     {
         UiCssRegistry.RegisterElement<Region>("Region");
+        UiCssRegistry.RegisterProperty<Region, CornerRadius>("border-radius", CornerRadiusProperty,
+            UiCssValueConverters.ParseCornerRadius);
         UiCssRegistry.RegisterProperty<Region, Thickness>("padding", PaddingProperty,
             UiCssValueConverters.ParseThickness);
         UiCssRegistry.RegisterProperty<Region>("padding-top", value =>
@@ -219,6 +238,24 @@ public abstract class Region : Parent
     {
         var decorationBounds = _committedDecorationBounds;
         var borderInnerBounds = _committedBorderInnerBounds;
+        if (CornerRadius != CornerRadius.Zero)
+        {
+            if (Background is null && BorderBrush is null)
+                return;
+            EnsureRoundedGeometry();
+            if ((Background is null or SolidColorBrush) && (BorderBrush is null or SolidColorBrush))
+            {
+                context.DrawRoundedDecoration(_roundedBorder!.Outer, _roundedBorder.Inner!.Value,
+                    ((SolidColorBrush?)Background)?.Color ?? default,
+                    ((SolidColorBrush?)BorderBrush)?.Color ?? default);
+                return;
+            }
+            if (Background is { } roundedBackground)
+                context.FillRoundedRectangle(_roundedBackground!, roundedBackground);
+            if (BorderBrush is { } roundedBorder)
+                context.FillRoundedBorder(_roundedBorder!, roundedBorder);
+            return;
+        }
         if (Background is { } background)
             context.FillRectangle(borderInnerBounds, background);
 
@@ -229,6 +266,28 @@ public abstract class Region : Parent
             decorationBounds,
             borderInnerBounds,
             borderBrush);
+    }
+
+    internal override UiDrawCommand CreateDescendantClip()
+    {
+        if (CornerRadius == CornerRadius.Zero)
+            return base.CreateDescendantClip();
+        EnsureRoundedGeometry();
+        return new UiPushRoundedClipCommand(_roundedDescendantClip!);
+    }
+
+    internal override bool ContainsDescendantClip(Point point) =>
+        new UiRoundedRectangle(new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height), CornerRadius).Contains(point);
+
+    private void EnsureRoundedGeometry()
+    {
+        var outer = new UiRoundedRectangle(_committedDecorationBounds, CornerRadius);
+        var inner = outer.Deflate(_committedBorderInnerBounds);
+        if (_roundedBorder is { } cached && cached.Outer == outer && cached.Inner == inner)
+            return;
+        _roundedBackground = new UiRoundedClipGeometry(inner, constraint: outer);
+        _roundedBorder = new UiRoundedClipGeometry(outer, inner);
+        _roundedDescendantClip = new UiRoundedClipGeometry(outer);
     }
 
     private static Rect DeflateBounds(Rect bounds, Thickness thickness) =>

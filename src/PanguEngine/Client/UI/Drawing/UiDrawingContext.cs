@@ -83,6 +83,57 @@ public sealed class UiDrawingContext
         }
     }
 
+    internal void FillRoundedRectangle(UiRoundedClipGeometry geometry, Brush brush)
+    {
+        if (brush is SolidColorBrush solid)
+        {
+            VerifyActive();
+            if (solid.Color.A != 0 && geometry.Outer.Bounds.Width > 0 && geometry.Outer.Bounds.Height > 0)
+                _commands.Add(new UiFillRoundedRectangleCommand(geometry, solid.Color));
+            return;
+        }
+        using (PushRoundedRegion(geometry, brush is NineSliceImageBrush))
+            FillRectangle(geometry.Outer.Bounds, brush);
+    }
+
+    internal void FillRoundedBorder(UiRoundedClipGeometry geometry, Brush brush)
+    {
+        if (brush is SolidColorBrush solid)
+        {
+            DrawRoundedDecoration(geometry.Outer, geometry.Inner!.Value, default, solid.Color);
+            return;
+        }
+        using (PushRoundedRegion(geometry, brush is NineSliceImageBrush))
+        {
+            if (brush is NineSliceImageBrush nineSlice)
+                FillNineSliceBorder(geometry.Outer.Bounds, geometry.Inner!.Value.Bounds, nineSlice, drawCenter: true);
+            else
+                FillRectangle(geometry.Outer.Bounds, brush);
+        }
+    }
+
+    internal void DrawRoundedDecoration(UiRoundedRectangle outer, UiRoundedRectangle inner,
+        Color background, Color border)
+    {
+        VerifyActive();
+        if (outer.Bounds.Width > 0 && outer.Bounds.Height > 0 && (background.A != 0 || border.A != 0))
+            _commands.Add(new UiDrawRoundedDecorationCommand(outer, inner, background, border));
+    }
+
+    internal void DrawRoundedShape(UiRoundedRectangle centerline, double thickness,
+        Color fill, Color stroke, StrokeLineJoin join)
+    {
+        VerifyActive();
+        if (fill.A != 0 || stroke.A != 0)
+            _commands.Add(new UiDrawRoundedShapeCommand(centerline, thickness, fill, stroke, join));
+    }
+
+    private UiDrawingScope PushRoundedRegion(UiRoundedClipGeometry geometry, bool snapImageBounds)
+    {
+        VerifyActive();
+        return PushState(PushCommand(_commands, new UiPushRoundedClipCommand(geometry, snapImageBounds)));
+    }
+
     /// <summary>
     /// Appends an image using the requested destination, source region, and sampling mode.
     /// </summary>
@@ -437,7 +488,8 @@ public sealed class UiDrawingContext
     private void FillNineSliceBorder(
         Rect outerBounds,
         Rect innerBounds,
-        NineSliceImageBrush brush)
+        NineSliceImageBrush brush,
+        bool drawCenter = false)
     {
         Span<double> destinationX = stackalloc double[4];
         Span<double> destinationY = stackalloc double[4];
@@ -456,7 +508,7 @@ public sealed class UiDrawingContext
             destinationX,
             destinationY,
             brush.SamplingMode,
-            drawCenter: false);
+            drawCenter);
     }
 
     private void AppendNineSlice(

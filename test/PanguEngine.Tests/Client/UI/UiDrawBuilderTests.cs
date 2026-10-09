@@ -13,6 +13,7 @@ public sealed class UiDrawBuilderTests
     {
         Assert.Equal(52u, UiVertex.SizeInBytes);
         Assert.Equal(52, Marshal.SizeOf<UiVertex>());
+        Assert.Equal(48, Marshal.OffsetOf<UiVertex>(nameof(UiVertex.DrawMetadata)).ToInt32());
         Assert.Equal(52u, Assert.Single(UiVertex.VertexInput.Buffers).Stride);
         Assert.Equal(
             [
@@ -20,6 +21,24 @@ public sealed class UiDrawBuilderTests
             ],
             UiVertex.VertexInput.Attributes.Skip(4)
                 .Select(attribute => (attribute.Location, attribute.Format, attribute.Offset)));
+    }
+
+    [Theory]
+    [InlineData(0u, 0u, 0u, 0u)]
+    [InlineData(1u, 255u, 0u, 0x3fdu)]
+    [InlineData(2u, 17u, 0x12345u, 0x048d1446u)]
+    [InlineData(0u, 0u, 0x200000u, 0x80000000u)]
+    [InlineData(3u, 255u, 0x3fffffu, 0xffffffffu)]
+    public void DrawMetadataPreservesAllComponentsAtPackingBoundaries(
+        uint materialKind, uint textureIndex, uint drawDataIndex, uint expectedMetadata)
+    {
+        var vertex = new UiVertex(0, 0, 1, 1, 1, 1,
+            materialKind: (UiMaterialKind)materialKind, textureIndex: textureIndex, drawDataIndex: drawDataIndex);
+        Assert.Equal(expectedMetadata, vertex.DrawMetadata);
+        Assert.Equal((UiMaterialKind)materialKind, vertex.MaterialKind);
+        Assert.Equal(textureIndex, vertex.TextureIndex);
+        Assert.Equal(drawDataIndex, vertex.DrawDataIndex);
+        Assert.Equal(256u, UiTextureTable.SlotCount);
     }
 
     [Fact]
@@ -173,7 +192,7 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
-    public void ClipUsesInclusivePhysicalScissorRounding()
+    public void ClipKeepsFractionalParametersAndRoundsItsQuadBoundsOutward()
     {
         var builder = new UiDrawBuilder();
         builder.Build(
@@ -188,7 +207,17 @@ public sealed class UiDrawBuilderTests
             false);
 
         var batch = Assert.Single(builder.Batches.ToArray());
-        Assert.Equal(new UiScissor(1, 3, 6, 7), batch.Scissor);
+        Assert.Equal(new UiScissor(0, 0, 100, 100), batch.Scissor);
+        Assert.Equal(1f, builder.Vertices[0].X);
+        Assert.Equal(3f, builder.Vertices[0].Y);
+        Assert.Equal(7f, builder.Vertices[2].X);
+        Assert.Equal(10f, builder.Vertices[2].Y);
+        var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+        var clip = builder.ClipData[(int)data.ClipIndex];
+        Assert.Equal(1.8f, clip.Bounds.X, 6);
+        Assert.Equal(3.3f, clip.Bounds.Y, 6);
+        Assert.Equal(6.45f, clip.Bounds.Z, 6);
+        Assert.Equal(9.45f, clip.Bounds.W, 6);
     }
 
     [Fact]
@@ -258,7 +287,17 @@ public sealed class UiDrawBuilderTests
             100,
             false);
 
-        Assert.Equal(new UiScissor(5, 5, 5, 5), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(new UiScissor(0, 0, 100, 100), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(5f, builder.Vertices[0].X);
+        Assert.Equal(5f, builder.Vertices[0].Y);
+        Assert.Equal(10f, builder.Vertices[2].X);
+        Assert.Equal(10f, builder.Vertices[2].Y);
+        var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+        var bounds = new List<System.Numerics.Vector4>();
+        for (var index = data.ClipIndex; index != 0; index = builder.ClipData[(int)index].ParentIndex)
+            bounds.Add(builder.ClipData[(int)index].Bounds);
+        Assert.Contains(new System.Numerics.Vector4(5, 5, 15, 15), bounds);
+        Assert.Contains(new System.Numerics.Vector4(0, 0, 10, 10), bounds);
     }
 
     [Fact]
@@ -278,9 +317,13 @@ public sealed class UiDrawBuilderTests
             100,
             false);
 
-        Assert.Equal(new UiScissor(0, 0, 10, 10), Assert.Single(builder.Batches.ToArray()).Scissor);
-        Assert.Equal(new UiVertex(4, 4, 1, 1, 1, 1), builder.Vertices[0]);
-        Assert.Equal(new UiVertex(14, 14, 1, 1, 1, 1), builder.Vertices[2]);
+        Assert.Equal(new UiScissor(0, 0, 100, 100), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(4f, builder.Vertices[0].X);
+        Assert.Equal(4f, builder.Vertices[0].Y);
+        Assert.Equal(10f, builder.Vertices[2].X);
+        Assert.Equal(10f, builder.Vertices[2].Y);
+        var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+        Assert.Equal(new System.Numerics.Vector4(0, 0, 10, 10), builder.ClipData[(int)data.ClipIndex].Bounds);
     }
 
     [Fact]
@@ -296,7 +339,9 @@ public sealed class UiDrawBuilderTests
             10,
             false);
 
-        Assert.Equal(new UiScissor(0, 0, 2, 2), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(new UiScissor(0, 0, 10, 10), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(2f, builder.Vertices[2].X);
+        Assert.Equal(2f, builder.Vertices[2].Y);
     }
 
     [Fact]
@@ -399,7 +444,7 @@ public sealed class UiDrawBuilderTests
     }
 
     [Fact]
-    public void RectanglesUseUInt32IndicesAndMergeOnlyConsecutiveEqualScissors()
+    public void RectanglesKeepDrawOrderAcrossDifferentClips()
     {
         var firstClip = new Rect(0, 0, 10, 10);
         var secondClip = new Rect(20, 0, 10, 10);
@@ -420,26 +465,13 @@ public sealed class UiDrawBuilderTests
             100,
             false);
 
+        Assert.Equal(new[] { 1 / 255f, 2 / 255f, 3 / 255f, 4 / 255f }
+                .SelectMany(color => Enumerable.Repeat(color, 6)),
+            builder.Indices.ToArray().Select(index => builder.Vertices[(int)index].R));
         Assert.Equal(
-            new uint[] { 0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4, 8, 9, 10, 10, 11, 8, 12, 13, 14, 14, 15, 12 },
-            builder.Indices.ToArray());
-        Assert.Equal(
-            [
-                new UiBatch(new UiScissor(0, 0, 10, 10), 0, 12),
-                new UiBatch(new UiScissor(20, 0, 10, 10), 12, 6),
-                new UiBatch(new UiScissor(0, 0, 10, 10), 18, 6)
-            ],
+            [new UiBatch(new UiScissor(0, 0, 100, 100), 0, 24)],
             builder.Batches.ToArray());
     }
-
-    [Theory]
-    [InlineData(0, 1, 1)]
-    [InlineData(0, 3, 4)]
-    [InlineData(4, 4, 4)]
-    [InlineData(4, 5, 8)]
-    [InlineData(8, 17, 32)]
-    public void CapacityGrowthIsDeterministic(int current, int required, int expected) =>
-        Assert.Equal(expected, UiDrawBuilder.GrowCapacity(current, required));
 
     [Fact]
     public void InvisibleCommandDoesNotSplitEqualScissorBatch()
@@ -501,11 +533,13 @@ public sealed class UiDrawBuilderTests
             100, 100, false);
 
         Assert.Equal(2, builder.RectangleCount);
-        Assert.Equal(new UiVertex(0, 0, 0, 1, 0, 1), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(1, 1, 0, 1, 0, 1, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
         Assert.Equal(new UiVertex(0, 0, 0, 0, 1, 1), builder.Vertices[4]);
         Assert.Equal(
-            [new UiBatch(new UiScissor(1, 1, 5, 5), 0, 6), new UiBatch(new UiScissor(0, 0, 100, 100), 6, 6)],
+            [new UiBatch(new UiScissor(0, 0, 100, 100), 0, 12)],
             builder.Batches.ToArray());
+        Assert.NotEqual(0u, builder.Vertices[0].DrawDataIndex);
+        Assert.Equal(0u, builder.Vertices[4].DrawDataIndex);
     }
 
     [Fact]
@@ -529,12 +563,6 @@ public sealed class UiDrawBuilderTests
         builder.Build(CommandList(Fill(new Rect(1, 2, 3, 4), new Color(255, 255, 255))), 100, 100, false);
         Assert.Equal(new UiVertex(1, 2, 1, 1, 1, 1), builder.Vertices[0]);
     }
-
-    [Fact]
-    public void CapacityGrowthUsesRequiredValueNearIntegerLimit() =>
-        Assert.Equal(
-            int.MaxValue,
-            UiDrawBuilder.GrowCapacity(int.MaxValue / 2 + 1, int.MaxValue));
 
     [Fact]
     public void ImageVerticesContainNormalizedUvAndTexelCenterBounds()
@@ -564,9 +592,8 @@ public sealed class UiDrawBuilderTests
         Assert.Equal(6.5f / 16, first.ClampMaxU);
         Assert.Equal(10.5f / 16, first.ClampMaxV);
         Assert.Equal(0.5f, first.A);
-        Assert.Equal(
-            PackMaterialData(UiMaterialKind.ImageLinear, 17),
-            first.MaterialData);
+        Assert.Equal(UiMaterialKind.ImageLinear, first.MaterialKind);
+        Assert.Equal(17u, first.TextureIndex);
         Assert.Single(builder.Batches.ToArray());
     }
 
@@ -719,16 +746,13 @@ public sealed class UiDrawBuilderTests
         Assert.Equal(24u, Assert.Single(builder.Batches.ToArray()).IndexCount);
         Assert.Equal(
             [
-                PackMaterialData(UiMaterialKind.ImageLinear, 1),
-                PackMaterialData(UiMaterialKind.ImageLinear, 1),
-                PackMaterialData(UiMaterialKind.ImageNearest, 2),
-                PackMaterialData(UiMaterialKind.ImageLinear, 3)
+                (UiMaterialKind.ImageLinear, 1u),
+                (UiMaterialKind.ImageLinear, 1u),
+                (UiMaterialKind.ImageNearest, 2u),
+                (UiMaterialKind.ImageLinear, 3u)
             ],
-            builder.Vertices.ToArray().Chunk(4).Select(vertices => vertices[0].MaterialData));
+            builder.Vertices.ToArray().Chunk(4).Select(vertices => (vertices[0].MaterialKind, vertices[0].TextureIndex)));
     }
-
-    private static uint PackMaterialData(UiMaterialKind materialKind, uint textureIndex) =>
-        (textureIndex << 8) | (uint)materialKind;
 
     private static UiDrawCommandList CommandList(params UiDrawCommand[] commands) =>
         new UiDrawCommandList([.. commands]);

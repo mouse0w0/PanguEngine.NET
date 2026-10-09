@@ -159,16 +159,17 @@ public sealed class UiDrawCommandListTests
 
         Assert.Equal(5, builder.RectangleCount);
         Assert.Equal(new UiVertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[0]);
-        Assert.Equal(new UiVertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[4]);
+        Assert.Equal(new UiVertex(21, 21, 1, 1, 1, 0.25f, drawDataIndex: builder.Vertices[4].DrawDataIndex), builder.Vertices[4]);
         Assert.Equal(new UiVertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[8]);
-        Assert.Equal(new UiVertex(10, 10, 1, 1, 1, 0.25f), builder.Vertices[12]);
+        Assert.Equal(new UiVertex(10, 10, 1, 1, 1, 0.25f, drawDataIndex: builder.Vertices[12].DrawDataIndex), builder.Vertices[12]);
         Assert.Equal(new UiVertex(10, 10, 1, 1, 1, 1), builder.Vertices[16]);
         Assert.Equal(
-            [new UiBatch(new UiScissor(10, 10, 20, 20), 0, 6),
-             new UiBatch(new UiScissor(21, 21, 1, 1), 6, 6),
-             new UiBatch(new UiScissor(10, 10, 20, 20), 12, 12),
-             new UiBatch(new UiScissor(0, 0, 100, 100), 24, 6)],
+            [new UiBatch(new UiScissor(0, 0, 100, 100), 0, 30)],
             builder.Batches.ToArray());
+        var nested = builder.DrawData[(int)builder.Vertices[4].DrawDataIndex];
+        Assert.Equal(new System.Numerics.Vector4(21, 21, 22, 22), builder.ClipData[(int)nested.ClipIndex].Bounds);
+        var parent = builder.DrawData[(int)builder.Vertices[12].DrawDataIndex];
+        Assert.Equal(new System.Numerics.Vector4(10, 10, 30, 30), builder.ClipData[(int)parent.ClipIndex].Bounds);
     }
 
     [Fact]
@@ -190,13 +191,15 @@ public sealed class UiDrawCommandListTests
         builder.Build(commands, 100, 100, false);
 
         Assert.Equal(2, builder.RectangleCount);
-        Assert.Equal(new UiVertex(8, 12, 1, 0, 0, 0.25f), builder.Vertices[0]);
-        Assert.Equal(new UiVertex(16, 24, 1, 0, 0, 0.25f), builder.Vertices[2]);
+        Assert.Equal(new UiVertex(8, 12, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(16, 18, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
         Assert.Equal(new UiVertex(10.5f, 16, 0, 1, 0, 1), builder.Vertices[4]);
         Assert.Equal(new UiVertex(12.5f, 19, 0, 1, 0, 1), builder.Vertices[6]);
         Assert.Equal(
-            [new UiBatch(new UiScissor(6, 8, 10, 10), 0, 6), new UiBatch(new UiScissor(0, 0, 100, 100), 6, 6)],
+            [new UiBatch(new UiScissor(0, 0, 100, 100), 0, 12)],
             builder.Batches.ToArray());
+        var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+        Assert.Equal(new System.Numerics.Vector4(6, 8, 16, 18), builder.ClipData[(int)data.ClipIndex].Bounds);
     }
 
     [Fact]
@@ -493,15 +496,18 @@ public sealed class UiDrawCommandListTests
         var builder = new UiDrawBuilder();
         builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
 
-        Assert.Equal(new UiVertex(12, 22, 1, 1, 1, 0.5f), builder.Vertices[0]);
-        Assert.Equal(new UiVertex(24, 34, 1, 1, 1, 0.5f), builder.Vertices[2]);
-        Assert.Equal(new UiVertex(10, 20, 1, 1, 1, 0.5f), builder.Vertices[4]);
-        Assert.Equal(new UiVertex(14, 24, 1, 1, 1, 0.5f), builder.Vertices[6]);
+        Assert.Equal(new UiVertex(12, 22, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
+        Assert.Equal(new UiVertex(20, 30, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
+        Assert.Equal(new UiVertex(10, 20, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[4].DrawDataIndex), builder.Vertices[4]);
+        Assert.Equal(new UiVertex(14, 24, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[4].DrawDataIndex), builder.Vertices[6]);
         Assert.Equal(new UiVertex(10, 20, 1, 1, 1, 1), builder.Vertices[8]);
         Assert.Equal(new UiVertex(0, 0, 1, 1, 1, 1), builder.Vertices[12]);
         Assert.Equal(
-            [new UiBatch(new UiScissor(10, 20, 10, 10), 0, 12), new UiBatch(new UiScissor(0, 0, 100, 100), 12, 12)],
+            [new UiBatch(new UiScissor(0, 0, 100, 100), 0, 24)],
             builder.Batches.ToArray());
+        var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+        Assert.Equal(new System.Numerics.Vector4(10, 20, 20, 30), builder.ClipData[(int)data.ClipIndex].Bounds);
+        Assert.Equal(builder.Vertices[0].DrawDataIndex, builder.Vertices[4].DrawDataIndex);
     }
 
     private static UiScreen CreateScreen(Action<UiDrawingContext> draw, double scale = 1, Point origin = default)

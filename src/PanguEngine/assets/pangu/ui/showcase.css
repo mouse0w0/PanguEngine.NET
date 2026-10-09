@@ -199,6 +199,10 @@ Button.showcase-combo:hover:focus {
     border-thickness: 1px;
 }
 
+.showcase-rounded-asymmetric {
+    border-radius: 4px 28px 12px 40px;
+}
+
 StackPanel.showcase-tabs-demo,
 StackPanel.showcase-tabs-content {
     spacing: 8px;

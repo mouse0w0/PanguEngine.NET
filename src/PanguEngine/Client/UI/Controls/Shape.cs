@@ -161,13 +161,29 @@ public abstract partial class Shape : UiNode
         var strokeColor = ((SolidColorBrush?)Stroke)?.Color;
         if (fillColor is null && strokeColor is null)
             return;
+        if (DrawAnalyticShape(context, fillColor, strokeColor))
+            return;
 
-        var geometry = Geometry;
-        if (fillColor is { } fill && geometry.FillMesh.Vertices.Length > 0)
-            context.DrawGeometry(geometry.FillMesh, fill);
-        if (strokeColor is { } stroke && geometry.StrokeMesh.Vertices.Length > 0)
-            context.DrawGeometry(geometry.StrokeMesh, stroke);
+        var analyticFill = fillColor is { } color && DrawAnalyticFill(context, color);
+        if (!analyticFill && fillColor is { } fill)
+        {
+            var mesh = Geometry.FillMesh;
+            if (mesh.Vertices.Length > 0)
+                context.DrawGeometry(mesh, fill);
+        }
+        if (strokeColor is { } stroke)
+        {
+            var mesh = Geometry.StrokeMesh;
+            if (mesh.Vertices.Length > 0)
+                context.DrawGeometry(mesh, stroke);
+        }
     }
+
+    /// <summary>Draws a specialized fill and returns whether the fill was handled.</summary>
+    private protected virtual bool DrawAnalyticFill(UiDrawingContext context, Color color) => false;
+
+    /// <summary>Draws a specialized fill and stroke and returns whether the shape was handled.</summary>
+    private protected virtual bool DrawAnalyticShape(UiDrawingContext context, Color? fill, Color? stroke) => false;
 
     /// <summary>
     /// Measures this shape's geometry for the available size.
@@ -198,6 +214,9 @@ public abstract partial class Shape : UiNode
     /// </summary>
     private protected virtual PathStretch GetGeometryStretch() => PathStretch.None;
 
+    /// <summary>Gets the elliptical corner radii that participate in the geometry key.</summary>
+    private protected virtual Point GetGeometryRadii() => Point.Zero;
+
     /// <summary>
     /// Gets the cached geometry for the current inputs, rebuilding it when the key changes.
     /// </summary>
@@ -219,6 +238,7 @@ public abstract partial class Shape : UiNode
     private ShapeGeometryKey CreateGeometryKey()
     {
         var arranged = IsArrangeValid;
+        var radii = GetGeometryRadii();
         return new ShapeGeometryKey(
             GetGeometryData(),
             GetGeometryFillRule(),
@@ -230,7 +250,9 @@ public abstract partial class Shape : UiNode
             StrokeMiterLimit,
             arranged ? LayoutBounds.Width : 0,
             arranged ? LayoutBounds.Height : 0,
-            Screen?.Scale ?? 1);
+            Screen?.Scale ?? 1,
+            radii.X,
+            radii.Y);
     }
 
     /// <summary>
@@ -377,5 +399,7 @@ public abstract partial class Shape : UiNode
         double StrokeMiterLimit,
         double Width,
         double Height,
-        double Scale);
+        double Scale,
+        double RadiusX,
+        double RadiusY);
 }

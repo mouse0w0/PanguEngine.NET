@@ -4,7 +4,7 @@ layout(location = 0) in vec2 inPosition;
 layout(location = 1) in vec4 inColor;
 layout(location = 2) in vec2 inUv;
 layout(location = 3) in vec4 inClampBounds;
-layout(location = 4) in uint inMaterialData;
+layout(location = 4) in uint inDrawMetadata;
 
 layout(push_constant) uniform UiProjection
 {
@@ -16,9 +16,12 @@ layout(location = 1) out vec2 fragUv;
 layout(location = 2) flat out vec4 fragClampBounds;
 layout(location = 3) flat out uint fragMaterialKind;
 layout(location = 4) flat out uint fragTextureIndex;
+layout(location = 5) flat out uint fragDrawDataIndex;
 
-const uint TextureIndexShift = 8u;
+const uint TextureIndexShift = 2u;
+const uint DrawDataIndexShift = 10u;
 const uint MaterialKindMask = (1u << TextureIndexShift) - 1u;
+const uint TextureIndexMask = (1u << (DrawDataIndexShift - TextureIndexShift)) - 1u;
 
 void main()
 {
@@ -26,6 +29,7 @@ void main()
     fragColor = inColor;
     fragUv = inUv;
     fragClampBounds = inClampBounds;
-    fragMaterialKind = inMaterialData & MaterialKindMask;
-    fragTextureIndex = inMaterialData >> TextureIndexShift;
+    fragMaterialKind = inDrawMetadata & MaterialKindMask;
+    fragTextureIndex = (inDrawMetadata >> TextureIndexShift) & TextureIndexMask;
+    fragDrawDataIndex = inDrawMetadata >> DrawDataIndexShift;
 }

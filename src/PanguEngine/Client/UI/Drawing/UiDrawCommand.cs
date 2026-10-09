@@ -107,6 +107,41 @@ public sealed class UiPushClipCommand : UiDrawCommand
     public Rect Clip { get; }
 }
 
+/// <summary>Constrains decoration or descendant drawing to an immutable rounded region.</summary>
+internal sealed class UiPushRoundedClipCommand(UiRoundedClipGeometry geometry, bool snapImageBounds = false) : UiDrawCommand
+{
+    internal UiRoundedClipGeometry Geometry { get; } = geometry;
+    internal bool SnapImageBounds { get; } = snapImageBounds;
+}
+
+/// <summary>Represents a solid fill constrained to a rounded region.</summary>
+internal sealed class UiFillRoundedRectangleCommand(UiRoundedClipGeometry geometry, Color color) : UiDrawCommand
+{
+    internal UiRoundedClipGeometry Geometry { get; } = geometry;
+    internal Color Color { get; } = color;
+}
+
+/// <summary>Represents a solid fill and stroke of a rectangle with optional elliptical corners.</summary>
+internal sealed class UiDrawRoundedShapeCommand(
+    UiRoundedRectangle centerline, double thickness, Color fill, Color stroke, StrokeLineJoin join) : UiDrawCommand
+{
+    internal UiRoundedRectangle Centerline { get; } = centerline;
+    internal double Thickness { get; } = thickness;
+    internal Color Fill { get; } = fill;
+    internal Color Stroke { get; } = stroke;
+    internal StrokeLineJoin Join { get; } = join;
+}
+
+/// <summary>Represents the complementary solid background and border of a rounded region.</summary>
+internal sealed class UiDrawRoundedDecorationCommand(
+    UiRoundedRectangle outer, UiRoundedRectangle inner, Color background, Color border) : UiDrawCommand
+{
+    internal UiRoundedRectangle Outer { get; } = outer;
+    internal UiRoundedRectangle Inner { get; } = inner;
+    internal Color Background { get; } = background;
+    internal Color Border { get; } = border;
+}
+
 /// <summary>
 /// Pushes an opacity factor multiplied into each draw within the scope.
 /// </summary>

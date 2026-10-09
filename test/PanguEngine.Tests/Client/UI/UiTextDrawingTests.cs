@@ -1,5 +1,6 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Drawing.Geometry;
 using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Graphics.Text;
 
@@ -122,7 +123,8 @@ public sealed class UiTextDrawingTests
         Assert.Equal(6.5f / 64, first.ClampMaxU);
         Assert.Equal(9.5f / 32, first.ClampMaxV);
         Assert.Equal((float)(128 / 255.0 * 0.5), first.A);
-        Assert.Equal(PackMaterialData(UiMaterialKind.TextMask, 7), first.MaterialData);
+        Assert.Equal(UiMaterialKind.TextMask, first.MaterialKind);
+        Assert.Equal(7u, first.TextureIndex);
         Assert.Single(builder.Batches.ToArray());
     }
 
@@ -276,7 +278,7 @@ public sealed class UiTextDrawingTests
     }
 
     [Fact]
-    public void BuilderPreservesRoundedScissorCullingForGlyphInk()
+    public void BuilderUsesClipParametersAndPreservesConservativeGlyphInkCulling()
     {
         using var fonts = new TextFontContext();
         var sourceRun = Assert.Single(Assert.Single(fonts.CreateLayout("A").Lines).GlyphRuns);
@@ -300,9 +302,13 @@ public sealed class UiTextDrawingTests
 
         Assert.Equal(1, resolutions);
         Assert.Equal(1, builder.RectangleCount);
-        Assert.Equal(1.1f, builder.Vertices[0].X);
+        Assert.Equal(2f, builder.Vertices[0].X);
         Assert.Equal(2.1f, builder.Vertices[2].X);
-        Assert.Equal(new UiScissor(2, 0, 1, 10), Assert.Single(builder.Batches.ToArray()).Scissor);
+        Assert.Equal(new UiScissor(0, 0, 100, 100), Assert.Single(builder.Batches.ToArray()).Scissor);
+        var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+        var clip = builder.ClipData[(int)data.ClipIndex];
+        Assert.Equal(2.2f, clip.Bounds.X);
+        Assert.Equal(2.3f, clip.Bounds.Z);
     }
 
     [Fact]
@@ -338,16 +344,13 @@ public sealed class UiTextDrawingTests
         Assert.Equal(24u, Assert.Single(builder.Batches.ToArray()).IndexCount);
         Assert.Equal(
             [
-                PackMaterialData(UiMaterialKind.Solid, 0),
-                PackMaterialData(UiMaterialKind.TextMask, 20),
-                PackMaterialData(UiMaterialKind.TextMask, 21),
-                PackMaterialData(UiMaterialKind.ImageLinear, 30)
+                (UiMaterialKind.Solid, 0u),
+                (UiMaterialKind.TextMask, 20u),
+                (UiMaterialKind.TextMask, 21u),
+                (UiMaterialKind.ImageLinear, 30u)
             ],
-            builder.Vertices.ToArray().Chunk(4).Select(vertices => vertices[0].MaterialData));
+            builder.Vertices.ToArray().Chunk(4).Select(vertices => (vertices[0].MaterialKind, vertices[0].TextureIndex)));
     }
-
-    private static uint PackMaterialData(UiMaterialKind materialKind, uint textureIndex) =>
-        (textureIndex << 8) | (uint)materialKind;
 
     private static UiDrawCommandList CommandList(params UiDrawCommand[] commands) =>
         new UiDrawCommandList([.. commands]);
@@ -362,6 +365,47 @@ public sealed class UiTextDrawingTests
         new(opacity);
 
     private static UiDrawCommand Pop => UiPopCommand.Instance;
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(4)]
+    public void ParameterizedClipKeepsOneGlyphQuadAndPreservesAtlasMapping(double radius)
+    {
+        using var fonts = new TextFontContext();
+        var source = Assert.Single(Assert.Single(fonts.CreateLayout("A").Lines).GlyphRuns);
+        var glyph = new PositionedGlyph(source.Glyphs[0].GlyphId, 0, 0, 0, 8, 0, 0, 0, false);
+        var layout = new TextLayout(8, 8, TextBounds.Empty,
+            [new TextLine(0, 1, 0, 0, 8, 8, 8, 0, [new TextGlyphRun(source.FontFace, 0, 1, [glyph])])]);
+        var bounds = new Rect(2, 1, 4, 5);
+        UiDrawCommand clip = radius == 0
+            ? new UiPushClipCommand(bounds)
+            : new UiPushRoundedClipCommand(new UiRoundedClipGeometry(
+                new UiRoundedRectangle(bounds, new CornerRadius(radius))));
+        var builder = new UiDrawBuilder();
+        builder.Build(CommandList(clip,
+            new UiDrawTextCommand(Point.Zero, layout, 8, new Color(255, 255, 255)), Pop),
+            32, 32, false, glyphResolver: _ => new UiGlyphRenderBinding(7, 32, 32,
+                new GlyphAtlasRegion(2, 3, 8, 8), 0, 0));
+        for (var i = 0; i < builder.VertexCount; i++)
+        {
+            var vertex = builder.Vertices[i];
+            Assert.Equal((2 + vertex.X) / 32, vertex.U, 6);
+            Assert.Equal((3 + vertex.Y) / 32, vertex.V, 6);
+            Assert.Equal(2.5f / 32, vertex.ClampMinU);
+            Assert.Equal(9.5f / 32, vertex.ClampMaxU);
+            Assert.Equal(3.5f / 32, vertex.ClampMinV);
+            Assert.Equal(10.5f / 32, vertex.ClampMaxV);
+            Assert.Equal(1f, vertex.A);
+            Assert.Equal(UiMaterialKind.TextMask, vertex.MaterialKind);
+            Assert.Equal(7u, vertex.TextureIndex);
+        }
+        Assert.Equal(4, builder.VertexCount);
+        Assert.Equal(2f, builder.Vertices[0].X);
+        Assert.Equal(1f, builder.Vertices[0].Y);
+        Assert.Equal(6f, builder.Vertices[2].X);
+        Assert.Equal(6f, builder.Vertices[2].Y);
+        Assert.Equal(0, builder.CellCoverageEvaluations);
+    }
 
     private static UiDrawingContext CreateDrawingContext(List<UiDrawCommand> commands) =>
         new(commands);

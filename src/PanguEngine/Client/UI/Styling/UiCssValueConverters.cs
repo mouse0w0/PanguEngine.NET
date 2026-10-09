@@ -79,6 +79,23 @@ public static class UiCssValueConverters
     /// <exception cref="FormatException">Thrown when the value is not a finite decimal number or carries a unit.</exception>
     public static double ParseNumber(string value) => ParseFinite(value, value);
 
+    /// <summary>Converts one to four CSS lengths into clockwise corner radii.</summary>
+    /// <param name="value">The corner lengths starting at the top left.</param>
+    /// <returns>The expanded corner radii.</returns>
+    /// <exception cref="FormatException">The value is not one to four lengths.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A radius is negative.</exception>
+    public static CornerRadius ParseCornerRadius(string value)
+    {
+        var parts = SplitAsciiWhitespace(value);
+        if (parts.Length is < 1 or > 4)
+            throw new FormatException($"Corner radius '{value}' must have 1, 2, 3 or 4 values.");
+        var a = ParseLength(parts[0]);
+        var b = parts.Length > 1 ? ParseLength(parts[1]) : a;
+        var c = parts.Length > 2 ? ParseLength(parts[2]) : a;
+        var d = parts.Length > 3 ? ParseLength(parts[3]) : b;
+        return new CornerRadius(a, b, c, d);
+    }
+
     /// <summary>Converts a trimmed CSS value into a thickness with one, two, three, or four edges.</summary>
     /// <param name="value">The trimmed CSS value, ordered top, right, bottom, left.</param>
     /// <returns>The parsed thickness.</returns>

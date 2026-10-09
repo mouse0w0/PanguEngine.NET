@@ -103,13 +103,15 @@ public sealed class HudScreenTests
             builder.Build(commands, 200, 100, false);
 
             Assert.Equal(2, builder.RectangleCount);
-            Assert.Equal(new UiVertex(2, 4, 1, 0, 0, 0.25f), builder.Vertices[0]);
-            Assert.Equal(new UiVertex(10, 16, 1, 0, 0, 0.25f), builder.Vertices[2]);
+            Assert.Equal(new UiVertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
+            Assert.Equal(new UiVertex(10, 10, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
             Assert.Equal(new UiVertex(0.5f, 1, 0, 1, 0, 1), builder.Vertices[4]);
             Assert.Equal(new UiVertex(2.5f, 4, 0, 1, 0, 1), builder.Vertices[6]);
             Assert.Equal(
-                [new UiBatch(new UiScissor(0, 0, 10, 10), 0, 6), new UiBatch(new UiScissor(0, 0, 200, 100), 6, 6)],
+                [new UiBatch(new UiScissor(0, 0, 200, 100), 0, 12)],
                 builder.Batches.ToArray());
+            var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
+            Assert.Equal(new System.Numerics.Vector4(0, 0, 10, 10), builder.ClipData[(int)data.ClipIndex].Bounds);
 
             manager.Close();
             commands.Clear();
@@ -118,7 +120,7 @@ public sealed class HudScreenTests
 
             Assert.Single(commands.OfType<UiFillRectangleCommand>());
             Assert.Equal(1, builder.RectangleCount);
-            Assert.Equal(new UiVertex(2, 4, 1, 0, 0, 0.25f), builder.Vertices[0]);
+            Assert.Equal(new UiVertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
         }
         finally
         {

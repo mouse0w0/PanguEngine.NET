@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using PanguEngine.Client.UI.Drawing;
+using PanguEngine.Client.UI.Drawing.Geometry;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 
@@ -8,9 +9,13 @@ namespace PanguEngine.Client.UI.Rendering;
 [StructLayout(LayoutKind.Sequential)]
 internal readonly struct UiVertex
 {
-    private const int TextureIndexShift = 8;
+    private const int TextureIndexShift = 2;
+    private const int DrawDataIndexShift = 10;
+    private const uint MaterialKindMask = (1u << TextureIndexShift) - 1;
+    private const uint TextureIndexMask = (1u << (DrawDataIndexShift - TextureIndexShift)) - 1;
 
     internal const uint SizeInBytes = 52;
+    internal const uint MaxDrawDataIndex = uint.MaxValue >> DrawDataIndexShift;
 
     internal static readonly VertexInputDescription VertexInput = new(
         [new VertexBufferLayoutDescription(0, SizeInBytes)],
@@ -36,7 +41,8 @@ internal readonly struct UiVertex
         float clampMaxU = 0,
         float clampMaxV = 0,
         UiMaterialKind materialKind = UiMaterialKind.Solid,
-        uint textureIndex = 0)
+        uint textureIndex = 0,
+        uint drawDataIndex = 0)
     {
         X = x;
         Y = y;
@@ -50,7 +56,8 @@ internal readonly struct UiVertex
         ClampMinV = clampMinV;
         ClampMaxU = clampMaxU;
         ClampMaxV = clampMaxV;
-        MaterialData = (textureIndex << TextureIndexShift) | (uint)materialKind;
+        DrawMetadata = (drawDataIndex << DrawDataIndexShift) |
+            (textureIndex << TextureIndexShift) | (uint)materialKind;
     }
 
     internal readonly float X;
@@ -65,7 +72,10 @@ internal readonly struct UiVertex
     internal readonly float ClampMinV;
     internal readonly float ClampMaxU;
     internal readonly float ClampMaxV;
-    internal readonly uint MaterialData;
+    internal readonly uint DrawMetadata;
+    internal UiMaterialKind MaterialKind => (UiMaterialKind)(DrawMetadata & MaterialKindMask);
+    internal uint TextureIndex => (DrawMetadata >> TextureIndexShift) & TextureIndexMask;
+    internal uint DrawDataIndex => DrawMetadata >> DrawDataIndexShift;
 }
 
 internal readonly record struct UiScissor(int X, int Y, uint Width, uint Height);
@@ -113,7 +123,7 @@ internal delegate UiImageRenderBinding? UiImageResolver(UiDrawImageCommand comma
 
 internal delegate UiGlyphRenderBinding? UiGlyphResolver(GlyphRasterKey key);
 
-internal sealed class UiDrawBuilder
+internal sealed partial class UiDrawBuilder
 {
     private readonly List<UiVertex> _vertices = [];
     private readonly List<uint> _indices = [];
@@ -128,6 +138,7 @@ internal sealed class UiDrawBuilder
     internal int RectangleCount => _legacyQuadCount;
     internal int VertexCount => _vertices.Count;
     internal int IndexCount => _indices.Count;
+    internal long CellCoverageEvaluations => _geometryRasterizer.CellCoverageEvaluations;
 
     internal void Build(
         UiDrawCommandList commands,
@@ -141,6 +152,7 @@ internal sealed class UiDrawBuilder
         _vertices.Clear();
         _indices.Clear();
         _batches.Clear();
+        ResetGpuData();
         _legacyQuadCount = 0;
         if (framebufferWidth == 0 || framebufferHeight == 0)
             return;
@@ -187,19 +199,12 @@ internal sealed class UiDrawBuilder
                         continue;
                     case UiPushClipCommand clip:
                         _states.Add(state);
-                        var bounds = Transform(clip.Clip, state);
-                        if (state.Clip is { } previousClip)
-                        {
-                            var left = Math.Max(previousClip.X, bounds.X);
-                            var top = Math.Max(previousClip.Y, bounds.Y);
-                            var right = Math.Min(previousClip.X + previousClip.Width, bounds.X + bounds.Width);
-                            var bottom = Math.Min(previousClip.Y + previousClip.Height, bounds.Y + bounds.Height);
-                            bounds = right <= left || bottom <= top
-                                ? Rect.Zero
-                                : new Rect(left, top, right - left, bottom - top);
-                        }
-
-                        state = state with { Clip = bounds };
+                        state = PushClip(state, new UiRoundedClipGeometry(
+                            new UiRoundedRectangle(clip.Clip, CornerRadius.Zero)));
+                        continue;
+                    case UiPushRoundedClipCommand roundedClip:
+                        _states.Add(state);
+                        state = PushClip(state, roundedClip.Geometry, roundedClip.SnapImageBounds);
                         continue;
                     case UiPushOpacityCommand opacity:
                         _states.Add(state);
@@ -217,8 +222,19 @@ internal sealed class UiDrawBuilder
                     continue;
                 }
 
+                _activeClip = state.ClipGeometry;
+                _imagePartitionBounds = state.ImagePartitionBounds;
                 switch (command)
                 {
+                    case UiFillRoundedRectangleCommand roundedFill:
+                        AppendRoundedFill(roundedFill, state, scissor, convertSrgbToLinear);
+                        break;
+                    case UiDrawRoundedShapeCommand roundedShape:
+                        AppendRoundedShape(roundedShape, state, scissor, convertSrgbToLinear);
+                        break;
+                    case UiDrawRoundedDecorationCommand decoration:
+                        AppendRoundedDecoration(decoration, state, scissor, convertSrgbToLinear);
+                        break;
                     case UiFillRectangleCommand rectangle:
                         AppendRectangle(
                             rectangle,
@@ -236,8 +252,7 @@ internal sealed class UiDrawBuilder
                             convertSrgbToLinear);
                         break;
                     case UiDrawImageCommand image:
-                        if (!TryGetPhysicalBounds(image.Bounds, framebufferWidth, framebufferHeight, state, out var imageBounds) ||
-                            !Intersects(imageBounds, scissor))
+                        if (!TryGetImageBounds(image.Bounds, framebufferWidth, framebufferHeight, state, scissor, out var imageBounds))
                         {
                             break;
                         }
@@ -245,6 +260,12 @@ internal sealed class UiDrawBuilder
                             throw new NotSupportedException("Image drawing requires an image resource resolver.");
                         if (imageResolver(image) is { } binding)
                         {
+                            if (state.ClipGeometry is not null)
+                            {
+                                var original = Transform(image.Bounds, state);
+                                imageBounds = new PhysicalBounds(original.X, original.Y,
+                                    original.X + original.Width, original.Y + original.Height);
+                            }
                             AppendImage(
                                 image,
                                 binding,
@@ -263,18 +284,25 @@ internal sealed class UiDrawBuilder
                         throw new NotSupportedException($"UI draw command '{command.GetType().Name}' is not supported.");
                 }
             }
+
+            if (_indices.Count > 0)
+                _batches.Add(new UiBatch(new UiScissor(0, 0, framebufferWidth, framebufferHeight),
+                    0, checked((uint)_indices.Count)));
         }
         catch
         {
             _vertices.Clear();
             _indices.Clear();
             _batches.Clear();
+            ResetGpuData();
             _legacyQuadCount = 0;
             throw;
         }
         finally
         {
             _states.Clear();
+            _activeClip = null;
+            _imagePartitionBounds = null;
         }
     }
 
@@ -457,12 +485,20 @@ internal sealed class UiDrawBuilder
         if (baseAlpha <= 0)
             return;
 
+        var meshBounds = Transform(command.Mesh.Bounds, state);
+        if (!Intersects(new PhysicalBounds(meshBounds.X, meshBounds.Y,
+                meshBounds.X + meshBounds.Width, meshBounds.Y + meshBounds.Height), scissor))
+            return;
+        var geometryClip = state.ClipGeometry is { } clip && !clip.Contains(Expand(meshBounds, 1))
+            ? clip.GetCpuClip()
+            : null;
         var quads = _geometryRasterizer.Rasterize(
             command.Mesh,
             state.Scale,
             state.X,
             state.Y,
-            scissor);
+            scissor,
+            geometryClip);
         if (quads.Count == 0)
             return;
 
@@ -471,7 +507,7 @@ internal sealed class UiDrawBuilder
         var b = ToColorChannel(color.B, convertSrgbToLinear);
         foreach (var quad in quads)
         {
-            AppendQuad(
+            AppendQuadRaw(
                 new PhysicalBounds(
                     quad.X,
                     quad.Y,
@@ -531,7 +567,7 @@ internal sealed class UiDrawBuilder
             v1);
     }
 
-    private void AppendQuad(
+    private void AppendQuadRaw(
         PhysicalBounds bounds,
         UiScissor scissor,
         UiMaterialKind materialKind,
@@ -547,8 +583,30 @@ internal sealed class UiDrawBuilder
         float clampMaxU,
         float clampMaxV,
         float u1 = 0,
-        float v1 = 0)
+        float v1 = 0,
+        uint drawDataIndex = 0)
     {
+        if (_activeClip is not null)
+        {
+            var left = Math.Max(bounds.Left, scissor.X);
+            var top = Math.Max(bounds.Top, scissor.Y);
+            var right = Math.Min(bounds.Right, (double)scissor.X + scissor.Width);
+            var bottom = Math.Min(bounds.Bottom, (double)scissor.Y + scissor.Height);
+            if (right <= left || bottom <= top)
+                return;
+            if (left != bounds.Left || top != bounds.Top || right != bounds.Right || bottom != bounds.Bottom)
+            {
+                var clippedU0 = Map(left, bounds.Left, bounds.Right, u0, u1);
+                var clippedU1 = Map(right, bounds.Left, bounds.Right, u0, u1);
+                var clippedV0 = Map(top, bounds.Top, bounds.Bottom, v0, v1);
+                var clippedV1 = Map(bottom, bounds.Top, bounds.Bottom, v0, v1);
+                bounds = new PhysicalBounds(left, top, right, bottom);
+                u0 = clippedU0;
+                u1 = clippedU1;
+                v0 = clippedV0;
+                v1 = clippedV1;
+            }
+        }
         var vertexBase = checked((uint)_vertices.Count);
         _vertices.Add(new UiVertex(
             (float)bounds.Left,
@@ -564,7 +622,8 @@ internal sealed class UiDrawBuilder
             clampMaxU,
             clampMaxV,
             materialKind,
-            textureIndex));
+            textureIndex,
+            drawDataIndex));
         _vertices.Add(new UiVertex(
             (float)bounds.Right,
             (float)bounds.Top,
@@ -579,7 +638,8 @@ internal sealed class UiDrawBuilder
             clampMaxU,
             clampMaxV,
             materialKind,
-            textureIndex));
+            textureIndex,
+            drawDataIndex));
         _vertices.Add(new UiVertex(
             (float)bounds.Right,
             (float)bounds.Bottom,
@@ -594,7 +654,8 @@ internal sealed class UiDrawBuilder
             clampMaxU,
             clampMaxV,
             materialKind,
-            textureIndex));
+            textureIndex,
+            drawDataIndex));
         _vertices.Add(new UiVertex(
             (float)bounds.Left,
             (float)bounds.Bottom,
@@ -609,28 +670,15 @@ internal sealed class UiDrawBuilder
             clampMaxU,
             clampMaxV,
             materialKind,
-            textureIndex));
+            textureIndex,
+            drawDataIndex));
 
-        var firstIndex = checked((uint)_indices.Count);
         _indices.Add(vertexBase);
         _indices.Add(checked(vertexBase + 1));
         _indices.Add(checked(vertexBase + 2));
         _indices.Add(checked(vertexBase + 2));
         _indices.Add(checked(vertexBase + 3));
         _indices.Add(vertexBase);
-
-        if (_batches.Count > 0 && _batches[^1].Scissor == scissor)
-        {
-            var previous = _batches[^1];
-            _batches[^1] = new UiBatch(
-                previous.Scissor,
-                previous.FirstIndex,
-                checked(previous.IndexCount + 6));
-        }
-        else
-        {
-            _batches.Add(new UiBatch(scissor, firstIndex, 6));
-        }
     }
 
     private static (float Min, float Max) GetNormalizedClamp(
@@ -755,5 +803,7 @@ internal sealed class UiDrawBuilder
         double Y,
         double Scale,
         Rect? Clip,
-        double Opacity);
+        double Opacity,
+        ClipState? ClipGeometry = null,
+        Rect? ImagePartitionBounds = null);
 }

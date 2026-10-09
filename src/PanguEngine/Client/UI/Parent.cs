@@ -1,6 +1,7 @@
 using PanguEngine.ComponentModel;
 using PanguEngine.Collections;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.Client.UI.Drawing;
 
 namespace PanguEngine.Client.UI;
 
@@ -52,6 +53,12 @@ public abstract class Parent : UiNode
         get => GetValue(ClipToBoundsProperty);
         set => SetValue(ClipToBoundsProperty, value);
     }
+
+    internal virtual UiDrawCommand CreateDescendantClip() =>
+        new UiPushClipCommand(new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height));
+
+    internal virtual bool ContainsDescendantClip(Point point) =>
+        point.X >= 0 && point.Y >= 0 && point.X < LayoutBounds.Width && point.Y < LayoutBounds.Height;
 
     internal void MoveChildToFront(UiNode child) => Children.Move(GetChildIndex(child), Children.Count - 1);
     internal void MoveChildToBack(UiNode child) => Children.Move(GetChildIndex(child), 0);
