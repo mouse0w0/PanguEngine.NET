@@ -17,6 +17,7 @@ internal static class UiShowcaseLayout
     [
         CreatePanelExample(),
         CreateStackExample(),
+        CreateUniformGridExample(),
         CreateCanvasExample(),
         CreateVisibilityExample()
     ];
@@ -65,6 +66,45 @@ internal static class UiShowcaseLayout
         for (var index = 0; index < 3; index++)
             stack.Children.Add(CreateSlot());
         return stack;
+    }
+
+    private static UiShowcaseExample CreateUniformGridExample()
+    {
+        var spacing = CreateUniformGrid("showcase-uniform-grid-spacing", 0, 3);
+        spacing.RowSpacing = 4;
+        spacing.ColumnSpacing = 12;
+        var hidden = CreateUniformGrid("showcase-uniform-grid-hidden", 0, 3);
+        hidden.Children[1].Visibility = Visibility.Hidden;
+        var collapsed = CreateUniformGrid("showcase-uniform-grid-collapsed", 0, 3);
+        collapsed.Children[1].Visibility = Visibility.Collapsed;
+        return new UiShowcaseExample(
+            "UniformGrid 布局",
+            "八个编号格子等分内容区，对比自动行列、固定行列及独立间距。隐藏保留占位，折叠后后续格子前移。",
+            UiShowcaseWidgets.Samples(
+                UiShowcaseWidgets.Sample("自动行列 · 3 × 3", CreateUniformGrid("showcase-uniform-grid-auto", 0, 0)),
+                UiShowcaseWidgets.Sample("固定 3 列 · 自动行数", CreateUniformGrid("showcase-uniform-grid-columns", 0, 3)),
+                UiShowcaseWidgets.Sample("固定 2 行 · 自动列数", CreateUniformGrid("showcase-uniform-grid-rows", 2, 0)),
+                UiShowcaseWidgets.Sample("行间距 4 · 列间距 12", spacing),
+                UiShowcaseWidgets.Sample("3 列 · 第 2 项隐藏", hidden),
+                UiShowcaseWidgets.Sample("3 列 · 第 2 项折叠", collapsed)));
+    }
+
+    private static UniformGrid CreateUniformGrid(string id, int rows, int columns)
+    {
+        var grid = new UniformGrid { StyleId = id, Rows = rows, Columns = columns };
+        grid.Classes.Add("showcase-layout-host");
+        grid.Classes.Add("showcase-uniform-grid");
+        for (var index = 0; index < 8; index++)
+        {
+            var cell = new Panel { StyleId = $"{id}-cell-{index + 1}" };
+            cell.Classes.Add("showcase-uniform-grid-cell");
+            var label = UiShowcaseWidgets.Label($"{index + 1:00}");
+            label.HorizontalAlignment = HorizontalAlignment.Center;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            cell.Children.Add(label);
+            grid.Children.Add(cell);
+        }
+        return grid;
     }
 
     private static UiShowcaseExample CreateCanvasExample()

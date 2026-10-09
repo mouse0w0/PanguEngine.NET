@@ -96,6 +96,18 @@ public static class UiCssValueConverters
         return new CornerRadius(a, b, c, d);
     }
 
+    /// <summary>Converts a trimmed CSS value into a unitless 32-bit decimal integer.</summary>
+    /// <param name="value">The trimmed CSS value.</param>
+    /// <returns>The parsed integer.</returns>
+    /// <exception cref="FormatException">Thrown when the value is not a 32-bit decimal integer or carries a unit.</exception>
+    public static int ParseInteger(string value)
+    {
+        if (int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var result))
+            return result;
+
+        throw new FormatException($"Value '{value}' is not a 32-bit decimal integer.");
+    }
+
     /// <summary>Converts a trimmed CSS value into a thickness with one, two, three, or four edges.</summary>
     /// <param name="value">The trimmed CSS value, ordered top, right, bottom, left.</param>
     /// <returns>The parsed thickness.</returns>

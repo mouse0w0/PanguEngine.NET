@@ -203,6 +203,26 @@ Button.showcase-combo:hover:focus {
     border-radius: 4px 28px 12px 40px;
 }
 
+UniformGrid.showcase-uniform-grid {
+    height: 168px;
+    padding: 8px;
+    row-spacing: 8px;
+    column-spacing: 8px;
+}
+
+Panel.showcase-uniform-grid-cell {
+    padding: 4px;
+    background-color: #243b5f;
+    border-color: #4f8df5;
+    border-thickness: 1px;
+}
+
+.showcase-uniform-grid-cell Text {
+    font-size: 13px;
+    color: #e8eef9;
+    text-alignment: center;
+}
+
 StackPanel.showcase-tabs-demo,
 StackPanel.showcase-tabs-content {
     spacing: 8px;
