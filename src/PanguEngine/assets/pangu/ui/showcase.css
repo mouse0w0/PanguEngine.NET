@@ -223,6 +223,37 @@ Panel.showcase-uniform-grid-cell {
     text-alignment: center;
 }
 
+.showcase-dock-region {
+    padding: 4px;
+    border-color: #11161f;
+    border-thickness: 1px;
+}
+
+.showcase-dock-region Text {
+    font-size: 13px;
+    color: #f2f5fc;
+}
+
+.showcase-dock-top {
+    background-color: #356fd4;
+}
+
+.showcase-dock-left {
+    background-color: #2f7158;
+}
+
+.showcase-dock-right {
+    background-color: #68528f;
+}
+
+.showcase-dock-bottom {
+    background-color: #98603b;
+}
+
+.showcase-dock-content {
+    background-color: #263f61;
+}
+
 StackPanel.showcase-tabs-demo,
 StackPanel.showcase-tabs-content {
     spacing: 8px;

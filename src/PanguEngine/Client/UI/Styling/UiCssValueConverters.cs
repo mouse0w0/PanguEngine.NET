@@ -40,6 +40,14 @@ public static class UiCssValueConverters
         ["vertical"] = Orientation.Vertical
     };
 
+    private static readonly Dictionary<string, Dock> DockMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["left"] = Dock.Left,
+        ["top"] = Dock.Top,
+        ["right"] = Dock.Right,
+        ["bottom"] = Dock.Bottom
+    };
+
     private static readonly Dictionary<string, TextWrapping> TextWrappingMap = new(StringComparer.OrdinalIgnoreCase)
     {
         ["nowrap"] = TextWrapping.NoWrap,
@@ -194,6 +202,12 @@ public static class UiCssValueConverters
     /// <returns>The parsed enumeration member.</returns>
     /// <exception cref="FormatException">Thrown when the value is not a recognized member.</exception>
     public static Orientation ParseOrientation(string value) => ParseEnum(value, OrientationMap);
+
+    /// <summary>Converts a trimmed CSS value into a dock direction.</summary>
+    /// <param name="value">The trimmed CSS value, either left, top, right, or bottom.</param>
+    /// <returns>The parsed dock direction.</returns>
+    /// <exception cref="FormatException">Thrown when the value is not a recognized dock direction.</exception>
+    public static Dock ParseDock(string value) => ParseEnum(value, DockMap);
 
     /// <summary>Converts a trimmed CSS value into a text wrapping mode.</summary>
     /// <param name="value">The trimmed CSS value.</param>

@@ -26,7 +26,7 @@ internal sealed class UiShowcaseScreen : GameScreen
             new UiShowcaseExample("圆角", "比较圆角背景、边框、形状和内容裁剪；顶部可切换缩放。", UiShowcaseWidgets.Examples(UiShowcaseRoundedRectangles.CreateExamples(Report))),
             new UiShowcaseExample("样式", "比较规则、配色和图像画刷。", UiShowcaseWidgets.Examples(UiShowcaseStyles.CreateExamples())),
             new UiShowcaseExample("绑定", "直接编辑输入，体验数据同步。", UiShowcaseWidgets.Examples(UiShowcaseBindings.CreateExamples(Report))),
-            new UiShowcaseExample("布局", "并列比较对齐、排列、位置与可见性。", UiShowcaseWidgets.Examples(UiShowcaseLayout.CreateExamples()))]);
+            new UiShowcaseExample("布局", "并列比较对齐、排列、停靠、位置与可见性。", UiShowcaseWidgets.Examples(UiShowcaseLayout.CreateExamples()))]);
 
         PausesGame = true;
         CloseOnEscape = true;

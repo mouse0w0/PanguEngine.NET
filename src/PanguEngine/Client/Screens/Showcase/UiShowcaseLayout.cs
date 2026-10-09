@@ -5,7 +5,7 @@ using PanguEngine.Client.UI.Drawing;
 namespace PanguEngine.Client.Screens.Showcase;
 
 /// <summary>
-/// Builds fixed layout comparisons for alignment, spacing, placement and visibility.
+/// Builds fixed layout comparisons for alignment, spacing, docking, placement and visibility.
 /// </summary>
 internal static class UiShowcaseLayout
 {
@@ -18,6 +18,7 @@ internal static class UiShowcaseLayout
         CreatePanelExample(),
         CreateStackExample(),
         CreateUniformGridExample(),
+        CreateDockExample(),
         CreateCanvasExample(),
         CreateVisibilityExample()
     ];
@@ -105,6 +106,71 @@ internal static class UiShowcaseLayout
             grid.Children.Add(cell);
         }
         return grid;
+    }
+
+    /// <summary>
+    /// Creates fixed comparisons of dock order and last-child filling.
+    /// </summary>
+    private static UiShowcaseExample CreateDockExample()
+    {
+        var samples = new UiShowcaseGallery(190, 2);
+        samples.Children.AddRange([
+            UiShowcaseWidgets.Sample("上边先停靠 · 填充开启", CreateDockSample("showcase-dock-top-fill", true, true)),
+            UiShowcaseWidgets.Sample("左边先停靠 · 填充开启", CreateDockSample("showcase-dock-left-fill", false, true)),
+            UiShowcaseWidgets.Sample("上边先停靠 · 填充关闭", CreateDockSample("showcase-dock-top-no-fill", true, false)),
+            UiShowcaseWidgets.Sample("左边先停靠 · 填充关闭", CreateDockSample("showcase-dock-left-no-fill", false, false))
+        ]);
+        return new UiShowcaseExample(
+            "DockPanel 布局",
+            "比较上边与左边的停靠先后；关闭最后节点填充后，留白显示剩余空间。",
+            samples);
+    }
+
+    /// <summary>
+    /// Creates a dock layout sample with the specified edge priority and filling policy.
+    /// </summary>
+    /// <param name="id">The sample's style identifier.</param>
+    /// <param name="topFirst">Whether the top edge takes priority over the left edge.</param>
+    /// <param name="lastChildFill">Whether the content region receives the remaining area.</param>
+    private static DockPanel CreateDockSample(string id, bool topFirst, bool lastChildFill)
+    {
+        var host = new DockPanel { StyleId = id, Height = 148, LastChildFill = lastChildFill };
+        host.Classes.Add("showcase-layout-host");
+        var top = CreateDockRegion("上", Dock.Top, "showcase-dock-top");
+        top.Height = 32;
+        var left = CreateDockRegion("左", Dock.Left, "showcase-dock-left");
+        left.Width = 40;
+        var right = CreateDockRegion("右", Dock.Right, "showcase-dock-right");
+        right.Width = 40;
+        var bottom = CreateDockRegion("下", Dock.Bottom, "showcase-dock-bottom");
+        bottom.Height = 32;
+        var content = CreateDockRegion("内容", Dock.Left, "showcase-dock-content");
+
+        if (topFirst)
+            host.Children.AddRange([top, left]);
+        else
+            host.Children.AddRange([left, top]);
+        host.Children.AddRange([right, bottom, content]);
+        return host;
+    }
+
+    /// <summary>
+    /// Creates a labeled region for a dock layout sample.
+    /// </summary>
+    /// <param name="text">The region label.</param>
+    /// <param name="dock">The region's dock direction.</param>
+    /// <param name="cssClass">The CSS class that distinguishes the region.</param>
+    private static Panel CreateDockRegion(string text, Dock dock, string cssClass)
+    {
+        var label = UiShowcaseWidgets.Label(text);
+        label.HorizontalAlignment = HorizontalAlignment.Center;
+        label.VerticalAlignment = VerticalAlignment.Center;
+        var region = new Panel();
+        region.Classes.Add("showcase-dock-region");
+        region.Classes.Add(cssClass);
+        region.Children.Add(label);
+        DockPanel.SetDock(region, dock);
+        return region;
     }
 
     private static UiShowcaseExample CreateCanvasExample()
