@@ -156,6 +156,11 @@ Button.showcase-outline:disabled {
     foreground: #7d8da6;
 }
 
+CheckBox.showcase-checkbox-accent Text.checkbox-text {
+    font-size: 19px;
+    color: #a8dfb0;
+}
+
 /* Style example: Author rules shared by the three comparison samples. */
 .showcase-author-target {
     background-color: #2f5b7a;

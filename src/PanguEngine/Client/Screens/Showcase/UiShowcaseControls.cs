@@ -22,6 +22,7 @@ internal static class UiShowcaseControls
         CreateButtonExample(report),
         UiShowcaseToggleButtons.CreateExample(report),
         CreateToggleSwitchExample(report),
+        UiShowcaseCheckBoxes.CreateExample(report),
         CreateTextBoxExample(),
         UiShowcaseTabs.CreateExample(),
         UiShowcaseScroll.CreateScrollBarExample(),

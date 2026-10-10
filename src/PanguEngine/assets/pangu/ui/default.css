@@ -118,6 +118,74 @@ ToggleSwitch:disabled .toggle-switch-thumb {
     background-color: #8b94a0;
 }
 
+CheckBox .checkbox-box {
+    width: 18px;
+    height: 18px;
+    background-color: #1f2329;
+    border-color: #5c6774;
+    border-thickness: 1px;
+}
+
+CheckBox Path.checkbox-mark {
+    width: 12px;
+    height: 12px;
+    horizontal-alignment: center;
+    vertical-alignment: center;
+    visibility: hidden;
+    data: "";
+    fill: #f2f4f7;
+    stroke: none;
+    stretch: uniform;
+}
+
+CheckBox:checked Path.checkbox-mark {
+    visibility: visible;
+    data: "M 0 5 L 2 3 L 5 6 L 10 0 L 12 2 L 5 10 Z";
+}
+
+CheckBox:indeterminate Path.checkbox-mark {
+    visibility: visible;
+    data: "M 0 0 L 12 0 L 12 2 L 0 2 Z";
+}
+
+CheckBox Text.checkbox-text {
+    font-size: 16px;
+    color: #f2f4f7;
+}
+
+CheckBox:checked .checkbox-box,
+CheckBox:indeterminate .checkbox-box {
+    background-color: #2f64a0;
+}
+
+CheckBox:hover .checkbox-box {
+    border-color: #8b94a0;
+}
+
+CheckBox:pressed .checkbox-box {
+    background-color: #252a30;
+}
+
+CheckBox:focus .checkbox-box {
+    border-color: #54a9ff;
+}
+
+CheckBox:disabled .checkbox-box,
+:disabled CheckBox .checkbox-box {
+    background-color: #1b1e23;
+    border-color: #343a41;
+}
+
+CheckBox:disabled Path.checkbox-mark,
+:disabled CheckBox Path.checkbox-mark {
+    fill: #8b94a0;
+}
+
+CheckBox:disabled Text.checkbox-text,
+:disabled CheckBox Text.checkbox-text {
+    color: #8b94a0;
+}
+
 TextBox {
     min-width: 160px;
     padding: 6px 8px;
