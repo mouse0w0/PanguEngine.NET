@@ -21,6 +21,7 @@ internal static class UiShowcaseControls
         CreateImageExample(),
         CreateButtonExample(report),
         UiShowcaseToggleButtons.CreateExample(report),
+        CreateToggleSwitchExample(report),
         CreateTextBoxExample(),
         UiShowcaseTabs.CreateExample(),
         UiShowcaseScroll.CreateScrollBarExample(),
@@ -73,6 +74,33 @@ internal static class UiShowcaseControls
                     UiShowcaseWidgets.Sample("禁用", disabled)), count,
                 UiShowcaseWidgets.Caption("组合状态：让下方按钮同时悬停与聚焦，观察强调色。"),
                 UiShowcaseStyles.CreateComboStateExample().Content));
+    }
+
+    private static UiShowcaseExample CreateToggleSwitchExample(Action<string> report)
+    {
+        var source = new ToggleSwitch { StyleId = "showcase-controls-switch-source" };
+        var peer = new ToggleSwitch { StyleId = "showcase-controls-switch-peer" };
+        peer.BindTwoWay(ToggleSwitch.IsOnProperty, source, ToggleSwitch.IsOnProperty);
+        var status = UiShowcaseWidgets.Label(string.Empty, "showcase-controls-switch-status");
+        status.Bind(Text.ContentProperty, source, ToggleSwitch.IsOnProperty,
+            static value => value ? "共享状态：开启" : "共享状态：关闭");
+        source.Subscribe(ToggleSwitch.IsOnProperty,
+            (_, args) => report(args.NewValue ? "滑动开关：开启" : "滑动开关：关闭"));
+
+        return new UiShowcaseExample(
+            "滑动开关",
+            "点击切换；聚焦后按 Enter，或按下并松开 Space。共享开关会同步变化。",
+            UiShowcaseWidgets.Column(
+                UiShowcaseWidgets.Samples(
+                    UiShowcaseWidgets.Sample("初始关闭", new ToggleSwitch()),
+                    UiShowcaseWidgets.Sample("初始开启", new ToggleSwitch { IsOn = true }),
+                    UiShowcaseWidgets.Sample("禁用关闭", new ToggleSwitch { IsEnabled = false }),
+                    UiShowcaseWidgets.Sample("禁用开启", new ToggleSwitch { IsOn = true, IsEnabled = false })),
+                UiShowcaseWidgets.Caption("共享状态"),
+                UiShowcaseWidgets.Samples(
+                    UiShowcaseWidgets.Sample("开关 A", source),
+                    UiShowcaseWidgets.Sample("开关 B", peer)),
+                UiShowcaseWidgets.Preview(status)));
     }
 
     private static UiShowcaseExample CreateTextBoxExample()

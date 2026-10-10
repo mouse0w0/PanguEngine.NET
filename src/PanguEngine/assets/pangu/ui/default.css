@@ -62,6 +62,62 @@ ToggleButton:checked:disabled {
     background-color: #253447;
 }
 
+ToggleSwitch {
+    width: 44px;
+    height: 24px;
+    padding: 2px;
+    border-thickness: 1px;
+    border-radius: 12px;
+    background-color: #30363e;
+    border-color: #5c6774;
+}
+
+ToggleSwitch:hover {
+    background-color: #434950;
+}
+
+ToggleSwitch:pressed {
+    background-color: #252a30;
+}
+
+ToggleSwitch:checked {
+    background-color: #2f64a0;
+    border-color: #54a9ff;
+}
+
+ToggleSwitch:checked:hover {
+    background-color: #3977bb;
+}
+
+ToggleSwitch:checked:pressed {
+    background-color: #254f80;
+}
+
+ToggleSwitch:focus {
+    border-color: #8fc4ff;
+}
+
+ToggleSwitch .toggle-switch-thumb {
+    padding: 9px;
+    border-thickness: 0px;
+    border-radius: 9px;
+    background-color: #f2f4f7;
+}
+
+ToggleSwitch:disabled,
+ToggleSwitch:disabled:hover,
+ToggleSwitch:disabled:pressed,
+ToggleSwitch:checked:disabled,
+ToggleSwitch:checked:disabled:hover,
+ToggleSwitch:checked:disabled:pressed {
+    background-color: #1b1e23;
+    border-color: #343a41;
+}
+
+ToggleSwitch:disabled .toggle-switch-thumb {
+    background-color: #8b94a0;
+}
+
 TextBox {
     min-width: 160px;
     padding: 6px 8px;
