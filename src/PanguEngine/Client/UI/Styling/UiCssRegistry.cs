@@ -135,6 +135,7 @@ public static class UiCssRegistry
 
         RuntimeHelpers.RunClassConstructor(typeof(Canvas).TypeHandle);
         RuntimeHelpers.RunClassConstructor(typeof(DockPanel).TypeHandle);
+        RuntimeHelpers.RunClassConstructor(typeof(Grid).TypeHandle);
 
         lock (RegistryLock)
         {

@@ -19,6 +19,7 @@ internal static class UiShowcaseLayout
         CreateStackExample(),
         CreateUniformGridExample(),
         CreateDockExample(),
+        CreateGridExample(),
         CreateCanvasExample(),
         CreateVisibilityExample()
     ];
@@ -172,6 +173,8 @@ internal static class UiShowcaseLayout
         DockPanel.SetDock(region, dock);
         return region;
     }
+
+    private static UiShowcaseExample CreateGridExample() => UiShowcaseGrid.CreateExample();
 
     private static UiShowcaseExample CreateCanvasExample()
     {

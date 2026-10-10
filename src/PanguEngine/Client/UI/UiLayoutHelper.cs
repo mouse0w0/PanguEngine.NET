@@ -3,6 +3,7 @@ namespace PanguEngine.Client.UI;
 internal static class UiLayoutHelper
 {
     private const int RoundUpNormalizationDigits = 8;
+    private const double PhysicalSnapTolerance = 1e-10;
 
     internal static double RoundLayoutValue(double value, double scale) =>
         RoundCore(value, scale, roundUp: false);
@@ -46,6 +47,15 @@ internal static class UiLayoutHelper
         var physicalValue = adjustedValue * scale;
         if (!double.IsFinite(physicalValue))
             throw new InvalidOperationException("Layout rounding produced a non-finite physical value.");
+
+        if (roundUp)
+        {
+            var nearest = Math.Round(physicalValue, MidpointRounding.AwayFromZero);
+            if (nearest > 0 && physicalValue > nearest &&
+                physicalValue - nearest <= PhysicalSnapTolerance &&
+                physicalValue == Math.BitIncrement(nearest))
+                physicalValue = nearest;
+        }
 
         var roundedPhysicalValue = roundUp
             ? Math.Ceiling(physicalValue)
