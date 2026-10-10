@@ -17,6 +17,7 @@ internal static class UiShowcaseLayout
     [
         CreatePanelExample(),
         CreateStackExample(),
+        CreateWrapExample(),
         CreateUniformGridExample(),
         CreateDockExample(),
         CreateGridExample(),
@@ -175,6 +176,48 @@ internal static class UiShowcaseLayout
     }
 
     private static UiShowcaseExample CreateGridExample() => UiShowcaseGrid.CreateExample();
+
+    private static UiShowcaseExample CreateWrapExample()
+    {
+        var variableWidths = CreateWrap("showcase-wrap-variable-widths", Orientation.Horizontal);
+        var widths = new[] { 32d, 48d, 40d, 56d, 32d, 48d };
+        for (var index = 0; index < widths.Length; index++)
+            variableWidths.Children[index].Width = widths[index];
+
+        return new UiShowcaseExample(
+            "WrapPanel 布局",
+            "空间不足时横向换行或纵向换列，分别对比元素间距、行间距和不同元素宽度。",
+            UiShowcaseWidgets.Samples(
+                UiShowcaseWidgets.Sample("横向换行", CreateWrap("showcase-wrap-horizontal", Orientation.Horizontal)),
+                UiShowcaseWidgets.Sample("纵向换列", CreateWrap("showcase-wrap-vertical", Orientation.Vertical)),
+                UiShowcaseWidgets.Sample("无间距", CreateWrap("showcase-wrap-spacing-0", Orientation.Horizontal, 0, 0)),
+                UiShowcaseWidgets.Sample("元素间距 16", CreateWrap("showcase-wrap-item-spacing-16", Orientation.Horizontal, 16)),
+                UiShowcaseWidgets.Sample("行间距 16", CreateWrap("showcase-wrap-line-spacing-16", Orientation.Horizontal, 8, 16)),
+                UiShowcaseWidgets.Sample("不同元素宽度", variableWidths)));
+    }
+
+    private static WrapPanel CreateWrap(
+        string id,
+        Orientation orientation,
+        double itemSpacing = 8,
+        double lineSpacing = 8)
+    {
+        var panel = new WrapPanel
+        {
+            StyleId = id,
+            Orientation = orientation,
+            ItemSpacing = itemSpacing,
+            LineSpacing = lineSpacing,
+            Width = 144,
+            Height = 112,
+            Padding = new Thickness(8),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        panel.Classes.Add("showcase-layout-host");
+        for (var index = 0; index < 6; index++)
+            panel.Children.Add(CreateSlot());
+        return panel;
+    }
 
     private static UiShowcaseExample CreateCanvasExample()
     {
