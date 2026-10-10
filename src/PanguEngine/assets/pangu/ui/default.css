@@ -46,6 +46,22 @@ Button.danger:disabled {
     border-color: #58292b;
 }
 
+ToggleButton:checked {
+    background-color: #2f64a0;
+}
+
+ToggleButton:checked:hover {
+    background-color: #3d75b5;
+}
+
+ToggleButton:checked:pressed {
+    background-color: #244e7e;
+}
+
+ToggleButton:checked:disabled {
+    background-color: #253447;
+}
+
 TextBox {
     min-width: 160px;
     padding: 6px 8px;

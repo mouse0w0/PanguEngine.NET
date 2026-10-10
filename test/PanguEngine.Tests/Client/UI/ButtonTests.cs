@@ -20,7 +20,7 @@ public sealed class ButtonTests
         var button = new Button();
         button.GetStyleRoot().UpdateStyles();
 
-        Assert.True(typeof(Button).IsSealed);
+        Assert.False(typeof(Button).IsSealed);
         Assert.Equal(typeof(Control), typeof(Button).BaseType);
         AssertProperty(
             Button.TextProperty,
@@ -1076,6 +1076,43 @@ public sealed class ButtonTests
         Assert.True(button.IsFocused);
         Assert.Same(screen, button.Screen);
         manager.Close();
+    }
+
+    [Fact]
+    public void PointerEnterAndSpaceUseTheSameOverridableActivation()
+    {
+        var root = new Canvas();
+        var button = Place(root, new ActivationButton(), 0, 0, 80, 32);
+        var manager = new UiManager();
+        var screen = new GameScreen(root);
+        var clicks = 0;
+        button.Click += (_, _) => clicks++;
+        manager.Open(screen);
+        manager.UpdateFrame(new Size(100, 100), 0);
+
+        Click(manager, new Point(5, 5), MouseButton.Left);
+        manager.ProcessKeyDown(Key.Enter, KeyModifiers.None);
+        manager.ProcessKeyDown(Key.Enter, KeyModifiers.None, isRepeat: true);
+        manager.ProcessKeyUp(Key.Enter, KeyModifiers.None);
+        manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
+        manager.ProcessKeyDown(Key.Space, KeyModifiers.None, isRepeat: true);
+        Assert.Equal(2, button.Activations);
+        manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
+
+        Assert.Equal(3, button.Activations);
+        Assert.Equal(3, clicks);
+        manager.Close();
+    }
+
+    private sealed class ActivationButton : Button
+    {
+        public int Activations { get; private set; }
+
+        protected override void OnClick()
+        {
+            Activations++;
+            base.OnClick();
+        }
     }
 
     private static (UiManager Manager, GameScreen Screen, Canvas Root, Button Button) OpenButtonScene()

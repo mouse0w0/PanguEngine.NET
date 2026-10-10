@@ -10,7 +10,7 @@ namespace PanguEngine.Client.UI.Controls;
 /// <summary>
 /// Provides a clickable control with optional text and image content.
 /// </summary>
-public sealed class Button : Control
+public class Button : Control
 {
     /// <summary>
     /// Identifies the <see cref="Text"/> property.
@@ -179,6 +179,11 @@ public sealed class Button : Control
     /// </summary>
     public event EventHandler? Click;
 
+    /// <summary>
+    /// Raises the <see cref="Click"/> event when this button is activated.
+    /// </summary>
+    protected virtual void OnClick() => Click?.Invoke(this, EventArgs.Empty);
+
     /// <inheritdoc />
     protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
     {
@@ -285,7 +290,7 @@ public sealed class Button : Control
 
         eventArgs.Handled = true;
         if (activate)
-            Click?.Invoke(this, EventArgs.Empty);
+            OnClick();
     }
 
     /// <inheritdoc />
@@ -300,7 +305,7 @@ public sealed class Button : Control
                 base.OnKeyDown(eventArgs);
                 eventArgs.Handled = true;
                 if (activate)
-                    Click?.Invoke(this, EventArgs.Empty);
+                    OnClick();
                 return;
             }
             case Key.Space:
@@ -331,7 +336,7 @@ public sealed class Button : Control
                 base.OnKeyUp(eventArgs);
                 eventArgs.Handled = true;
                 if (activate)
-                    Click?.Invoke(this, EventArgs.Empty);
+                    OnClick();
                 return;
             }
             default:
