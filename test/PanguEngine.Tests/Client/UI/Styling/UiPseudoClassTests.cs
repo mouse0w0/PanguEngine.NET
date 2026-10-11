@@ -41,6 +41,7 @@ public sealed class UiPseudoClassTests
         Assert.Same(UiPseudoClass.Hover, UiPseudoClass.Get("hover"));
         Assert.Same(UiPseudoClass.Hover, UiPseudoClass.Get("HOVER"));
         Assert.Same(UiPseudoClass.Focus, UiPseudoClass.Get("focus"));
+        Assert.Same(UiPseudoClass.FocusWithin, UiPseudoClass.Get("focus-within"));
         Assert.Same(UiPseudoClass.Disabled, UiPseudoClass.Get("disabled"));
         Assert.Same(UiPseudoClass.Pressed, UiPseudoClass.Get("pressed"));
 

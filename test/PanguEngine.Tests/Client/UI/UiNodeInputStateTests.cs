@@ -31,10 +31,17 @@ public sealed class UiNodeInputStateTests
             nameof(UiNode.IsFocused),
             defaultValue: false,
             isReadOnly: true);
+        AssertProperty(
+            UiNode.IsFocusWithinProperty,
+            typeof(UiNode),
+            nameof(UiNode.IsFocusWithin),
+            defaultValue: false,
+            isReadOnly: true);
 
         Assert.True(node.IsEnabled);
         Assert.False(node.IsHovered);
         Assert.False(node.IsFocused);
+        Assert.False(node.IsFocusWithin);
     }
 
     [Fact]

@@ -24,6 +24,9 @@ public sealed class UiPseudoClass
     /// <summary>Gets the built-in focus pseudo class.</summary>
     public static UiPseudoClass Focus { get; } = Get("focus");
 
+    /// <summary>Gets the built-in pseudo class for nodes that have focus themselves or in their descendants.</summary>
+    public static UiPseudoClass FocusWithin { get; } = Get("focus-within");
+
     /// <summary>Gets the built-in disabled pseudo class.</summary>
     public static UiPseudoClass Disabled { get; } = Get("disabled");
 

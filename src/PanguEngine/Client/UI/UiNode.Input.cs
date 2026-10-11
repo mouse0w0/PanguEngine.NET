@@ -16,6 +16,11 @@ public abstract partial class UiNode
             nameof(IsFocused),
             onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.Focus, node.IsFocused));
 
+    private static readonly PropertyKey<bool> IsFocusWithinPropertyKey =
+        Property.RegisterReadOnly<UiNode, bool>(
+            nameof(IsFocusWithin),
+            onChanged: static (node, _, _) => node.SetPseudoClass(UiPseudoClass.FocusWithin, node.IsFocusWithin));
+
     /// <summary>
     /// Identifies the <see cref="Focusable"/> property.
     /// </summary>
@@ -56,6 +61,11 @@ public abstract partial class UiNode
     public static readonly Property<bool> IsFocusedProperty = IsFocusedPropertyKey.Property;
 
     /// <summary>
+    /// Identifies the <see cref="IsFocusWithin"/> property.
+    /// </summary>
+    public static readonly Property<bool> IsFocusWithinProperty = IsFocusWithinPropertyKey.Property;
+
+    /// <summary>
     /// Gets or sets whether this node can receive keyboard focus.
     /// </summary>
     public bool Focusable
@@ -91,6 +101,11 @@ public abstract partial class UiNode
     /// Gets whether this node currently owns keyboard focus.
     /// </summary>
     public bool IsFocused => GetValue(IsFocusedProperty);
+
+    /// <summary>
+    /// Gets whether this node or one of its descendants currently owns keyboard focus.
+    /// </summary>
+    public bool IsFocusWithin => GetValue(IsFocusWithinProperty);
 
     /// <summary>
     /// Occurs when the pointer enters this node's hit path.
@@ -166,12 +181,21 @@ public abstract partial class UiNode
     /// <summary>
     /// Requests keyboard focus for this node.
     /// </summary>
-    /// <returns>Whether this node became or remained focused.</returns>
+    /// <returns>Whether the focus request was accepted.</returns>
+    /// <remarks>Notification callbacks may make the resolved target unavailable before this method returns.</remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the open screen is accessed from the wrong thread or a focus transition is already notifying.
     /// </exception>
     public bool Focus() =>
         Screen is not null && Screen.TryFocus(this);
+
+    /// <summary>Gets the node that receives a direct or pointer focus request for this node.</summary>
+    /// <returns>The desired keyboard focus target.</returns>
+    /// <remarks>
+    /// The target is resolved once and must satisfy the current screen's focus eligibility rules.
+    /// Overrides must not request focus, dispatch input, or modify the node tree.
+    /// </remarks>
+    protected internal virtual UiNode GetFocusTarget() => this;
 
     /// <summary>
     /// Converts a point from screen coordinates to this node's local coordinates.
@@ -350,6 +374,14 @@ public abstract partial class UiNode
             SetValue(IsFocusedPropertyKey, true);
         else
             ClearValue(IsFocusedPropertyKey);
+    }
+
+    internal void SetFocusWithin(bool value)
+    {
+        if (value)
+            SetValue(IsFocusWithinPropertyKey, true);
+        else
+            ClearValue(IsFocusWithinPropertyKey);
     }
 
     /// <summary>

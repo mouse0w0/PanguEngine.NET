@@ -7,6 +7,7 @@ namespace PanguEngine.Client.UI;
 public partial class UiScreen
 {
     private readonly List<UiHitPathEntry> _hoverPath = [];
+    private UiNode[] _focusWithinPath = [];
 
     private readonly UiNode?[] _pressedTargets =
         new UiNode?[(int)MouseButton.Button12 - (int)MouseButton.Left + 1];
@@ -22,12 +23,14 @@ public partial class UiScreen
     {
         internal InputStateCleanupSnapshot(
             UiNode? focusedNode,
+            UiNode[] focusWithinPath,
             Control[] pressedControls,
             UiHitPathEntry[] hoverPath,
             UiNode[] exitedNodes,
             Point pointerPosition)
         {
             FocusedNode = focusedNode;
+            FocusWithinPath = focusWithinPath;
             PressedControls = pressedControls;
             HoverPath = hoverPath;
             ExitedNodes = exitedNodes;
@@ -35,6 +38,7 @@ public partial class UiScreen
         }
 
         internal UiNode? FocusedNode { get; }
+        internal UiNode[] FocusWithinPath { get; }
         internal Control[] PressedControls { get; }
         internal UiHitPathEntry[] HoverPath { get; }
         internal UiNode[] ExitedNodes { get; }
@@ -78,7 +82,8 @@ public partial class UiScreen
         if (!CanFocus(node))
             return false;
 
-        return ChangeFocus(node);
+        var target = node.GetFocusTarget();
+        return CanFocus(target) && ChangeFocus(target);
     }
 
     internal void RefreshPointerAfterLayout()
@@ -168,8 +173,12 @@ public partial class UiScreen
             {
                 if (CanFocus(path[pathIndex].Node))
                 {
-                    focusCandidate = path[pathIndex].Node;
-                    break;
+                    var targetNode = path[pathIndex].Node.GetFocusTarget();
+                    if (CanFocus(targetNode))
+                    {
+                        focusCandidate = targetNode;
+                        break;
+                    }
                 }
             }
 
@@ -359,37 +368,35 @@ public partial class UiScreen
 
     internal void NotifyInputStateLoss(InputStateCleanupSnapshot snapshot)
     {
-        snapshot.FocusedNode?.SetFocused(false);
-
-        for (var index = snapshot.PressedControls.Length - 1; index >= 0; index--)
-            snapshot.PressedControls[index].SetPressed(false);
-
-        for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
-            snapshot.ExitedNodes[index].SetHovered(false);
-
-        if (snapshot.FocusedNode is { } focused)
+        var ownsFocusGuard = snapshot.FocusedNode is not null && !_isChangingFocus;
+        if (ownsFocusGuard)
+            _isChangingFocus = true;
+        try
         {
-            var focusArgs = new UiFocusChangedEventArgs(focused, null);
-            var ownsFocusGuard = !_isChangingFocus;
-            if (ownsFocusGuard)
-                _isChangingFocus = true;
-            try
+            ClearFocusWithin(snapshot.FocusWithinPath, 0);
+            if (snapshot.FocusedNode is { } focusedNode)
+                ClearFocusedState(focusedNode);
+
+            for (var index = snapshot.PressedControls.Length - 1; index >= 0; index--)
+                snapshot.PressedControls[index].SetPressed(false);
+
+            for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
+                snapshot.ExitedNodes[index].SetHovered(false);
+
+            if (snapshot.FocusedNode is { } focused)
+                focused.RaiseLostFocus(new UiFocusChangedEventArgs(focused, null));
+
+            if (snapshot.ExitedNodes.Length != 0)
             {
-                focused.RaiseLostFocus(focusArgs);
-            }
-            finally
-            {
-                if (ownsFocusGuard)
-                    _isChangingFocus = false;
+                var args = new UiPointerEventArgs(snapshot.ExitedNodes[^1], snapshot.PointerPosition, snapshot.HoverPath);
+                for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
+                    snapshot.ExitedNodes[index].RaisePointerExited(args);
             }
         }
-
-        if (snapshot.ExitedNodes.Length != 0)
+        finally
         {
-            var path = snapshot.HoverPath;
-            var args = new UiPointerEventArgs(snapshot.ExitedNodes[^1], snapshot.PointerPosition, path);
-            for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
-                snapshot.ExitedNodes[index].RaisePointerExited(args);
+            if (ownsFocusGuard)
+                _isChangingFocus = false;
         }
     }
 
@@ -437,8 +444,12 @@ public partial class UiScreen
     {
         var focused = FocusedNode;
         var lostFocus = focused is not null && (clearAll || !IsInputStateCurrent(focused));
+        var focusWithinPath = lostFocus ? _focusWithinPath : [];
         if (lostFocus)
+        {
             FocusedNode = null;
+            _focusWithinPath = [];
+        }
 
         for (var index = 0; index < _pressedTargets.Length; index++)
         {
@@ -484,6 +495,7 @@ public partial class UiScreen
 
         return new InputStateCleanupSnapshot(
             lostFocus ? focused : null,
+            focusWithinPath,
             pressedControls,
             oldHoverPath,
             exitedNodes,
@@ -666,7 +678,9 @@ public partial class UiScreen
             _isChangingFocus = true;
             try
             {
-                old?.SetFocused(false);
+                UpdateFocusWithin(next);
+                if (old is not null)
+                    ClearFocusedState(old);
 
                 if (next is not null &&
                     IsScreenActive() &&
@@ -698,6 +712,57 @@ public partial class UiScreen
         {
             EndRuntimeOperation();
         }
+    }
+
+    private void UpdateFocusWithin(UiNode? focused)
+    {
+        var nodes = new List<UiNode>();
+        for (var current = focused; current is not null; current = current.Parent)
+            nodes.Add(current);
+        nodes.Reverse();
+
+        var oldPath = _focusWithinPath;
+        var newPath = nodes.ToArray();
+        _focusWithinPath = newPath;
+        var commonLength = 0;
+        while (commonLength < oldPath.Length &&
+               commonLength < newPath.Length &&
+               ReferenceEquals(oldPath[commonLength], newPath[commonLength]))
+        {
+            commonLength++;
+        }
+
+        ClearFocusWithin(oldPath, commonLength);
+        for (var index = commonLength; index < newPath.Length; index++)
+        {
+            if (!ReferenceEquals(_focusWithinPath, newPath))
+                return;
+
+            newPath[index].SetFocusWithin(true);
+        }
+    }
+
+    private static void ClearFocusWithin(UiNode[] path, int startIndex)
+    {
+        for (var index = path.Length - 1; index >= startIndex; index--)
+        {
+            var node = path[index];
+            if (node.Screen is { } screen &&
+                screen._focusWithinPath.Any(current => ReferenceEquals(current, node)))
+            {
+                continue;
+            }
+
+            node.SetFocusWithin(false);
+        }
+    }
+
+    private static void ClearFocusedState(UiNode node)
+    {
+        if (node.Screen is { } screen && ReferenceEquals(screen.FocusedNode, node))
+            return;
+
+        node.SetFocused(false);
     }
 
     private bool CanFocus(UiNode node)
