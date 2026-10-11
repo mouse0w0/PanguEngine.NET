@@ -216,6 +216,93 @@ TextBox:disabled {
     caret-color: #8b94a0;
 }
 
+NumericUpDown {
+    min-width: 160px;
+    background-color: #1f2329;
+    border-color: #5c6774;
+    border-thickness: 1px;
+}
+
+NumericUpDown:hover {
+    border-color: #8b94a0;
+}
+
+NumericUpDown:focus-within {
+    border-color: #54a9ff;
+}
+
+NumericUpDown:readonly {
+    background-color: #252a30;
+}
+
+NumericUpDown .numeric-up-down-editor {
+    min-width: 0px;
+    background-color: transparent;
+    border-thickness: 0px;
+}
+
+NumericUpDown .numeric-up-down-increase,
+NumericUpDown .numeric-up-down-decrease {
+    min-width: 22px;
+    min-height: 14px;
+    background-color: #30363e;
+}
+
+NumericUpDown .numeric-up-down-increase:hover,
+NumericUpDown .numeric-up-down-decrease:hover {
+    background-color: #434950;
+}
+
+NumericUpDown .numeric-up-down-increase:pressed,
+NumericUpDown .numeric-up-down-decrease:pressed {
+    background-color: #252a30;
+}
+
+NumericUpDown .numeric-up-down-increase:disabled,
+NumericUpDown .numeric-up-down-decrease:disabled,
+NumericUpDown:disabled .numeric-up-down-increase,
+NumericUpDown:disabled .numeric-up-down-decrease,
+:disabled NumericUpDown .numeric-up-down-increase,
+:disabled NumericUpDown .numeric-up-down-decrease {
+    background-color: #1b1e23;
+}
+
+NumericUpDown Path.numeric-up-down-arrow {
+    width: 8px;
+    height: 4px;
+    fill: #f2f4f7;
+    stroke: none;
+    stretch: uniform;
+}
+
+NumericUpDown .numeric-up-down-increase Path.numeric-up-down-arrow {
+    data: "M 0 4 L 4 0 L 8 4 Z";
+}
+
+NumericUpDown .numeric-up-down-decrease Path.numeric-up-down-arrow {
+    data: "M 0 0 L 8 0 L 4 4 Z";
+}
+
+NumericUpDown .numeric-up-down-increase:disabled Path.numeric-up-down-arrow,
+NumericUpDown .numeric-up-down-decrease:disabled Path.numeric-up-down-arrow,
+NumericUpDown:disabled Path.numeric-up-down-arrow,
+:disabled NumericUpDown Path.numeric-up-down-arrow {
+    fill: #6e7884;
+}
+
+NumericUpDown:disabled,
+:disabled NumericUpDown {
+    background-color: #1b1e23;
+    border-color: #343a41;
+}
+
+NumericUpDown:disabled .numeric-up-down-editor,
+:disabled NumericUpDown .numeric-up-down-editor {
+    foreground: #8b94a0;
+    caret-color: #8b94a0;
+    selection-background: #343a41;
+}
+
 TabView {
     background-color: #1b1f24;
 }
