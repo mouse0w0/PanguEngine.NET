@@ -26,6 +26,7 @@ internal static class UiShowcaseControls
         CreateTextBoxExample(),
         UiShowcaseNumericUpDown.CreateExample(),
         UiShowcaseTabs.CreateExample(),
+        UiShowcaseSliders.CreateExample(report),
         UiShowcaseScroll.CreateScrollBarExample(),
         UiShowcaseScroll.CreateScrollViewExample()
     ];

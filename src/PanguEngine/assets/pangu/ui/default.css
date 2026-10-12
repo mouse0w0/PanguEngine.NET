@@ -530,3 +530,56 @@ ScrollBar:horizontal .scrollbar-decrease .scrollbar-arrow {
 ScrollBar:horizontal .scrollbar-increase .scrollbar-arrow {
     data: "M 9 8 L 5 4 L 5 12 Z";
 }
+
+Slider .slider-track {
+    background-color: #3c444d;
+    border-radius: 2px;
+}
+
+Slider .slider-fill {
+    background-color: #54a9ff;
+    border-radius: 2px;
+}
+
+Slider .slider-thumb {
+    background-color: #d8e8fa;
+    border-color: #6e7884;
+    border-thickness: 1px;
+    border-radius: 10px;
+}
+
+Slider:hover .slider-thumb {
+    background-color: #f2f7ff;
+}
+
+Slider:pressed .slider-thumb {
+    background-color: #8fc4ff;
+}
+
+Slider:focus .slider-thumb {
+    border-color: #54a9ff;
+}
+
+Slider .slider-tick {
+    background-color: #6e7884;
+}
+
+Slider Text.slider-tick-label {
+    color: #aeb9c7;
+    font-size: 12px;
+}
+
+Slider:disabled .slider-thumb,
+:disabled Slider .slider-thumb {
+    background-color: #49515c;
+    border-color: #5c6774;
+}
+
+Slider:disabled .slider-fill,
+:disabled Slider .slider-fill {
+    background-color: #5c6774;
+}
+
+Slider:empty .slider-track {
+    background-color: #2b3138;
+}
