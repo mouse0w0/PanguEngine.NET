@@ -67,7 +67,7 @@ public sealed class SingleSelectionModelTests
 
         Assert.Equal(new (string, object?, object?)[]
         {
-            ("SelectedIndex", -1, 1), ("SelectedItem", null, "b")
+            ("SelectedItem", null, "b"), ("SelectedIndex", -1, 1)
         }, changes);
     }
 
@@ -86,7 +86,7 @@ public sealed class SingleSelectionModelTests
         model.Clear();
         model.Clear();
 
-        Assert.Equal(new[] { "SelectedIndex", "SelectedItem" }, changes);
+        Assert.Equal(new[] { "SelectedItem", "SelectedIndex" }, changes);
         Assert.Equal(-1, model.SelectedIndex);
     }
 
@@ -166,6 +166,29 @@ public sealed class SingleSelectionModelTests
         Assert.Equal(-1, model.SelectedIndex);
         Assert.Equal(0, model.SelectedItem);
         Assert.Equal(new[] { "SelectedIndex", "SelectedIndex" }, changes);
+    }
+
+    [Fact]
+    public void EqualStringCandidatesChangePositionWithoutNotifyingTheItem()
+    {
+        var first = new string('a', 1);
+        var second = new string('a', 1);
+        var model = new SingleSelectionModel<string>(new ObservableList<string>([first, second]).AsReadOnly())
+        {
+            SelectedIndex = 0
+        };
+        var indexes = new List<int>();
+        var items = new List<string?>();
+        using var indexSubscription = model.Subscribe(SingleSelectionModel<string>.SelectedIndexProperty,
+            (_, change) => indexes.Add(change.NewValue));
+        using var itemSubscription = model.Subscribe(SingleSelectionModel<string>.SelectedItemProperty,
+            (_, change) => items.Add(change.NewValue));
+
+        model.SelectedIndex = 1;
+
+        Assert.Same(second, model.SelectedItem);
+        Assert.Equal(1, Assert.Single(indexes));
+        Assert.Empty(items);
     }
 
     [Fact]

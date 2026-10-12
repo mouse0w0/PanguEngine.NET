@@ -238,8 +238,11 @@ public sealed class GridTests
         var child = new Panel();
         grid.Children.Add(child);
         Layout(grid, 100, 20);
-        grid.ColumnDefinitions = new(GridLength.Star, GridLength.Star);
+        grid.ColumnDefinitions = grid.ColumnDefinitions;
         Assert.True(grid.IsMeasureValid);
+        grid.ColumnDefinitions = new(GridLength.Star, GridLength.Star);
+        Assert.False(grid.IsMeasureValid);
+        Layout(grid, 100, 20);
         grid.ColumnDefinitions = new(20, GridLength.Star);
         Assert.False(grid.IsMeasureValid);
         Layout(grid, 100, 20);

@@ -28,7 +28,7 @@ public sealed class SingleSelectionModelSourceTests
 
         Assert.Equal(new (string, object?, object?)[]
         {
-            ("Source", first, second), ("SelectedIndex", 1, -1), ("SelectedItem", "b", null)
+            ("SelectedIndex", 1, -1), ("SelectedItem", "b", null), ("Source", first, second)
         }, changes);
     }
 

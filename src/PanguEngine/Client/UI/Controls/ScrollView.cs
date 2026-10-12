@@ -32,7 +32,7 @@ public sealed partial class ScrollView : Control
     public static readonly Property<ScrollBarVisibility> HorizontalScrollBarVisibilityProperty =
         Property.Register<ScrollView, ScrollBarVisibility>(
             nameof(HorizontalScrollBarVisibility),
-            onChanged: static (view, _, _) => view.InvalidateMeasure());
+            onChanged: static (view, _, _) => view.OnScrollBarVisibilityChanged());
 
     /// <summary>
     /// Identifies the <see cref="VerticalScrollBarVisibility"/> property.
@@ -41,7 +41,7 @@ public sealed partial class ScrollView : Control
         Property.Register<ScrollView, ScrollBarVisibility>(
             nameof(VerticalScrollBarVisibility),
             ScrollBarVisibility.Auto,
-            onChanged: static (view, _, _) => view.InvalidateMeasure());
+            onChanged: static (view, _, _) => view.OnScrollBarVisibilityChanged());
 
     /// <summary>
     /// Identifies the <see cref="ShowArrows"/> property.
@@ -50,7 +50,11 @@ public sealed partial class ScrollView : Control
         Property.Register<ScrollView, bool>(
             nameof(ShowArrows),
             true,
-            onChanged: static (view, _, _) => view.InvalidateMeasure());
+            onChanged: static (view, _, _) =>
+            {
+                view.InvalidateMeasure();
+                view.ApplyConfigurationToBars();
+            });
 
     /// <summary>
     /// Identifies the <see cref="IsScrollChainingEnabled"/> property.
@@ -64,15 +68,15 @@ public sealed partial class ScrollView : Control
     /// Identifies the <see cref="Offset"/> property.
     /// </summary>
     /// <remarks>
-    /// The property carries no registered invalidation so that the layout pass can normalize the
-    /// effective value without invalidating the arrangement it is computing. Ordinary changes
-    /// invalidate arrangement through <c>OnPropertyChanged</c>.
+    /// Offset normalization during layout preserves the arrangement being computed.
+    /// Other changes update the viewport and scroll bars before host notifications.
     /// </remarks>
     public static readonly DirectProperty<ScrollView, Point> OffsetProperty =
         Property.RegisterDirect<ScrollView, Point>(
             nameof(Offset),
-            static view => view._offset,
-            static (view, value) => view.SetOffset(value));
+            static view => view.Offset,
+            static (view, value) => view.Offset = value,
+            onChanged: static (view, _, _) => view.OnOffsetChanged());
 
     /// <summary>
     /// Identifies the <see cref="SmallChange"/> property.
@@ -81,6 +85,7 @@ public sealed partial class ScrollView : Control
         Property.Register<ScrollView, double>(
             nameof(SmallChange),
             16,
+            onChanged: static (view, _, _) => view.ApplyConfigurationToBars(),
             validate: IsFiniteNonNegative,
             validationMessage: "SmallChange must be a finite non-negative value.");
 
@@ -223,8 +228,8 @@ public sealed partial class ScrollView : Control
     /// </remarks>
     public Point Offset
     {
-        get => GetValue(OffsetProperty);
-        set => SetValue(OffsetProperty, value);
+        get => _offset;
+        set => SetField(OffsetProperty, ref _offset, CoerceOffset(value));
     }
 
     /// <summary>
@@ -281,31 +286,18 @@ public sealed partial class ScrollView : Control
     private bool IsVerticalScrollable =>
         VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
 
-    private void SetOffset(Point value) =>
-        SetField(OffsetProperty, ref _offset, CoerceOffset(value));
-
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
+    private void OnOffsetChanged()
     {
-        if (ReferenceEquals(eventArgs.Property, OffsetProperty))
-        {
-            if (!_isInScrollLayout)
-                _viewport.InvalidateArrange();
-            if (!_isSynchronizingBars)
-                ApplyOffsetToBars();
-        }
-        else if (ReferenceEquals(eventArgs.Property, ShowArrowsProperty) ||
-                 ReferenceEquals(eventArgs.Property, SmallChangeProperty))
-        {
-            ApplyConfigurationToBars();
-        }
-        else if (ReferenceEquals(eventArgs.Property, HorizontalScrollBarVisibilityProperty) ||
-                 ReferenceEquals(eventArgs.Property, VerticalScrollBarVisibilityProperty))
-        {
-            SetOffset(_offset);
-        }
+        if (!_isInScrollLayout)
+            _viewport.InvalidateArrange();
+        if (!_isSynchronizingBars)
+            ApplyOffsetToBars();
+    }
 
-        base.OnPropertyChanged(eventArgs);
+    private void OnScrollBarVisibilityChanged()
+    {
+        InvalidateMeasure();
+        Offset = _offset;
     }
 
     /// <summary>

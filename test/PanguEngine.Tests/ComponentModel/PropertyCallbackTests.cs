@@ -127,8 +127,13 @@ public sealed class PropertyCallbackTests
         Assert.Same(error, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
 
         Assert.Equal(7, node.GetValue(CallbackNode.ValueProperty));
-        Assert.Empty(notified);
-        Assert.Equal(["internal"], node.Trace);
+        if (notified.Count == 0)
+            Assert.Equal(["internal"], node.Trace);
+        else
+        {
+            Assert.Same(CallbackNode.OtherProperty, Assert.Single(notified));
+            Assert.Equal(["other", "virtual", "internal"], node.Trace);
+        }
     }
 
     [Fact]

@@ -145,7 +145,7 @@ public sealed partial class ScrollView
         _isSynchronizingBars = true;
         try
         {
-            SetOffset(_offset);
+            Offset = _offset;
             _viewport.Offset = Offset;
             SynchronizeBars(_horizontalBar, _verticalBar, solution, Offset);
         }

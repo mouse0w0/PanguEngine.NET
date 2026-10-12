@@ -67,6 +67,7 @@ public sealed class TabItem : Control
         Children.Add(_headerHost);
         ClipToBounds = true;
         Focusable = true;
+        Subscribe(IsEnabledProperty, (_, _) => OwnerView?.OnItemStateChanged(this));
     }
 
     /// <summary>Gets or sets the node displayed in the tab header, or null for an empty header.</summary>
@@ -153,17 +154,6 @@ public sealed class TabItem : Control
     {
         if (ReferenceEquals(_header, child))
             _header = null;
-    }
-
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
-    {
-        if (ReferenceEquals(eventArgs.Property, IsEnabledProperty))
-        {
-            OwnerView?.OnItemStateChanged(this);
-        }
-
-        base.OnPropertyChanged(eventArgs);
     }
 
     /// <inheritdoc />

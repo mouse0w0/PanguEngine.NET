@@ -19,7 +19,12 @@ public sealed class ToggleSwitch : Control
         Property.RegisterDirect<ToggleSwitch, bool>(
             nameof(IsOn),
             static control => control.IsOn,
-            static (control, value) => control.IsOn = value);
+            static (control, value) => control.IsOn = value,
+            onChanged: static (control, _, _) =>
+            {
+                control.SetPseudoClass(CheckedPseudoClass, control.IsOn);
+                control.InvalidateArrange();
+            });
 
     private readonly Panel _thumb;
     private bool _enterKeyDown;
@@ -49,18 +54,6 @@ public sealed class ToggleSwitch : Control
     {
         get;
         set => SetField(IsOnProperty, ref field, value);
-    }
-
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
-    {
-        if (ReferenceEquals(eventArgs.Property, IsOnProperty))
-        {
-            SetPseudoClass(CheckedPseudoClass, IsOn);
-            InvalidateArrange();
-        }
-
-        base.OnPropertyChanged(eventArgs);
     }
 
     /// <inheritdoc />

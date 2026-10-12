@@ -48,7 +48,7 @@ public sealed class RegionTests
     }
 
     [Fact]
-    public void EquivalentBackgroundDoesNotRaisePropertyChanged()
+    public void EquivalentBackgroundInstancesRaisePropertyChanged()
     {
         var region = new TestRegion
         {
@@ -61,9 +61,12 @@ public sealed class RegionTests
                 changes++;
         };
 
-        region.Background = new SolidColorBrush(10, 20, 30, 40);
+        var replacement = new SolidColorBrush(10, 20, 30, 40);
+        region.Background = replacement;
+        region.Background = replacement;
 
-        Assert.Equal(0, changes);
+        Assert.Same(replacement, region.Background);
+        Assert.Equal(1, changes);
     }
 
     [Fact]

@@ -204,7 +204,7 @@ public sealed class ToggleButtonTests
     }
 
     [Fact]
-    public void ClickObservesStateCorrectedByTheBindingSource()
+    public void ClickObservesTheTargetValueWhenTheSourceRejectsWithoutNotification()
     {
         var (manager, screen, button) = OpenScene();
         var model = new NotifyingBooleanModel { RejectTrue = true };
@@ -214,9 +214,9 @@ public sealed class ToggleButtonTests
 
         Click(manager);
 
-        Assert.Equal(new[] { false }, observed);
+        Assert.Equal(new[] { true }, observed);
         Assert.False(model.Value);
-        Assert.False(button.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.True(button.HasPseudoClass(UiPseudoClass.Get("checked")));
         Assert.True(button.IsBound(ToggleButton.IsCheckedProperty));
         manager.Close();
     }

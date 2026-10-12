@@ -79,9 +79,10 @@ public sealed class DirectPropertyStyleTests
         internal static readonly DirectProperty<DirectNode, int> ValueProperty =
             Property.RegisterDirect<DirectNode, int>(nameof(Value), o => o.Value, (o, v) => o.Value = v);
         internal static readonly DirectProperty<DirectNode, int> ReadOnlyProperty =
-            Property.RegisterDirect<DirectNode, int>("ReadOnly", o => o._value);
+            Property.RegisterDirect<DirectNode, int>(nameof(ReadOnly), o => o.ReadOnly);
 
         private int _value = 7;
+        internal int ReadOnly => _value;
         internal Action? DrawAction { get; set; }
         internal int Value
         {

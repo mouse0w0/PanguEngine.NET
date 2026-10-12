@@ -126,36 +126,20 @@ public sealed class UiNodeStylingTests
     }
 
     [Fact]
-    public void StyleChangeNotificationsFollowRegistrationOrder()
-    {
-        var button = new Button();
-        var order = new List<string>();
-        button.PropertyChanged += (_, e) =>
-        {
-            if (ReferenceEquals(e.Property, Region.BackgroundProperty)) order.Add("Background");
-            if (ReferenceEquals(e.Property, Region.BorderBrushProperty)) order.Add("BorderBrush");
-        };
-
-        ApplyTheme(
-            button,
-            Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
-            Rule(Selector<Button>(), Setter(Region.BorderBrushProperty, Brush(2))));
-
-        Assert.Equal(new[] { "Background", "BorderBrush" }, order);
-    }
-
-    [Fact]
     public void EarlierPropertyHandlerCanLocallyMaskLaterStyleNotification()
     {
         var button = new Button();
         var screen = new UiScreen(button);
-        var borderNotifications = 0;
+        var changes = new List<PropertyChangedEventArgs>();
         button.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Region.BackgroundProperty))
-                button.BorderBrush = Brush(9);
-            if (ReferenceEquals(e.Property, Region.BorderBrushProperty))
-                borderNotifications++;
+            if (!ReferenceEquals(e.Property, Region.BackgroundProperty) &&
+                !ReferenceEquals(e.Property, Region.BorderBrushProperty))
+                return;
+            changes.Add(e);
+            if (changes.Count == 1)
+                button.SetValue(ReferenceEquals(e.Property, Region.BackgroundProperty)
+                    ? Region.BorderBrushProperty : Region.BackgroundProperty, Brush(9));
         };
         var sheet = new UiStyleSheet([
             Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
@@ -165,8 +149,12 @@ public sealed class UiNodeStylingTests
         screen.SetStyleSheets([sheet]);
         screen.Root!.UpdateStyles();
 
-        Assert.Equal(Brush(9), button.BorderBrush);
-        Assert.Equal(1, borderNotifications);
+        Assert.Equal(2, changes.Count);
+        Assert.NotSame(changes[0].Property, changes[1].Property);
+        Assert.Equal(Brush(9), changes[1].NewValue);
+        var maskedProperty = ReferenceEquals(changes[0].Property, Region.BackgroundProperty)
+            ? Region.BorderBrushProperty : Region.BackgroundProperty;
+        Assert.Equal(Brush(9), button.GetValue(maskedProperty));
     }
 
     [Fact]
@@ -184,37 +172,43 @@ public sealed class UiNodeStylingTests
                 Setter(Region.BackgroundProperty, Brush(5)),
                 Setter(Region.BorderBrushProperty, Brush(6))));
 
-        var borderNotifications = 0;
+        var changes = new List<PropertyChangedEventArgs>();
         button.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Region.BackgroundProperty))
-                button.BorderBrush = Brush(9);
-            if (ReferenceEquals(e.Property, Region.BorderBrushProperty))
-                borderNotifications++;
+            if (!ReferenceEquals(e.Property, Region.BackgroundProperty) &&
+                !ReferenceEquals(e.Property, Region.BorderBrushProperty))
+                return;
+            changes.Add(e);
+            if (changes.Count == 1)
+                button.SetValue(ReferenceEquals(e.Property, Region.BackgroundProperty)
+                    ? Region.BorderBrushProperty : Region.BackgroundProperty, Brush(9));
         };
 
         button.Classes.Add("primary");
         button.GetStyleRoot().UpdateStyles();
 
-        Assert.Equal(Brush(9), button.BorderBrush);
-        Assert.Equal(1, borderNotifications);
+        Assert.Equal(2, changes.Count);
+        Assert.NotSame(changes[0].Property, changes[1].Property);
+        Assert.Equal(Brush(9), changes[1].NewValue);
+        var maskedProperty = ReferenceEquals(changes[0].Property, Region.BackgroundProperty)
+            ? Region.BorderBrushProperty : Region.BackgroundProperty;
+        Assert.Equal(Brush(9), button.GetValue(maskedProperty));
     }
 
     [Fact]
     public void StyleChangeExceptionStopsRemainingNotifications()
     {
         var button = new Button();
-        var order = new List<string>();
+        var notified = new List<Property>();
+        var failure = new InvalidOperationException("style-fail");
         button.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Region.BackgroundProperty))
+            if (ReferenceEquals(e.Property, Region.BackgroundProperty) ||
+                ReferenceEquals(e.Property, Region.BorderBrushProperty))
             {
-                order.Add("Background");
-                throw new InvalidOperationException("bg-fail");
+                notified.Add(e.Property);
+                throw failure;
             }
-
-            if (ReferenceEquals(e.Property, Region.BorderBrushProperty))
-                order.Add("BorderBrush");
         };
 
         var exception = Assert.Throws<InvalidOperationException>(() => ApplyTheme(
@@ -222,8 +216,9 @@ public sealed class UiNodeStylingTests
             Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
             Rule(Selector<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))));
 
-        Assert.Equal("bg-fail", exception.Message);
-        Assert.Equal(new[] { "Background" }, order);
+        Assert.Same(failure, exception);
+        Assert.Single(notified);
+        Assert.Equal(Brush(1), button.Background);
         Assert.Equal(Brush(2), button.BorderBrush);
         Assert.False(button.IsUpdatingStyles);
         Assert.False(button.Screen!.IsUpdatingLayout);
@@ -1665,7 +1660,7 @@ public sealed class UiNodeStylingTests
         internal static readonly Property<EquatableValue> ValueProperty =
             Property.Register<EquatableNode, EquatableValue>(
                 "Value",
-                new EquatableValue(0));
+                new EquatableValue(0), comparer: EqualityComparer<EquatableValue>.Default);
     }
 
     private sealed class EquatableValue(int value) : IEquatable<EquatableValue>
@@ -1705,7 +1700,8 @@ public sealed class UiNodeStylingTests
     private sealed class GuardedStyleNode : UiNode
     {
         internal static readonly Property<GuardedValue> ValueProperty =
-            Property.Register<GuardedStyleNode, GuardedValue>("Value", new GuardedValue(0));
+            Property.Register<GuardedStyleNode, GuardedValue>("Value", new GuardedValue(0),
+                comparer: EqualityComparer<GuardedValue>.Default);
     }
 
     private sealed class CustomStateControl : Control

@@ -19,7 +19,11 @@ public class Button : Control
         Property.Register<Button, string>(
             nameof(Text),
             string.Empty,
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            onChanged: static (node, _, _) =>
+            {
+                node.InvalidateMeasure();
+                node.SynchronizeText();
+            },
             validate: static value => value is not null,
             validationMessage: "Text cannot be null.");
 
@@ -30,7 +34,12 @@ public class Button : Control
         Property.Register<Button, Font>(
             nameof(Font),
             new Font(string.Empty),
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            onChanged: static (node, _, _) =>
+            {
+                node.InvalidateMeasure();
+                if (node._textNode is { } text)
+                    text.Font = node.Font;
+            },
             validate: static value => value is not null,
             validationMessage: "Font cannot be null.");
 
@@ -41,7 +50,12 @@ public class Button : Control
         Property.Register<Button, double>(
             nameof(FontSize),
             16d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            onChanged: static (node, _, _) =>
+            {
+                node.InvalidateMeasure();
+                if (node._textNode is { } text)
+                    text.FontSize = node.FontSize;
+            },
             validate: IsFinitePositive,
             validationMessage: "FontSize must be positive and finite.");
 
@@ -51,7 +65,12 @@ public class Button : Control
     public static readonly Property<Color> ForegroundProperty =
         Property.Register<Button, Color>(
             nameof(Foreground),
-            new Color(242, 244, 247));
+            new Color(242, 244, 247),
+            onChanged: static (node, _, _) =>
+            {
+                if (node._textNode is { } text)
+                    text.Color = node.Foreground;
+            });
 
     /// <summary>
     /// Identifies the <see cref="Icon"/> property.
@@ -60,7 +79,11 @@ public class Button : Control
         Property.Register<Button, UiImage?>(
             nameof(Icon),
             defaultValue: null,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) =>
+            {
+                node.InvalidateMeasure();
+                node.SynchronizeIcon();
+            });
 
     /// <summary>
     /// Identifies the <see cref="IconSize"/> property.
@@ -69,7 +92,12 @@ public class Button : Control
         Property.Register<Button, double>(
             nameof(IconSize),
             16d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            onChanged: static (node, _, _) =>
+            {
+                node.InvalidateMeasure();
+                if (node._imageNode is { } image)
+                    node.SetIconSize(image);
+            },
             validate: IsFiniteNonNegative,
             validationMessage: "IconSize must be a finite non-negative value.");
 
@@ -183,25 +211,6 @@ public class Button : Control
     /// Raises the <see cref="Click"/> event when this button is activated.
     /// </summary>
     protected virtual void OnClick() => Click?.Invoke(this, EventArgs.Empty);
-
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
-    {
-        if (ReferenceEquals(eventArgs.Property, TextProperty))
-            SynchronizeText();
-        else if (ReferenceEquals(eventArgs.Property, IconProperty))
-            SynchronizeIcon();
-        else if (_textNode is not null && ReferenceEquals(eventArgs.Property, FontProperty))
-            _textNode.Font = Font;
-        else if (_textNode is not null && ReferenceEquals(eventArgs.Property, FontSizeProperty))
-            _textNode.FontSize = FontSize;
-        else if (_textNode is not null && ReferenceEquals(eventArgs.Property, ForegroundProperty))
-            _textNode.Color = Foreground;
-        else if (_imageNode is not null && ReferenceEquals(eventArgs.Property, IconSizeProperty))
-            SetIconSize(_imageNode);
-
-        base.OnPropertyChanged(eventArgs);
-    }
 
     /// <inheritdoc />
     protected override Size MeasureContent(Size availableSize)

@@ -24,13 +24,23 @@ public sealed partial class TabView : Control
         Property.Register<TabView, TabStripPlacement>(
             nameof(TabStripPlacement),
             TabStripPlacement.Top,
-            onChanged: static (node, _, _) => node.InvalidateMeasure());
+            onChanged: static (node, _, _) =>
+            {
+                node.InvalidateMeasure();
+                node.CancelDrag();
+                node._strip.SynchronizeOrientation();
+            });
 
     /// <summary>Identifies the <see cref="CanReorderTabs"/> property.</summary>
     public static readonly Property<bool> CanReorderTabsProperty =
         Property.Register<TabView, bool>(
             nameof(CanReorderTabs),
-            false);
+            false,
+            onChanged: static (node, _, _) =>
+            {
+                if (!node.CanReorderTabs)
+                    node.CancelDrag();
+            });
 
     /// <summary>Identifies the <see cref="MinTabWidth"/> property.</summary>
     public static readonly Property<double> MinTabWidthProperty =
@@ -89,6 +99,11 @@ public sealed partial class TabView : Control
         _contentArea = new TabContentArea(this);
         Children.Add(_strip);
         Children.Add(_contentArea);
+        Subscribe(IsEnabledProperty, (_, _) =>
+        {
+            if (!IsEnabled)
+                CancelDrag();
+        });
         Subscribe(ScreenProperty, (_, change) =>
         {
             CancelDrag();
@@ -176,26 +191,6 @@ public sealed partial class TabView : Control
         return double.IsPositiveInfinity(availableWidth)
             ? preferred
             : Math.Min(preferred, availableWidth);
-    }
-
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
-    {
-        if (ReferenceEquals(eventArgs.Property, TabStripPlacementProperty))
-        {
-            CancelDrag();
-            _strip.SynchronizeOrientation();
-        }
-        else if (ReferenceEquals(eventArgs.Property, CanReorderTabsProperty) && !CanReorderTabs)
-        {
-            CancelDrag();
-        }
-        else if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) && !IsEnabled)
-        {
-            CancelDrag();
-        }
-
-        base.OnPropertyChanged(eventArgs);
     }
 
     /// <inheritdoc />

@@ -12,15 +12,18 @@ public abstract class NumericUpDown : Control
 {
     /// <summary>Identifies the <see cref="FormatString"/> property.</summary>
     public static readonly Property<string> FormatStringProperty =
-        Property.Register<NumericUpDown, string>(nameof(FormatString), string.Empty);
+        Property.Register<NumericUpDown, string>(nameof(FormatString), string.Empty,
+            onChanged: static (node, _, _) => node.OnFormattingChanged());
 
     /// <summary>Identifies the <see cref="FormatProvider"/> property.</summary>
     public static readonly Property<IFormatProvider> FormatProviderProperty =
-        Property.Register<NumericUpDown, IFormatProvider>(nameof(FormatProvider), CultureInfo.InvariantCulture);
+        Property.Register<NumericUpDown, IFormatProvider>(nameof(FormatProvider), CultureInfo.InvariantCulture,
+            onChanged: static (node, _, _) => node.OnFormattingChanged());
 
     /// <summary>Identifies the <see cref="IsReadOnly"/> property.</summary>
     public static readonly Property<bool> IsReadOnlyProperty =
-        Property.Register<NumericUpDown, bool>(nameof(IsReadOnly));
+        Property.Register<NumericUpDown, bool>(nameof(IsReadOnly),
+            onChanged: static (node, _, _) => node.OnReadOnlyChanged());
 
     private readonly IFormatProvider _initialFormatProvider = CultureInfo.CurrentCulture;
 
@@ -52,6 +55,16 @@ public abstract class NumericUpDown : Control
         set => SetValue(IsReadOnlyProperty, value);
     }
 
+    /// <summary>Responds to changes in numeric formatting settings.</summary>
+    protected virtual void OnFormattingChanged()
+    {
+    }
+
+    /// <summary>Responds to changes in the read-only setting.</summary>
+    protected virtual void OnReadOnlyChanged()
+    {
+    }
+
     /// <inheritdoc />
     protected override TValue GetFallbackValue<TValue>(Property<TValue> property) =>
         ReferenceEquals(property, FormatProviderProperty)
@@ -68,22 +81,32 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
 
     /// <summary>Identifies the <see cref="Value"/> property.</summary>
     public static readonly DirectProperty<NumericUpDown<T>, T> ValueProperty =
-        Property.RegisterDirect<NumericUpDown<T>, T>(nameof(Value), static node => node._value,
-            static (node, value) => node.SetNumber(value), unsetValue: T.Zero);
+        Property.RegisterDirect<NumericUpDown<T>, T>(nameof(Value), static node => node.Value,
+            static (node, value) => node.Value = value, unsetValue: T.Zero,
+            onChanged: static (node, _, _) => node.OnValueChanged());
 
     /// <summary>Identifies the <see cref="Minimum"/> property.</summary>
     public static readonly DirectProperty<NumericUpDown<T>, T> MinimumProperty =
-        Property.RegisterDirect<NumericUpDown<T>, T>(nameof(Minimum), static node => node._minimum,
-            static (node, value) => node.SetMinimum(value), unsetValue: T.Zero);
+        Property.RegisterDirect<NumericUpDown<T>, T>(nameof(Minimum), static node => node.Minimum,
+            static (node, value) => node.Minimum = value, unsetValue: T.Zero,
+            onChanged: static (node, _, _) => node.OnRangeChanged(true));
 
     /// <summary>Identifies the <see cref="Maximum"/> property.</summary>
     public static readonly DirectProperty<NumericUpDown<T>, T> MaximumProperty =
-        Property.RegisterDirect<NumericUpDown<T>, T>(nameof(Maximum), static node => node._maximum,
-            static (node, value) => node.SetMaximum(value), unsetValue: DefaultMaximum);
+        Property.RegisterDirect<NumericUpDown<T>, T>(nameof(Maximum), static node => node.Maximum,
+            static (node, value) => node.Maximum = value, unsetValue: DefaultMaximum,
+            onChanged: static (node, _, _) => node.OnRangeChanged(false));
 
     /// <summary>Identifies the <see cref="Increment"/> property.</summary>
     public static readonly Property<T> IncrementProperty = Property.Register<NumericUpDown<T>, T>(
-        nameof(Increment), T.One, validate: static value => T.IsFinite(value) && value >= T.Zero,
+        nameof(Increment), T.One,
+        onChanged: static (node, _, _) =>
+        {
+            node.CancelRepeat();
+            node._wheelRemainder = 0;
+            node.UpdatePartStates();
+        },
+        validate: static value => T.IsFinite(value) && value >= T.Zero,
         validationMessage: "Increment must be finite and non-negative.");
 
     private readonly TextBox _editor = new();
@@ -119,30 +142,68 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
         _decrease.PropertyChanged += OnPartPropertyChanged;
         ShowValue();
         UpdatePartStates();
+        Subscribe(IsPressedProperty, (_, _) =>
+        {
+            if (!IsPressed)
+                CancelRepeat();
+        });
+        Subscribe(IsEnabledProperty, (_, _) =>
+        {
+            if (!IsEnabled)
+            {
+                CancelRepeat();
+                _wheelRemainder = 0;
+            }
+        });
+        Subscribe(VisibilityProperty, (_, _) =>
+        {
+            if (Visibility != Visibility.Visible)
+            {
+                CancelRepeat();
+                _wheelRemainder = 0;
+            }
+        });
+        Subscribe(ScreenProperty, (_, _) =>
+        {
+            CancelRepeat();
+            _wheelRemainder = 0;
+        });
     }
 
     /// <summary>Gets or sets the finite value, clamped to the current range.</summary>
     /// <exception cref="ArgumentException">The supplied value is not finite.</exception>
     public T Value
     {
-        get => GetValue(ValueProperty);
-        set => SetValue(ValueProperty, value);
+        get => _value;
+        set
+        {
+            EnsureFinite(value, nameof(Value));
+            SetField(ValueProperty, ref _value, Clamp(value));
+        }
     }
 
     /// <summary>Gets or sets the finite lower boundary, raising the upper boundary when necessary.</summary>
     /// <exception cref="ArgumentException">The supplied value is not finite.</exception>
     public T Minimum
     {
-        get => GetValue(MinimumProperty);
-        set => SetValue(MinimumProperty, value);
+        get => _minimum;
+        set
+        {
+            EnsureFinite(value, nameof(Minimum));
+            SetField(MinimumProperty, ref _minimum, value);
+        }
     }
 
     /// <summary>Gets or sets the finite upper boundary, lowering the lower boundary when necessary.</summary>
     /// <exception cref="ArgumentException">The supplied value is not finite.</exception>
     public T Maximum
     {
-        get => GetValue(MaximumProperty);
-        set => SetValue(MaximumProperty, value);
+        get => _maximum;
+        set
+        {
+            EnsureFinite(value, nameof(Maximum));
+            SetField(MaximumProperty, ref _maximum, value);
+        }
     }
 
     /// <summary>Gets or sets the finite non-negative step size. Zero disables incremental input.</summary>
@@ -156,38 +217,32 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     /// <inheritdoc />
     protected internal override UiNode GetFocusTarget() => _editor;
 
-    private void SetNumber(T value)
+    private void OnValueChanged()
     {
-        EnsureFinite(value, nameof(Value));
-        SetField(ValueProperty, ref _value, Clamp(value));
+        if (!_editing)
+            ShowValue();
+        UpdatePartStates();
     }
 
-    private void SetMinimum(T value)
-    {
-        EnsureFinite(value, nameof(Minimum));
-        SetRange(value, _maximum < value ? value : _maximum);
-    }
-
-    private void SetMaximum(T value)
-    {
-        EnsureFinite(value, nameof(Maximum));
-        SetRange(_minimum > value ? value : _minimum, value);
-    }
-
-    private void SetRange(T minimum, T maximum)
+    private void OnRangeChanged(bool minimumChanged)
     {
         var oldMinimum = _minimum;
         var oldMaximum = _maximum;
         var oldValue = _value;
-        _minimum = minimum;
-        _maximum = maximum;
+        if (minimumChanged)
+            _maximum = T.Max(_minimum, _maximum);
+        else
+            _minimum = T.Min(_minimum, _maximum);
         _value = Clamp(_value);
-        if (oldMinimum != _minimum)
-            RaisePropertyChanged(MinimumProperty, oldMinimum, _minimum);
-        if (oldMaximum != _maximum)
-            RaisePropertyChanged(MaximumProperty, oldMaximum, _maximum);
-        if (oldValue != _value)
+        var newMinimum = _minimum;
+        var newMaximum = _maximum;
+        if (!ValueProperty.ValuesEqual(oldValue, _value))
             RaisePropertyChanged(ValueProperty, oldValue, _value);
+        if (!MinimumProperty.ValuesEqual(oldMinimum, newMinimum))
+            RaisePropertyChanged(MinimumProperty, oldMinimum, newMinimum);
+        if (!MaximumProperty.ValuesEqual(oldMaximum, newMaximum))
+            RaisePropertyChanged(MaximumProperty, oldMaximum, newMaximum);
+        UpdatePartStates();
     }
 
     private T Clamp(T value) => value < _minimum ? _minimum : value > _maximum ? _maximum : value;
@@ -199,55 +254,24 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
+    protected override void OnFormattingChanged()
     {
-        if (ReferenceEquals(eventArgs.Property, ValueProperty))
-        {
-            if (!_editing)
-                ShowValue();
-            UpdatePartStates();
-        }
-        else if (ReferenceEquals(eventArgs.Property, MinimumProperty) ||
-                 ReferenceEquals(eventArgs.Property, MaximumProperty))
-        {
-            UpdatePartStates();
-        }
-        else if (ReferenceEquals(eventArgs.Property, FormatStringProperty) ||
-                 ReferenceEquals(eventArgs.Property, FormatProviderProperty))
-        {
-            if (!_editing)
-                ShowValue();
-            UpdatePartStates();
-        }
-        else if (ReferenceEquals(eventArgs.Property, IsReadOnlyProperty))
-        {
-            CancelRepeat();
-            _wheelRemainder = 0;
-            _editor.IsReadOnly = IsReadOnly;
-            SetPseudoClass(ReadOnlyPseudoClass, IsReadOnly);
-            _editing = false;
+        if (!_editing)
             ShowValue();
-            _editing = _editor.IsFocused && !IsReadOnly;
-            UpdatePartStates();
-        }
-        else if (ReferenceEquals(eventArgs.Property, IncrementProperty))
-        {
-            CancelRepeat();
-            _wheelRemainder = 0;
-            UpdatePartStates();
-        }
-        else if (ReferenceEquals(eventArgs.Property, IsPressedProperty) && !IsPressed)
-        {
-            CancelRepeat();
-        }
-        else if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) && !IsEnabled ||
-                 ReferenceEquals(eventArgs.Property, VisibilityProperty) && Visibility != Visibility.Visible ||
-                 ReferenceEquals(eventArgs.Property, ScreenProperty))
-        {
-            CancelRepeat();
-            _wheelRemainder = 0;
-        }
-        base.OnPropertyChanged(eventArgs);
+        UpdatePartStates();
+    }
+
+    /// <inheritdoc />
+    protected override void OnReadOnlyChanged()
+    {
+        CancelRepeat();
+        _wheelRemainder = 0;
+        _editor.IsReadOnly = IsReadOnly;
+        SetPseudoClass(ReadOnlyPseudoClass, IsReadOnly);
+        _editing = false;
+        ShowValue();
+        _editing = _editor.IsFocused && !IsReadOnly;
+        UpdatePartStates();
     }
 
     private void UpdatePartStates()

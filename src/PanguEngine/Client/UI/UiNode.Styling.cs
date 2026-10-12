@@ -138,7 +138,6 @@ public abstract partial class UiNode
                     snapshot.ValidateValues();
 
                     changes = ComputeStyleChanges(_styleSnapshot, snapshot);
-                    changes.Sort((a, b) => a.Property.RegistrationOrder.CompareTo(b.Property.RegistrationOrder));
                     _styleSnapshot = snapshot;
                 }
                 catch

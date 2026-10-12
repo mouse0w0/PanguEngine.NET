@@ -6,7 +6,7 @@ namespace PanguEngine.Tests.ComponentModel;
 public sealed class DirectPropertyBindingTests
 {
     [Fact]
-    public void TwoWayInitialValueDoesNotWriteTargetNormalizationBackToSource()
+    public void TwoWayInitialValueWritesTargetNormalizationBackToSource()
     {
         var source = new Host { Value = 20 };
         var target = new Host { Maximum = 10 };
@@ -14,9 +14,9 @@ public sealed class DirectPropertyBindingTests
 
         target.BindTwoWay(Host.ValueProperty, source, Host.ValueProperty);
 
-        Assert.Equal(20, source.Value);
+        Assert.Equal(10, source.Value);
         Assert.Equal(10, target.Value);
-        Assert.Equal(0, source.SetterCalls);
+        Assert.Equal(1, source.SetterCalls);
     }
 
     [Fact]
@@ -24,14 +24,18 @@ public sealed class DirectPropertyBindingTests
     {
         var source = new Host { Value = 2 };
         var target = new Host();
+        var unbindOnConversion = false;
         target.BindTwoWay(Host.ValueProperty, source, Host.ValueProperty, value => value,
             (int value, out int result) =>
             {
-                target.Unbind(Host.ValueProperty);
+                if (unbindOnConversion)
+                    target.Unbind(Host.ValueProperty);
                 result = value;
                 return true;
             });
 
+        Assert.True(target.IsBound(Host.ValueProperty));
+        unbindOnConversion = true;
         target.Value = 3;
 
         Assert.Equal(2, source.Value);
@@ -40,7 +44,7 @@ public sealed class DirectPropertyBindingTests
     }
 
     [Fact]
-    public void NonIdempotentSettersDoNotRecursivelyWriteBackResynchronization()
+    public void NonConvergingSettersPropagateUntilANotificationThrows()
     {
         var source = new Host { Adjustment = 1 };
         var target = new Host { Adjustment = 1 };
@@ -49,20 +53,17 @@ public sealed class DirectPropertyBindingTests
             if (target.SetterCalls > 8)
                 throw new InvalidOperationException("Binding writeback did not terminate.");
         };
-        target.BindTwoWay(Host.ValueProperty, source, Host.ValueProperty);
-        source.SetterCalls = 0;
-        target.SetterCalls = 0;
+        var error = Assert.Throws<InvalidOperationException>(() =>
+            target.BindTwoWay(Host.ValueProperty, source, Host.ValueProperty));
 
-        target.Value = 10;
-
-        Assert.Equal(12, source.Value);
-        Assert.Equal(13, target.Value);
-        Assert.Equal(1, source.SetterCalls);
-        Assert.Equal(2, target.SetterCalls);
+        Assert.Equal("Binding writeback did not terminate.", error.Message);
+        Assert.True(source.SetterCalls > 1);
+        Assert.True(target.SetterCalls > 1);
+        Assert.True(target.IsBound(Host.ValueProperty));
     }
 
     [Fact]
-    public void SourceSynchronizationDoesNotEchoThroughItsSetter()
+    public void SourceSynchronizationEchoStopsWhenTheSourceValueIsUnchanged()
     {
         var source = new Host { Value = 2 };
         var target = new Host();
@@ -70,14 +71,15 @@ public sealed class DirectPropertyBindingTests
 
         target.BindTwoWay(Host.ValueProperty, source, Host.ValueProperty);
 
-        Assert.Equal(0, source.SetterCalls);
-        source.Value = 3;
         Assert.Equal(1, source.SetterCalls);
+        source.SetterCalls = 0;
+        source.Value = 3;
+        Assert.Equal(2, source.SetterCalls);
         Assert.Equal(3, target.Value);
     }
 
     [Fact]
-    public void SourceUpdateDoesNotWriteTargetNormalizationBackToSource()
+    public void SourceUpdateWritesTargetNormalizationBackToSource()
     {
         var source = new Host { Value = 2 };
         var target = new Host { Maximum = 10 };
@@ -87,8 +89,8 @@ public sealed class DirectPropertyBindingTests
         source.Value = 20;
 
         Assert.Equal(10, target.Value);
-        Assert.Equal(20, source.Value);
-        Assert.Equal(1, source.SetterCalls);
+        Assert.Equal(10, source.Value);
+        Assert.Equal(2, source.SetterCalls);
     }
 
     [Fact]
@@ -108,7 +110,7 @@ public sealed class DirectPropertyBindingTests
 
         Assert.Equal(4, source.Value);
         Assert.Equal(4, target.Value);
-        Assert.Equal(1, source.SetterCalls);
+        Assert.Equal(2, source.SetterCalls);
     }
 
     [Fact]
@@ -161,7 +163,7 @@ public sealed class DirectPropertyBindingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void TwoWayWritesSourceOnceAndAcceptsNormalization(bool useSetValue)
+    public void TwoWayPropagatesSourceNormalizationUntilValuesStabilize(bool useSetValue)
     {
         var source = new Host { Maximum = 10, Value = 2 };
         var target = new Host();
@@ -173,9 +175,24 @@ public sealed class DirectPropertyBindingTests
         else
             target.Value = 20;
 
-        Assert.Equal(1, source.SetterCalls);
+        Assert.Equal(2, source.SetterCalls);
         Assert.Equal(10, source.Value);
         Assert.Equal(10, target.Value);
+    }
+
+    [Fact]
+    public void SilentSourceNormalizationDoesNotRestoreTheTarget()
+    {
+        var source = new Host { Maximum = 10, Value = 10 };
+        var target = new Host();
+        target.BindTwoWay(Host.ValueProperty, source, Host.ValueProperty);
+        source.SetterCalls = 0;
+
+        target.Value = 20;
+
+        Assert.Equal(10, source.Value);
+        Assert.Equal(20, target.Value);
+        Assert.Equal(1, source.SetterCalls);
     }
 
     [Fact]
@@ -343,7 +360,7 @@ public sealed class DirectPropertyBindingTests
     }
 
     [Fact]
-    public void TargetChangesDuringSourceSynchronizationDoNotWriteBack()
+    public void TargetChangesDuringSourceSynchronizationWriteBack()
     {
         var source = new Host { Value = 2 };
         var target = new Host();
@@ -357,13 +374,13 @@ public sealed class DirectPropertyBindingTests
         source.Value = 3;
 
         Assert.Equal(4, target.Value);
-        Assert.Equal(3, source.Value);
+        Assert.Equal(4, source.Value);
         target.Value = 5;
         Assert.Equal(5, source.Value);
     }
 
     [Fact]
-    public void NestedSourceUpdatesDoNotEnableWritebackInsideOuterSynchronization()
+    public void NestedSourceAndTargetUpdatesContinuePropagating()
     {
         var source = new Host { Value = 2 };
         var target = new Host();
@@ -380,7 +397,7 @@ public sealed class DirectPropertyBindingTests
         source.Value = 3;
 
         Assert.Equal(5, target.Value);
-        Assert.Equal(4, source.Value);
+        Assert.Equal(5, source.Value);
         target.Value = 6;
         Assert.Equal(6, source.Value);
     }
@@ -539,7 +556,7 @@ public sealed class DirectPropertyBindingTests
         internal static readonly DirectProperty<Host, int> OtherProperty =
             Property.RegisterDirect<Host, int>(nameof(Other), o => o.Other, (o, v) => o.Other = v);
         internal static readonly DirectProperty<Host, int> ReadOnlyProperty =
-            Property.RegisterDirect<Host, int>("ReadOnly", o => o._readOnly);
+            Property.RegisterDirect<Host, int>(nameof(ReadOnly), o => o.ReadOnly);
         internal static readonly Property<int> StoredProperty = Property.Register<Host, int>("Stored");
 
         private int _value;
@@ -552,6 +569,7 @@ public sealed class DirectPropertyBindingTests
         internal bool ThrowSetter { get; set; }
         internal bool ThrowNotifications { get; set; }
         internal bool HasStoredValue => HasLocalValue(ValueProperty);
+        internal int ReadOnly => _readOnly;
 
         internal int Value
         {

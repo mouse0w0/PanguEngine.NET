@@ -8,21 +8,23 @@ public sealed class SingleSelectionModel<T> : ObservableObject
     public static readonly DirectProperty<SingleSelectionModel<T>, IReadOnlyObservableList<T>?> SourceProperty =
         Property.RegisterDirect<SingleSelectionModel<T>, IReadOnlyObservableList<T>?>(
             nameof(Source),
-            static owner => owner._source,
-            static (owner, value) => owner.SetSource(value));
+            static owner => owner.Source,
+            static (owner, value) => owner.Source = value,
+            onChanged: static (owner, oldSource, _) => owner.OnSourceChanged(oldSource));
 
     public static readonly DirectProperty<SingleSelectionModel<T>, int> SelectedIndexProperty =
         Property.RegisterDirect<SingleSelectionModel<T>, int>(
             nameof(SelectedIndex),
-            static owner => owner._selectedIndex,
-            static (owner, value) => owner.SetIndex(value),
-            unsetValue: -1);
+            static owner => owner.SelectedIndex,
+            static (owner, value) => owner.SelectedIndex = value,
+            unsetValue: -1,
+            onChanged: static (owner, oldIndex, _) => owner.OnIndexChanged(oldIndex));
 
     public static readonly DirectProperty<SingleSelectionModel<T>, T?> SelectedItemProperty =
         Property.RegisterDirect<SingleSelectionModel<T>, T?>(
             nameof(SelectedItem),
-            static owner => owner.ReadItem(),
-            static (owner, value) => owner.SetItem(value));
+            static owner => owner.SelectedItem,
+            static (owner, value) => owner.SelectedItem = value);
 
     private int _selectedIndex = -1;
     private bool _notifying;
@@ -36,106 +38,107 @@ public sealed class SingleSelectionModel<T> : ObservableObject
     public SingleSelectionModel(IReadOnlyObservableList<T> source)
     {
         ArgumentNullException.ThrowIfNull(source);
-        SetSource(source);
+        Source = source;
     }
 
     public IReadOnlyObservableList<T>? Source
     {
-        get => GetValue(SourceProperty);
-        set => SetValue(SourceProperty, value);
+        get => _source;
+        set
+        {
+            if (_notifying && !ReferenceEquals(_source, value))
+                VerifyNotNotifying();
+            SetField(SourceProperty, ref _source, value);
+        }
     }
 
     public int SelectedIndex
     {
-        get => GetValue(SelectedIndexProperty);
-        set => SetValue(SelectedIndexProperty, value);
+        get => _selectedIndex;
+        set
+        {
+            var index = (uint)value < (uint)(_source?.Count ?? 0) ? value : -1;
+            if (_notifying && index != _selectedIndex)
+                VerifyNotNotifying();
+            SetField(SelectedIndexProperty, ref _selectedIndex, index);
+        }
     }
 
     public T? SelectedItem
     {
-        get => GetValue(SelectedItemProperty);
-        set => SetValue(SelectedItemProperty, value);
+        get => ReadItem();
+        set
+        {
+            if (_notifying && SameItem(ReadItem(), value))
+                return;
+            SelectedIndex = FindItemIndex(value);
+        }
     }
 
     public void Select(int index)
     {
         VerifyMutationAccess();
         if ((uint)index < (uint)(_source?.Count ?? 0))
-            SetIndex(index);
+            SelectedIndex = index;
     }
 
-    public void Clear() => SetIndex(-1);
+    public void Clear() => SelectedIndex = -1;
 
-    private void SetSource(IReadOnlyObservableList<T>? source)
+    private void OnSourceChanged(IReadOnlyObservableList<T>? oldSource)
     {
-        VerifyMutationAccess();
-        if (ReferenceEquals(_source, source))
-            return;
-        VerifyNotNotifying();
-        var oldSource = _source;
         var oldIndex = _selectedIndex;
-        var oldItem = ReadItem();
+        var oldItem = oldIndex < 0 ? default : oldSource![oldIndex];
         _sourceSubscription?.Detach();
         _sourceSubscription = null;
-        _source = source;
         _selectedIndex = -1;
-        if (source is not null)
+        if (_source is not null)
         {
-            var subscription = new SourceSubscription(this, source);
+            var subscription = new SourceSubscription(this, _source);
             _sourceSubscription = subscription;
             subscription.Attach();
         }
 
-        Publish(oldSource, oldIndex, oldItem);
+        PublishSelection(oldIndex, oldItem);
     }
 
     private T? ReadItem() => _selectedIndex < 0 ? default : _source![_selectedIndex];
 
-    private void SetIndex(int index)
+    private void OnIndexChanged(int oldIndex)
     {
-        VerifyMutationAccess();
-        var newIndex = (uint)index < (uint)(_source?.Count ?? 0) ? index : -1;
-        if (newIndex == _selectedIndex)
+        if (_notifying)
             return;
-        VerifyNotNotifying();
-        Commit(newIndex, ReadItem());
+        var oldItem = oldIndex < 0 ? default : _source![oldIndex];
+        PublishSelection(oldIndex, oldItem, false);
     }
 
-    private void SetItem(T? item)
+    private int FindItemIndex(T? item)
     {
-        VerifyMutationAccess();
-        if (_notifying && SameItem(ReadItem(), item))
-            return;
-
         for (var index = 0; index < (_source?.Count ?? 0); index++)
         {
             if (EqualityComparer<T?>.Default.Equals(_source![index], item))
             {
-                SetIndex(index);
-                return;
+                return index;
             }
         }
 
-        SetIndex(-1);
+        return -1;
     }
 
     private void Commit(int index, T? oldItem)
     {
         var oldIndex = _selectedIndex;
         _selectedIndex = index;
-        Publish(_source, oldIndex, oldItem);
+        PublishSelection(oldIndex, oldItem);
     }
 
-    private void Publish(IReadOnlyObservableList<T>? oldSource, int oldIndex, T? oldItem)
+    private void PublishSelection(int oldIndex, T? oldItem, bool notifyIndex = true)
     {
         var newIndex = _selectedIndex;
         var newItem = ReadItem();
         _notifying = true;
         try
         {
-            if (!ReferenceEquals(oldSource, _source))
-                RaisePropertyChanged(SourceProperty, oldSource, _source);
-            if (oldIndex != newIndex)
+            if (notifyIndex && oldIndex != newIndex)
                 RaisePropertyChanged(SelectedIndexProperty, oldIndex, newIndex);
             if (!SameItem(oldItem, newItem))
                 RaisePropertyChanged(SelectedItemProperty, oldItem, newItem);
@@ -143,6 +146,21 @@ public sealed class SingleSelectionModel<T> : ObservableObject
         finally
         {
             _notifying = false;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
+    {
+        var wasNotifying = _notifying;
+        _notifying = true;
+        try
+        {
+            base.OnPropertyChanged(eventArgs);
+        }
+        finally
+        {
+            _notifying = wasNotifying;
         }
     }
 
@@ -198,9 +216,7 @@ public sealed class SingleSelectionModel<T> : ObservableObject
             throw new InvalidOperationException("Selection cannot change during notification.");
     }
 
-    private static bool SameItem(T? left, T? right) => typeof(T).IsValueType
-        ? EqualityComparer<T?>.Default.Equals(left, right)
-        : ReferenceEquals(left, right);
+    private static bool SameItem(T? left, T? right) => SelectedItemProperty.ValuesEqual(left, right);
 
     private sealed class SourceSubscription(SingleSelectionModel<T> owner, IReadOnlyObservableList<T> source)
     {

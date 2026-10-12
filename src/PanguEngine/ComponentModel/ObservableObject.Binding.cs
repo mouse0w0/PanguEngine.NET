@@ -89,7 +89,11 @@ public abstract partial class ObservableObject
     /// <param name="targetProperty">The target property.</param>
     /// <param name="source">The notifying source object.</param>
     /// <param name="sourceProperty">The writable direct source property expression.</param>
-    /// <remarks>If the target validator rejects the initial value, the current value is preserved and the registered binding remains active for subsequent source updates.</remarks>
+    /// <remarks>
+    /// If the target validator rejects the initial value, the current value is preserved and the binding remains active.
+    /// Target changes during initialization or source updates can write back. Synchronization follows property
+    /// notifications until values stabilize; source writes without notifications leave the target unchanged.
+    /// </remarks>
     /// <exception cref="ArgumentException">Thrown when the target validator rejects the initial value.</exception>
     public void BindTwoWay<TRoot, TValue>(
         Property<TValue> targetProperty,
@@ -127,7 +131,11 @@ public abstract partial class ObservableObject
     /// <param name="sourceProperty">The writable direct source property expression.</param>
     /// <param name="converter">The forward value converter.</param>
     /// <param name="convertBack">The reverse value converter.</param>
-    /// <remarks>If the target validator rejects the converted initial value, the current value is preserved and the registered binding remains active for subsequent source updates.</remarks>
+    /// <remarks>
+    /// If the target validator rejects the converted initial value, the current value is preserved and the binding remains active.
+    /// Target changes during initialization or source updates can write back. Synchronization follows property
+    /// notifications until values stabilize; source writes without notifications leave the target unchanged.
+    /// </remarks>
     /// <exception cref="ArgumentException">Thrown when the target validator rejects the converted initial value.</exception>
     public void BindTwoWay<TRoot, TSource, TTarget>(
         Property<TTarget> targetProperty,
@@ -231,7 +239,11 @@ public abstract partial class ObservableObject
     /// <param name="targetProperty">The target property.</param>
     /// <param name="source">The source property host.</param>
     /// <param name="sourceProperty">The source property.</param>
-    /// <remarks>If the target validator rejects the initial value, the current value is preserved and the registered binding remains active for subsequent source updates.</remarks>
+    /// <remarks>
+    /// If the target validator rejects the initial value, the current value is preserved and the binding remains active.
+    /// Target changes during initialization or source updates can write back. Synchronization follows property
+    /// notifications until values stabilize; source writes without notifications leave the target unchanged.
+    /// </remarks>
     /// <exception cref="ArgumentException">Thrown when the target validator rejects the initial value.</exception>
     public void BindTwoWay<TValue>(
         Property<TValue> targetProperty,
@@ -266,7 +278,11 @@ public abstract partial class ObservableObject
     /// <param name="sourceProperty">The source property.</param>
     /// <param name="converter">The forward value converter.</param>
     /// <param name="convertBack">The reverse value converter.</param>
-    /// <remarks>If the target validator rejects the converted initial value, the current value is preserved and the registered binding remains active for subsequent source updates.</remarks>
+    /// <remarks>
+    /// If the target validator rejects the converted initial value, the current value is preserved and the binding remains active.
+    /// Target changes during initialization or source updates can write back. Synchronization follows property
+    /// notifications until values stabilize; source writes without notifications leave the target unchanged.
+    /// </remarks>
     /// <exception cref="ArgumentException">Thrown when the target validator rejects the converted initial value.</exception>
     public void BindTwoWay<TSource, TTarget>(
         Property<TTarget> targetProperty,

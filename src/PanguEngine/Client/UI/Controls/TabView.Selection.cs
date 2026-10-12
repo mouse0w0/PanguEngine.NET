@@ -5,29 +5,16 @@ namespace PanguEngine.Client.UI.Controls;
 
 public sealed partial class TabView
 {
-    private int _pendingOldSelectionIndex = -1;
-
     private void OnSelectionPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
     {
-        if (ReferenceEquals(eventArgs.Property, SingleSelectionModel<TabItem>.SelectedIndexProperty))
-        {
-            var change = (PropertyChangedEventArgs<int>)eventArgs;
-            _pendingOldSelectionIndex = change.OldValue;
-            // SelectedItem is the identity notification; an index-only move does not change selection.
-            return;
-        }
-
         if (!ReferenceEquals(eventArgs.Property, SingleSelectionModel<TabItem>.SelectedItemProperty))
             return;
 
         var selection = (PropertyChangedEventArgs<TabItem?>)eventArgs;
         if (_collectionNotificationPending)
             return;
-        var oldIndex = _pendingOldSelectionIndex;
-        if (oldIndex < 0 && selection.OldValue is { } oldItem)
-            oldIndex = Items.IndexOf(oldItem);
+        var oldIndex = selection.OldValue is { } oldItem ? Items.IndexOf(oldItem) : -1;
         UpdateSelection(selection.OldValue, selection.NewValue, oldIndex);
-        _pendingOldSelectionIndex = -1;
     }
 
     private void UpdateSelection(TabItem? oldItem, TabItem? newItem, int oldIndex)

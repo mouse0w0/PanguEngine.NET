@@ -256,7 +256,6 @@ public sealed partial class TabView
 
         var finalSelection = Selection.SelectedItem;
         _collectionNotificationPending = false;
-        _pendingOldSelectionIndex = -1;
         if (!ReferenceEquals(previousSelection, finalSelection))
             UpdateSelection(previousSelection, finalSelection, previousIndex);
     }

@@ -24,7 +24,14 @@ public sealed partial class ScrollBar : Control
         Property.Register<ScrollBar, Orientation>(
             nameof(Orientation),
             Orientation.Vertical,
-            onChanged: static (bar, _, _) => bar.InvalidateMeasure());
+            onChanged: static (bar, _, _) =>
+            {
+                bar.InvalidateMeasure();
+                bar.CancelInteraction();
+                bar.SynchronizeOrientationPseudoClass();
+                bar.UpdateArrowStates();
+                bar.RefreshGeometry();
+            });
 
     /// <summary>
     /// Identifies the <see cref="Minimum"/> property.
@@ -32,8 +39,9 @@ public sealed partial class ScrollBar : Control
     public static readonly DirectProperty<ScrollBar, double> MinimumProperty =
         Property.RegisterDirect<ScrollBar, double>(
             nameof(Minimum),
-            static bar => bar._minimum,
-            static (bar, value) => bar.SetMinimum(value));
+            static bar => bar.Minimum,
+            static (bar, value) => bar.Minimum = value,
+            onChanged: static (bar, _, _) => bar.OnRangeChanged());
 
     /// <summary>
     /// Identifies the <see cref="Maximum"/> property.
@@ -41,9 +49,10 @@ public sealed partial class ScrollBar : Control
     public static readonly DirectProperty<ScrollBar, double> MaximumProperty =
         Property.RegisterDirect<ScrollBar, double>(
             nameof(Maximum),
-            static bar => bar._maximum,
-            static (bar, value) => bar.SetMaximum(value),
-            unsetValue: 100d);
+            static bar => bar.Maximum,
+            static (bar, value) => bar.Maximum = value,
+            unsetValue: 100d,
+            onChanged: static (bar, _, _) => bar.OnRangeChanged());
 
     /// <summary>
     /// Identifies the <see cref="Value"/> property.
@@ -51,8 +60,9 @@ public sealed partial class ScrollBar : Control
     public static readonly DirectProperty<ScrollBar, double> ValueProperty =
         Property.RegisterDirect<ScrollBar, double>(
             nameof(Value),
-            static bar => bar._value,
-            static (bar, value) => bar.SetPosition(value));
+            static bar => bar.Value,
+            static (bar, value) => bar.Value = value,
+            onChanged: static (bar, _, _) => bar.OnValueChanged());
 
     /// <summary>
     /// Identifies the <see cref="ViewportSize"/> property.
@@ -60,8 +70,9 @@ public sealed partial class ScrollBar : Control
     public static readonly DirectProperty<ScrollBar, double> ViewportSizeProperty =
         Property.RegisterDirect<ScrollBar, double>(
             nameof(ViewportSize),
-            static bar => bar._viewportSize,
-            static (bar, value) => bar.SetViewportSize(value));
+            static bar => bar.ViewportSize,
+            static (bar, value) => bar.ViewportSize = value,
+            onChanged: static (bar, _, _) => bar.OnViewportSizeChanged());
 
     /// <summary>
     /// Identifies the <see cref="SmallChange"/> property.
@@ -89,7 +100,13 @@ public sealed partial class ScrollBar : Control
     public static readonly Property<bool> ShowArrowsProperty =
         Property.Register<ScrollBar, bool>(
             nameof(ShowArrows),
-            true);
+            true,
+            onChanged: static (bar, _, _) =>
+            {
+                bar.CancelInteraction();
+                bar.UpdatePartVisibility();
+                bar.RefreshGeometry();
+            });
 
     /// <summary>
     /// Identifies the <see cref="IsWheelScrollingEnabled"/> property.
@@ -106,7 +123,7 @@ public sealed partial class ScrollBar : Control
         Property.Register<ScrollBar, double>(
             nameof(BarThickness),
             16d,
-            onChanged: static (bar, _, _) => bar.InvalidateMeasure(),
+            onChanged: static (bar, _, _) => bar.OnGeometryConfigurationChanged(),
             validate: IsFiniteNonNegative,
             validationMessage: "BarThickness must be a finite non-negative value.");
 
@@ -117,7 +134,7 @@ public sealed partial class ScrollBar : Control
         Property.Register<ScrollBar, double>(
             nameof(MinimumThumbLength),
             16d,
-            onChanged: static (bar, _, _) => bar.InvalidateMeasure(),
+            onChanged: static (bar, _, _) => bar.OnGeometryConfigurationChanged(),
             validate: IsFiniteNonNegative,
             validationMessage: "MinimumThumbLength must be a finite non-negative value.");
 
@@ -168,6 +185,30 @@ public sealed partial class ScrollBar : Control
         SynchronizeOrientationPseudoClass();
         UpdatePartVisibility();
         UpdateArrowStates();
+        Subscribe(BorderThicknessProperty, (_, _) =>
+        {
+            if (IsUpdatingStyles && IsFocused && !_wasFocusedAtLastArrange &&
+                _interaction == InteractionKind.DragThumb)
+            {
+                _isThumbDragRebasePending = true;
+            }
+        });
+        Subscribe(IsEnabledProperty, (_, _) =>
+        {
+            if (!IsEnabled)
+                CancelInteraction();
+        });
+        Subscribe(VisibilityProperty, (_, _) =>
+        {
+            if (Visibility != Visibility.Visible)
+                CancelInteraction();
+        });
+        Subscribe(IsPressedProperty, (_, _) =>
+        {
+            if (!IsPressed)
+                CancelInteraction();
+        });
+        Subscribe(ScreenProperty, (_, _) => CancelInteraction());
     }
 
     /// <summary>
@@ -184,8 +225,12 @@ public sealed partial class ScrollBar : Control
     /// </summary>
     public double Minimum
     {
-        get => GetValue(MinimumProperty);
-        set => SetValue(MinimumProperty, value);
+        get => _minimum;
+        set
+        {
+            EnsureFinite(value, nameof(Minimum));
+            SetField(MinimumProperty, ref _minimum, value);
+        }
     }
 
     /// <summary>
@@ -193,8 +238,12 @@ public sealed partial class ScrollBar : Control
     /// </summary>
     public double Maximum
     {
-        get => GetValue(MaximumProperty);
-        set => SetValue(MaximumProperty, value);
+        get => _maximum;
+        set
+        {
+            EnsureFinite(value, nameof(Maximum));
+            SetField(MaximumProperty, ref _maximum, value);
+        }
     }
 
     /// <summary>
@@ -202,8 +251,8 @@ public sealed partial class ScrollBar : Control
     /// </summary>
     public double Value
     {
-        get => GetValue(ValueProperty);
-        set => SetValue(ValueProperty, value);
+        get => _value;
+        set => SetField(ValueProperty, ref _value, CoercePosition(value));
     }
 
     /// <summary>
@@ -211,8 +260,12 @@ public sealed partial class ScrollBar : Control
     /// </summary>
     public double ViewportSize
     {
-        get => GetValue(ViewportSizeProperty);
-        set => SetValue(ViewportSizeProperty, value);
+        get => _viewportSize;
+        set
+        {
+            EnsureNonNegative(value, nameof(ViewportSize));
+            SetField(ViewportSizeProperty, ref _viewportSize, value);
+        }
     }
 
     /// <summary>
@@ -273,79 +326,31 @@ public sealed partial class ScrollBar : Control
         set => SetValue(MinimumThumbLengthProperty, value);
     }
 
-    private void SetMinimum(double value)
+    private void OnRangeChanged()
     {
-        EnsureFinite(value, nameof(Minimum));
-        SetField(MinimumProperty, ref _minimum, value);
+        CancelInteraction();
+        Value = _value;
+        UpdateArrowStates();
+        RefreshGeometry();
     }
 
-    private void SetMaximum(double value)
+    private void OnValueChanged()
     {
-        EnsureFinite(value, nameof(Maximum));
-        SetField(MaximumProperty, ref _maximum, value);
+        UpdateArrowStates();
+        RefreshGeometry();
     }
 
-    private void SetPosition(double value) =>
-        SetField(ValueProperty, ref _value, CoercePosition(value));
-
-    private void SetViewportSize(double value)
+    private void OnViewportSizeChanged()
     {
-        EnsureNonNegative(value, nameof(ViewportSize));
-        SetField(ViewportSizeProperty, ref _viewportSize, value);
+        CancelInteraction();
+        RefreshGeometry();
     }
 
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
+    private void OnGeometryConfigurationChanged()
     {
-        if (ReferenceEquals(eventArgs.Property, BorderThicknessProperty) &&
-            IsUpdatingStyles && IsFocused && !_wasFocusedAtLastArrange &&
-            _interaction == InteractionKind.DragThumb)
-        {
-            _isThumbDragRebasePending = true;
-        }
-
-        if (ReferenceEquals(eventArgs.Property, OrientationProperty))
-        {
-            CancelInteraction();
-            SynchronizeOrientationPseudoClass();
-            UpdateArrowStates();
-            RefreshGeometry();
-        }
-        else if (ReferenceEquals(eventArgs.Property, MinimumProperty) ||
-                 ReferenceEquals(eventArgs.Property, MaximumProperty))
-        {
-            CancelInteraction();
-            SetPosition(_value);
-            UpdateArrowStates();
-            RefreshGeometry();
-        }
-        else if (ReferenceEquals(eventArgs.Property, ValueProperty))
-        {
-            UpdateArrowStates();
-            RefreshGeometry();
-        }
-        else if (ReferenceEquals(eventArgs.Property, ViewportSizeProperty) ||
-                 ReferenceEquals(eventArgs.Property, MinimumThumbLengthProperty) ||
-                 ReferenceEquals(eventArgs.Property, BarThicknessProperty))
-        {
-            CancelInteraction();
-            RefreshGeometry();
-        }
-        else if (ReferenceEquals(eventArgs.Property, ShowArrowsProperty))
-        {
-            CancelInteraction();
-            UpdatePartVisibility();
-            RefreshGeometry();
-        }
-        else if (ReferenceEquals(eventArgs.Property, IsEnabledProperty) && !IsEnabled ||
-                 ReferenceEquals(eventArgs.Property, VisibilityProperty) && Visibility != Visibility.Visible ||
-                 ReferenceEquals(eventArgs.Property, IsPressedProperty) && !IsPressed ||
-                 ReferenceEquals(eventArgs.Property, ScreenProperty))
-        {
-            CancelInteraction();
-        }
-
-        base.OnPropertyChanged(eventArgs);
+        InvalidateMeasure();
+        CancelInteraction();
+        RefreshGeometry();
     }
 
     private double Range => Math.Max(0, Maximum - Minimum);

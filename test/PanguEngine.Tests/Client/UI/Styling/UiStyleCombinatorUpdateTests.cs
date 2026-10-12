@@ -919,7 +919,8 @@ public sealed class UiStyleCombinatorUpdateTests
         internal GuardedNode() => Classes.Add("guard");
 
         internal static readonly Property<GuardedValue> ValueProperty =
-            Property.Register<GuardedNode, GuardedValue>("Value", new GuardedValue(0));
+            Property.Register<GuardedNode, GuardedValue>("Value", new GuardedValue(0),
+                comparer: EqualityComparer<GuardedValue>.Default);
     }
 
     private sealed class MutationCallbackNode : UiNode

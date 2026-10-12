@@ -26,8 +26,8 @@ public sealed class CheckBox : Control
     /// <summary>Identifies the <see cref="Content"/> property.</summary>
     public static readonly DirectProperty<CheckBox, object?> ContentProperty =
         Property.RegisterDirect<CheckBox, object?>(nameof(Content),
-            static box => box._content,
-            static (box, value) => box.SetContent(value),
+            static box => box.Content,
+            static (box, value) => box.Content = value,
             onChanged: static (box, _, value) => box.SynchronizeContent(value));
 
     /// <summary>Identifies the <see cref="Spacing"/> property.</summary>
@@ -87,12 +87,23 @@ public sealed class CheckBox : Control
     /// <summary>Gets or sets the label as a node, text, another object's text representation, or null.</summary>
     /// <remarks>
     /// A node moves from its previous owner and clears this slot when moved elsewhere.
-    /// Equal assignments do not refresh text, and changes inside an ordinary object are not observed.
+    /// Assignments of the same content instance do not refresh text, and changes inside an ordinary object are not observed.
     /// </remarks>
     public object? Content
     {
-        get => GetValue(ContentProperty);
-        set => SetValue(ContentProperty, value);
+        get => _content;
+        set
+        {
+            if (value is UiNode node)
+            {
+                for (UiNode? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
+                    if (ReferenceEquals(node, ancestor))
+                        throw new ArgumentException("Content cannot be this check box or an ancestor.", nameof(value));
+                if (ReferenceEquals(node, _box) || ReferenceEquals(node, _mark) || ReferenceEquals(node, _contentPanel))
+                    throw new ArgumentException("An internal check box node cannot be assigned as content.", nameof(value));
+            }
+            SetField(ContentProperty, ref _content, value);
+        }
     }
 
     /// <summary>Gets or sets the logical-pixel gap between the box and a label that participates in layout.</summary>
@@ -201,21 +212,6 @@ public sealed class CheckBox : Control
 
     /// <inheritdoc />
     protected override bool IsPressedPseudoClassActive => IsPressed || _spaceKeyDown;
-
-    private void SetContent(object? value)
-    {
-        if (EqualityComparer<object?>.Default.Equals(_content, value))
-            return;
-        if (value is UiNode node)
-        {
-            for (UiNode? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
-                if (ReferenceEquals(node, ancestor))
-                    throw new ArgumentException("Content cannot be this check box or an ancestor.", nameof(value));
-            if (ReferenceEquals(node, _box) || ReferenceEquals(node, _mark) || ReferenceEquals(node, _contentPanel))
-                throw new ArgumentException("An internal check box node cannot be assigned as content.", nameof(value));
-        }
-        SetField(ContentProperty, ref _content, value);
-    }
 
     private void SynchronizeContent(object? value)
     {

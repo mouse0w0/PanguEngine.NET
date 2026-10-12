@@ -42,7 +42,13 @@ public abstract partial class ObservableObject
     /// <remarks>
     /// Assignment preserves an existing binding. One-way bindings do not write back; two-way bindings
     /// observe property change notifications and synchronize the current target value to their source.
+    /// Changes raised during synchronization continue propagating until the properties stop notifying.
+    /// Source writes that produce no notification do not refresh the target.
     /// Ordinary property values are validated before they are committed.
+    /// Ordinary assignments establish a local value even when equal to the fallback value.
+    /// Ordinary assignments replace the local value even when the values compare equal.
+    /// Notifications are raised only when the effective value changes.
+    /// Comparison or notification failures preserve the committed local value.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the property is read-only or the host's write-access policy rejects the operation.
@@ -80,7 +86,7 @@ public abstract partial class ObservableObject
         ArgumentNullException.ThrowIfNull(property);
         property.VerifyOwner(this);
         VerifyMutationAccess();
-        if (EqualityComparer<TValue>.Default.Equals(field, value))
+        if (property.ValuesEqual(field, value))
             return false;
 
         var oldValue = field;
@@ -239,10 +245,8 @@ public abstract partial class ObservableObject
         var oldValue = GetValueCore(property);
         _localValues ??= [];
         _localValues[property] = value;
-        if (EqualityComparer<T>.Default.Equals(oldValue, value))
-            return;
-
-        RaisePropertyChanged(property, oldValue, value);
+        if (!property.ValuesEqual(oldValue, value))
+            RaisePropertyChanged(property, oldValue, value);
     }
 
     private void ClearValueCore<T>(Property<T> property)
@@ -258,7 +262,7 @@ public abstract partial class ObservableObject
 
         var oldValue = storedValue is null ? default! : (T)storedValue;
         var newValue = GetValueCore(property);
-        if (EqualityComparer<T>.Default.Equals(oldValue, newValue))
+        if (property.ValuesEqual(oldValue, newValue))
             return;
 
         RaisePropertyChanged(property, oldValue, newValue);

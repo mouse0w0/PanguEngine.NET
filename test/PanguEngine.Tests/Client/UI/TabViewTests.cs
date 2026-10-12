@@ -221,6 +221,23 @@ public sealed class TabViewTests
     }
 
     [Fact]
+    public void RepeatedSelectionAndClearingReportTheActualPreviousIndex()
+    {
+        var (view, first, second, _) = CreateViewWithThreeItems();
+        var changes = new List<TabSelectionChangedEventArgs>();
+        view.SelectionChanged += (_, change) => changes.Add(change);
+
+        view.Selection.SelectedItem = second;
+        view.Selection.SelectedItem = first;
+        view.Selection.Clear();
+        view.Selection.SelectedItem = second;
+
+        Assert.Equal(new[] { 0, 1, 0, -1 }, changes.Select(change => change.OldIndex));
+        Assert.Equal(new[] { 1, 0, -1, 1 }, changes.Select(change => change.NewIndex));
+        Assert.Same(second, view.Selection.SelectedItem);
+    }
+
+    [Fact]
     public void InsertionAndRemovalOfOtherItemsKeepSelectionWithoutNotification()
     {
         var (view, a, b, _) = CreateViewWithThreeItems();

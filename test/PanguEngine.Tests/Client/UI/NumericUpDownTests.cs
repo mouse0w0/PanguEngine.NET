@@ -44,6 +44,39 @@ public sealed class NumericUpDownTests
         Assert.Equal(-20, node.Value);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void BoundaryNotificationReentrancyPublishesEachCommittedValueChangeOnce(bool changeMinimum)
+    {
+        var node = new NumericUpDown<int> { Value = 10 };
+        var changes = new List<(int OldValue, int NewValue)>();
+        using var valueSubscription = node.Subscribe(NumericUpDown<int>.ValueProperty,
+            (_, change) => changes.Add((change.OldValue, change.NewValue)));
+        var dependentProperty = changeMinimum
+            ? NumericUpDown<int>.MaximumProperty
+            : NumericUpDown<int>.MinimumProperty;
+        using var boundarySubscription = node.Subscribe(dependentProperty, (_, change) =>
+        {
+            if (change.NewValue != (changeMinimum ? 120 : -20))
+                return;
+            if (changeMinimum)
+                node.Maximum = 150;
+            else
+                node.Minimum = -50;
+            node.Value = changeMinimum ? 140 : -40;
+        });
+
+        if (changeMinimum)
+            node.Minimum = 120;
+        else
+            node.Maximum = -20;
+
+        Assert.Equal(changeMinimum ? new[] { (10, 120), (120, 140) } : new[] { (10, -20), (-20, -40) }, changes);
+        Assert.Equal(changeMinimum ? 140 : -40, node.Value);
+        Assert.InRange(node.Value, node.Minimum, node.Maximum);
+    }
+
     [Fact]
     public void InvalidNumericAssignmentsAreRejected()
     {

@@ -49,6 +49,62 @@ public sealed class DirectPropertyTests
         Assert.Equal(8, host.Value);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SetFieldUsesReferenceEqualityForRecordsUnlessValueEqualityIsConfigured(bool useValueComparer)
+    {
+        var original = new EqualValue(7);
+        var host = new ValueHost<EqualValue>(original);
+        var changes = new List<PropertyChangedEventArgs<EqualValue>>();
+        var property = useValueComparer ? ValueHost<EqualValue>.ValueComparedProperty : ValueHost<EqualValue>.ValueProperty;
+        using var subscription = host.Subscribe(property, (_, change) => changes.Add(change));
+        var replacement = new EqualValue(7);
+
+        Assert.Equal(!useValueComparer, host.UpdateValue(replacement, useValueComparer));
+        Assert.False(host.UpdateValue(replacement, useValueComparer));
+        Assert.Same(useValueComparer ? original : replacement, host.Value);
+        if (useValueComparer)
+            Assert.Empty(changes);
+        else
+        {
+            var change = Assert.Single(changes);
+            Assert.Same(original, change.OldValue);
+            Assert.Same(replacement, change.NewValue);
+        }
+    }
+
+    [Fact]
+    public void SetFieldUsesContentEqualityForStrings()
+    {
+        var original = new string('a', 1);
+        var host = new ValueHost<string>(original);
+        var changes = 0;
+        using var subscription = host.Subscribe(ValueHost<string>.ValueProperty, (_, _) => changes++);
+
+        Assert.False(host.UpdateValue(new string('a', 1)));
+        Assert.Same(original, host.Value);
+        Assert.Equal(0, changes);
+        Assert.True(host.UpdateValue("b"));
+        Assert.Equal(1, changes);
+    }
+
+    [Fact]
+    public void SetFieldUsesValueEqualityForNullableValueTypes()
+    {
+        var host = new ValueHost<int?>(7);
+        var changes = new List<(int? OldValue, int? NewValue)>();
+        using var subscription = host.Subscribe(ValueHost<int?>.ValueProperty,
+            (_, change) => changes.Add((change.OldValue, change.NewValue)));
+
+        Assert.False(host.UpdateValue(7));
+        Assert.True(host.UpdateValue(null));
+        Assert.False(host.UpdateValue(null));
+        Assert.True(host.UpdateValue(7));
+
+        Assert.Equal(new (int?, int?)[] { (7, null), (null, 7) }, changes);
+    }
+
     [Fact]
     public void ClearCallsSetterEvenWithoutALocalValue()
     {
@@ -140,10 +196,11 @@ public sealed class DirectPropertyTests
                 });
 
         internal static readonly DirectProperty<Host, bool> ActiveProperty =
-            Property.RegisterDirect<Host, bool>("Active", o => o._active);
+            Property.RegisterDirect<Host, bool>(nameof(Active), o => o.Active);
 
         private int _value = 7;
         private bool _active;
+        internal bool Active => _active;
         internal List<string> Notifications { get; } = [];
         internal int SetterCalls { get; private set; }
         internal bool RejectWrites { get; init; }
@@ -172,6 +229,23 @@ public sealed class DirectPropertyTests
                 throw new InvalidOperationException("write rejected");
         }
     }
+
+    private sealed class ValueHost<T>(T value) : ObservableObject
+    {
+        internal static readonly DirectProperty<ValueHost<T>, T> ValueProperty =
+            Property.RegisterDirect<ValueHost<T>, T>(nameof(Value), host => host.Value);
+        internal static readonly DirectProperty<ValueHost<T>, T> ValueComparedProperty =
+            Property.RegisterDirect<ValueHost<T>, T>("ValueCompared", host => host.Value,
+                comparer: EqualityComparer<T>.Default);
+
+        private T _value = value;
+        internal T Value => _value;
+
+        internal bool UpdateValue(T next, bool useValueComparer = false) =>
+            SetField(useValueComparer ? ValueComparedProperty : ValueProperty, ref _value, next);
+    }
+
+    private sealed record EqualValue(int Number);
 
     private sealed class ForeignHost : ObservableObject
     {

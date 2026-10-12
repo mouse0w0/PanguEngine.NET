@@ -18,16 +18,14 @@ internal abstract class Binding<TSource, TTarget>(
 {
     private readonly WeakReference<ObservableObject> _target = new(target);
     private bool _isDetached;
-    private bool _isWritingSource;
-    private bool _isWritingTarget;
 
     public void Initialize(TTarget initialValue)
     {
-        if (_target.TryGetTarget(out var targetNode))
+        if (_target.TryGetTarget(out var target))
         {
             if (convertBack is not null)
-                targetNode.PropertyChanged += OnTargetPropertyChanged;
-            SetTargetValue(targetNode, initialValue);
+                target.PropertyChanged += OnTargetPropertyChanged;
+            target.SetValueFromBinding(targetProperty, initialValue, this);
         }
     }
 
@@ -37,71 +35,39 @@ internal abstract class Binding<TSource, TTarget>(
             return;
 
         DetachSource();
-        if (convertBack is not null && _target.TryGetTarget(out var targetNode))
-            targetNode.PropertyChanged -= OnTargetPropertyChanged;
+        if (convertBack is not null && _target.TryGetTarget(out var target))
+            target.PropertyChanged -= OnTargetPropertyChanged;
         _isDetached = true;
     }
 
     protected void UpdateTarget()
     {
-        if (_isWritingSource)
-            return;
-        UpdateTargetCore();
-    }
-
-    private void UpdateTargetCore()
-    {
         if (_isDetached)
             return;
-        if (!_target.TryGetTarget(out var targetNode))
+        if (!_target.TryGetTarget(out var target))
         {
             Detach();
             return;
         }
 
-        if (!targetNode.IsCurrentBinding(targetProperty, this))
+        if (!target.IsCurrentBinding(targetProperty, this))
             return;
 
-        SetTargetValue(targetNode, converter(ReadSource()));
-    }
-
-    private void SetTargetValue(ObservableObject targetNode, TTarget value)
-    {
-        var wasWritingTarget = _isWritingTarget;
-        _isWritingTarget = true;
-        try
-        {
-            targetNode.SetValueFromBinding(targetProperty, value, this);
-        }
-        finally
-        {
-            _isWritingTarget = wasWritingTarget;
-        }
+        target.SetValueFromBinding(targetProperty, converter(ReadSource()), this);
     }
 
     private void OnTargetPropertyChanged(object? sender, PropertyChangedEventArgs eventArgs)
     {
-        if (_isDetached || _isWritingSource || _isWritingTarget || !ReferenceEquals(eventArgs.Property, targetProperty))
+        if (_isDetached || !ReferenceEquals(eventArgs.Property, targetProperty))
             return;
-        if (!_target.TryGetTarget(out var targetNode) || !targetNode.IsCurrentBinding(targetProperty, this))
+        if (!_target.TryGetTarget(out var target) || !target.IsCurrentBinding(targetProperty, this))
             return;
 
-        _isWritingSource = true;
-        try
-        {
-            if (!convertBack!(targetNode.GetValue(targetProperty), out var sourceValue))
-                return;
-            if (EqualityComparer<TSource>.Default.Equals(ReadSource(), sourceValue))
-                return;
-            if (_isDetached || !targetNode.IsCurrentBinding(targetProperty, this))
-                return;
-            WriteSource(sourceValue);
-            UpdateTargetCore();
-        }
-        finally
-        {
-            _isWritingSource = false;
-        }
+        if (!convertBack!(target.GetValue(targetProperty), out var sourceValue))
+            return;
+        if (_isDetached || !target.IsCurrentBinding(targetProperty, this))
+            return;
+        WriteSource(sourceValue);
     }
 
     protected abstract TSource ReadSource();

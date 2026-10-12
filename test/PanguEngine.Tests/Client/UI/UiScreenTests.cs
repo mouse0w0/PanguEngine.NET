@@ -1452,13 +1452,15 @@ public sealed class UiScreenTests
     private sealed class ThrowingStyleNode : UiNode
     {
         internal static readonly Property<GuardedValue> ValueProperty =
-            Property.Register<ThrowingStyleNode, GuardedValue>("Value", new GuardedValue(0));
+            Property.Register<ThrowingStyleNode, GuardedValue>("Value", new GuardedValue(0),
+                comparer: EqualityComparer<GuardedValue>.Default);
     }
 
     private sealed class FailOnceStyleNode : UiNode
     {
         internal static readonly Property<GuardedValue> ValueProperty =
-            Property.Register<FailOnceStyleNode, GuardedValue>("Value", new GuardedValue(0));
+            Property.Register<FailOnceStyleNode, GuardedValue>("Value", new GuardedValue(0),
+                comparer: EqualityComparer<GuardedValue>.Default);
 
         internal double Value => GetValue(ValueProperty).Number;
     }

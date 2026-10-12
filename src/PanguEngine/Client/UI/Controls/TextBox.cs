@@ -22,7 +22,11 @@ public sealed class TextBox : Control
         Property.Register<TextBox, string>(
             nameof(Text),
             string.Empty,
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            onChanged: static (node, oldValue, newValue) =>
+            {
+                node.InvalidateMeasure();
+                node.OnTextChanged(oldValue, newValue);
+            },
             validate: static value => value is not null,
             validationMessage: "Text cannot be null.");
 
@@ -97,7 +101,8 @@ public sealed class TextBox : Control
     public static readonly Property<bool> IsReadOnlyProperty =
         Property.Register<TextBox, bool>(
             nameof(IsReadOnly),
-            false);
+            false,
+            onChanged: static (node, _, _) => node.ResetCaretPhase());
 
     static TextBox()
     {
@@ -462,27 +467,18 @@ public sealed class TextBox : Control
             CommitChange(change);
     }
 
-    /// <inheritdoc />
-    protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
+    private void OnTextChanged(string oldValue, string newValue)
     {
-        if (ReferenceEquals(eventArgs.Property, TextProperty))
+        if (_pendingChange is { } pending &&
+            string.Equals(pending.ExpectedText, oldValue, StringComparison.Ordinal) &&
+            string.Equals(pending.Text, newValue, StringComparison.Ordinal))
         {
-            var change = (PropertyChangedEventArgs<string>)eventArgs;
-            if (_pendingChange is { } pending &&
-                string.Equals(pending.ExpectedText, change.OldValue, StringComparison.Ordinal) &&
-                string.Equals(pending.Text, change.NewValue, StringComparison.Ordinal))
-            {
-                _editingState.Apply(pending);
-            }
-            else
-                _editingState.SynchronizeExternalText(change.NewValue);
-
-            ResetCaretPhase();
+            _editingState.Apply(pending);
         }
-        else if (ReferenceEquals(eventArgs.Property, IsReadOnlyProperty))
-            ResetCaretPhase();
+        else
+            _editingState.SynchronizeExternalText(newValue);
 
-        base.OnPropertyChanged(eventArgs);
+        ResetCaretPhase();
     }
 
     /// <inheritdoc />

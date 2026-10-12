@@ -376,7 +376,7 @@ public sealed class ScrollViewTests
         source.Offset = new Point(0, 9999);
 
         Assert.Equal(400, view.Offset.Y);
-        Assert.Equal(9999, source.Offset.Y);
+        Assert.Equal(400, source.Offset.Y);
 
         view.ScrollTo(0, 100);
 

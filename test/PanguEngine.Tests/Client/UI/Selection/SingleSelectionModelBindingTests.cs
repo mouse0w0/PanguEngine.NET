@@ -26,7 +26,7 @@ public sealed class SingleSelectionModelBindingTests
     }
 
     [Fact]
-    public void TwoWayInitializationAndSourceUpdatesDoNotWriteNormalizedIndexBack()
+    public void TwoWaySourceUpdatesWriteChangedNormalizedIndexBack()
     {
         var source = new Host { Index = 9 };
         var model = new SingleSelectionModel<string>(new ObservableList<string>(["a", "b"]).AsReadOnly());
@@ -38,7 +38,7 @@ public sealed class SingleSelectionModelBindingTests
         Assert.Equal("b", model.SelectedItem);
         source.Index = 8;
         Assert.Equal(-1, model.SelectedIndex);
-        Assert.Equal(8, source.Index);
+        Assert.Equal(-1, source.Index);
     }
 
     [Fact]
@@ -234,16 +234,14 @@ public sealed class SingleSelectionModelBindingTests
     {
         internal static readonly DirectProperty<NormalizingHost, int> IndexProperty =
             Property.RegisterDirect<NormalizingHost, int>(nameof(Index), owner => owner.Index,
-                (owner, value) => owner.SetIndex(value));
+                (owner, value) => owner.Index = value);
 
-        internal int Index { get; private set; } = -1;
+        private int _index = -1;
 
-        private void SetIndex(int value)
+        internal int Index
         {
-            var old = Index;
-            Index = Math.Min(value, 0);
-            if (old != Index)
-                RaisePropertyChanged(IndexProperty, old, Index);
+            get => _index;
+            set => SetField(IndexProperty, ref _index, Math.Min(value, 0));
         }
     }
 }
