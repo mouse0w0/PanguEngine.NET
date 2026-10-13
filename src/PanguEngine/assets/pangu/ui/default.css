@@ -186,6 +186,75 @@ CheckBox:disabled Text.checkbox-text,
     color: #8b94a0;
 }
 
+RadioButton {
+    padding: 4px;
+    background-color: transparent;
+    border-color: transparent;
+    border-thickness: 1px;
+    spacing: 8px;
+}
+
+RadioButton > .radio-button-indicator {
+    width: 18px;
+    height: 18px;
+}
+
+RadioButton > .radio-button-indicator > .radio-button-ring {
+    fill: #1f2329;
+    stroke: #5c6774;
+    stroke-width: 1px;
+}
+
+RadioButton > .radio-button-indicator > .radio-button-dot {
+    width: 8px;
+    height: 8px;
+    fill: none;
+}
+
+RadioButton > .radio-button-content > .radio-button-text {
+    font-size: 16px;
+    color: #f2f4f7;
+}
+
+RadioButton:hover > .radio-button-indicator > .radio-button-ring {
+    fill: #30363e;
+    stroke: #8b94a0;
+}
+
+RadioButton:pressed > .radio-button-indicator > .radio-button-ring {
+    fill: #252a30;
+    stroke: #54a9ff;
+}
+
+RadioButton:checked > .radio-button-indicator > .radio-button-dot {
+    fill: #54a9ff;
+}
+
+RadioButton:focus {
+    border-color: #54a9ff;
+}
+
+RadioButton:disabled,
+:disabled RadioButton {
+    border-color: transparent;
+}
+
+RadioButton:disabled > .radio-button-indicator > .radio-button-ring,
+:disabled RadioButton > .radio-button-indicator > .radio-button-ring {
+    fill: #1b1e23;
+    stroke: #343a41;
+}
+
+RadioButton:disabled:checked > .radio-button-indicator > .radio-button-dot,
+:disabled RadioButton:checked > .radio-button-indicator > .radio-button-dot {
+    fill: #6e7884;
+}
+
+RadioButton:disabled > .radio-button-content > .radio-button-text,
+:disabled RadioButton > .radio-button-content > .radio-button-text {
+    color: #8b94a0;
+}
+
 TextBox {
     min-width: 160px;
     padding: 6px 8px;
