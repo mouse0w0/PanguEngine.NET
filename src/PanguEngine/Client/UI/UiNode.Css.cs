@@ -7,12 +7,12 @@ public abstract partial class UiNode
     static UiNode()
     {
         UiCssRegistry.RegisterElement<UiNode>("UiNode");
-        UiCssRegistry.RegisterProperty<UiNode, double>("width", WidthProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<UiNode, double>("height", HeightProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("width", WidthProperty, UiCssValueConverters.ParseDimension);
+        UiCssRegistry.RegisterProperty<UiNode, double>("height", HeightProperty, UiCssValueConverters.ParseDimension);
         UiCssRegistry.RegisterProperty<UiNode, double>("min-width", MinWidthProperty, UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<UiNode, double>("min-height", MinHeightProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<UiNode, double>("max-width", MaxWidthProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<UiNode, double>("max-height", MaxHeightProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("max-width", MaxWidthProperty, UiCssValueConverters.ParseMaxDimension);
+        UiCssRegistry.RegisterProperty<UiNode, double>("max-height", MaxHeightProperty, UiCssValueConverters.ParseMaxDimension);
         UiCssRegistry.RegisterProperty<UiNode, Thickness>("margin", MarginProperty, UiCssValueConverters.ParseThickness);
         UiCssRegistry.RegisterProperty<UiNode>("margin-top", value =>
             new[] { UiStyleSetter.CreateEdge(MarginProperty, UiStyleEdge.Top, UiCssValueConverters.ParseLength(value)) });

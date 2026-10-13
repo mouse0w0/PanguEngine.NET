@@ -8,8 +8,8 @@ public abstract partial class Shape
     static Shape()
     {
         UiCssRegistry.RegisterElement<Shape>("Shape");
-        UiCssRegistry.RegisterProperty<Shape, Brush?>("fill", FillProperty, ParseShapeBrush);
-        UiCssRegistry.RegisterProperty<Shape, Brush?>("stroke", StrokeProperty, ParseShapeBrush);
+        UiCssRegistry.RegisterProperty<Shape, Brush?>("fill", FillProperty, UiCssValueConverters.ParseBrush);
+        UiCssRegistry.RegisterProperty<Shape, Brush?>("stroke", StrokeProperty, UiCssValueConverters.ParseBrush);
         UiCssRegistry.RegisterProperty<Shape, double>(
             "stroke-width",
             StrokeThicknessProperty,
@@ -27,11 +27,6 @@ public abstract partial class Shape
             StrokeMiterLimitProperty,
             UiCssValueConverters.ParseNumber);
     }
-
-    private static Brush? ParseShapeBrush(string value) =>
-        value.Equals("none", StringComparison.OrdinalIgnoreCase)
-            ? null
-            : UiCssValueConverters.ParseBrush(value);
 
     private static StrokeLineCap ParseStrokeLineCap(string value) =>
         value.ToLowerInvariant() switch

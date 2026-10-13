@@ -81,6 +81,24 @@ public static class UiCssValueConverters
     /// <exception cref="FormatException">Thrown when the value is not a finite decimal number.</exception>
     public static double ParseLength(string value) => ParseFinite(StripOptionalPx(value), value);
 
+    /// <summary>Converts a trimmed CSS length or auto into a requested dimension.</summary>
+    /// <param name="value">The trimmed CSS value, either auto or a length with an optional px suffix.</param>
+    /// <returns>NaN for automatic sizing, or the finite logical length.</returns>
+    /// <exception cref="FormatException">Thrown when the value is neither auto nor a finite decimal length.</exception>
+    public static double ParseDimension(string value) =>
+        value.Equals("auto", StringComparison.OrdinalIgnoreCase)
+            ? double.NaN
+            : ParseLength(value);
+
+    /// <summary>Converts a trimmed CSS length or none into a maximum dimension.</summary>
+    /// <param name="value">The trimmed CSS value, either none or a length with an optional px suffix.</param>
+    /// <returns>Positive infinity for no upper limit, or the finite logical length.</returns>
+    /// <exception cref="FormatException">Thrown when the value is neither none nor a finite decimal length.</exception>
+    public static double ParseMaxDimension(string value) =>
+        value.Equals("none", StringComparison.OrdinalIgnoreCase)
+            ? double.PositiveInfinity
+            : ParseLength(value);
+
     /// <summary>Converts a trimmed CSS value into a finite unitless number.</summary>
     /// <param name="value">The trimmed CSS value.</param>
     /// <returns>The finite number.</returns>
@@ -160,11 +178,14 @@ public static class UiCssValueConverters
         return new Color(r, g, b, a);
     }
 
-    /// <summary>Converts a trimmed CSS color value into a solid color brush.</summary>
-    /// <param name="value">The trimmed CSS color value.</param>
-    /// <returns>A solid color brush with the parsed color.</returns>
-    /// <exception cref="FormatException">Thrown when the value is not a supported color.</exception>
-    public static Brush ParseBrush(string value) => new SolidColorBrush(ParseColor(value));
+    /// <summary>Converts a trimmed CSS color or none into a brush.</summary>
+    /// <param name="value">The trimmed CSS value, either none, transparent, or a supported hex color.</param>
+    /// <returns>Null for none, or a solid color brush with the parsed color.</returns>
+    /// <exception cref="FormatException">Thrown when the value is neither none nor a supported color.</exception>
+    public static Brush? ParseBrush(string value) =>
+        value.Equals("none", StringComparison.OrdinalIgnoreCase)
+            ? null
+            : new SolidColorBrush(ParseColor(value));
 
     /// <summary>Converts a trimmed CSS value into a boolean.</summary>
     /// <param name="value">The trimmed CSS value, either true or false.</param>
