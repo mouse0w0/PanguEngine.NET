@@ -14,9 +14,6 @@ namespace PanguEngine.Client.UI.Controls;
 /// </remarks>
 public sealed class TabItem : Control
 {
-    private static readonly UiPseudoClass SelectedPseudoClass = UiPseudoClass.Get("selected");
-    private static readonly UiPseudoClass DraggingPseudoClass = UiPseudoClass.Get("dragging");
-
     private const double HeaderGap = 4;
 
     /// <summary>Identifies the <see cref="IsClosable"/> property.</summary>
@@ -264,7 +261,7 @@ public sealed class TabItem : Control
         _closeButton = null;
     }
 
-    private void RefreshSelectedPseudoClass() => SetPseudoClass(SelectedPseudoClass, IsSelected);
+    private void RefreshSelectedPseudoClass() => SetPseudoClass(UiPseudoClass.Selected, IsSelected);
 
-    private void RefreshDraggingPseudoClass() => SetPseudoClass(DraggingPseudoClass, IsDragging);
+    private void RefreshDraggingPseudoClass() => SetPseudoClass(UiPseudoClass.Dragging, IsDragging);
 }

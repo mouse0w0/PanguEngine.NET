@@ -35,8 +35,8 @@ public sealed class CheckBoxTests
         box.IsChecked = true;
         box.IsChecked = null;
         Assert.Equal(0, clicks);
-        Assert.True(box.HasPseudoClass(UiPseudoClass.Get("indeterminate")));
-        Assert.False(box.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.True(box.HasPseudoClass(UiPseudoClass.Indeterminate));
+        Assert.False(box.HasPseudoClass(UiPseudoClass.Checked));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class CheckBoxTests
         using var subscription = box.Subscribe(CheckBox.IsCheckedProperty, (_, args) =>
         {
             Assert.Equal(true, args.NewValue);
-            Assert.True(box.HasPseudoClass(UiPseudoClass.Get("checked")));
+            Assert.True(box.HasPseudoClass(UiPseudoClass.Checked));
             calls.Add("state");
         });
         box.Click += (_, _) => calls.Add("click");

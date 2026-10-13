@@ -11,9 +11,6 @@ namespace PanguEngine.Client.UI.Controls;
 /// </summary>
 public sealed class CheckBox : Control
 {
-    private static readonly UiPseudoClass CheckedPseudoClass = UiPseudoClass.Get("checked");
-    private static readonly UiPseudoClass IndeterminatePseudoClass = UiPseudoClass.Get("indeterminate");
-
     /// <summary>Identifies the <see cref="IsChecked"/> property.</summary>
     public static readonly Property<bool?> IsCheckedProperty =
         Property.Register<CheckBox, bool?>(nameof(IsChecked), false,
@@ -260,8 +257,8 @@ public sealed class CheckBox : Control
     private void SynchronizeCheckState()
     {
         var state = IsChecked;
-        SetPseudoClass(CheckedPseudoClass, state == true);
-        SetPseudoClass(IndeterminatePseudoClass, state is null);
+        SetPseudoClass(UiPseudoClass.Checked, state == true);
+        SetPseudoClass(UiPseudoClass.Indeterminate, state is null);
     }
 
     private double GetLayoutSpacing()

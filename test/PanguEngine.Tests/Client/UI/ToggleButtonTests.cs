@@ -23,7 +23,7 @@ public sealed class ToggleButtonTests
         Assert.False(ToggleButton.IsCheckedProperty.IsReadOnly);
         Assert.False(button.IsChecked);
         Assert.True(button.Focusable);
-        Assert.False(button.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.False(button.HasPseudoClass(UiPseudoClass.Checked));
         Assert.Equal("Button", BackgroundSelector(button));
 
         var screen = new UiScreen(button);
@@ -42,7 +42,7 @@ public sealed class ToggleButtonTests
         button.Click += (_, _) => clicks++;
         using var subscription = button.Subscribe(ToggleButton.IsCheckedProperty, (_, args) =>
         {
-            Assert.Equal(args.NewValue, button.HasPseudoClass(UiPseudoClass.Get("checked")));
+            Assert.Equal(args.NewValue, button.HasPseudoClass(UiPseudoClass.Checked));
             changes.Add(args.NewValue);
         });
 
@@ -134,7 +134,7 @@ public sealed class ToggleButtonTests
             Click(manager);
 
         Assert.True(button.IsChecked);
-        Assert.True(button.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.True(button.HasPseudoClass(UiPseudoClass.Checked));
         Assert.False(button.HasPseudoClass(UiPseudoClass.Pressed));
         Assert.Equal(0, clicks);
         manager.Close();
@@ -180,7 +180,7 @@ public sealed class ToggleButtonTests
         model.Value = false;
 
         Assert.False(button.IsChecked);
-        Assert.False(button.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.False(button.HasPseudoClass(UiPseudoClass.Checked));
         manager.Close();
     }
 
@@ -216,7 +216,7 @@ public sealed class ToggleButtonTests
 
         Assert.Equal(new[] { true }, observed);
         Assert.False(model.Value);
-        Assert.True(button.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.True(button.HasPseudoClass(UiPseudoClass.Checked));
         Assert.True(button.IsBound(ToggleButton.IsCheckedProperty));
         manager.Close();
     }
@@ -234,7 +234,7 @@ public sealed class ToggleButtonTests
 
         Assert.Same(error, actual);
         Assert.True(button.IsChecked);
-        Assert.True(button.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.True(button.HasPseudoClass(UiPseudoClass.Checked));
         Assert.Equal(0, clicks);
         manager.Close();
     }

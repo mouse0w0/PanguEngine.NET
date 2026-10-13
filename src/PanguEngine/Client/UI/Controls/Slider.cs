@@ -9,10 +9,6 @@ namespace PanguEngine.Client.UI.Controls;
 /// <summary>Defines shared orientation, dimensions and tick display settings for sliders.</summary>
 public abstract class Slider : Control
 {
-    private static readonly UiPseudoClass HorizontalPseudoClass = UiPseudoClass.Get("horizontal");
-    private static readonly UiPseudoClass VerticalPseudoClass = UiPseudoClass.Get("vertical");
-    private static readonly UiPseudoClass EmptyPseudoClass = UiPseudoClass.Get("empty");
-
     /// <summary>Identifies the slider axis.</summary>
     public static readonly Property<Orientation> OrientationProperty = Property.Register<Slider, Orientation>(
         nameof(Orientation), onChanged: static (slider, _, _) => slider.OnGeometryConfigurationChanged());
@@ -82,9 +78,9 @@ public abstract class Slider : Control
 
     protected void SynchronizePseudoClasses(bool hasValue)
     {
-        SetPseudoClass(HorizontalPseudoClass, Orientation == Orientation.Horizontal);
-        SetPseudoClass(VerticalPseudoClass, Orientation == Orientation.Vertical);
-        SetPseudoClass(EmptyPseudoClass, !hasValue);
+        SetPseudoClass(UiPseudoClass.Horizontal, Orientation == Orientation.Horizontal);
+        SetPseudoClass(UiPseudoClass.Vertical, Orientation == Orientation.Vertical);
+        SetPseudoClass(UiPseudoClass.Empty, !hasValue);
     }
 
     private static Property<double> RegisterLength(string name, double defaultValue) => Property.Register<Slider, double>(

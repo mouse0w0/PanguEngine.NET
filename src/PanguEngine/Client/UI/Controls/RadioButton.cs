@@ -9,8 +9,6 @@ namespace PanguEngine.Client.UI.Controls;
 /// <summary>Provides content, presentation, and input behavior shared by strongly typed radio buttons.</summary>
 public abstract class RadioButton : Control
 {
-    private static readonly UiPseudoClass CheckedPseudoClass = UiPseudoClass.Get("checked");
-
     /// <summary>Identifies the <see cref="Content"/> property.</summary>
     public static readonly DirectProperty<RadioButton, object?> ContentProperty =
         Property.RegisterDirect<RadioButton, object?>(nameof(Content),
@@ -236,7 +234,7 @@ public abstract class RadioButton : Control
 
     internal void VerifyGroupAccess() => VerifyMutationAccess();
     internal void CommitChecked(bool value) => _isChecked = value;
-    internal void RefreshCheckedPseudoClass() => SetPseudoClass(CheckedPseudoClass, IsChecked);
+    internal void RefreshCheckedPseudoClass() => SetPseudoClass(UiPseudoClass.Checked, IsChecked);
     internal void PublishCheckedChanged(bool oldValue, bool newValue) =>
         RaisePropertyChanged(IsCheckedProperty, oldValue, newValue);
 

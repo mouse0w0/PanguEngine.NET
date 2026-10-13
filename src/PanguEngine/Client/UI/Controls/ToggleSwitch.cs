@@ -10,8 +10,6 @@ namespace PanguEngine.Client.UI.Controls;
 /// </summary>
 public sealed class ToggleSwitch : Control
 {
-    private static readonly UiPseudoClass CheckedPseudoClass = UiPseudoClass.Get("checked");
-
     /// <summary>
     /// Identifies the <see cref="IsOn"/> property.
     /// </summary>
@@ -22,7 +20,7 @@ public sealed class ToggleSwitch : Control
             static (control, value) => control.IsOn = value,
             onChanged: static (control, _, _) =>
             {
-                control.SetPseudoClass(CheckedPseudoClass, control.IsOn);
+                control.SetPseudoClass(UiPseudoClass.Checked, control.IsOn);
                 control.InvalidateArrange();
             });
 

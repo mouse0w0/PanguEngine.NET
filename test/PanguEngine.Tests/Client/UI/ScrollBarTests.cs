@@ -9,9 +9,6 @@ namespace PanguEngine.Tests.Client.UI;
 
 public sealed class ScrollBarTests
 {
-    private static readonly UiPseudoClass HorizontalPseudoClass = UiPseudoClass.Get("horizontal");
-    private static readonly UiPseudoClass VerticalPseudoClass = UiPseudoClass.Get("vertical");
-
     [Fact]
     public void PublicSurfaceAndDefaultsMatchTheScrollBarContract()
     {
@@ -72,13 +69,13 @@ public sealed class ScrollBarTests
             .ToArray();
 
         Assert.Equal(expected, actual);
-        Assert.True(bar.HasPseudoClass(VerticalPseudoClass));
-        Assert.False(bar.HasPseudoClass(HorizontalPseudoClass));
+        Assert.True(bar.HasPseudoClass(UiPseudoClass.Vertical));
+        Assert.False(bar.HasPseudoClass(UiPseudoClass.Horizontal));
 
         bar.Orientation = Orientation.Horizontal;
 
-        Assert.True(bar.HasPseudoClass(HorizontalPseudoClass));
-        Assert.False(bar.HasPseudoClass(VerticalPseudoClass));
+        Assert.True(bar.HasPseudoClass(UiPseudoClass.Horizontal));
+        Assert.False(bar.HasPseudoClass(UiPseudoClass.Vertical));
         Assert.Equal(expected, bar.Children
             .Select(child => child.Classes.Single(name => name.StartsWith("scrollbar-", StringComparison.Ordinal)))
             .ToArray());
@@ -553,14 +550,14 @@ public sealed class ScrollBarTests
         var before = bar.Children
             .Select(child => child.Classes.ToArray())
             .ToArray();
-        Assert.True(bar.HasPseudoClass(VerticalPseudoClass));
+        Assert.True(bar.HasPseudoClass(UiPseudoClass.Vertical));
 
         screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
         manager.UpdateFrame(new Size(100, 200), 0);
 
         Assert.Equal(Orientation.Horizontal, bar.Orientation);
-        Assert.True(bar.HasPseudoClass(HorizontalPseudoClass));
-        Assert.False(bar.HasPseudoClass(VerticalPseudoClass));
+        Assert.True(bar.HasPseudoClass(UiPseudoClass.Horizontal));
+        Assert.False(bar.HasPseudoClass(UiPseudoClass.Vertical));
         Assert.Equal(before, bar.Children.Select(child => child.Classes.ToArray()).ToArray());
         manager.Close();
     }

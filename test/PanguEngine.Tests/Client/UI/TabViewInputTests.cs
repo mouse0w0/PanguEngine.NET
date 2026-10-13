@@ -7,8 +7,6 @@ namespace PanguEngine.Tests.Client.UI;
 
 public sealed class TabViewInputTests
 {
-    private static readonly UiPseudoClass DraggingPseudoClass = UiPseudoClass.Get("dragging");
-
     [Fact]
     public void ArrowKeysMoveFocusWithoutChangingSelection()
     {
@@ -240,11 +238,11 @@ public sealed class TabViewInputTests
         manager.ProcessPointerMoved(end);
         manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(items[0].IsDragging);
-        Assert.True(items[0].HasPseudoClass(DraggingPseudoClass));
+        Assert.True(items[0].HasPseudoClass(UiPseudoClass.Dragging));
         manager.ProcessPointerReleased(end, MouseButton.Left, KeyModifiers.None);
 
         Assert.False(items[0].IsDragging);
-        Assert.False(items[0].HasPseudoClass(DraggingPseudoClass));
+        Assert.False(items[0].HasPseudoClass(UiPseudoClass.Dragging));
         Assert.Same(items[1], view.Items[0]);
         Assert.Same(items[2], view.Items[1]);
         Assert.Same(items[0], view.Items[2]);

@@ -8,8 +8,6 @@ namespace PanguEngine.Client.UI.Controls;
 /// </summary>
 public sealed class ToggleButton : Button
 {
-    private static readonly UiPseudoClass CheckedPseudoClass = UiPseudoClass.Get("checked");
-
     /// <summary>
     /// Identifies the <see cref="IsChecked"/> property.
     /// </summary>
@@ -17,7 +15,7 @@ public sealed class ToggleButton : Button
         Property.Register<ToggleButton, bool>(
             nameof(IsChecked),
             false,
-            onChanged: static (node, _, value) => node.SetPseudoClass(CheckedPseudoClass, value));
+            onChanged: static (node, _, value) => node.SetPseudoClass(UiPseudoClass.Checked, value));
 
     static ToggleButton()
     {

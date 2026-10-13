@@ -23,7 +23,7 @@ public sealed class ToggleSwitchTests
 
         Assert.Equal([true, false], changes);
         Assert.False(control.IsOn);
-        Assert.False(control.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.False(control.HasPseudoClass(UiPseudoClass.Checked));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class ToggleSwitchTests
         using var subscription = control.Subscribe(ToggleSwitch.IsOnProperty, (_, args) =>
         {
             Assert.Equal(args.NewValue, control.IsOn);
-            Assert.True(control.HasPseudoClass(UiPseudoClass.Get("checked")));
+            Assert.True(control.HasPseudoClass(UiPseudoClass.Checked));
             throw error;
         });
 
@@ -42,7 +42,7 @@ public sealed class ToggleSwitchTests
 
         Assert.Same(error, actual);
         Assert.True(control.IsOn);
-        Assert.True(control.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.True(control.HasPseudoClass(UiPseudoClass.Checked));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class ToggleSwitchTests
 
         Assert.False(source.IsOn);
         Assert.False(target.IsOn);
-        Assert.False(target.HasPseudoClass(UiPseudoClass.Get("checked")));
+        Assert.False(target.HasPseudoClass(UiPseudoClass.Checked));
     }
 
     [Fact]

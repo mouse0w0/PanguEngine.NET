@@ -6,8 +6,6 @@ namespace PanguEngine.Tests.Client.UI;
 
 public sealed class TabItemTests
 {
-    private static readonly UiPseudoClass SelectedPseudoClass = UiPseudoClass.Get("selected");
-
     [Fact]
     public void IsClosableTogglesAnIndependentNonFocusableCloseButton()
     {
@@ -127,17 +125,17 @@ public sealed class TabItemTests
         view.Items.Add(first);
         view.Items.Add(second);
 
-        Assert.True(first.HasPseudoClass(SelectedPseudoClass));
-        Assert.False(second.HasPseudoClass(SelectedPseudoClass));
+        Assert.True(first.HasPseudoClass(UiPseudoClass.Selected));
+        Assert.False(second.HasPseudoClass(UiPseudoClass.Selected));
 
         view.Selection.SelectedItem = second;
 
-        Assert.False(first.HasPseudoClass(SelectedPseudoClass));
-        Assert.True(second.HasPseudoClass(SelectedPseudoClass));
+        Assert.False(first.HasPseudoClass(UiPseudoClass.Selected));
+        Assert.True(second.HasPseudoClass(UiPseudoClass.Selected));
 
         view.Selection.SelectedItem = null;
 
-        Assert.False(second.HasPseudoClass(SelectedPseudoClass));
+        Assert.False(second.HasPseudoClass(UiPseudoClass.Selected));
     }
 
     [Fact]

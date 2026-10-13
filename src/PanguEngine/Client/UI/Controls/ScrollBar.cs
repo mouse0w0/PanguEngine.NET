@@ -14,9 +14,6 @@ namespace PanguEngine.Client.UI.Controls;
 /// </remarks>
 public sealed partial class ScrollBar : Control
 {
-    private static readonly UiPseudoClass HorizontalPseudoClass = UiPseudoClass.Get("horizontal");
-    private static readonly UiPseudoClass VerticalPseudoClass = UiPseudoClass.Get("vertical");
-
     /// <summary>
     /// Identifies the <see cref="Orientation"/> property.
     /// </summary>
@@ -488,8 +485,8 @@ public sealed partial class ScrollBar : Control
     private void SynchronizeOrientationPseudoClass()
     {
         var horizontal = Orientation == Orientation.Horizontal;
-        SetPseudoClass(HorizontalPseudoClass, horizontal);
-        SetPseudoClass(VerticalPseudoClass, !horizontal);
+        SetPseudoClass(UiPseudoClass.Horizontal, horizontal);
+        SetPseudoClass(UiPseudoClass.Vertical, !horizontal);
     }
 
     private void UpdatePartVisibility()

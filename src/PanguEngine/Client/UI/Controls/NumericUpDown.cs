@@ -76,7 +76,6 @@ public abstract class NumericUpDown : Control
 /// <typeparam name="T">A numeric type that can represent the default values zero, one, and one hundred.</typeparam>
 public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
 {
-    private static readonly UiPseudoClass ReadOnlyPseudoClass = UiPseudoClass.Get("readonly");
     private static readonly T DefaultMaximum = T.CreateChecked(100);
 
     /// <summary>Identifies the <see cref="Value"/> property.</summary>
@@ -267,7 +266,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
         CancelRepeat();
         _wheelRemainder = 0;
         _editor.IsReadOnly = IsReadOnly;
-        SetPseudoClass(ReadOnlyPseudoClass, IsReadOnly);
+        SetPseudoClass(UiPseudoClass.ReadOnly, IsReadOnly);
         _editing = false;
         ShowValue();
         _editing = _editor.IsFocused && !IsReadOnly;

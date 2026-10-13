@@ -405,7 +405,7 @@ public sealed class TabViewTests
         screen.SetStyleSheets([UiStyleSheet.Parse("TabItem:selected { background-color: #010203; }")]);
         view.UpdateStyles();
 
-        Assert.True(item.HasPseudoClass(UiPseudoClass.Get("selected")));
+        Assert.True(item.HasPseudoClass(UiPseudoClass.Selected));
         Assert.Equal(new SolidColorBrush(1, 2, 3), item.Background);
     }
 
@@ -423,8 +423,8 @@ public sealed class TabViewTests
         Assert.Same(first, view.Selection.SelectedItem);
         Assert.True(first.IsSelected);
         Assert.False(second.IsSelected);
-        Assert.True(first.HasPseudoClass(UiPseudoClass.Get("selected")));
-        Assert.False(second.HasPseudoClass(UiPseudoClass.Get("selected")));
+        Assert.True(first.HasPseudoClass(UiPseudoClass.Selected));
+        Assert.False(second.HasPseudoClass(UiPseudoClass.Selected));
     }
 
     [Fact]

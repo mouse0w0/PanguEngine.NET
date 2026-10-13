@@ -33,6 +33,30 @@ public sealed class UiPseudoClass
     /// <summary>Gets the built-in pressed pseudo class.</summary>
     public static UiPseudoClass Pressed { get; } = Get("pressed");
 
+    /// <summary>Gets the built-in checked pseudo class.</summary>
+    public static UiPseudoClass Checked { get; } = Get("checked");
+
+    /// <summary>Gets the built-in indeterminate pseudo class.</summary>
+    public static UiPseudoClass Indeterminate { get; } = Get("indeterminate");
+
+    /// <summary>Gets the built-in read-only pseudo class.</summary>
+    public static UiPseudoClass ReadOnly { get; } = Get("readonly");
+
+    /// <summary>Gets the built-in horizontal orientation pseudo class.</summary>
+    public static UiPseudoClass Horizontal { get; } = Get("horizontal");
+
+    /// <summary>Gets the built-in vertical orientation pseudo class.</summary>
+    public static UiPseudoClass Vertical { get; } = Get("vertical");
+
+    /// <summary>Gets the built-in pseudo class for controls without a value.</summary>
+    public static UiPseudoClass Empty { get; } = Get("empty");
+
+    /// <summary>Gets the built-in selected pseudo class.</summary>
+    public static UiPseudoClass Selected { get; } = Get("selected");
+
+    /// <summary>Gets the built-in dragging pseudo class.</summary>
+    public static UiPseudoClass Dragging { get; } = Get("dragging");
+
     /// <summary>Gets or creates the shared identifier for a case-insensitive pseudo-class name.</summary>
     /// <param name="name">An ASCII identifier without a leading colon.</param>
     /// <returns>The same identifier for all equivalent names, including concurrent requests.</returns>
