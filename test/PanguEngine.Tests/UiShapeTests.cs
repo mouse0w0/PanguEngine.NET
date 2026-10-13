@@ -357,6 +357,9 @@ public sealed class UiShapeTests
     [Fact]
     public void CssRegistrationExposesShapeAndPathPropertiesWithoutData()
     {
+        _ = new Rectangle();
+        _ = new Path();
+
         var fill = Assert.Single(
             UiCssRegistry.FindProperty(typeof(Rectangle), "fill")!.Convert("none"));
         Assert.Same(Shape.FillProperty, fill.Property);

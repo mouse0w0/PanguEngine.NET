@@ -7,6 +7,7 @@ using PanguEngine.ComponentModel;
 
 namespace PanguEngine.Tests.Client.UI.Styling;
 
+[Collection(UiToolkitCollection.Name)]
 public sealed class UiStyleCombinatorTests
 {
     private static UiStyleSelector Selector(string css) =>
@@ -572,7 +573,7 @@ public sealed class UiStyleCombinatorTests
     {
         var rule = SingleRule(".panel:hover .button { width: 10; }");
 
-        var declaration = Assert.Single(rule.Bind(typeof(Button)));
+        var declaration = Assert.Single(rule.Bind(new Button().GetType()));
         Assert.Same(UiNode.WidthProperty, declaration.Setter.Property);
         Assert.Equal(10d, declaration.Setter.BoxedValue);
     }

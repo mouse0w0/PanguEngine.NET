@@ -15,6 +15,7 @@ internal sealed partial class UiStyleResolver
     private readonly List<RuleEntry> _rules;
     private readonly Lock _bindingSync = new();
     private readonly Dictionary<Type, IReadOnlyList<BoundRuleEntry>> _boundRules = [];
+    private long _cachedRegistryVersion = -1;
 
     internal UiStyleResolver(
         IEnumerable<UiStyleSheet> baseStyleSheets,
@@ -155,16 +156,16 @@ internal sealed partial class UiStyleResolver
     private IReadOnlyList<BoundRuleEntry> GetBoundRules(UiNode node)
     {
         var nodeType = node.GetType();
-        lock (_bindingSync)
-        {
-            if (_boundRules.TryGetValue(nodeType, out var cached))
-                return cached;
-        }
-
-        UiCssRegistry.EnsureInitialized(nodeType);
 
         lock (_bindingSync)
         {
+            var version = UiCssRegistry.Version;
+            if (_cachedRegistryVersion != version)
+            {
+                _boundRules.Clear();
+                _cachedRegistryVersion = version;
+            }
+
             if (_boundRules.TryGetValue(nodeType, out var cached))
                 return cached;
 
@@ -210,10 +211,8 @@ internal sealed partial class UiStyleResolver
                 }
             }
 
-            if (_boundRules.TryGetValue(nodeType, out var published))
-                return published;
             var result = rules.AsReadOnly();
-            _boundRules.Add(nodeType, result);
+            _boundRules[nodeType] = result;
             return result;
         }
     }

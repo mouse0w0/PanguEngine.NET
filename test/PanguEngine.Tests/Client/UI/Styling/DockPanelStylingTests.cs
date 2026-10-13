@@ -1,5 +1,3 @@
-using System.Reflection;
-using System.Runtime.Loader;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Styling;
@@ -8,50 +6,6 @@ namespace PanguEngine.Tests.Client.UI.Styling;
 
 public sealed class DockPanelStylingTests
 {
-    [Fact]
-    public void DockStylesResolveOnOrdinaryNodes()
-    {
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("UiNode { DoCk: BoTtOm; }")]);
-        var snapshot = resolver.Resolve(new TestNode());
-
-        Assert.Equal(Dock.Bottom, snapshot.GetValue(DockPanel.DockProperty));
-        Assert.Equal("DoCk", Assert.Single(snapshot.GetSources(DockPanel.DockProperty)).CssPropertyName);
-    }
-
-    [Fact]
-    public void FirstOrdinaryNodeStyleLookupRegistersDockInAnIsolatedLoadContext()
-    {
-        var context = new AssemblyLoadContext("DockPanel CSS initialization", isCollectible: true);
-        try
-        {
-            var assembly = context.LoadFromAssemblyPath(typeof(UiNode).Assembly.Location);
-            Assert.Same(context, AssemblyLoadContext.GetLoadContext(assembly));
-            var panelType = assembly.GetType("PanguEngine.Client.UI.Controls.Panel", throwOnError: true)!;
-            var nodeType = assembly.GetType("PanguEngine.Client.UI.UiNode", throwOnError: true)!;
-            var screenType = assembly.GetType("PanguEngine.Client.UI.UiScreen", throwOnError: true)!;
-            var sheetType = assembly.GetType("PanguEngine.Client.UI.Styling.UiStyleSheet", throwOnError: true)!;
-            var root = Activator.CreateInstance(panelType)!;
-            var screen = Activator.CreateInstance(screenType, [root])!;
-            var sheet = sheetType.GetMethod(nameof(UiStyleSheet.Parse), [typeof(string), typeof(string)])!
-                .Invoke(null, ["Panel { dock: bottom; }", null]);
-            var sheets = Array.CreateInstance(sheetType, 1);
-            sheets.SetValue(sheet, 0);
-            screenType.GetMethod(nameof(UiScreen.SetStyleSheets))!.Invoke(screen, [sheets]);
-
-            nodeType.GetMethod("UpdateStyles", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(root, null);
-
-            var dockPanelType = assembly.GetType("PanguEngine.Client.UI.Controls.DockPanel", throwOnError: true)!;
-            _ = Activator.CreateInstance(dockPanelType);
-            var dock = dockPanelType.GetMethod(nameof(DockPanel.GetDock))!.Invoke(null, [root]);
-            Assert.Equal("Bottom", dock!.ToString());
-        }
-        finally
-        {
-            context.Unload();
-        }
-    }
-
     [Fact]
     public void DockPanelSelectorResolvesFillAndInheritedBoxProperties()
     {
@@ -80,8 +34,9 @@ public sealed class DockPanelStylingTests
     [InlineData("DockPanel { last-child-fill: yes; }", true)]
     public void InvalidDockAndFillValuesProduceCssDiagnostics(string css, bool targetsPanel)
     {
+        var panel = new DockPanel();
         var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(css)]);
-        UiNode node = targetsPanel ? new DockPanel() : new TestNode();
+        UiNode node = targetsPanel ? panel : new TestNode();
 
         var error = Assert.Throws<UiStyleParseException>(() => resolver.Resolve(node));
 

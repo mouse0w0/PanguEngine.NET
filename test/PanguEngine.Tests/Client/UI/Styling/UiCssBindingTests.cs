@@ -8,6 +8,7 @@ using PanguEngine.ComponentModel;
 
 namespace PanguEngine.Tests.Client.UI.Styling;
 
+[Collection(UiToolkitCollection.Name)]
 public sealed class UiCssBindingTests
 {
     [Fact]

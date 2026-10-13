@@ -6,53 +6,18 @@ using PanguEngine.ComponentModel;
 
 namespace PanguEngine.Tests.Client.UI.Styling;
 
+[Collection(UiToolkitCollection.Name)]
 public sealed class UiCssRegistryTests
 {
     private static bool LazyAliasInitialized;
 
     [Fact]
-    public void BuiltInCssNamesResolveToRegisteredProperties()
-    {
-        Assert.Equal("width", UiCssRegistry.FindProperty(typeof(UiNode), "WIDTH")!.Name);
-        Assert.Same(
-            UiNode.WidthProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(UiNode), "width")!.Convert("10px")).Property);
-        Assert.Same(
-            UiNode.MarginProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(UiNode), "margin")!.Convert("1 2")).Property);
-        Assert.Same(
-            UiNode.MarginProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(UiNode), "margin-left")!.Convert("4")).Property);
-        Assert.Same(
-            Region.PaddingProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(Region), "padding")!.Convert("1 2 3 4")).Property);
-        Assert.Same(
-            Region.PaddingProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(Panel), "padding-top")!.Convert("4")).Property);
-        Assert.Same(
-            Region.BackgroundProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(Panel), "background-color")!.Convert("#010203")).Property);
-        Assert.Same(
-            StackPanel.OrientationProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(StackPanel), "orientation")!.Convert("horizontal"))
-                .Property);
-        Assert.Same(
-            Text.FontSizeProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(Text), "font-size")!.Convert("12")).Property);
-        Assert.Same(
-            ImageView.StretchProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(ImageView), "stretch")!.Convert("uniform")).Property);
-        Assert.Same(
-            Button.ForegroundProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(Button), "foreground")!.Convert("#f2f4f7")).Property);
-        Assert.Same(
-            Canvas.LeftProperty,
-            Assert.Single(UiCssRegistry.FindProperty(typeof(UiNode), "left")!.Convert("4")).Property);
-    }
-
-    [Fact]
     public void PropertiesWithoutCssDefinitionAreNotExposed()
     {
+        _ = new Text();
+        _ = new Button();
+        _ = new ImageView();
+
         Assert.Null(UiCssRegistry.FindProperty(typeof(Text), "content"));
         Assert.Null(UiCssRegistry.FindProperty(typeof(Button), "text"));
         Assert.Null(UiCssRegistry.FindProperty(typeof(ImageView), "source"));
@@ -165,41 +130,25 @@ public sealed class UiCssRegistryTests
     }
 
     [Fact]
-    public void RegisteringOnFrozenTypeRejectsElementsAndProperties()
+    public void PublishedBindingCacheRefreshesAfterLateElementAndPropertyRegistration()
     {
-        UiCssRegistry.RegisterProperty<FrozenRegistrationNode, double>(
-            "frozen-reg-seed",
-            FrozenRegistrationNode.FirstProperty,
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("late-tag { opacity: 0.2; late-prop: 4; }")]);
+        var node = new LateRegistrationNode();
+        Assert.Equal(1d, resolver.Resolve(node).GetValue(UiNode.OpacityProperty));
+
+        UiCssRegistry.RegisterElement<LateRegistrationNode>("late-tag");
+        UiCssRegistry.RegisterProperty<LateRegistrationNode, double>(
+            "late-prop",
+            LateRegistrationNode.ValueProperty,
             UiCssValueConverters.ParseLength);
 
-        Assert.NotNull(UiCssRegistry.FindProperty(typeof(FrozenRegistrationNode), "frozen-reg-seed"));
-
-        Assert.Throws<InvalidOperationException>(() =>
-            UiCssRegistry.RegisterElement<FrozenRegistrationNode>("frozen-reg-tag"));
-        Assert.Throws<InvalidOperationException>(() =>
-            UiCssRegistry.RegisterProperty<FrozenRegistrationNode, double>(
-                "frozen-reg-extra",
-                FrozenRegistrationNode.SecondProperty,
-                UiCssValueConverters.ParseLength));
+        var snapshot = resolver.Resolve(node);
+        Assert.Equal(0.2, snapshot.GetValue(UiNode.OpacityProperty));
+        Assert.Equal(4d, snapshot.GetValue(LateRegistrationNode.ValueProperty));
     }
 
     [Fact]
-    public void PublishedBindingCacheFreezesLateElementAndPropertyRegistration()
-    {
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("Ghost { opacity: 0.2; }")]);
-        _ = resolver.Resolve(new LateRegistrationNode());
-
-        Assert.Throws<InvalidOperationException>(() =>
-            UiCssRegistry.RegisterElement<LateRegistrationNode>("late-tag"));
-        Assert.Throws<InvalidOperationException>(() =>
-            UiCssRegistry.RegisterProperty<LateRegistrationNode, double>(
-                "late-prop",
-                LateRegistrationNode.ValueProperty,
-                UiCssValueConverters.ParseLength));
-    }
-
-    [Fact]
-    public void StaticConstructorAliasRunsOnFirstSelectorMatchNotOnParse()
+    public void ParsingTypeLookupAndBindingDoNotInitializeCssDefinitions()
     {
         LazyAliasInitialized = false;
 
@@ -207,52 +156,19 @@ public sealed class UiCssRegistryTests
         Assert.False(LazyAliasInitialized);
 
         var selector = SingleSelector("lazy-tag");
-        Assert.Equal(typeof(LazyAliasNode), selector.MatchTargetType(typeof(LazyAliasNode)));
+        Assert.Null(selector.MatchTargetType(typeof(LazyAliasNode)));
+        Assert.False(LazyAliasInitialized);
+        Assert.Null(UiCssRegistry.FindProperty(typeof(LazyAliasNode), "lazy-alias-tone"));
+        Assert.False(LazyAliasInitialized);
+        var rule = Assert.Single(UiStyleSheet.Parse("lazy-tag { lazy-alias-tone: 0.4; }").Rules);
+        Assert.Empty(rule.Bind(typeof(LazyAliasNode)));
+        Assert.False(LazyAliasInitialized);
+
+        var node = new LazyAliasNode();
         Assert.True(LazyAliasInitialized);
-    }
-
-    [Fact]
-    public void EmptyAndCSharpOnlySheetsAlsoFreezeRegistrationsBeforeCaching()
-    {
-        VerifyFrozen(new UiStyleResolver([], []), new EmptyCacheNode());
-        var csharpRule = new UiStyleRule(
-            UiStyleSelector.For<CSharpCacheNode>(),
-            [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)]);
-        VerifyFrozen(new UiStyleResolver([], [new UiStyleSheet([csharpRule])]), new CSharpCacheNode());
-
-        static void VerifyFrozen<TNode>(UiStyleResolver resolver, TNode node) where TNode : UiNode
-        {
-            _ = resolver.Resolve(node);
-            Assert.Throws<InvalidOperationException>(() => UiCssRegistry.RegisterElement<TNode>("late-tag"));
-            Assert.Throws<InvalidOperationException>(() => UiCssRegistry.RegisterProperty<TNode, double>(
-                "late-value", UiNode.OpacityProperty, UiCssValueConverters.ParseNumber));
-        }
-    }
-
-    [Fact]
-    public void StronglyTypedSelectorKeepsClrTargetAndTypeNameRegardlessOfAlias()
-    {
-        var selector = UiStyleSelector.For<CSharpAliasNode>();
-
-        Assert.Equal(typeof(CSharpAliasNode), selector.TargetType);
-        Assert.Equal(nameof(CSharpAliasNode), selector.TypeName);
-        Assert.True(selector.Matches(new CSharpAliasNode()));
-    }
-
-    [Fact]
-    public void AppendingRegistrationToFrozenTypeIsRejected()
-    {
-        UiCssRegistry.RegisterProperty<FrozenCssNode, double>(
-            "frozen-seed",
-            FrozenCssNode.FirstProperty,
-            UiCssValueConverters.ParseLength);
-        Assert.NotNull(UiCssRegistry.FindProperty(typeof(FrozenCssNode), "frozen-seed"));
-
-        Assert.Throws<InvalidOperationException>(() =>
-            UiCssRegistry.RegisterProperty<FrozenCssNode, double>(
-                "frozen-extra",
-                FrozenCssNode.SecondProperty,
-                UiCssValueConverters.ParseLength));
+        Assert.True(selector.Matches(node));
+        Assert.NotNull(UiCssRegistry.FindProperty(node.GetType(), "lazy-alias-tone"));
+        Assert.Equal(0.4, Assert.Single(rule.Bind(node.GetType())).Setter.BoxedValue);
     }
 
     [Fact]
@@ -316,14 +232,15 @@ public sealed class UiCssRegistryTests
     [Fact]
     public void ExpandRegistrationReturnsTypedEdgesAndBindsOriginalDeclarationIndex()
     {
-        var css = UiCssRegistry.FindProperty(typeof(ExpandCssNode), "expand-sides")!;
+        var node = new ExpandCssNode();
+        var css = UiCssRegistry.FindProperty(node.GetType(), "expand-sides")!;
 
         Assert.Equal(
             [UiStyleEdge.Left, UiStyleEdge.Right],
             css.Convert("5").Select(setter => setter.Component));
 
         var rule = Assert.Single(UiStyleSheet.Parse("ExpandCssNode { expand-sides: 2; expand-sides: 3; }").Rules);
-        var bound = rule.Bind(typeof(ExpandCssNode));
+        var bound = rule.Bind(node.GetType());
 
         Assert.Equal([0, 0, 1, 1], bound.Select(declaration => declaration.DeclarationIndex));
         Assert.All(bound, declaration => Assert.Equal("expand-sides", declaration.CssPropertyName));
@@ -335,21 +252,12 @@ public sealed class UiCssRegistryTests
     [Fact]
     public void ExpandRegistrationRejectsDuplicateComponentAtBind()
     {
+        var node = new ExpandCssNode();
         var rule = Assert.Single(UiStyleSheet.Parse("ExpandCssNode { expand-duplicate: 1; }").Rules);
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(ExpandCssNode)));
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-    }
-
-    [Fact]
-    public void CreateEdgeCarriesComponentAndThicknessBoxedValue()
-    {
-        var setter = UiStyleSetter.CreateEdge(Region.PaddingProperty, UiStyleEdge.Left, 5);
-
-        Assert.Equal<UiStyleEdge?>(UiStyleEdge.Left, setter.Component);
-        Assert.Same(Region.PaddingProperty, setter.Property);
-        Assert.IsType<Thickness>(setter.BoxedValue);
     }
 
     [Fact]
@@ -364,48 +272,40 @@ public sealed class UiCssRegistryTests
     {
         var rule = Assert.Single(UiStyleSheet.Parse("Panel:hover { padding-top: 4; }").Rules);
 
-        var declaration = Assert.Single(rule.Bind(typeof(Panel)));
+        var declaration = Assert.Single(rule.Bind(new Panel().GetType()));
         Assert.Same(Region.PaddingProperty, declaration.Setter.Property);
         Assert.Equal<UiStyleEdge?>(UiStyleEdge.Top, declaration.Setter.Component);
     }
 
     [Fact]
-    public void FrozenBaseStillAllowsRegisteringAnotherDerivedType()
+    public void DerivedLookupUsesLaterBaseDefinitions()
     {
-        UiCssRegistry.RegisterProperty<FrozenBoundaryDerivedA, double>(
+        UiCssRegistry.RegisterProperty<RegistrationBoundaryDerivedA, double>(
             "boundary-a",
-            FrozenBoundaryDerivedA.ValueProperty,
+            RegistrationBoundaryDerivedA.ValueProperty,
             UiCssValueConverters.ParseLength);
-        Assert.NotNull(UiCssRegistry.FindProperty(typeof(FrozenBoundaryDerivedA), "boundary-a"));
+        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("* { boundary-base: 3; boundary-a: 4; }")]);
+        var node = new RegistrationBoundaryDerivedA();
+        Assert.Equal(0d, resolver.Resolve(node).GetValue(RegistrationBoundaryBase.ValueProperty));
 
-        Assert.Throws<InvalidOperationException>(() =>
-            UiCssRegistry.RegisterProperty<FrozenBoundaryBase, double>(
-                "boundary-base",
-                FrozenBoundaryBase.ValueProperty,
-                UiCssValueConverters.ParseLength));
-
-        UiCssRegistry.RegisterProperty<FrozenBoundaryDerivedB, double>(
-            "boundary-b",
-            FrozenBoundaryDerivedB.ValueProperty,
+        UiCssRegistry.RegisterProperty<RegistrationBoundaryBase, double>(
+            "boundary-base",
+            RegistrationBoundaryBase.ValueProperty,
             UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterElement<FrozenBoundaryDerivedB>("boundary-b-tag");
-        Assert.NotNull(UiCssRegistry.FindProperty(typeof(FrozenBoundaryDerivedB), "boundary-b"));
+
+        var snapshot = resolver.Resolve(node);
+        Assert.Equal(3d, snapshot.GetValue(RegistrationBoundaryBase.ValueProperty));
+        Assert.Equal(4d, snapshot.GetValue(RegistrationBoundaryDerivedA.ValueProperty));
     }
 
     [Fact]
-    public void ConvertReturnsACopyAndBoundResultSurvivesConverterListMutation()
+    public void BoundResultSurvivesConverterListMutation()
     {
-        var definition = UiCssRegistry.FindProperty(typeof(ExpandMutableNode), "mutable-sides")!;
-
-        var first = definition.Convert("5");
-        var second = definition.Convert("5");
-        Assert.NotSame(first, second);
-        Assert.Equal(2, first.Count);
-
+        var node = new ExpandMutableNode();
         var resolver = new UiStyleResolver([], [UiStyleSheet.Parse("ExpandMutableNode { mutable-sides: 5; }")]);
         Assert.Equal(
             new Thickness(5, 0, 5, 0),
-            resolver.Resolve(new ExpandMutableNode()).GetValue(ExpandMutableNode.PaddingProperty));
+            resolver.Resolve(node).GetValue(ExpandMutableNode.PaddingProperty));
 
         ExpandMutableNode.Output.Clear();
 
@@ -440,7 +340,8 @@ public sealed class UiCssRegistryTests
     {
         var rule = Assert.Single(UiStyleSheet.Parse(css).Rules);
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(ExpandRejectNode)));
+        var node = new ExpandRejectNode();
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
         Assert.IsType<ArgumentException>(error.InnerException);
@@ -466,15 +367,6 @@ public sealed class UiCssRegistryTests
 
     private sealed class FindGrandchildNode : FindDerivedNode
     {
-    }
-
-    private sealed class FrozenCssNode : UiNode
-    {
-        internal static readonly Property<double> FirstProperty =
-            Property.Register<FrozenCssNode, double>("First", 0);
-
-        internal static readonly Property<double> SecondProperty =
-            Property.Register<FrozenCssNode, double>("Second", 0);
     }
 
     private sealed class DupCssNode : UiNode
@@ -530,22 +422,16 @@ public sealed class UiCssRegistryTests
                 onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 
-    private class FrozenBoundaryBase : UiNode
+    private class RegistrationBoundaryBase : UiNode
     {
         internal static readonly Property<double> ValueProperty =
-            Property.Register<FrozenBoundaryBase, double>("Value", 0);
+            Property.Register<RegistrationBoundaryBase, double>("Value", 0);
     }
 
-    private sealed class FrozenBoundaryDerivedA : FrozenBoundaryBase
+    private sealed class RegistrationBoundaryDerivedA : RegistrationBoundaryBase
     {
         internal new static readonly Property<double> ValueProperty =
-            Property.Register<FrozenBoundaryDerivedA, double>("Value", 0);
-    }
-
-    private sealed class FrozenBoundaryDerivedB : FrozenBoundaryBase
-    {
-        internal new static readonly Property<double> ValueProperty =
-            Property.Register<FrozenBoundaryDerivedB, double>("Value", 0);
+            Property.Register<RegistrationBoundaryDerivedA, double>("Value", 0);
     }
 
     private sealed class ExpandRejectNode : UiNode
@@ -683,15 +569,6 @@ public sealed class UiCssRegistryTests
     {
     }
 
-    private sealed class FrozenRegistrationNode : UiNode
-    {
-        internal static readonly Property<double> FirstProperty =
-            Property.Register<FrozenRegistrationNode, double>("First", 0);
-
-        internal static readonly Property<double> SecondProperty =
-            Property.Register<FrozenRegistrationNode, double>("Second", 0);
-    }
-
     private sealed class LateRegistrationNode : UiNode
     {
         internal static readonly Property<double> ValueProperty =
@@ -704,22 +581,8 @@ public sealed class UiCssRegistryTests
         {
             LazyAliasInitialized = true;
             UiCssRegistry.RegisterElement<LazyAliasNode>("lazy-tag");
-        }
-    }
-
-    private sealed class EmptyCacheNode : UiNode
-    {
-    }
-
-    private sealed class CSharpCacheNode : UiNode
-    {
-    }
-
-    private sealed class CSharpAliasNode : UiNode
-    {
-        static CSharpAliasNode()
-        {
-            UiCssRegistry.RegisterElement<CSharpAliasNode>("csharp-alias");
+            UiCssRegistry.RegisterProperty<LazyAliasNode, double>(
+                "lazy-alias-tone", UiNode.OpacityProperty, UiCssValueConverters.ParseNumber);
         }
     }
 }

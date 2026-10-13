@@ -1,6 +1,3 @@
-using System.Runtime.CompilerServices;
-using PanguEngine.Client.UI.Controls;
-
 using PanguEngine.ComponentModel;
 
 namespace PanguEngine.Client.UI.Styling;
@@ -9,15 +6,26 @@ namespace PanguEngine.Client.UI.Styling;
 /// Registers CSS element names and property definitions for UI node types.
 /// </summary>
 /// <remarks>
-/// Definitions are registered from control static constructors, resolved along the CLR base type chain and
-/// frozen on first lookup so that published binding caches cannot be invalidated by later registrations.
+/// Definitions are registered from control static constructors and resolved along the CLR base type chain.
+/// Queries read already registered definitions without initializing control types.
+/// Later registrations are used when invalidated node styles are recomputed.
 /// </remarks>
 public static class UiCssRegistry
 {
     private static readonly Lock RegistryLock = new();
     private static readonly Dictionary<Type, Dictionary<string, PropertyDefinition>> PropertyRegistry = [];
     private static readonly Dictionary<Type, string> ElementNames = [];
-    private static readonly HashSet<Type> FrozenTypes = [];
+    private static long _version;
+
+    /// <summary>Gets the global version of the registered CSS definitions.</summary>
+    internal static long Version
+    {
+        get
+        {
+            lock (RegistryLock)
+                return _version;
+        }
+    }
 
     /// <summary>
     /// Registers a stable CSS element name for a node type.
@@ -26,7 +34,7 @@ public static class UiCssRegistry
     /// <param name="name">The ASCII identifier element name, compared with ordinal case sensitivity.</param>
     /// <exception cref="ArgumentException">Thrown when the name is not a valid ASCII identifier.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the target type is frozen or already has a registered element name.
+    /// Thrown when the target type already has a registered element name.
     /// </exception>
     public static void RegisterElement<TNode>(string name)
         where TNode : UiNode
@@ -35,13 +43,11 @@ public static class UiCssRegistry
         var targetType = typeof(TNode);
         lock (RegistryLock)
         {
-            if (FrozenTypes.Contains(targetType))
-                throw new InvalidOperationException(
-                    $"CSS definitions for '{targetType}' are frozen and cannot register element name '{name}'.");
-
             if (!ElementNames.TryAdd(targetType, name))
                 throw new InvalidOperationException(
                     $"An element name is already registered for '{targetType}'.");
+
+            _version++;
         }
     }
 
@@ -59,7 +65,7 @@ public static class UiCssRegistry
     /// <typeparamref name="TTarget"/> cannot be stored on.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the target type is frozen or the target/name pair is already registered.
+    /// Thrown when the target/name pair is already registered.
     /// </exception>
     public static void RegisterProperty<TTarget, TValue>(
         string name,
@@ -99,7 +105,7 @@ public static class UiCssRegistry
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="converter"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when the name is invalid.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the target type is frozen or the target/name pair is already registered.
+    /// Thrown when the target/name pair is already registered.
     /// </exception>
     public static void RegisterProperty<TTarget>(
         string name,
@@ -112,43 +118,6 @@ public static class UiCssRegistry
     }
 
     /// <summary>
-    /// Initializes the CSS definitions for a node type and prevents subsequent registration on its type chain.
-    /// </summary>
-    /// <param name="targetType">The node type whose definitions are fixed.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="targetType"/> is null.</exception>
-    internal static void EnsureInitialized(Type targetType)
-    {
-        ArgumentNullException.ThrowIfNull(targetType);
-
-        lock (RegistryLock)
-        {
-            if (FrozenTypes.Contains(targetType))
-                return;
-        }
-
-        for (var current = targetType;
-             current is not null && typeof(UiNode).IsAssignableFrom(current);
-             current = current.BaseType)
-        {
-            RuntimeHelpers.RunClassConstructor(current.TypeHandle);
-        }
-
-        RuntimeHelpers.RunClassConstructor(typeof(Canvas).TypeHandle);
-        RuntimeHelpers.RunClassConstructor(typeof(DockPanel).TypeHandle);
-        RuntimeHelpers.RunClassConstructor(typeof(Grid).TypeHandle);
-
-        lock (RegistryLock)
-        {
-            for (var current = targetType;
-                 current is not null && typeof(UiNode).IsAssignableFrom(current);
-                 current = current.BaseType)
-            {
-                FrozenTypes.Add(current);
-            }
-        }
-    }
-
-    /// <summary>
     /// Finds the nearest CLR type in the base chain whose element name matches ordinally.
     /// </summary>
     /// <param name="runtimeType">The node runtime type the search starts from.</param>
@@ -157,9 +126,8 @@ public static class UiCssRegistry
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="runtimeType"/> or <paramref name="name"/> is null.</exception>
     internal static Type? MatchElement(Type runtimeType, string name)
     {
+        ArgumentNullException.ThrowIfNull(runtimeType);
         ArgumentNullException.ThrowIfNull(name);
-
-        EnsureInitialized(runtimeType);
 
         lock (RegistryLock)
         {
@@ -187,9 +155,8 @@ public static class UiCssRegistry
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="targetType"/> or <paramref name="name"/> is null.</exception>
     internal static PropertyDefinition? FindProperty(Type targetType, string name)
     {
+        ArgumentNullException.ThrowIfNull(targetType);
         ArgumentNullException.ThrowIfNull(name);
-
-        EnsureInitialized(targetType);
 
         lock (RegistryLock)
         {
@@ -216,10 +183,6 @@ public static class UiCssRegistry
         var definition = new PropertyDefinition(name, targetType, converter);
         lock (RegistryLock)
         {
-            if (FrozenTypes.Contains(targetType))
-                throw new InvalidOperationException(
-                    $"CSS definitions for '{targetType}' are frozen and cannot register '{name}'.");
-
             if (PropertyRegistry.TryGetValue(targetType, out var existing) && existing.ContainsKey(name))
                 throw new InvalidOperationException(
                     $"A CSS property named '{name}' is already registered for '{targetType}'.");
@@ -231,6 +194,7 @@ public static class UiCssRegistry
             }
 
             existing[name] = definition;
+            _version++;
         }
     }
 

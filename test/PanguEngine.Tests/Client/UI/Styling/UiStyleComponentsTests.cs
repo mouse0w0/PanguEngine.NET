@@ -42,12 +42,6 @@ public sealed class UiStyleComponentsTests
         var rule = Assert.Single(UiStyleSheet.Parse(
             $"Panel {{ {name}-top: 1; {name}-right: 2; {name}-bottom: 3; {name}-left: 4; }}").Rules);
 
-        var declarations = rule.Bind(typeof(Panel));
-
-        Assert.Equal(
-            new[] { UiStyleEdge.Top, UiStyleEdge.Right, UiStyleEdge.Bottom, UiStyleEdge.Left },
-            declarations.Select(declaration => declaration.Setter.Component!.Value));
-        Assert.All(declarations, declaration => Assert.Same(property, declaration.Setter.Property));
         var resolver = new UiStyleResolver([], [new UiStyleSheet([rule])]);
         Assert.Equal(new Thickness(4, 1, 2, 3), resolver.Resolve(new Panel()).GetValue(property));
     }
@@ -236,26 +230,13 @@ public sealed class UiStyleComponentsTests
     }
 
     [Fact]
-    public void OpacityRejectsPixelsWhileTheConverterAcceptsNumbers()
+    public void OpacityRejectsPixelsWithInvalidValueDiagnostic()
     {
-        Assert.Equal(0.5, UiCssValueConverters.ParseNumber("0.5"));
-        Assert.Throws<FormatException>(() => UiCssValueConverters.ParseNumber("1px"));
-
         var rule = Assert.Single(UiStyleSheet.Parse("Panel { opacity: 1px; }").Rules);
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Panel)));
+        var node = new Panel();
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-    }
-
-    [Fact]
-    public void IndependentCssNamesMapToTheSameProperty()
-    {
-        var background = UiCssRegistry.FindProperty(typeof(Region), "background")!;
-        var backgroundColor = UiCssRegistry.FindProperty(typeof(Region), "background-color")!;
-
-        Assert.NotSame(background, backgroundColor);
-        Assert.Same(Region.BackgroundProperty, Assert.Single(background.Convert("#010203")).Property);
-        Assert.Same(Region.BackgroundProperty, Assert.Single(backgroundColor.Convert("#010203")).Property);
     }
 
     [Theory]

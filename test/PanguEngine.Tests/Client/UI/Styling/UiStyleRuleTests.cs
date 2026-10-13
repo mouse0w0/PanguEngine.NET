@@ -190,7 +190,7 @@ public sealed class UiStyleRuleTests
     {
         var rule = Assert.Single(UiStyleSheet.Parse("Button { padding: 4px; }").Rules);
 
-        var declaration = Assert.Single(rule.Bind(typeof(Button)));
+        var declaration = Assert.Single(rule.Bind(new Button().GetType()));
 
         Assert.Same(Region.PaddingProperty, declaration.Setter.Property);
         Assert.Null(declaration.Setter.Component);
@@ -204,7 +204,7 @@ public sealed class UiStyleRuleTests
     {
         var rule = Assert.Single(UiStyleSheet.Parse("Region { padding: 1px 2px; padding-left: 9px; }").Rules);
 
-        var bound = rule.Bind(typeof(Region));
+        var bound = rule.Bind(new Panel().GetType());
 
         Assert.Equal(2, bound.Count);
         Assert.Equal([0, 1], bound.Select(declaration => declaration.DeclarationIndex));

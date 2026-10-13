@@ -7,18 +7,6 @@ namespace PanguEngine.Tests.Client.UI.Styling;
 public sealed class GridStyleTests
 {
     [Fact]
-    public void AttachedCssPropertiesBindOnOrdinaryNodes()
-    {
-        var resolver = new UiStyleResolver([], [UiStyleSheet.Parse(
-            "Panel { grid-row: 2; grid-column: 3; grid-row-span: 4; grid-column-span: 5; }")]);
-        var snapshot = resolver.Resolve(new Panel());
-        Assert.Equal(2, snapshot.GetValue(Grid.RowProperty));
-        Assert.Equal(3, snapshot.GetValue(Grid.ColumnProperty));
-        Assert.Equal(4, snapshot.GetValue(Grid.RowSpanProperty));
-        Assert.Equal(5, snapshot.GetValue(Grid.ColumnSpanProperty));
-    }
-
-    [Fact]
     public void CssDefinitionsAndPlacementParticipateInLayout()
     {
         var grid = new Grid();

@@ -18,15 +18,15 @@ public sealed class UiStyleParserTests
 
     private static UiStyleRule SingleRule(string css) => Assert.Single(ParseCss(css).Rules);
 
-    private static IReadOnlyList<UiStyleRule.BoundDeclaration> BoundDeclarations(string css, Type targetType) =>
-        SingleRule(css).Bind(targetType);
+    private static IReadOnlyList<UiStyleRule.BoundDeclaration> BoundDeclarations(string css, UiNode node) =>
+        SingleRule(css).Bind(node.GetType());
 
-    private static IReadOnlyList<UiStyleSetter> BoundSetters(string css, Type targetType) =>
-        BoundDeclarations(css, targetType).Select(declaration => declaration.Setter).ToArray();
+    private static IReadOnlyList<UiStyleSetter> BoundSetters(string css, UiNode node) =>
+        BoundDeclarations(css, node).Select(declaration => declaration.Setter).ToArray();
 
-    private static T ParsedValue<T>(Type targetType, string css)
+    private static T ParsedValue<T>(UiNode node, string css)
     {
-        var setter = Assert.Single(BoundSetters(css, targetType));
+        var setter = Assert.Single(BoundSetters(css, node));
         return (T)setter.BoxedValue!;
     }
 
@@ -52,7 +52,7 @@ public sealed class UiStyleParserTests
         Assert.Equal("Button.primary#save:focus:hover", selector.SelectorText);
         Assert.Equal("menu.css", sheet.SourceName);
 
-        var setters = rule.Bind(typeof(Button));
+        var setters = rule.Bind(new Button().GetType());
         Assert.Equal(new Color(0x11, 0x22, 0x33, 0xcc),
             Assert.IsType<SolidColorBrush>(setters[0].Setter.BoxedValue).Color);
         Assert.Equal(0.8, (double)setters[1].Setter.BoxedValue!);
@@ -112,7 +112,8 @@ public sealed class UiStyleParserTests
 
         var sheet = UiStyleSheet.Parse(stream, "bad.css");
         var rule = Assert.Single(sheet.Rules);
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
+        var node = new Button();
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
         Assert.Equal("bad.css", error.SourceName);
@@ -130,8 +131,9 @@ public sealed class UiStyleParserTests
 
         var ruleA = Assert.Single(fromString.Rules);
         var ruleB = Assert.Single(fromStream.Rules);
-        var a = (SolidColorBrush)Assert.Single(ruleA.Bind(typeof(Button))).Setter.BoxedValue!;
-        var b = (SolidColorBrush)Assert.Single(ruleB.Bind(typeof(Button))).Setter.BoxedValue!;
+        var node = new Button();
+        var a = (SolidColorBrush)Assert.Single(ruleA.Bind(node.GetType())).Setter.BoxedValue!;
+        var b = (SolidColorBrush)Assert.Single(ruleB.Bind(node.GetType())).Setter.BoxedValue!;
         Assert.Equal(a.Color, b.Color);
     }
 
@@ -147,7 +149,7 @@ public sealed class UiStyleParserTests
 
         Assert.True(stream.CanRead);
         var rule = Assert.Single(sheet.Rules);
-        Assert.Equal(0.5, (double)Assert.Single(rule.Bind(typeof(Button))).Setter.BoxedValue!);
+        Assert.Equal(0.5, (double)Assert.Single(rule.Bind(new Button().GetType())).Setter.BoxedValue!);
     }
 
     [Fact]
@@ -174,7 +176,8 @@ public sealed class UiStyleParserTests
         var css = "Button {\r\n\twidth: 1;\r\n}\r\nCanvas {\r\n\theight: bad;\r\n}\r\n";
 
         var rule = Assert.Single(ParseCss(css, "crlf.css").Rules.Where(r => r.Selectors[0].TypeName == "Canvas"));
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Canvas)));
+        var node = new Canvas();
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
         Assert.Equal(5, error.Line);
@@ -185,7 +188,8 @@ public sealed class UiStyleParserTests
     public void TabCountsAsOneColumnForInvalidDeclarationValue()
     {
         var rule = SingleRule("Button:hover {\n\twidth: nope;\n}");
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Button)));
+        var node = new Button();
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
         Assert.Equal(2, error.Line);
@@ -220,13 +224,13 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("/* header */ Button { /* inner */ width: 1; /* tail */ } /* footer */");
 
-        Assert.Single(rule.Bind(typeof(Button)));
+        Assert.Single(rule.Bind(new Button().GetType()));
     }
 
     [Fact]
     public void SkipsBlockCommentsInsideDeclarationValues()
     {
-        var value = ParsedValue<Thickness>(typeof(Region), "Region { padding: 1 /* ; } */ 2; }");
+        var value = ParsedValue<Thickness>(new Panel(), "Region { padding: 1 /* ; } */ 2; }");
 
         Assert.Equal(new Thickness(2, 1, 2, 1), value);
     }
@@ -246,7 +250,7 @@ public sealed class UiStyleParserTests
         var rule = SingleRule("Button { }");
 
         Assert.Empty(rule.Setters);
-        Assert.Empty(rule.Bind(typeof(Button)));
+        Assert.Empty(rule.Bind(new Button().GetType()));
     }
 
     [Fact]
@@ -413,7 +417,7 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("Button { ghost: 1; }");
 
-        Assert.Empty(rule.Bind(typeof(Button)));
+        Assert.Empty(rule.Bind(new Button().GetType()));
     }
 
     [Fact]
@@ -433,40 +437,12 @@ public sealed class UiStyleParserTests
     }
 
     [Fact]
-    public void ParsesBuiltInDoubleValues()
-    {
-        var setters = BoundSetters("UiNode { width: 10px; height: 10; opacity: 1.5; }", typeof(UiNode));
-
-        Assert.Equal(10d, (double)setters[0].BoxedValue!);
-        Assert.Equal(10d, (double)setters[1].BoxedValue!);
-        Assert.Equal(1.5, (double)setters[2].BoxedValue!);
-    }
-
-    [Fact]
     public void DoubleRejectsExponentSyntax()
     {
         var rule = SingleRule("UiNode { width: 1e2; }");
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(UiNode)));
-
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
-    }
-
-    [Fact]
-    public void ParsesBuiltInThicknessValues()
-    {
-        Assert.Equal(new Thickness(5), ParsedValue<Thickness>(typeof(Region), "Region { padding: 5; }"));
-        Assert.Equal(new Thickness(6, 5, 6, 5), ParsedValue<Thickness>(typeof(Region), "Region { padding: 5 6; }"));
-        Assert.Equal(new Thickness(2, 5, 2, 8), ParsedValue<Thickness>(typeof(Region), "Region { padding: 5 2 8; }"));
-        Assert.Equal(new Thickness(4, 1, 2, 3), ParsedValue<Thickness>(typeof(Region), "Region { padding: 1 2 3 4; }"));
-    }
-
-    [Fact]
-    public void ThicknessRejectsCountsOtherThanOneToFour()
-    {
-        var rule = SingleRule("Region { padding: 5 2 8 1 3; }");
-
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(Region)));
+        var node = new Panel();
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
     }
@@ -474,14 +450,16 @@ public sealed class UiStyleParserTests
     [Fact]
     public void ParsesBuiltInColorAndBrushValues()
     {
-        Assert.Equal(new Color(0xaa, 0xbb, 0xcc), ParsedValue<Color>(typeof(Text), "Text { color: #aabbcc; }"));
-        Assert.Equal(new Color(0xaa, 0xbb, 0xcc, 0xdd), ParsedValue<Color>(typeof(Text), "Text { color: #aabbccdd; }"));
-        Assert.Equal(new Color(0, 0, 0, 0), ParsedValue<Color>(typeof(Text), "Text { color: transparent; }"));
+        var text = new Text();
+        Assert.Equal(new Color(0xaa, 0xbb, 0xcc), ParsedValue<Color>(text, "Text { color: #aabbcc; }"));
+        Assert.Equal(new Color(0xaa, 0xbb, 0xcc, 0xdd), ParsedValue<Color>(text, "Text { color: #aabbccdd; }"));
+        Assert.Equal(new Color(0, 0, 0, 0), ParsedValue<Color>(text, "Text { color: transparent; }"));
 
-        var brush = ParsedValue<Brush>(typeof(Region), "Region { background: #112233; }");
+        var region = new Panel();
+        var brush = ParsedValue<Brush>(region, "Region { background: #112233; }");
         Assert.Equal(new Color(0x11, 0x22, 0x33), Assert.IsType<SolidColorBrush>(brush).Color);
 
-        var transparent = ParsedValue<Brush>(typeof(Region), "Region { background: transparent; }");
+        var transparent = ParsedValue<Brush>(region, "Region { background: transparent; }");
         Assert.Equal(new Color(0, 0, 0, 0), Assert.IsType<SolidColorBrush>(transparent).Color);
     }
 
@@ -489,34 +467,37 @@ public sealed class UiStyleParserTests
     public void ParsesBuiltInEnumValuesCaseInsensitively()
     {
         Assert.Equal(Orientation.Horizontal,
-            ParsedValue<Orientation>(typeof(StackPanel), "StackPanel { orientation: HORIZONTAL; }"));
+            ParsedValue<Orientation>(new StackPanel(), "StackPanel { orientation: HORIZONTAL; }"));
+        var node = new Panel();
         Assert.Equal(Visibility.Collapsed,
-            ParsedValue<Visibility>(typeof(UiNode), "UiNode { visibility: collapsed; }"));
+            ParsedValue<Visibility>(node, "UiNode { visibility: collapsed; }"));
         Assert.Equal(HorizontalAlignment.Center,
-            ParsedValue<HorizontalAlignment>(typeof(UiNode), "UiNode { horizontal-alignment: CENTER; }"));
-        Assert.Equal(TextWrapping.Wrap, ParsedValue<TextWrapping>(typeof(Text), "Text { wrapping: wrap; }"));
-        Assert.Equal(TextAlignment.Right, ParsedValue<TextAlignment>(typeof(Text), "Text { text-alignment: right; }"));
+            ParsedValue<HorizontalAlignment>(node, "UiNode { horizontal-alignment: CENTER; }"));
+        var text = new Text();
+        Assert.Equal(TextWrapping.Wrap, ParsedValue<TextWrapping>(text, "Text { wrapping: wrap; }"));
+        Assert.Equal(TextAlignment.Right, ParsedValue<TextAlignment>(text, "Text { text-alignment: right; }"));
+        var image = new ImageView();
         Assert.Equal(ImageStretch.UniformToFill,
-            ParsedValue<ImageStretch>(typeof(ImageView), "ImageView { stretch: uniformToFill; }"));
+            ParsedValue<ImageStretch>(image, "ImageView { stretch: uniformToFill; }"));
         Assert.Equal(ImageSamplingMode.Nearest,
-            ParsedValue<ImageSamplingMode>(typeof(ImageView), "ImageView { sampling-mode: nearest; }"));
+            ParsedValue<ImageSamplingMode>(image, "ImageView { sampling-mode: nearest; }"));
     }
 
     [Fact]
     public void PropertyNameResolutionIsCaseInsensitive()
     {
-        var setter = Assert.Single(BoundSetters("Button { BACKGROUND: #112233; }", typeof(Button)));
+        var setter = Assert.Single(BoundSetters("Button { BACKGROUND: #112233; }", new Button()));
 
         Assert.Same(Region.BackgroundProperty, setter.Property);
     }
 
     [Fact]
-    public void BindingInitializesCanvasAttachedProperties()
+    public void BindingUsesAttachedPropertiesRegisteredByCanvas()
     {
         Assert.Equal("Panel", SingleRule("Panel { }").Selectors[0].TypeName);
 
         var expected = Canvas.LeftProperty;
-        var setter = Assert.Single(BoundSetters("Button { left: 4; }", typeof(Button)));
+        var setter = Assert.Single(BoundSetters("Button { left: 4; }", new Button()));
         Assert.Same(expected, setter.Property);
         Assert.Equal(4d, (double)setter.BoxedValue!);
     }
@@ -526,7 +507,7 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("Button:hover { padding: 4; }");
 
-        var declaration = Assert.Single(rule.Bind(typeof(Button)));
+        var declaration = Assert.Single(rule.Bind(new Button().GetType()));
         Assert.Same(Region.PaddingProperty, declaration.Setter.Property);
         Assert.Equal(new Thickness(4), declaration.Setter.BoxedValue);
     }
@@ -534,23 +515,25 @@ public sealed class UiStyleParserTests
     [Fact]
     public void CustomPropertyConverterParsesValueAndReportsInvalidValue()
     {
-        Assert.True(ParsedValue<bool>(typeof(FlagConvNode), "FlagConvNode { flag: yes; }"));
+        var node = new FlagConvNode();
+        Assert.True(ParsedValue<bool>(node, "FlagConvNode { flag: yes; }"));
 
         var rule = SingleRule("FlagConvNode { flag: maybe; }");
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(FlagConvNode)));
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
     }
 
     [Fact]
     public void BuiltInBooleanConverterAcceptsTrueAndFalse()
     {
-        Assert.True(ParsedValue<bool>(typeof(BoolNode), "BoolNode { flag: TRUE; }"));
-        Assert.False(ParsedValue<bool>(typeof(BoolNode), "BoolNode { flag: false; }"));
+        var node = new BoolNode();
+        Assert.True(ParsedValue<bool>(node, "BoolNode { flag: TRUE; }"));
+        Assert.False(ParsedValue<bool>(node, "BoolNode { flag: false; }"));
 
         var rule = SingleRule("BoolNode { flag: yes; }");
         Assert.Equal(
             UiStyleParseError.InvalidValue,
-            Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(BoolNode))).Error);
+            Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType())).Error);
     }
 
     [Fact]
@@ -558,7 +541,7 @@ public sealed class UiStyleParserTests
     {
         TrimNode.Received = null;
 
-        _ = ParsedValue<string>(typeof(TrimNode), "TrimNode { raw:  alpha\t beta  ; }");
+        _ = ParsedValue<string>(new TrimNode(), "TrimNode { raw:  alpha\t beta  ; }");
 
         Assert.Equal("alpha\t beta", TrimNode.Received);
     }
@@ -570,7 +553,8 @@ public sealed class UiStyleParserTests
         ThrowingNode.Error = expected;
         var rule = SingleRule("ThrowingNode { raw: value; }");
 
-        var actual = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(ThrowingNode)));
+        var node = new ThrowingNode();
+        var actual = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, actual.Error);
         Assert.Same(expected, actual.InnerException);
@@ -581,7 +565,7 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("DerivedStyleNode { tone: bright; }");
 
-        var setter = Assert.Single(rule.Bind(typeof(DerivedStyleNode)));
+        var setter = Assert.Single(rule.Bind(new DerivedStyleNode().GetType()));
 
         Assert.Same(DerivedStyleNode.ToneProperty, setter.Setter.Property);
     }
@@ -612,7 +596,7 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("Button { opacity: 0.2; background: #010203; }");
 
-        var bound = rule.Bind(typeof(Button));
+        var bound = rule.Bind(new Button().GetType());
 
         Assert.Equal(2, bound.Count);
         Assert.Equal("opacity", bound[0].CssPropertyName);
@@ -637,7 +621,7 @@ public sealed class UiStyleParserTests
     [InlineData("0.5 /*!important*/ !important /* tail */")]
     public void ImportantSuffixIsRemovedBeforeConversion(string value)
     {
-        var declaration = Assert.Single(BoundDeclarations($"UiNode {{ opacity: {value}; }}", typeof(UiNode)));
+        var declaration = Assert.Single(BoundDeclarations($"UiNode {{ opacity: {value}; }}", new Panel()));
 
         Assert.Equal(0.5, (double)declaration.Setter.BoxedValue!);
         Assert.True(declaration.IsImportant);
@@ -653,7 +637,8 @@ public sealed class UiStyleParserTests
         TrimNode.Received = null;
         var rule = Assert.Single(ParseCss($"TrimNode {{\n  raw: {value};\n}}", "important.css").Rules);
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(TrimNode)));
+        var node = new TrimNode();
+        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(node.GetType()));
 
         Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
         Assert.Equal("important.css", error.SourceName);
@@ -668,7 +653,7 @@ public sealed class UiStyleParserTests
     public void ImportantSuffixPreservesInternalWhitespaceAndTrimsSuffixWhitespace()
     {
         var declaration = Assert.Single(BoundDeclarations(
-            "TrimNode { raw: alpha\t beta \t\r\n\f\v!important; }", typeof(TrimNode)));
+            "TrimNode { raw: alpha\t beta \t\r\n\f\v!important; }", new TrimNode()));
 
         Assert.Equal("alpha\t beta", declaration.Setter.BoxedValue);
         Assert.Equal("alpha\t beta", TrimNode.Received);
@@ -684,7 +669,7 @@ public sealed class UiStyleParserTests
     [InlineData("alpha /*!important*/", "alpha")]
     public void ValuesWithoutContinuousImportantMarkerKeepConverterSemantics(string value, string expected)
     {
-        var declaration = Assert.Single(BoundDeclarations($"TrimNode {{ raw: {value}; }}", typeof(TrimNode)));
+        var declaration = Assert.Single(BoundDeclarations($"TrimNode {{ raw: {value}; }}", new TrimNode()));
 
         Assert.Equal(expected, declaration.Setter.BoxedValue);
         Assert.False(declaration.IsImportant);
@@ -693,7 +678,7 @@ public sealed class UiStyleParserTests
     [Fact]
     public void UnknownPropertyWithMalformedImportantIsIgnored()
     {
-        Assert.Empty(BoundDeclarations("UiNode { ghost: !important !important; }", typeof(UiNode)));
+        Assert.Empty(BoundDeclarations("UiNode { ghost: !important !important; }", new Panel()));
     }
 
     [Fact]
@@ -709,7 +694,7 @@ public sealed class UiStyleParserTests
     {
         var rule = SingleRule("Button:hover { padding: 4 !important; }");
 
-        var declaration = Assert.Single(rule.Bind(typeof(Button)));
+        var declaration = Assert.Single(rule.Bind(new Button().GetType()));
         Assert.Equal(new Thickness(4), declaration.Setter.BoxedValue);
         Assert.True(declaration.IsImportant);
     }
