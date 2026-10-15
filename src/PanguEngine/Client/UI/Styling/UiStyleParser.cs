@@ -173,6 +173,7 @@ internal static class UiStyleParser
             var classes = new List<string>();
             string? id = null;
             var pseudoClasses = new List<UiPseudoClass>();
+            var nthConditions = new List<UiStyleNthCondition>();
             var end = GetMark();
 
             while (true)
@@ -199,7 +200,21 @@ internal static class UiStyleParser
                 else if (c == ':')
                 {
                     Advance();
-                    pseudoClasses.Add(UiPseudoClass.Get(ReadIdentifier()));
+                    var pseudoStart = GetMark();
+                    var name = ReadIdentifier().ToLowerInvariant();
+                    if (name is "nth-child" or "nth-last-child")
+                    {
+                        if (_pos >= text.Length || text[_pos] != '(')
+                            throw Error(UiStyleParseError.InvalidSyntax, pseudoStart, name.Length);
+                        Advance();
+                        nthConditions.Add(new UiStyleNthCondition(name == "nth-last-child", ParseNthExpression()));
+                    }
+                    else
+                    {
+                        if (_pos < text.Length && text[_pos] == '(')
+                            throw Error(UiStyleParseError.InvalidSyntax, pseudoStart, name.Length);
+                        pseudoClasses.Add(UiPseudoClass.Get(name));
+                    }
                 }
                 else
                 {
@@ -209,11 +224,93 @@ internal static class UiStyleParser
                 end = GetMark();
             }
 
-            if (!hasType && classes.Count == 0 && id is null && pseudoClasses.Count == 0)
+            if (!hasType && classes.Count == 0 && id is null && pseudoClasses.Count == 0 && nthConditions.Count == 0)
                 throw Error(UiStyleParseError.InvalidSyntax, start, 1);
 
-            segments.Add(UiStyleSelectorSegment.Create(null, typeName, classes, id, pseudoClasses));
+            segments.Add(UiStyleSelectorSegment.Create(null, typeName, classes, id, pseudoClasses, nthConditions));
             return end;
+        }
+
+        private UiNthExpression ParseNthExpression()
+        {
+            SkipTrivia();
+            var start = GetMark();
+            if (_pos < text.Length && text[_pos] is 'o' or 'O' or 'e' or 'E')
+            {
+                var keyword = ReadIdentifier().ToLowerInvariant();
+                var expression = keyword switch
+                {
+                    "odd" => new UiNthExpression(2, 1),
+                    "even" => new UiNthExpression(2, 0),
+                    _ => throw Error(UiStyleParseError.InvalidSyntax, start, keyword.Length)
+                };
+                return FinishNthExpression(expression);
+            }
+
+            var negative = false;
+            var separatedPlus = false;
+            if (_pos < text.Length && text[_pos] is '+' or '-')
+            {
+                negative = text[_pos] == '-';
+                Advance();
+                if (!negative)
+                {
+                    var beforeComments = _pos;
+                    SkipComments();
+                    separatedPlus = _pos != beforeComments;
+                }
+            }
+
+            int coefficient;
+            if (_pos < text.Length && text[_pos] is 'n' or 'N')
+                coefficient = negative ? -1 : 1;
+            else
+            {
+                if (separatedPlus)
+                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+                coefficient = ReadNthInteger(negative);
+                if (_pos >= text.Length || text[_pos] is not ('n' or 'N'))
+                    return FinishNthExpression(new UiNthExpression(0, coefficient));
+            }
+
+            Advance();
+            SkipTrivia();
+            if (_pos < text.Length && text[_pos] == ')')
+                return FinishNthExpression(new UiNthExpression(coefficient, 0));
+            if (_pos >= text.Length || text[_pos] is not ('+' or '-'))
+                throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+            negative = text[_pos] == '-';
+            Advance();
+            SkipTrivia();
+            var offset = ReadNthInteger(negative);
+            return FinishNthExpression(new UiNthExpression(coefficient, offset));
+        }
+
+        private int ReadNthInteger(bool negative)
+        {
+            var start = GetMark();
+            if (_pos >= text.Length || !char.IsAsciiDigit(text[_pos]))
+                throw Error(UiStyleParseError.InvalidSyntax, start, 1);
+            var limit = negative ? 2147483648L : int.MaxValue;
+            long magnitude = 0;
+            while (_pos < text.Length && char.IsAsciiDigit(text[_pos]))
+            {
+                var digit = text[_pos] - '0';
+                if (magnitude > (limit - digit) / 10)
+                    throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+                magnitude = magnitude * 10 + digit;
+                Advance();
+            }
+            return (int)(negative ? -magnitude : magnitude);
+        }
+
+        private UiNthExpression FinishNthExpression(UiNthExpression expression)
+        {
+            SkipTrivia();
+            if (_pos >= text.Length || text[_pos] != ')')
+                throw Error(UiStyleParseError.InvalidSyntax, GetMark(), 1);
+            Advance();
+            return expression;
         }
 
         private UiStyleRule.CssDeclaration ParseDeclaration()

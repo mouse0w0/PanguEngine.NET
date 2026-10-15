@@ -80,7 +80,7 @@ public abstract class Slider : Control
     {
         SetPseudoClass(UiPseudoClass.Horizontal, Orientation == Orientation.Horizontal);
         SetPseudoClass(UiPseudoClass.Vertical, Orientation == Orientation.Vertical);
-        SetPseudoClass(UiPseudoClass.Empty, !hasValue);
+        SetPseudoClass(UiPseudoClass.NoValue, !hasValue);
     }
 
     private static Property<double> RegisterLength(string name, double defaultValue) => Property.Register<Slider, double>(

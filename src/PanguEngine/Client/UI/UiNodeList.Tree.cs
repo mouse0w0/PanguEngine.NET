@@ -102,8 +102,9 @@ public sealed partial class UiNodeList
     private void ReorderChildren(Action updateStorage)
     {
         var resolver = _owner.Screen?.StyleResolver ?? UiStyleResolver.Default;
+        var refreshStyles = resolver.HasSiblingRelationships || resolver.HasChildIndexedPseudoClasses;
         var affectedScreens = new List<UiScreen>();
-        if (resolver.HasSiblingRelationships)
+        if (refreshStyles)
             AddAffectedScreen(affectedScreens, _owner.Screen);
         var activeScreens = BeginRuntimeOperations(affectedScreens);
         try
@@ -113,7 +114,7 @@ public sealed partial class UiNodeList
             _owner.InvalidateTreeStructure();
             if (preserveHitTestLayout)
                 _owner.RestoreHitTestLayoutAfterChildOrderChange();
-            if (resolver.HasSiblingRelationships)
+            if (refreshStyles)
                 CommitAndNotifyWithStyle(activeScreens, [_owner]);
         }
         finally

@@ -18,6 +18,24 @@ public sealed class UiPseudoClass
     /// <remarks>The name <c>root</c> is reserved. Its matching state cannot be changed manually.</remarks>
     public static UiPseudoClass Root { get; } = Get("root");
 
+    /// <summary>Gets the structural pseudo class that matches the first sibling, including a parentless node.</summary>
+    public static UiPseudoClass FirstChild { get; } = Get("first-child");
+
+    /// <summary>Gets the structural pseudo class that matches the last sibling, including a parentless node.</summary>
+    public static UiPseudoClass LastChild { get; } = Get("last-child");
+
+    /// <summary>Gets the structural pseudo class that matches a node without other siblings.</summary>
+    public static UiPseudoClass OnlyChild { get; } = Get("only-child");
+
+    /// <summary>Gets the structural pseudo class that matches a node without child nodes, regardless of content.</summary>
+    public static UiPseudoClass Empty { get; } = Get("empty");
+
+    /// <summary>Gets whether this identifier constrains sibling position or count.</summary>
+    internal bool IsChildIndexed => this == FirstChild || this == LastChild || this == OnlyChild;
+
+    /// <summary>Gets whether this identifier is matched automatically from tree structure.</summary>
+    internal bool IsStructural => this == Root || this == Empty || IsChildIndexed;
+
     /// <summary>Gets the built-in hover pseudo class.</summary>
     public static UiPseudoClass Hover { get; } = Get("hover");
 
@@ -49,7 +67,7 @@ public sealed class UiPseudoClass
     public static UiPseudoClass Vertical { get; } = Get("vertical");
 
     /// <summary>Gets the built-in pseudo class for controls without a value.</summary>
-    public static UiPseudoClass Empty { get; } = Get("empty");
+    public static UiPseudoClass NoValue { get; } = Get("no-value");
 
     /// <summary>Gets the built-in selected pseudo class.</summary>
     public static UiPseudoClass Selected { get; } = Get("selected");

@@ -42,6 +42,12 @@ internal sealed partial class UiStyleResolver
     /// <summary>Gets whether any input rule requires the root pseudo class.</summary>
     internal bool HasRootPseudoClass { get; private set; }
 
+    /// <summary>Gets whether any input rule depends on sibling positions or counts.</summary>
+    internal bool HasChildIndexedPseudoClasses { get; private set; }
+
+    /// <summary>Gets whether any input rule depends on the presence of child nodes.</summary>
+    internal bool HasEmptyPseudoClass { get; private set; }
+
     private void AddRules(IReadOnlyList<UiStyleSheet> sheets, UiStyleOrigin origin)
     {
         for (var sheetIndex = 0; sheetIndex < sheets.Count; sheetIndex++)
@@ -54,6 +60,8 @@ internal sealed partial class UiStyleResolver
                 HasRelationships |= rule.HasRelationships;
                 HasSiblingRelationships |= rule.HasSiblingRelationships;
                 HasRootPseudoClass |= rule.Selectors.Any(static selector => selector.HasRootPseudoClass);
+                HasChildIndexedPseudoClasses |= rule.HasChildIndexedPseudoClasses;
+                HasEmptyPseudoClass |= rule.HasEmptyPseudoClass;
                 HasVariables |= rule.HasVariables;
                 _rules.Add(new RuleEntry(origin, sheetIndex, ruleIndex, rule, declarationIndex));
                 declarationIndex += rule.DeclarationCount;

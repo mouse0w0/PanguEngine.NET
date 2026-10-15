@@ -28,13 +28,15 @@ internal sealed class UiStyleSelectorSegment
         string typeName,
         IReadOnlyList<string> classes,
         string? id,
-        IReadOnlyList<UiPseudoClass> pseudoClasses)
+        IReadOnlyList<UiPseudoClass> pseudoClasses,
+        IReadOnlyList<UiStyleNthCondition> nthConditions)
     {
         TargetType = targetType;
         TypeName = typeName;
         Classes = classes;
         Id = id;
         PseudoClasses = pseudoClasses;
+        NthConditions = nthConditions;
         Text = BuildText();
     }
 
@@ -53,6 +55,9 @@ internal sealed class UiStyleSelectorSegment
     /// <summary>Gets the required pseudo-class identifiers, deduplicated and sorted by ordinal name.</summary>
     internal IReadOnlyList<UiPseudoClass> PseudoClasses { get; }
 
+    /// <summary>Gets the immutable sibling-position conditions in normalized order.</summary>
+    internal IReadOnlyList<UiStyleNthCondition> NthConditions { get; }
+
     /// <summary>Gets the normalized text of this single segment.</summary>
     internal string Text { get; }
 
@@ -60,10 +65,17 @@ internal sealed class UiStyleSelectorSegment
     internal int IdCount => Id is null ? 0 : 1;
 
     /// <summary>Gets this segment's combined class and pseudo-class contribution to specificity.</summary>
-    internal int ClassAndPseudoCount => Classes.Count + PseudoClasses.Count;
+    internal int ClassAndPseudoCount => Classes.Count + PseudoClasses.Count + NthConditions.Count;
 
     /// <summary>Gets a value indicating whether this segment requires any pseudo class.</summary>
-    internal bool HasPseudoClasses => PseudoClasses.Count != 0;
+    internal bool HasPseudoClasses => PseudoClasses.Count != 0 || NthConditions.Count != 0;
+
+    /// <summary>Gets whether sibling positions or counts affect this segment's match.</summary>
+    internal bool HasChildIndexedPseudoClasses =>
+        NthConditions.Count != 0 || PseudoClasses.Any(static pseudo => pseudo.IsChildIndexed);
+
+    /// <summary>Gets whether the presence of children affects this segment's match.</summary>
+    internal bool HasEmptyPseudoClass => PseudoClasses.Contains(UiPseudoClass.Empty);
 
     /// <summary>Gets a value indicating whether this segment constrains the node element type.</summary>
     internal bool HasTypeConstraint => TargetType is not null || TypeName != "*";
@@ -74,7 +86,8 @@ internal sealed class UiStyleSelectorSegment
         string typeName,
         IEnumerable<string>? classes,
         string? id,
-        IEnumerable<UiPseudoClass>? pseudoClasses)
+        IEnumerable<UiPseudoClass>? pseudoClasses,
+        IEnumerable<UiStyleNthCondition>? nthConditions = null)
     {
         if (id is not null)
             UiStyleIdentifier.ThrowIfInvalid(id, nameof(id));
@@ -101,12 +114,22 @@ internal sealed class UiStyleSelectorSegment
         }
 
         orderedPseudoClasses.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Name, right.Name));
+        var orderedNthConditions = nthConditions?.Distinct().ToList() ?? [];
+        orderedNthConditions.Sort(static (left, right) =>
+        {
+            var comparison = StringComparer.Ordinal.Compare(left.Name, right.Name);
+            if (comparison != 0)
+                return comparison;
+            comparison = left.Expression.A.CompareTo(right.Expression.A);
+            return comparison != 0 ? comparison : left.Expression.B.CompareTo(right.Expression.B);
+        });
         return new UiStyleSelectorSegment(
             targetType,
             typeName,
             normalizedClasses.AsReadOnly(),
             id,
-            orderedPseudoClasses.AsReadOnly());
+            orderedPseudoClasses.AsReadOnly(),
+            orderedNthConditions.AsReadOnly());
     }
 
     /// <summary>Resolves the CLR type matched by this segment for the supplied node type, or null when unmatched.</summary>
@@ -136,6 +159,12 @@ internal sealed class UiStyleSelectorSegment
                 return false;
         }
 
+        foreach (var condition in NthConditions)
+        {
+            if (!condition.Matches(node))
+                return false;
+        }
+
         return true;
     }
 
@@ -156,7 +185,7 @@ internal sealed class UiStyleSelectorSegment
     private string BuildText()
     {
         var builder = new StringBuilder();
-        if (HasTypeConstraint || (Classes.Count == 0 && Id is null && PseudoClasses.Count == 0))
+        if (HasTypeConstraint || (Classes.Count == 0 && Id is null && !HasPseudoClasses))
             builder.Append(TypeName);
         foreach (var className in Classes)
             builder.Append('.').Append(className);
@@ -164,6 +193,8 @@ internal sealed class UiStyleSelectorSegment
             builder.Append('#').Append(Id);
         foreach (var pseudoClass in PseudoClasses)
             builder.Append(':').Append(pseudoClass.Name);
+        foreach (var condition in NthConditions)
+            builder.Append(':').Append(condition);
 
         return builder.ToString();
     }
@@ -240,7 +271,7 @@ public sealed class UiStyleSelector
 
     /// <summary>
     /// Gets the rightmost segment's required pseudo-class identifiers, deduplicated and sorted by ordinal name;
-    /// every identifier must be active on the target node to match.
+    /// every identifier must match the target node's state or structure. Function arguments are represented in <see cref="SelectorText"/>.
     /// </summary>
     public IReadOnlyList<UiPseudoClass> PseudoClasses { get; }
 
@@ -271,6 +302,13 @@ public sealed class UiStyleSelector
     /// <summary>Gets whether any segment in the chain requires the root pseudo class.</summary>
     internal bool HasRootPseudoClass =>
         _segments.Any(static segment => segment.PseudoClasses.Contains(UiPseudoClass.Root));
+
+    /// <summary>Gets whether any segment depends on sibling positions or counts.</summary>
+    internal bool HasChildIndexedPseudoClasses =>
+        _segments.Any(static segment => segment.HasChildIndexedPseudoClasses);
+
+    /// <summary>Gets whether any segment depends on the presence of child nodes.</summary>
+    internal bool HasEmptyPseudoClass => _segments.Any(static segment => segment.HasEmptyPseudoClass);
 
     /// <summary>Creates a selector for a target node type as a single-segment chain.</summary>
     /// <typeparam name="TNode">The target node type.</typeparam>

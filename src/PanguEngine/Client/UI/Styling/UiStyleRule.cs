@@ -85,6 +85,12 @@ public sealed class UiStyleRule
     /// <summary>Gets whether any selector in this rule contains a sibling combinator.</summary>
     internal bool HasSiblingRelationships => Selectors.Any(static selector => selector.HasSiblingRelationships);
 
+    /// <summary>Gets whether any selector depends on sibling positions or counts.</summary>
+    internal bool HasChildIndexedPseudoClasses => Selectors.Any(static selector => selector.HasChildIndexedPseudoClasses);
+
+    /// <summary>Gets whether any selector depends on the presence of child nodes.</summary>
+    internal bool HasEmptyPseudoClass => Selectors.Any(static selector => selector.HasEmptyPseudoClass);
+
     internal int DeclarationCount => _cssDeclarations?.Count ?? Setters.Count;
 
     internal IReadOnlyList<CssDeclaration> CssDeclarations =>

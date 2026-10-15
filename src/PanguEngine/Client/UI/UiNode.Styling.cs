@@ -96,14 +96,14 @@ public abstract partial class UiNode
     /// The collection only changes when the requested membership differs,
     /// and a no-op does not invalidate styles. A pseudo class mirrors real control state;
     /// its styles are applied during screen layout.
-    /// Requests for <see cref="UiPseudoClass.Root"/> have no effect because root matching depends on tree structure.
+    /// Requests for built-in structural pseudo classes have no effect because they are matched from tree structure.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the owning screen does not allow style input changes.
     /// </exception>
     protected void SetPseudoClass(UiPseudoClass pseudoClass, bool active)
     {
-        if (pseudoClass == UiPseudoClass.Root)
+        if (pseudoClass.IsStructural)
             return;
 
         var isActive = _pseudoClasses.Contains(pseudoClass);
@@ -122,8 +122,29 @@ public abstract partial class UiNode
     /// <summary>Determines whether this node matches the supplied structural or state pseudo class.</summary>
     /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
     /// <returns>true when the node matches the pseudo class; otherwise false.</returns>
-    internal bool HasPseudoClass(UiPseudoClass pseudoClass) =>
-        pseudoClass == UiPseudoClass.Root ? Parent is null : _pseudoClasses.Contains(pseudoClass);
+    internal bool HasPseudoClass(UiPseudoClass pseudoClass)
+    {
+        if (pseudoClass == UiPseudoClass.Root)
+            return Parent is null;
+        if (pseudoClass == UiPseudoClass.Empty)
+            return this is not Parent parent || parent.ReadOnlyChildren.Count == 0;
+        if (pseudoClass == UiPseudoClass.FirstChild)
+            return Parent is null || ReferenceEquals(Parent.ReadOnlyChildren[0], this);
+        if (pseudoClass == UiPseudoClass.LastChild)
+            return Parent is null || ReferenceEquals(Parent.ReadOnlyChildren[^1], this);
+        if (pseudoClass == UiPseudoClass.OnlyChild)
+            return Parent is null || Parent.ReadOnlyChildren.Count == 1;
+        return _pseudoClasses.Contains(pseudoClass);
+    }
+
+    /// <summary>Gets the node's one-based sibling position, treating a parentless node as a single sibling.</summary>
+    internal int GetChildPosition(bool fromEnd)
+    {
+        if (Parent is null)
+            return 1;
+        var index = Parent.Children.IndexOf(this);
+        return fromEnd ? Parent.ReadOnlyChildren.Count - index : index + 1;
+    }
 
     internal void InvalidateStyle()
     {
@@ -282,7 +303,8 @@ public abstract partial class UiNode
         UiNode? root,
         UiStyleResolver resolver)
     {
-        if (root is not null && resolver.HasRelationships)
+        if (root is not null && (resolver.HasRelationships || resolver.HasChildIndexedPseudoClasses ||
+                                 resolver.HasEmptyPseudoClass))
             entries.Add(root);
     }
 
@@ -296,7 +318,8 @@ public abstract partial class UiNode
         if (node is not null && (screenChanged || !ReferenceEquals(previousResolver, currentResolver) ||
                                  previousResolver.HasRelationships ||
                                  currentResolver.HasRelationships || previousResolver.HasVariables ||
-                                 currentResolver.HasVariables ||
+                                 currentResolver.HasVariables || previousResolver.HasChildIndexedPseudoClasses ||
+                                 currentResolver.HasChildIndexedPseudoClasses ||
                                  previousResolver.HasRootPseudoClass || currentResolver.HasRootPseudoClass))
         {
             entries.Add(node);

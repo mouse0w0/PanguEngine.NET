@@ -404,8 +404,8 @@ public sealed class UiStyleParserTests
     [Theory]
     [InlineData("Button:not(.primary) { }")]
     [InlineData("Button:is(.primary) { }")]
-    [InlineData("Button:nth-child(2) { }")]
-    public void FunctionPseudoClassSyntaxIsRejected(string css)
+    [InlineData("Button:nth-of-type(2) { }")]
+    public void UnsupportedFunctionPseudoClassSyntaxIsRejected(string css)
     {
         var error = Assert.Throws<UiStyleParseException>(() => ParseCss(css));
 

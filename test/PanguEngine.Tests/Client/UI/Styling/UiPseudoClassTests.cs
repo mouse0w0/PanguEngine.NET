@@ -50,6 +50,7 @@ public sealed class UiPseudoClassTests
         Assert.Same(UiPseudoClass.Horizontal, UiPseudoClass.Get("horizontal"));
         Assert.Same(UiPseudoClass.Vertical, UiPseudoClass.Get("vertical"));
         Assert.Same(UiPseudoClass.Empty, UiPseudoClass.Get("empty"));
+        Assert.Same(UiPseudoClass.NoValue, UiPseudoClass.Get("no-value"));
         Assert.Same(UiPseudoClass.Selected, UiPseudoClass.Get("selected"));
         Assert.Same(UiPseudoClass.Dragging, UiPseudoClass.Get("dragging"));
 

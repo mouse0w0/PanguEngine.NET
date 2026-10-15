@@ -11,6 +11,31 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class SliderTests
 {
     [Fact]
+    public void NoValueStateChangesTheDefaultTrackStyleAndRestoresItWhenValuesReturn()
+    {
+        var items = new ObservableList<int>([60]);
+        var slider = new Slider<int>(new ListSliderValueModel<int>(items));
+        _ = new UiScreen(slider);
+        slider.UpdateStyles();
+        var track = Part(slider, "track");
+        var normalBackground = track.GetValue(Region.BackgroundProperty);
+        var noValue = UiPseudoClass.NoValue;
+        Assert.False(slider.HasPseudoClass(noValue));
+
+        items.Clear();
+        slider.UpdateStyles();
+        Assert.False(slider.HasValue);
+        Assert.True(slider.HasPseudoClass(noValue));
+        Assert.NotEqual(normalBackground, track.GetValue(Region.BackgroundProperty));
+
+        items.Add(120);
+        slider.UpdateStyles();
+        Assert.True(slider.HasValue);
+        Assert.False(slider.HasPseudoClass(noValue));
+        Assert.Equal(normalBackground, track.GetValue(Region.BackgroundProperty));
+    }
+
+    [Fact]
     public void AvailabilityTransitionsPublishOnlyCommittedAvailability()
     {
         var items = new ObservableList<int>();

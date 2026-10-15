@@ -647,6 +647,6 @@ Slider:disabled .slider-fill,
     background-color: #5c6774;
 }
 
-Slider:empty .slider-track {
+Slider:no-value .slider-track {
     background-color: #2b3138;
 }
