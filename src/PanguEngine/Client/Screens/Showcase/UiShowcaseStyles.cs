@@ -18,7 +18,8 @@ internal static class UiShowcaseStyles
         CreateAuthorLocalExample(),
         CreateSelectorExample(),
         CreatePaletteExample(),
-        CreateNineSliceExample()
+        CreateNineSliceExample(),
+        CreateFontInheritanceExample()
     ];
 
     private static UiShowcaseExample CreateAuthorLocalExample()
@@ -35,6 +36,57 @@ internal static class UiShowcaseStyles
                 UiShowcaseWidgets.Sample("基础规则", basis),
                 UiShowcaseWidgets.Sample("额外规则覆盖", overridden),
                 UiShowcaseWidgets.Sample("本地值优先", local)));
+    }
+
+    private static UiShowcaseExample CreateFontInheritanceExample()
+    {
+        const string sampleText = "Aa 0123456789\n第二行文字";
+        var inherited = UiShowcaseWidgets.Label($"继承父级 · {sampleText}", "showcase-font-inherited");
+        var overridden = UiShowcaseWidgets.Label($"局部覆盖 · {sampleText}", "showcase-font-overridden");
+        var button = new Button { StyleId = "showcase-font-button", Text = "示例按钮" };
+        var editor = new TextBox { StyleId = "showcase-font-editor", Text = "可编辑文本" };
+        var preview = UiShowcaseWidgets.Preview(inherited, overridden, button, editor);
+        preview.Classes.Add("showcase-font-inheritance");
+        var preset = UiShowcaseWidgets.Caption("当前预设：A");
+        var overrideButton = new Button { StyleId = "showcase-font-toggle-override" };
+        var overrideEnabled = false;
+
+        void SetPreset(bool useB)
+        {
+            if (useB)
+                preview.Classes.Add("showcase-font-preset-b");
+            else
+                preview.Classes.Remove("showcase-font-preset-b");
+            preset.Content = useB ? "当前预设：B" : "当前预设：A";
+        }
+
+        void SetLocalOverride(bool enabled)
+        {
+            overrideEnabled = enabled;
+            if (enabled)
+            {
+                overridden.FontSize = 20;
+                overridden.Color = new Color(0x82, 0xD6, 0x9B);
+            }
+            else
+            {
+                overridden.ClearValue(UiNode.FontSizeProperty);
+                overridden.ClearValue(UiNode.ColorProperty);
+            }
+            overrideButton.Text = enabled ? "清除局部覆盖" : "恢复局部覆盖";
+        }
+
+        SetLocalOverride(true);
+        overrideButton.Click += (_, _) => SetLocalOverride(!overrideEnabled);
+        var actions = UiShowcaseWidgets.Samples(
+            UiShowcaseWidgets.ActionButton("showcase-font-preset-a", "预设 A", () => SetPreset(false)),
+            UiShowcaseWidgets.ActionButton("showcase-font-preset-b", "预设 B", () => SetPreset(true)),
+            overrideButton);
+
+        return new UiShowcaseExample(
+            "字体与颜色继承",
+            "切换预设或清除覆盖，观察文字变化；按钮和输入框保留主题色。",
+            UiShowcaseWidgets.Column(actions, preset, preview));
     }
 
     private static Button AuthorButton(string id, string text)

@@ -56,6 +56,22 @@ ScrollView.showcase-gallery-view {
     border-thickness: 1px;
 }
 
+StackPanel.showcase-font-inheritance {
+    font-size: 16px;
+    line-height: 1.2;
+    font-weight: normal;
+    font-style: normal;
+    color: #8fc4ff;
+}
+
+StackPanel.showcase-font-inheritance.showcase-font-preset-b {
+    font-size: 22px;
+    line-height: 1.6;
+    font-weight: bold;
+    font-style: italic;
+    color: #ffcf70;
+}
+
 Text.showcase-heading,
 Text.showcase-type-heading {
     font-size: 26px;
