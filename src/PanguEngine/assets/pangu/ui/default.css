@@ -261,8 +261,8 @@ TextBox {
     border-color: #5c6774;
     border-thickness: 1px;
     color: #f2f4f7;
-    placeholder-foreground: #8b94a0;
-    selection-background: #2f64a0;
+    placeholder-color: #8b94a0;
+    selection-background-color: #2f64a0;
     caret-color: #f2f4f7;
 }
 
@@ -278,8 +278,8 @@ TextBox:disabled {
     background-color: #1b1e23;
     border-color: #343a41;
     color: #8b94a0;
-    placeholder-foreground: #5c6774;
-    selection-background: #343a41;
+    placeholder-color: #5c6774;
+    selection-background-color: #343a41;
     caret-color: #8b94a0;
 }
 
@@ -367,7 +367,7 @@ NumericUpDown:disabled .numeric-up-down-editor,
 :disabled NumericUpDown .numeric-up-down-editor {
     color: #8b94a0;
     caret-color: #8b94a0;
-    selection-background: #343a41;
+    selection-background-color: #343a41;
 }
 
 TabView {

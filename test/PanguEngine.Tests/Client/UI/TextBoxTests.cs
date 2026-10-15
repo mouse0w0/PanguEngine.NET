@@ -1,5 +1,3 @@
-using PanguEngine.ComponentModel;
-using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 using System.ComponentModel;
 using System.Reflection;
 using System.Text;
@@ -7,9 +5,10 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.ComponentModel;
 using PanguEngine.Desktop;
-using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
+using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.Client.UI;
 
@@ -38,7 +37,7 @@ public sealed class TextBoxTests
         var commands = screen.CreateDrawCommandList();
         var text = Assert.Single(commands.OfType<UiDrawTextCommand>());
         var selection = Assert.Single(commands.OfType<UiFillRectangleCommand>()
-            .Where(command => command.Color == textBox.SelectionBackground));
+            .Where(command => command.Color == textBox.SelectionBackgroundColor));
         Assert.NotSame(initial.Layout, text.Layout);
         Assert.Equal(initial.Layout.Height * 1.5, text.Layout.Height, 6);
         Assert.Equal(text.Layout.Height, selection.Bounds.Height);
@@ -60,8 +59,8 @@ public sealed class TextBoxTests
         Assert.Equal(string.Empty, UiNode.FontFamilyProperty.DefaultValue);
         Assert.Equal(new Color(255, 255, 255), UiNode.ColorProperty.DefaultValue);
         Assert.Equal(new Color(242, 244, 247), textBox.Color);
-        AssertProperty(TextBox.PlaceholderForegroundProperty, new Color(139, 148, 160));
-        AssertProperty(TextBox.SelectionBackgroundProperty, new Color(47, 100, 160));
+        AssertProperty(TextBox.PlaceholderColorProperty, new Color(139, 148, 160));
+        AssertProperty(TextBox.SelectionBackgroundColorProperty, new Color(47, 100, 160));
         AssertProperty(TextBox.CaretColorProperty, new Color(242, 244, 247));
         AssertProperty(TextBox.IsReadOnlyProperty, false);
         Assert.True(textBox.Focusable);
@@ -91,8 +90,8 @@ public sealed class TextBoxTests
         {
             UiNode.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
             Region.BorderBrushProperty, Region.BorderThicknessProperty,
-            UiNode.ColorProperty, TextBox.PlaceholderForegroundProperty,
-            TextBox.SelectionBackgroundProperty, TextBox.CaretColorProperty
+            UiNode.ColorProperty, TextBox.PlaceholderColorProperty,
+            TextBox.SelectionBackgroundColorProperty, TextBox.CaretColorProperty
         };
         foreach (var property in properties)
         {
@@ -160,8 +159,8 @@ public sealed class TextBoxTests
                                    border-thickness: 2px;
                                    font-size: 20px;
                                    color: #070809;
-                                   placeholder-foreground: #101112;
-                                   selection-background: #131415;
+                                   placeholder-color: #101112;
+                                   selection-background-color: #131415;
                                    caret-color: #161718;
                                }
                                """)
@@ -178,8 +177,8 @@ public sealed class TextBoxTests
         Assert.Equal(new Thickness(2), node.BorderThickness);
         Assert.Equal(20d, node.FontSize);
         Assert.Equal(new Color(7, 8, 9), node.Color);
-        Assert.Equal(new Color(16, 17, 18), node.PlaceholderForeground);
-        Assert.Equal(new Color(19, 20, 21), node.SelectionBackground);
+        Assert.Equal(new Color(16, 17, 18), node.PlaceholderColor);
+        Assert.Equal(new Color(19, 20, 21), node.SelectionBackgroundColor);
         Assert.Equal(new Color(22, 23, 24), node.CaretColor);
 
         node.Background = new SolidColorBrush(30, 31, 32);
@@ -547,7 +546,7 @@ public sealed class TextBoxTests
         var text = Assert.Single(commands.OfType<UiDrawTextCommand>());
         var selection = Assert.Single(commands
             .OfType<UiFillRectangleCommand>()
-            .Where(command => command.Color == textBox.SelectionBackground));
+            .Where(command => command.Color == textBox.SelectionBackgroundColor));
 
         var clip = Assert.Single(commands.OfType<UiPushClipCommand>()).Clip;
         Assert.Single(text.Layout.Lines);
@@ -668,7 +667,7 @@ public sealed class TextBoxTests
 
         var commands = screen.CreateDrawCommandList().ToArray();
         var placeholderIndex = Array.FindIndex(commands, command =>
-            command is UiDrawTextCommand text && text.Color == textBox.PlaceholderForeground);
+            command is UiDrawTextCommand text && text.Color == textBox.PlaceholderColor);
         var caretIndex = Array.FindIndex(commands, command =>
             command is UiFillRectangleCommand fill && fill.Color == textBox.CaretColor);
         var focusIndex = Array.FindIndex(commands, command =>
@@ -687,8 +686,8 @@ public sealed class TextBoxTests
         Assert.Equal(-1, overlayIndex);
         Assert.Equal(new SolidColorBrush(27, 30, 35), textBox.Background);
         Assert.Equal(new SolidColorBrush(52, 58, 65), textBox.BorderBrush);
-        Assert.Equal(new Color(92, 103, 116), textBox.PlaceholderForeground);
-        Assert.Equal(textBox.PlaceholderForeground, Assert.Single(commands.OfType<UiDrawTextCommand>()).Color);
+        Assert.Equal(new Color(92, 103, 116), textBox.PlaceholderColor);
+        Assert.Equal(textBox.PlaceholderColor, Assert.Single(commands.OfType<UiDrawTextCommand>()).Color);
         Assert.DoesNotContain(commands, command =>
             command is UiFillRectangleCommand fill && fill.Color == new Color(84, 169, 255));
     }
@@ -712,11 +711,11 @@ public sealed class TextBoxTests
         textBox.SelectAll();
         Assert.Contains(
             screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
-            command => command.Color == textBox.SelectionBackground);
+            command => command.Color == textBox.SelectionBackgroundColor);
         screen.ClearFocus();
         Assert.DoesNotContain(
             screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
-            command => command.Color == textBox.SelectionBackground);
+            command => command.Color == textBox.SelectionBackgroundColor);
     }
 
     private static (UiManager Manager, GameScreen Screen, TextBox TextBox) OpenTextBox(

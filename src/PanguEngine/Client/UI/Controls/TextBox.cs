@@ -1,9 +1,9 @@
-using PanguEngine.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Input;
 using PanguEngine.Client.UI.Styling;
+using PanguEngine.ComponentModel;
 using PanguEngine.Desktop;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
@@ -42,19 +42,19 @@ public sealed class TextBox : Control
             validationMessage: "Placeholder cannot be null.");
 
     /// <summary>
-    /// Identifies the <see cref="PlaceholderForeground"/> property.
+    /// Identifies the <see cref="PlaceholderColor"/> property.
     /// </summary>
-    public static readonly Property<Color> PlaceholderForegroundProperty =
+    public static readonly Property<Color> PlaceholderColorProperty =
         Property.Register<TextBox, Color>(
-            nameof(PlaceholderForeground),
+            nameof(PlaceholderColor),
             new Color(139, 148, 160));
 
     /// <summary>
-    /// Identifies the <see cref="SelectionBackground"/> property.
+    /// Identifies the <see cref="SelectionBackgroundColor"/> property.
     /// </summary>
-    public static readonly Property<Color> SelectionBackgroundProperty =
+    public static readonly Property<Color> SelectionBackgroundColorProperty =
         Property.Register<TextBox, Color>(
-            nameof(SelectionBackground),
+            nameof(SelectionBackgroundColor),
             new Color(47, 100, 160));
 
     /// <summary>
@@ -78,10 +78,11 @@ public sealed class TextBox : Control
     {
         UiCssRegistry.RegisterElement<TextBox>("TextBox");
         UiCssRegistry.RegisterProperty<TextBox, Color>(
-            "placeholder-foreground", PlaceholderForegroundProperty, UiCssValueConverters.ParseColor);
+            "placeholder-color", PlaceholderColorProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<TextBox, Color>(
-            "selection-background", SelectionBackgroundProperty, UiCssValueConverters.ParseColor);
-        UiCssRegistry.RegisterProperty<TextBox, Color>("caret-color", CaretColorProperty, UiCssValueConverters.ParseColor);
+            "selection-background-color", SelectionBackgroundColorProperty, UiCssValueConverters.ParseColor);
+        UiCssRegistry.RegisterProperty<TextBox, Color>("caret-color", CaretColorProperty,
+            UiCssValueConverters.ParseColor);
     }
 
     private static readonly UiKeyBindings<TextBox> KeyBindings =
@@ -240,19 +241,19 @@ public sealed class TextBox : Control
     /// <summary>
     /// Gets or sets the non-premultiplied placeholder text color.
     /// </summary>
-    public Color PlaceholderForeground
+    public Color PlaceholderColor
     {
-        get => GetValue(PlaceholderForegroundProperty);
-        set => SetValue(PlaceholderForegroundProperty, value);
+        get => GetValue(PlaceholderColorProperty);
+        set => SetValue(PlaceholderColorProperty, value);
     }
 
     /// <summary>
     /// Gets or sets the non-premultiplied selection background color.
     /// </summary>
-    public Color SelectionBackground
+    public Color SelectionBackgroundColor
     {
-        get => GetValue(SelectionBackgroundProperty);
-        set => SetValue(SelectionBackgroundProperty, value);
+        get => GetValue(SelectionBackgroundColorProperty);
+        set => SetValue(SelectionBackgroundColorProperty, value);
     }
 
     /// <summary>
@@ -477,7 +478,7 @@ public sealed class TextBox : Control
                         _textY,
                         end - start,
                         layout.Height),
-                    SelectionBackground);
+                    SelectionBackgroundColor);
             }
 
             if (_drawLayout)
@@ -488,7 +489,7 @@ public sealed class TextBox : Control
                         _textY),
                     layout,
                     FontSize,
-                    _layoutIsPlaceholder ? PlaceholderForeground : Color);
+                    _layoutIsPlaceholder ? PlaceholderColor : Color);
             }
 
             if (IsEnabled && IsFocused && !IsReadOnly && SelectionLength == 0 && IsCaretVisible())
