@@ -36,12 +36,13 @@ public sealed class ControlPropertyValidationTests
     public void TextInputsRejectNullBeforePublishingOrSynchronizingChildren()
     {
         AssertRejected(new Text(), Text.ContentProperty, null!);
-        AssertRejected(new Text(), Text.FontProperty, null!);
+        AssertRejected(new Panel(), UiNode.FontFamilyProperty, null!);
+        AssertRejected(new Text(), UiNode.FontFamilyProperty, null!);
         AssertRejected(new Button(), Button.TextProperty, null!);
-        AssertRejected(new Button(), Button.FontProperty, null!);
+        AssertRejected(new Button(), UiNode.FontFamilyProperty, null!);
         AssertRejected(new TextBox(), TextBox.TextProperty, null!);
         AssertRejected(new TextBox(), TextBox.PlaceholderProperty, null!);
-        AssertRejected(new TextBox(), TextBox.FontProperty, null!);
+        AssertRejected(new TextBox(), UiNode.FontFamilyProperty, null!);
     }
 
     private static void AssertRejected<T>(UiNode node, Property<T> property, T value)
@@ -66,6 +67,8 @@ public sealed class ControlPropertyValidationTests
         yield return (() => new Rectangle(), Shape.StrokeMiterLimitProperty, 1, [0.5, double.NaN, double.PositiveInfinity, double.NegativeInfinity]);
         yield return (() => new Text(), Text.FontSizeProperty, 12, positive);
         yield return (() => new Text(), Text.LineHeightProperty, 1, positive);
+        yield return (() => new Panel(), UiNode.LineHeightProperty, 1, positive);
+        yield return (() => new TextBox(), UiNode.LineHeightProperty, 1, positive);
         yield return (() => new TextBox(), TextBox.FontSizeProperty, 12, positive);
         yield return (() => new ScrollBar(), ScrollBar.LargeChangeProperty, 0, nonNegative);
         yield return (() => new ScrollBar(), ScrollBar.MinimumThumbLengthProperty, 0, nonNegative);

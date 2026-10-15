@@ -1,5 +1,7 @@
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.ComponentModel;
 using PanguEngine.Collections;
+using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI;
 
@@ -29,16 +31,51 @@ public abstract partial class UiNode : ObservableObject
     /// </summary>
     public static readonly Property<UiScreen?> ScreenProperty = ScreenPropertyKey.Property;
 
-    /// <summary>
-    /// Identifies the inherited <see cref="FontSize"/> property.
-    /// </summary>
+    /// <summary>Identifies the inherited <see cref="FontFamily"/> property.</summary>
+    public static readonly Property<string> FontFamilyProperty =
+        Property.Register<UiNode, string>(
+            nameof(FontFamily), string.Empty,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: static value => value is not null,
+            validationMessage: "FontFamily cannot be null.",
+            inherits: true);
+
+    /// <summary>Identifies the inherited <see cref="FontWeight"/> property.</summary>
+    public static readonly Property<FontWeight> FontWeightProperty =
+        Property.Register<UiNode, FontWeight>(
+            nameof(FontWeight), FontWeight.Normal,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            inherits: true);
+
+    /// <summary>Identifies the inherited <see cref="FontStyle"/> property.</summary>
+    public static readonly Property<FontStyle> FontStyleProperty =
+        Property.Register<UiNode, FontStyle>(
+            nameof(FontStyle), FontStyle.Normal,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            inherits: true);
+
+    /// <summary>Identifies the inherited <see cref="FontSize"/> property.</summary>
     public static readonly Property<double> FontSizeProperty =
         Property.Register<UiNode, double>(
-            nameof(FontSize),
-            16d,
+            nameof(FontSize), 16d,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             validate: IsFinitePositive,
             validationMessage: "FontSize must be positive and finite.",
+            inherits: true);
+
+    /// <summary>Identifies the inherited <see cref="LineHeight"/> property.</summary>
+    public static readonly Property<double> LineHeightProperty =
+        Property.Register<UiNode, double>(
+            nameof(LineHeight), 1d,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFinitePositive,
+            validationMessage: "LineHeight must be positive and finite.",
+            inherits: true);
+
+    /// <summary>Identifies the inherited <see cref="Color"/> property.</summary>
+    public static readonly Property<Color> ColorProperty =
+        Property.Register<UiNode, Color>(
+            nameof(Color), new Color(255, 255, 255),
             inherits: true);
 
     /// <summary>
@@ -69,6 +106,35 @@ public abstract partial class UiNode : ObservableObject
     public UiScreen? Screen => GetValue(ScreenProperty);
 
     /// <summary>
+    /// Gets or sets the preferred font family, inherited from the parent when no local or styled value applies.
+    /// </summary>
+    /// <remarks>An empty family name requests the engine default font.</remarks>
+    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
+    public string FontFamily
+    {
+        get => GetValue(FontFamilyProperty);
+        set => SetValue(FontFamilyProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the preferred font weight, inherited from the parent when no local or styled value applies.
+    /// </summary>
+    public FontWeight FontWeight
+    {
+        get => GetValue(FontWeightProperty);
+        set => SetValue(FontWeightProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the preferred font style, inherited from the parent when no local or styled value applies.
+    /// </summary>
+    public FontStyle FontStyle
+    {
+        get => GetValue(FontStyleProperty);
+        set => SetValue(FontStyleProperty, value);
+    }
+
+    /// <summary>
     /// Gets or sets the text size in logical pixels, inherited from the parent when no local or styled value applies.
     /// </summary>
     /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
@@ -76,6 +142,25 @@ public abstract partial class UiNode : ObservableObject
     {
         get => GetValue(FontSizeProperty);
         set => SetValue(FontSizeProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the natural line height multiplier, inherited from the parent when no local or styled value applies.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
+    public double LineHeight
+    {
+        get => GetValue(LineHeightProperty);
+        set => SetValue(LineHeightProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the non-premultiplied foreground color, inherited from the parent when no local or styled value applies.
+    /// </summary>
+    public Color Color
+    {
+        get => GetValue(ColorProperty);
+        set => SetValue(ColorProperty, value);
     }
 
     /// <inheritdoc />
@@ -106,6 +191,8 @@ public abstract partial class UiNode : ObservableObject
     /// </exception>
     public void MoveToBack() =>
         Parent?.MoveChildToBack(this);
+
+    internal Font CreateFontRequest() => new(FontFamily, FontWeight, FontStyle);
 
     internal void SetParent(Parent? parent) =>
         SetValue(ParentPropertyKey, parent);

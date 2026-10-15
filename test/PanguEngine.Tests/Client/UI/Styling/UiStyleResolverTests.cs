@@ -82,7 +82,7 @@ public sealed class UiStyleResolverTests
         Assert.Equal(new SolidColorBrush(48, 54, 62), result.GetValue(Region.BackgroundProperty));
         Assert.Equal(new SolidColorBrush(92, 103, 116), result.GetValue(Region.BorderBrushProperty));
         Assert.Equal(new Thickness(1), result.GetValue(Region.BorderThicknessProperty));
-        Assert.Equal(new Color(242, 244, 247), result.GetValue(Button.ForegroundProperty));
+        Assert.Equal(new Color(242, 244, 247), result.GetValue(UiNode.ColorProperty));
         var source = Assert.Single(result.GetSources(Region.BackgroundProperty));
         Assert.Equal("pangu/ui/default.css", source.SheetSourceName);
         Assert.Equal(UiStyleOrigin.Base, source.Origin);

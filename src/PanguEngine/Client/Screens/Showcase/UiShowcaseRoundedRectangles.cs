@@ -158,7 +158,7 @@ internal static class UiShowcaseRoundedRectangles
                 Padding = Thickness.Zero,
                 BorderThickness = Thickness.Zero,
                 Background = new SolidColorBrush(255, 180, 84),
-                Foreground = new Color(26, 32, 43)
+                Color = new Color(26, 32, 43)
             };
             corner.Click += (_, _) => click();
             Canvas.SetLeft(corner, x);

@@ -3,7 +3,7 @@ Button {
     background-color: #30363e;
     border-color: #5c6774;
     border-thickness: 1px;
-    foreground: #f2f4f7;
+    color: #f2f4f7;
 }
 
 Button:hover {
@@ -21,7 +21,7 @@ Button:focus {
 Button:disabled {
     background-color: #1b1e23;
     border-color: #343a41;
-    foreground: #8b94a0;
+    color: #8b94a0;
 }
 
 Button.danger {
@@ -148,9 +148,12 @@ CheckBox:indeterminate Path.checkbox-mark {
     data: "M 0 0 L 12 0 L 12 2 L 0 2 Z";
 }
 
+CheckBox {
+    color: #f2f4f7;
+}
+
 CheckBox Text.checkbox-text {
     font-size: 16px;
-    color: #f2f4f7;
 }
 
 CheckBox:checked .checkbox-box,
@@ -181,12 +184,13 @@ CheckBox:disabled Path.checkbox-mark,
     fill: #8b94a0;
 }
 
-CheckBox:disabled Text.checkbox-text,
-:disabled CheckBox Text.checkbox-text {
+CheckBox:disabled,
+:disabled CheckBox {
     color: #8b94a0;
 }
 
 RadioButton {
+    color: #f2f4f7;
     padding: 4px;
     background-color: transparent;
     border-color: transparent;
@@ -213,7 +217,6 @@ RadioButton > .radio-button-indicator > .radio-button-dot {
 
 RadioButton > .radio-button-content > .radio-button-text {
     font-size: 16px;
-    color: #f2f4f7;
 }
 
 RadioButton:hover > .radio-button-indicator > .radio-button-ring {
@@ -237,6 +240,7 @@ RadioButton:focus {
 RadioButton:disabled,
 :disabled RadioButton {
     border-color: transparent;
+    color: #8b94a0;
 }
 
 RadioButton:disabled > .radio-button-indicator > .radio-button-ring,
@@ -250,18 +254,13 @@ RadioButton:disabled:checked > .radio-button-indicator > .radio-button-dot,
     fill: #6e7884;
 }
 
-RadioButton:disabled > .radio-button-content > .radio-button-text,
-:disabled RadioButton > .radio-button-content > .radio-button-text {
-    color: #8b94a0;
-}
-
 TextBox {
     min-width: 160px;
     padding: 6px 8px;
     background-color: #1f2329;
     border-color: #5c6774;
     border-thickness: 1px;
-    foreground: #f2f4f7;
+    color: #f2f4f7;
     placeholder-foreground: #8b94a0;
     selection-background: #2f64a0;
     caret-color: #f2f4f7;
@@ -278,7 +277,7 @@ TextBox:focus {
 TextBox:disabled {
     background-color: #1b1e23;
     border-color: #343a41;
-    foreground: #8b94a0;
+    color: #8b94a0;
     placeholder-foreground: #5c6774;
     selection-background: #343a41;
     caret-color: #8b94a0;
@@ -366,7 +365,7 @@ NumericUpDown:disabled,
 
 NumericUpDown:disabled .numeric-up-down-editor,
 :disabled NumericUpDown .numeric-up-down-editor {
-    foreground: #8b94a0;
+    color: #8b94a0;
     caret-color: #8b94a0;
     selection-background: #343a41;
 }

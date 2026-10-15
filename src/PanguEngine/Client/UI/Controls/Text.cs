@@ -22,36 +22,6 @@ public sealed class Text : UiNode
             validationMessage: "Content cannot be null.");
 
     /// <summary>
-    /// Identifies the <see cref="Font"/> property.
-    /// </summary>
-    public static readonly Property<Font> FontProperty =
-        Property.Register<Text, Font>(
-            nameof(Font),
-            new Font(string.Empty),
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
-            validate: static value => value is not null,
-            validationMessage: "Font cannot be null.");
-
-    /// <summary>
-    /// Identifies the <see cref="Color"/> property.
-    /// </summary>
-    public static readonly Property<Color> ColorProperty =
-        Property.Register<Text, Color>(
-            nameof(Color),
-            new Color(255, 255, 255));
-
-    /// <summary>
-    /// Identifies the <see cref="LineHeight"/> property.
-    /// </summary>
-    public static readonly Property<double> LineHeightProperty =
-        Property.Register<Text, double>(
-            nameof(LineHeight),
-            1,
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
-            validate: IsFinitePositive,
-            validationMessage: "LineHeight must be positive and finite.");
-
-    /// <summary>
     /// Identifies the <see cref="Wrapping"/> property.
     /// </summary>
     public static readonly Property<TextWrapping> WrappingProperty =
@@ -72,8 +42,6 @@ public sealed class Text : UiNode
     static Text()
     {
         UiCssRegistry.RegisterElement<Text>("Text");
-        UiCssRegistry.RegisterProperty<Text, double>("line-height", LineHeightProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Text, Color>("color", ColorProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<Text, TextWrapping>(
             "wrapping",
             WrappingProperty,
@@ -104,35 +72,6 @@ public sealed class Text : UiNode
     }
 
     /// <summary>
-    /// Gets or sets the preferred font request.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
-    public Font Font
-    {
-        get => GetValue(FontProperty);
-        set => SetValue(FontProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the non-premultiplied text color.
-    /// </summary>
-    public Color Color
-    {
-        get => GetValue(ColorProperty);
-        set => SetValue(ColorProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the natural line height multiplier.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
-    public double LineHeight
-    {
-        get => GetValue(LineHeightProperty);
-        set => SetValue(LineHeightProperty, value);
-    }
-
-    /// <summary>
     /// Gets or sets the automatic line wrapping mode.
     /// </summary>
     public TextWrapping Wrapping
@@ -155,7 +94,7 @@ public sealed class Text : UiNode
     {
         var layout = UiToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
             Content,
-            Font,
+            CreateFontRequest(),
             FontSize,
             availableSize.Width,
             LineHeight,

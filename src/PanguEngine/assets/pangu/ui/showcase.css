@@ -111,7 +111,7 @@ Text.showcase-warning {
 Button.showcase-primary {
     background-color: #356fd4;
     border-color: #4f8df5;
-    foreground: #ffffff;
+    color: #ffffff;
 }
 
 Button.showcase-primary:hover {
@@ -129,13 +129,13 @@ Button.showcase-primary:focus {
 Button.showcase-primary:disabled {
     background-color: #25364d;
     border-color: #3b4b63;
-    foreground: #7d8da6;
+    color: #7d8da6;
 }
 
 Button.showcase-outline {
     background-color: transparent;
     border-color: #4f8df5;
-    foreground: #94bbff;
+    color: #94bbff;
 }
 
 Button.showcase-outline:hover {
@@ -153,7 +153,7 @@ Button.showcase-outline:focus {
 Button.showcase-outline:disabled {
     background-color: transparent;
     border-color: #3b4b63;
-    foreground: #7d8da6;
+    color: #7d8da6;
 }
 
 CheckBox.showcase-checkbox-accent Text.checkbox-text {

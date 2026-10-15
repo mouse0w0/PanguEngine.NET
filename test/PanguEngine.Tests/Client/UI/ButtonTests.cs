@@ -25,12 +25,9 @@ public sealed class ButtonTests
         AssertProperty(
             Button.TextProperty,
             string.Empty);
-        AssertProperty(
-            Button.FontProperty,
-            new Font(string.Empty));
-        AssertProperty(
-            Button.ForegroundProperty,
-            new Color(242, 244, 247));
+        Assert.Equal(typeof(UiNode), Button.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(UiNode), Button.ColorProperty.OwnerType);
+        Assert.Equal(new Color(242, 244, 247), button.Color);
         AssertProperty(
             Button.IconProperty,
             (UiImage?)null);
@@ -107,9 +104,11 @@ public sealed class ButtonTests
         var font = new Font("Requested Family");
         var button = new Button
         {
-            Font = font,
+            FontFamily = font.FamilyName,
+            FontWeight = font.Weight,
+            FontStyle = font.Style,
             FontSize = 19,
-            Foreground = new Color(10, 20, 30),
+            Color = new Color(10, 20, 30),
             IconSize = 23
         };
 
@@ -120,18 +119,22 @@ public sealed class ButtonTests
         var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
         var text = Assert.IsType<Text>(button.ReadOnlyChildren[1]);
 
-        Assert.Equal(font, text.Font);
+        Assert.Equal(font.FamilyName, text.FontFamily);
+        Assert.Equal(font.Weight, text.FontWeight);
+        Assert.Equal(font.Style, text.FontStyle);
         Assert.Equal(19, text.FontSize);
         Assert.Equal(new Color(10, 20, 30), text.Color);
         Assert.Equal(23, image.Width);
         Assert.Equal(23, image.Height);
 
-        button.Font = new Font("Replacement Family");
+        button.FontFamily = "Replacement Family";
         button.FontSize = 21;
-        button.Foreground = new Color(40, 50, 60);
+        button.Color = new Color(40, 50, 60);
         button.IconSize = 17;
 
-        Assert.Equal(button.Font, text.Font);
+        Assert.Equal(button.FontFamily, text.FontFamily);
+        Assert.Equal(button.FontWeight, text.FontWeight);
+        Assert.Equal(button.FontStyle, text.FontStyle);
         Assert.Equal(21, text.FontSize);
         Assert.Equal(new Color(40, 50, 60), text.Color);
         Assert.Equal(17, image.Width);
@@ -330,7 +333,7 @@ public sealed class ButtonTests
         Assert.Equal(5, disabled.Count);
         Assert.Equal(new Color(27, 30, 35), disabled[0].Color);
         Assert.All(disabled.Skip(1), command => Assert.Equal(new Color(52, 58, 65), command.Color));
-        Assert.Equal(new Color(139, 148, 160), button.Foreground);
+        Assert.Equal(new Color(139, 148, 160), button.Color);
         manager.Close();
     }
 
@@ -368,7 +371,7 @@ public sealed class ButtonTests
         Assert.Equal(new Color(104, 43, 45), fills[0].Color);
         Assert.All(fills.Skip(1), command => Assert.Equal(new Color(157, 73, 77), command.Color));
         Assert.True(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
-        Assert.Equal(new Color(139, 148, 160), button.Foreground);
+        Assert.Equal(new Color(139, 148, 160), button.Color);
 
         button.ClearValue(Region.BackgroundProperty);
         button.ClearValue(Region.BorderBrushProperty);
@@ -410,7 +413,7 @@ public sealed class ButtonTests
         screen.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(58, 24, 25), button.Background);
         Assert.Equal(new SolidColorBrush(88, 41, 43), button.BorderBrush);
-        Assert.Equal(new Color(139, 148, 160), button.Foreground);
+        Assert.Equal(new Color(139, 148, 160), button.Color);
         Assert.Equal("Button.danger:disabled", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
 
         button.Classes.Remove("danger");
@@ -504,11 +507,11 @@ public sealed class ButtonTests
         Assert.Equal(
             danger ? new SolidColorBrush(88, 41, 43) : new SolidColorBrush(52, 58, 65),
             button.BorderBrush);
-        Assert.Equal(new Color(139, 148, 160), button.Foreground);
+        Assert.Equal(new Color(139, 148, 160), button.Color);
     }
 
     [Fact]
-    public void DisabledForegroundSynchronizesTextAndHonorsLocalOverride()
+    public void DisabledColorIsInheritedByTextAndHonorsLocalOverride()
     {
         var button = new Button { Text = "Delete" };
         button.Classes.Add("danger");
@@ -518,9 +521,9 @@ public sealed class ButtonTests
         button.GetStyleRoot().UpdateStyles();
 
         Assert.Equal(new Color(139, 148, 160), text.Color);
-        button.Foreground = new Color(240, 230, 220);
+        button.Color = new Color(240, 230, 220);
         Assert.Equal(new Color(240, 230, 220), text.Color);
-        button.ClearValue(Button.ForegroundProperty);
+        button.ClearValue(UiNode.ColorProperty);
         Assert.Equal(new Color(139, 148, 160), text.Color);
     }
 

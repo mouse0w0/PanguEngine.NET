@@ -297,7 +297,7 @@ public sealed class ToggleButtonTests
         button.UpdateStyles();
         ordinary.UpdateStyles();
         Assert.Equal("ToggleButton:checked:disabled", BackgroundSelector(button));
-        Assert.Equal(ordinary.Foreground, button.Foreground);
+        Assert.Equal(ordinary.Color, button.Color);
         Assert.Equal(ordinary.BorderBrush, button.BorderBrush);
         Assert.NotEqual(ordinary.Background, button.Background);
 

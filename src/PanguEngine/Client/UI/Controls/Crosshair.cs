@@ -10,7 +10,7 @@ namespace PanguEngine.Client.UI.Controls;
 public sealed class Crosshair : UiNode
 {
     /// <summary>Identifies the <see cref="Color"/> property.</summary>
-    public static readonly Property<Color> ColorProperty =
+    public new static readonly Property<Color> ColorProperty =
         Property.Register<Crosshair, Color>(
             nameof(Color),
             new Color(255, 255, 255));
@@ -90,6 +90,7 @@ public sealed class Crosshair : UiNode
     static Crosshair()
     {
         UiCssRegistry.RegisterElement<Crosshair>("Crosshair");
+        UiCssRegistry.RegisterProperty<Crosshair, Color>("color", ColorProperty, UiCssValueConverters.ParseColor);
     }
 
     /// <summary>
@@ -101,8 +102,8 @@ public sealed class Crosshair : UiNode
         VerticalAlignment = VerticalAlignment.Center;
     }
 
-    /// <summary>Gets or sets the crosshair color.</summary>
-    public Color Color
+    /// <summary>Gets or sets the crosshair color independently of the parent foreground color.</summary>
+    public new Color Color
     {
         get => GetValue(ColorProperty);
         set => SetValue(ColorProperty, value);

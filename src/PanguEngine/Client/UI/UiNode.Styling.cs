@@ -1,6 +1,8 @@
 using PanguEngine.ComponentModel;
+using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Styling;
 using PanguEngine.Collections;
+using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI;
 
@@ -16,7 +18,13 @@ public abstract partial class UiNode
     static UiNode()
     {
         UiCssRegistry.RegisterElement<UiNode>("UiNode");
+        UiCssRegistry.RegisterProperty<UiNode, string>("font-family", FontFamilyProperty, UiCssFontConverters.ParseFamily);
+        UiCssRegistry.RegisterProperty<UiNode, FontWeight>("font-weight", FontWeightProperty, UiCssFontConverters.ParseWeight);
+        UiCssRegistry.RegisterProperty<UiNode, FontStyle>("font-style", FontStyleProperty, UiCssFontConverters.ParseStyle);
         UiCssRegistry.RegisterProperty<UiNode, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("line-height", LineHeightProperty, UiCssFontConverters.ParseLineHeight);
+        UiCssRegistry.RegisterProperty<UiNode, Color>("color", ColorProperty, UiCssValueConverters.ParseColor);
+        UiCssRegistry.RegisterProperty<UiNode>("font", UiCssFontConverters.ParseFont);
         UiCssRegistry.RegisterProperty<UiNode, double>("width", WidthProperty, UiCssValueConverters.ParseDimension);
         UiCssRegistry.RegisterProperty<UiNode, double>("height", HeightProperty, UiCssValueConverters.ParseDimension);
         UiCssRegistry.RegisterProperty<UiNode, double>("min-width", MinWidthProperty, UiCssValueConverters.ParseLength);

@@ -2,11 +2,46 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Controls;
 using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Client.UI.Rendering;
+using PanguEngine.Client.UI.Styling;
 
 namespace PanguEngine.Tests.Client.UI;
 
 public sealed class CrosshairTests
 {
+    [Fact]
+    public void ParentColorDoesNotAffectCrosshairAndOwnCssColorCanBeCleared()
+    {
+        var root = new Panel { Color = new Color(10, 20, 30) };
+        var crosshair = new Crosshair { OutlineThickness = 0, OutlineColor = new Color(0, 0, 0, 0) };
+        root.Children.Add(crosshair);
+        var screen = new UiScreen(root) { UseLayoutRounding = false };
+        screen.SetBaseStyleSheets([]);
+        screen.Open();
+        screen.PrepareFrame(new Size(200, 100));
+
+        Assert.NotEmpty(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>());
+        Assert.All(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
+            command => Assert.Equal(new Color(255, 255, 255), command.Color));
+
+        screen.SetStyleSheets([UiStyleSheet.Parse("Crosshair { color: #123456; }")]);
+        screen.PrepareFrame(new Size(200, 100));
+        root.Color = new Color(40, 50, 60);
+
+        Assert.All(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
+            command => Assert.Equal(new Color(0x12, 0x34, 0x56), command.Color));
+        crosshair.Color = new Color(70, 80, 90);
+        crosshair.ClearValue(Crosshair.ColorProperty);
+        Assert.Equal(new Color(0x12, 0x34, 0x56), crosshair.Color);
+
+        screen.SetStyleSheets([]);
+        screen.PrepareFrame(new Size(200, 100));
+
+        Assert.Equal(new Color(255, 255, 255), crosshair.Color);
+        Assert.All(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
+            command => Assert.Equal(new Color(255, 255, 255), command.Color));
+        screen.Close();
+    }
+
     [Fact]
     public void DefaultsExposeExpectedProperties()
     {

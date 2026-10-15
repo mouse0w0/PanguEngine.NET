@@ -42,25 +42,6 @@ public sealed class TextBox : Control
             validationMessage: "Placeholder cannot be null.");
 
     /// <summary>
-    /// Identifies the <see cref="Font"/> property.
-    /// </summary>
-    public static readonly Property<Font> FontProperty =
-        Property.Register<TextBox, Font>(
-            nameof(Font),
-            new Font(string.Empty),
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
-            validate: static value => value is not null,
-            validationMessage: "Font cannot be null.");
-
-    /// <summary>
-    /// Identifies the <see cref="Foreground"/> property.
-    /// </summary>
-    public static readonly Property<Color> ForegroundProperty =
-        Property.Register<TextBox, Color>(
-            nameof(Foreground),
-            new Color(242, 244, 247));
-
-    /// <summary>
     /// Identifies the <see cref="PlaceholderForeground"/> property.
     /// </summary>
     public static readonly Property<Color> PlaceholderForegroundProperty =
@@ -96,7 +77,6 @@ public sealed class TextBox : Control
     static TextBox()
     {
         UiCssRegistry.RegisterElement<TextBox>("TextBox");
-        UiCssRegistry.RegisterProperty<TextBox, Color>("foreground", ForegroundProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<TextBox, Color>(
             "placeholder-foreground", PlaceholderForegroundProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<TextBox, Color>(
@@ -255,25 +235,6 @@ public sealed class TextBox : Control
     {
         get => GetValue(PlaceholderProperty);
         set => SetValue(PlaceholderProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the preferred font request.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
-    public Font Font
-    {
-        get => GetValue(FontProperty);
-        set => SetValue(FontProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the non-premultiplied text color.
-    /// </summary>
-    public Color Foreground
-    {
-        get => GetValue(ForegroundProperty);
-        set => SetValue(ForegroundProperty, value);
     }
 
     /// <summary>
@@ -476,10 +437,10 @@ public sealed class TextBox : Control
 
         _layout = UiToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
             layoutText,
-            Font,
+            CreateFontRequest(),
             FontSize,
             availableSize.Width,
-            1,
+            LineHeight,
             TextWrapping.NoWrap,
             TextAlignment.Left));
         _caretWidth = GetCaretWidth();
@@ -527,7 +488,7 @@ public sealed class TextBox : Control
                         _textY),
                     layout,
                     FontSize,
-                    _layoutIsPlaceholder ? PlaceholderForeground : Foreground);
+                    _layoutIsPlaceholder ? PlaceholderForeground : Color);
             }
 
             if (IsEnabled && IsFocused && !IsReadOnly && SelectionLength == 0 && IsCaretVisible())

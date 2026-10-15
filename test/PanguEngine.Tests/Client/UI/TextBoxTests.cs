@@ -17,6 +17,35 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class TextBoxTests
 {
     [Fact]
+    public void InheritedLineHeightResizesTextAndSelectionTogether()
+    {
+        using var context = new UiTextTestContext();
+        var root = new Panel();
+        var textBox = new TextBox { Text = "Hello" };
+        root.Children.Add(textBox);
+        var screen = new GameScreen(root) { UseLayoutRounding = false };
+        var manager = new UiManager();
+        manager.Open(screen);
+        manager.UpdateFrame(new Size(400, 200), 0);
+        Assert.True(textBox.Focus());
+        textBox.Select(0, 1);
+        var initial = Assert.Single(screen.CreateDrawCommandList().OfType<UiDrawTextCommand>());
+
+        root.LineHeight = 1.5;
+
+        Assert.False(textBox.IsMeasureValid);
+        manager.UpdateFrame(new Size(400, 200), 0);
+        var commands = screen.CreateDrawCommandList();
+        var text = Assert.Single(commands.OfType<UiDrawTextCommand>());
+        var selection = Assert.Single(commands.OfType<UiFillRectangleCommand>()
+            .Where(command => command.Color == textBox.SelectionBackground));
+        Assert.NotSame(initial.Layout, text.Layout);
+        Assert.Equal(initial.Layout.Height * 1.5, text.Layout.Height, 6);
+        Assert.Equal(text.Layout.Height, selection.Bounds.Height);
+        manager.Destroy();
+    }
+
+    [Fact]
     public void PublicSurfaceAndDefaultsMatchTheTextBoxContract()
     {
         var textBox = new TextBox();
@@ -26,8 +55,11 @@ public sealed class TextBoxTests
         Assert.Equal(typeof(Control), typeof(TextBox).BaseType);
         AssertProperty(TextBox.TextProperty, string.Empty);
         AssertProperty(TextBox.PlaceholderProperty, string.Empty);
-        AssertProperty(TextBox.FontProperty, new Font(string.Empty));
-        AssertProperty(TextBox.ForegroundProperty, new Color(242, 244, 247));
+        Assert.Equal(typeof(UiNode), TextBox.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(UiNode), TextBox.ColorProperty.OwnerType);
+        Assert.Equal(string.Empty, UiNode.FontFamilyProperty.DefaultValue);
+        Assert.Equal(new Color(255, 255, 255), UiNode.ColorProperty.DefaultValue);
+        Assert.Equal(new Color(242, 244, 247), textBox.Color);
         AssertProperty(TextBox.PlaceholderForegroundProperty, new Color(139, 148, 160));
         AssertProperty(TextBox.SelectionBackgroundProperty, new Color(47, 100, 160));
         AssertProperty(TextBox.CaretColorProperty, new Color(242, 244, 247));
@@ -59,7 +91,7 @@ public sealed class TextBoxTests
         {
             UiNode.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
             Region.BorderBrushProperty, Region.BorderThicknessProperty,
-            TextBox.ForegroundProperty, TextBox.PlaceholderForegroundProperty,
+            UiNode.ColorProperty, TextBox.PlaceholderForegroundProperty,
             TextBox.SelectionBackgroundProperty, TextBox.CaretColorProperty
         };
         foreach (var property in properties)
@@ -101,7 +133,7 @@ public sealed class TextBoxTests
         node.IsEnabled = false;
         node.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(52, 58, 65), node.BorderBrush);
-        Assert.Equal(new Color(139, 148, 160), node.Foreground);
+        Assert.Equal(new Color(139, 148, 160), node.Color);
         Assert.Equal(new Thickness(1), node.BorderThickness);
         Assert.Equal(new Thickness(8, 6), node.Padding);
         node.IsEnabled = true;
@@ -127,7 +159,7 @@ public sealed class TextBoxTests
                                    border-color: #040506;
                                    border-thickness: 2px;
                                    font-size: 20px;
-                                   foreground: #070809;
+                                   color: #070809;
                                    placeholder-foreground: #101112;
                                    selection-background: #131415;
                                    caret-color: #161718;
@@ -145,7 +177,7 @@ public sealed class TextBoxTests
         Assert.Equal(new SolidColorBrush(4, 5, 6), node.BorderBrush);
         Assert.Equal(new Thickness(2), node.BorderThickness);
         Assert.Equal(20d, node.FontSize);
-        Assert.Equal(new Color(7, 8, 9), node.Foreground);
+        Assert.Equal(new Color(7, 8, 9), node.Color);
         Assert.Equal(new Color(16, 17, 18), node.PlaceholderForeground);
         Assert.Equal(new Color(19, 20, 21), node.SelectionBackground);
         Assert.Equal(new Color(22, 23, 24), node.CaretColor);
@@ -522,7 +554,7 @@ public sealed class TextBoxTests
         Assert.Equal(textBox.ContentBounds, clip);
         Assert.InRange(selection.Bounds.X, clip.X, clip.X + clip.Width);
         Assert.InRange(selection.Bounds.Y, clip.Y, clip.Y + clip.Height);
-        Assert.Equal(textBox.Foreground, text.Color);
+        Assert.Equal(textBox.Color, text.Color);
         Assert.True(textBox.DesiredSize.Width >= 160);
     }
 

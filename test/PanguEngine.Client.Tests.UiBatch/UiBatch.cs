@@ -259,7 +259,9 @@ internal sealed class UiBatchScene : IClientTestScene
                 new Text
                 {
                     Content = "动态字形图集与简体中文换行",
-                    Font = new Font("Missing UI Family"),
+                    FontFamily = "Missing UI Family",
+                    FontWeight = FontWeight.Normal,
+                    FontStyle = FontStyle.Normal,
                     FontSize = 18,
                     Color = new Color(95, 225, 185),
                     Wrapping = TextWrapping.Wrap,

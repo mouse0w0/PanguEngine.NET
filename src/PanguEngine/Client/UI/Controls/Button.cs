@@ -28,35 +28,6 @@ public class Button : Control
             validationMessage: "Text cannot be null.");
 
     /// <summary>
-    /// Identifies the <see cref="Font"/> property.
-    /// </summary>
-    public static readonly Property<Font> FontProperty =
-        Property.Register<Button, Font>(
-            nameof(Font),
-            new Font(string.Empty),
-            onChanged: static (node, _, _) =>
-            {
-                node.InvalidateMeasure();
-                if (node._textNode is { } text)
-                    text.Font = node.Font;
-            },
-            validate: static value => value is not null,
-            validationMessage: "Font cannot be null.");
-
-    /// <summary>
-    /// Identifies the <see cref="Foreground"/> property.
-    /// </summary>
-    public static readonly Property<Color> ForegroundProperty =
-        Property.Register<Button, Color>(
-            nameof(Foreground),
-            new Color(242, 244, 247),
-            onChanged: static (node, _, _) =>
-            {
-                if (node._textNode is { } text)
-                    text.Color = node.Foreground;
-            });
-
-    /// <summary>
     /// Identifies the <see cref="Icon"/> property.
     /// </summary>
     public static readonly Property<UiImage?> IconProperty =
@@ -99,7 +70,6 @@ public class Button : Control
     static Button()
     {
         UiCssRegistry.RegisterElement<Button>("Button");
-        UiCssRegistry.RegisterProperty<Button, Color>("foreground", ForegroundProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<Button, double>("icon-size", IconSizeProperty, UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<Button, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
     }
@@ -125,25 +95,6 @@ public class Button : Control
     {
         get => GetValue(TextProperty);
         set => SetValue(TextProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the preferred font request for the button text.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown when the value is null.</exception>
-    public Font Font
-    {
-        get => GetValue(FontProperty);
-        set => SetValue(FontProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the non-premultiplied button text color.
-    /// </summary>
-    public Color Foreground
-    {
-        get => GetValue(ForegroundProperty);
-        set => SetValue(ForegroundProperty, value);
     }
 
     /// <summary>
@@ -360,8 +311,6 @@ public class Button : Control
         var text = new Text
         {
             Content = content,
-            Font = Font,
-            Color = Foreground,
             Wrapping = TextWrapping.NoWrap,
             IsHitTestVisible = false
         };

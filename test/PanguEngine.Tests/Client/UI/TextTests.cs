@@ -11,6 +11,38 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class TextTests
 {
     [Fact]
+    public void InheritedTypographyReflowsWhileInheritedColorReusesLayout()
+    {
+        using var context = new UiTextTestContext();
+        var alias = context.RegisterAlias();
+        var root = new Panel();
+        var text = new Text { Content = "Hello" };
+        root.Children.Add(text);
+        var screen = new GameScreen(root) { UseLayoutRounding = false };
+        var manager = new UiManager();
+        manager.Open(screen);
+        manager.UpdateFrame(new Size(400, 200), 0);
+        var initial = GetCommand(screen);
+
+        root.FontFamily = alias.FamilyName;
+        root.LineHeight = 1.5;
+
+        Assert.False(text.IsMeasureValid);
+        manager.UpdateFrame(new Size(400, 200), 0);
+        var reflow = GetCommand(screen);
+        Assert.NotSame(initial.Layout, reflow.Layout);
+        Assert.Same(context.FontManager.Match(alias), reflow.Layout.Lines[0].GlyphRuns[0].FontFace);
+        Assert.True(reflow.Layout.Height > initial.Layout.Height);
+
+        root.Color = new Color(10, 20, 30);
+        var recolored = GetCommand(screen);
+
+        Assert.Same(reflow.Layout, recolored.Layout);
+        Assert.Equal(root.Color, recolored.Color);
+        manager.Destroy();
+    }
+
+    [Fact]
     public void NewMeasurementRequiresInitializedToolkitServices()
     {
         var text = new Text { Content = "Hello" };
@@ -39,14 +71,18 @@ public sealed class TextTests
         var text = new Text();
 
         AssertProperty(Text.ContentProperty, string.Empty);
-        AssertProperty(Text.FontProperty, new Font(string.Empty));
-        AssertProperty(Text.ColorProperty, new Color(255, 255, 255));
-        AssertProperty(Text.LineHeightProperty, 1d);
+        Assert.Equal(typeof(UiNode), Text.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(UiNode), Text.ColorProperty.OwnerType);
+        Assert.Equal(typeof(UiNode), Text.LineHeightProperty.OwnerType);
+        Assert.Equal(new Color(255, 255, 255), Text.ColorProperty.DefaultValue);
+        Assert.Equal(1d, Text.LineHeightProperty.DefaultValue);
         AssertProperty(Text.WrappingProperty, TextWrapping.NoWrap);
         AssertProperty(Text.AlignmentProperty, TextAlignment.Left);
 
         Assert.Equal(string.Empty, text.Content);
-        Assert.Equal(new Font(string.Empty), text.Font);
+        Assert.Equal(string.Empty, text.FontFamily);
+        Assert.Equal(FontWeight.Normal, text.FontWeight);
+        Assert.Equal(FontStyle.Normal, text.FontStyle);
         Assert.Equal(16, text.FontSize);
         Assert.Equal(new Color(255, 255, 255), text.Color);
         Assert.Equal(1, text.LineHeight);
@@ -97,7 +133,7 @@ public sealed class TextTests
         var text = new Text
         {
             Content = "A long line that must wrap",
-            Font = new Font("Missing Family"),
+            FontFamily = "Missing Family",
             Wrapping = TextWrapping.Wrap
         };
         var screen = new GameScreen(text);
@@ -147,7 +183,9 @@ public sealed class TextTests
 
         ReplaceAfter(() => text.Content = "Changed");
         var alias = context.RegisterAlias();
-        ReplaceAfter(() => text.Font = alias);
+        ReplaceAfter(() => text.FontFamily = alias.FamilyName);
+        ReplaceAfter(() => text.FontWeight = FontWeight.Bold);
+        ReplaceAfter(() => text.FontStyle = FontStyle.Italic);
         ReplaceAfter(() => text.FontSize = 20);
         ReplaceAfter(() => text.LineHeight = 1.5);
         ReplaceAfter(() => text.Wrapping = TextWrapping.Wrap);
@@ -175,7 +213,13 @@ public sealed class TextTests
     {
         using var context = new UiTextTestContext();
         var requestedFont = new Font("Testxx Han Sans CN");
-        var text = new Text { Content = "Hello", Font = requestedFont };
+        var text = new Text
+        {
+            Content = "Hello",
+            FontFamily = requestedFont.FamilyName,
+            FontWeight = requestedFont.Weight,
+            FontStyle = requestedFont.Style
+        };
         var screen = new GameScreen(text);
         var manager = new UiManager();
         manager.Open(screen);
