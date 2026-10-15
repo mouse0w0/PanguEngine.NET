@@ -7,6 +7,7 @@ public abstract class Property
 {
     private static readonly Lock RegistryLock = new();
     private static readonly Dictionary<(Type OwnerType, string Name), Property> Registry = [];
+    private static readonly List<Property> InheritableProperties = [];
 
     private protected Property(
         string name,
@@ -14,7 +15,8 @@ public abstract class Property
         Type targetType,
         Type valueType,
         object? defaultValue,
-        bool isReadOnly)
+        bool isReadOnly,
+        bool inherits)
     {
         ArgumentNullException.ThrowIfNull(name);
         if (name.Length == 0 || string.IsNullOrWhiteSpace(name))
@@ -30,6 +32,7 @@ public abstract class Property
         ValueType = valueType;
         DefaultValue = defaultValue;
         IsReadOnly = isReadOnly;
+        Inherits = inherits;
     }
 
     /// <summary>Gets the registered property name.</summary>
@@ -53,6 +56,9 @@ public abstract class Property
     /// <summary>Gets whether the property accesses an owner-managed field through delegates.</summary>
     public virtual bool IsDirect => false;
 
+    /// <summary>Gets whether hosts that support inheritance may inherit this property's value.</summary>
+    public bool Inherits { get; }
+
     /// <summary>
     /// Registers a strongly typed property for an owner host type.
     /// </summary>
@@ -64,6 +70,7 @@ public abstract class Property
     /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
     /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
     /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity.</param>
+    /// <param name="inherits">Whether hosts that support inheritance may inherit this property's value.</param>
     /// <remarks>
     /// Expose a CLR property whose get accessor calls GetValue with this descriptor and whose set accessor
     /// calls SetValue with this descriptor and the assigned value. Value-change operations belong in onChanged.
@@ -81,7 +88,8 @@ public abstract class Property
         Action<TOwner, TValue, TValue>? onChanged = null,
         Func<TValue, bool>? validate = null,
         string? validationMessage = null,
-        IEqualityComparer<TValue>? comparer = null)
+        IEqualityComparer<TValue>? comparer = null,
+        bool inherits = false)
         where TOwner : ObservableObject
     {
         var property = new Property<TValue>(
@@ -95,7 +103,8 @@ public abstract class Property
                 : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue),
             validate: validate,
             validationMessage: validationMessage,
-            comparer: comparer);
+            comparer: comparer,
+            inherits: inherits);
         property.PublishDescriptor();
         return property;
     }
@@ -111,6 +120,7 @@ public abstract class Property
     /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
     /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
     /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity.</param>
+    /// <param name="inherits">Whether hosts that support inheritance may inherit this property's value.</param>
     /// <remarks>The default is validated before registration. Validation failures occur before value commit; onChanged failures preserve the committed value and skip host notifications.</remarks>
     /// <returns>The key that grants owner access to the registered property.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null.</exception>
@@ -123,7 +133,8 @@ public abstract class Property
         Action<TOwner, TValue, TValue>? onChanged = null,
         Func<TValue, bool>? validate = null,
         string? validationMessage = null,
-        IEqualityComparer<TValue>? comparer = null)
+        IEqualityComparer<TValue>? comparer = null,
+        bool inherits = false)
         where TOwner : ObservableObject
     {
         var property = new Property<TValue>(
@@ -137,7 +148,8 @@ public abstract class Property
                 : (owner, oldValue, newValue) => onChanged((TOwner)owner, oldValue, newValue),
             validate: validate,
             validationMessage: validationMessage,
-            comparer: comparer);
+            comparer: comparer,
+            inherits: inherits);
         property.PublishDescriptor();
         return new PropertyKey<TValue>(property);
     }
@@ -154,6 +166,7 @@ public abstract class Property
     /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
     /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
     /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity.</param>
+    /// <param name="inherits">Whether hosts that support inheritance may inherit this property's value.</param>
     /// <remarks>
     /// The effective value is committed before <paramref name="onChanged"/> runs; if that callback fails,
     /// the committed value remains and host notifications are skipped. The default is validated before registration;
@@ -170,7 +183,8 @@ public abstract class Property
         Action<TTarget, TValue, TValue>? onChanged = null,
         Func<TValue, bool>? validate = null,
         string? validationMessage = null,
-        IEqualityComparer<TValue>? comparer = null)
+        IEqualityComparer<TValue>? comparer = null,
+        bool inherits = false)
         where TOwner : ObservableObject
         where TTarget : ObservableObject
     {
@@ -185,7 +199,8 @@ public abstract class Property
                 : (target, oldValue, newValue) => onChanged((TTarget)target, oldValue, newValue),
             validate: validate,
             validationMessage: validationMessage,
-            comparer: comparer);
+            comparer: comparer,
+            inherits: inherits);
         property.PublishDescriptor();
         return property;
     }
@@ -239,7 +254,15 @@ public abstract class Property
                     $"A property named '{Name}' is already registered for owner '{OwnerType}'.");
 
             Registry[(OwnerType, Name)] = this;
+            if (Inherits)
+                InheritableProperties.Add(this);
         }
+    }
+
+    internal static Property[] GetInheritableProperties()
+    {
+        lock (RegistryLock)
+            return InheritableProperties.ToArray();
     }
 
     internal bool IsOwnedBy(ObservableObject node) =>
@@ -260,9 +283,13 @@ public abstract class Property
 
     internal abstract void RaiseEffectiveValueChanged(ObservableObject host, object? oldValue, object? newValue);
 
+    internal abstract void RaiseInheritedValueChanged(ObservableObject host, object? oldValue, object? newValue);
+
     internal abstract bool AreEqual(object? left, object? right);
 
     internal abstract ArgumentException? GetBoxedValidationError(object? value);
+
+    internal abstract object? GetBoxedValue(ObservableObject host);
 }
 
 /// <summary>
@@ -302,8 +329,9 @@ public class Property<T> : Property
         Action<ObservableObject, T, T>? onChanged = null,
         Func<T, bool>? validate = null,
         string? validationMessage = null,
-        IEqualityComparer<T>? comparer = null)
-        : base(name, ownerType, targetType, typeof(T), defaultValue, isReadOnly)
+        IEqualityComparer<T>? comparer = null,
+        bool inherits = false)
+        : base(name, ownerType, targetType, typeof(T), defaultValue, isReadOnly, inherits)
     {
         DefaultValue = defaultValue;
         _onChanged = onChanged;
@@ -323,6 +351,9 @@ public class Property<T> : Property
 
     internal override void RaiseEffectiveValueChanged(ObservableObject host, object? oldValue, object? newValue) =>
         host.RaiseEffectiveValueChanged(this, oldValue, newValue);
+
+    internal override void RaiseInheritedValueChanged(ObservableObject host, object? oldValue, object? newValue) =>
+        host.RaiseInheritedValueChanged(this, oldValue, newValue);
 
     internal bool ValuesEqual(T left, T right) => _comparer.Equals(left, right);
 
@@ -349,4 +380,6 @@ public class Property<T> : Property
 
     internal override ArgumentException? GetBoxedValidationError(object? value) =>
         GetValidationError((T)value!, nameof(value));
+
+    internal override object? GetBoxedValue(ObservableObject host) => host.GetValue(this);
 }

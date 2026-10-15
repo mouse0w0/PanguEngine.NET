@@ -11,18 +11,21 @@ namespace PanguEngine.Client.UI.Styling;
 internal sealed class UiStyleSnapshot
 {
     private readonly Dictionary<Property, object?> _values;
-    private readonly Dictionary<Property, IReadOnlyList<UiStyleValueSource>> _sources;
 
     internal UiStyleSnapshot(Dictionary<Property, object?> values, Dictionary<Property, IReadOnlyList<UiStyleValueSource>> sources)
     {
         _values = values;
-        _sources = sources;
+        Sources = sources;
     }
 
     internal bool TryGetBoxedValue(Property property, out object? value) =>
         _values.TryGetValue(property, out value);
 
     internal IEnumerable<Property> StyledProperties => _values.Keys;
+
+    internal IReadOnlyDictionary<Property, object?> Values => _values;
+
+    internal IReadOnlyDictionary<Property, IReadOnlyList<UiStyleValueSource>> Sources { get; }
 
     /// <summary>Validates the resolved property values and reports CSS rejection with declaration sources.</summary>
     /// <exception cref="ArgumentException">Thrown when a value from C# declarations is rejected.</exception>
@@ -77,6 +80,6 @@ internal sealed class UiStyleSnapshot
     internal IReadOnlyList<UiStyleValueSource> GetSources(Property property)
     {
         ArgumentNullException.ThrowIfNull(property);
-        return _sources.TryGetValue(property, out var sources) ? sources : Array.Empty<UiStyleValueSource>();
+        return Sources.TryGetValue(property, out var sources) ? sources : Array.Empty<UiStyleValueSource>();
     }
 }

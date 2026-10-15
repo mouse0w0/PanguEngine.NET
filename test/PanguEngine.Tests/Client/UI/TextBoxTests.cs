@@ -27,7 +27,6 @@ public sealed class TextBoxTests
         AssertProperty(TextBox.TextProperty, string.Empty);
         AssertProperty(TextBox.PlaceholderProperty, string.Empty);
         AssertProperty(TextBox.FontProperty, new Font(string.Empty));
-        AssertProperty(TextBox.FontSizeProperty, 16d);
         AssertProperty(TextBox.ForegroundProperty, new Color(242, 244, 247));
         AssertProperty(TextBox.PlaceholderForegroundProperty, new Color(139, 148, 160));
         AssertProperty(TextBox.SelectionBackgroundProperty, new Color(47, 100, 160));
@@ -59,7 +58,7 @@ public sealed class TextBoxTests
         var properties = new Property[]
         {
             UiNode.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
-            Region.BorderBrushProperty, Region.BorderThicknessProperty, TextBox.FontSizeProperty,
+            Region.BorderBrushProperty, Region.BorderThicknessProperty,
             TextBox.ForegroundProperty, TextBox.PlaceholderForegroundProperty,
             TextBox.SelectionBackgroundProperty, TextBox.CaretColorProperty
         };
@@ -73,6 +72,9 @@ public sealed class TextBoxTests
             });
             Assert.NotEmpty(node.GetStyleValueSources(property));
         }
+
+        Assert.Empty(node.GetStyleValueSources(UiNode.FontSizeProperty));
+        Assert.Equal(16d, node.FontSize);
 
         screen.SetBaseStyleSheets([]);
         screen.Root!.UpdateStyles();

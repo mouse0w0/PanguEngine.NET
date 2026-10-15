@@ -53,17 +53,6 @@ public sealed class TextBox : Control
             validationMessage: "Font cannot be null.");
 
     /// <summary>
-    /// Identifies the <see cref="FontSize"/> property.
-    /// </summary>
-    public static readonly Property<double> FontSizeProperty =
-        Property.Register<TextBox, double>(
-            nameof(FontSize),
-            16d,
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
-            validate: IsFinitePositive,
-            validationMessage: "FontSize must be positive and finite.");
-
-    /// <summary>
     /// Identifies the <see cref="Foreground"/> property.
     /// </summary>
     public static readonly Property<Color> ForegroundProperty =
@@ -107,7 +96,6 @@ public sealed class TextBox : Control
     static TextBox()
     {
         UiCssRegistry.RegisterElement<TextBox>("TextBox");
-        UiCssRegistry.RegisterProperty<TextBox, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<TextBox, Color>("foreground", ForegroundProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<TextBox, Color>(
             "placeholder-foreground", PlaceholderForegroundProperty, UiCssValueConverters.ParseColor);
@@ -277,16 +265,6 @@ public sealed class TextBox : Control
     {
         get => GetValue(FontProperty);
         set => SetValue(FontProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the text size in logical pixels.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
-    public double FontSize
-    {
-        get => GetValue(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     /// <summary>

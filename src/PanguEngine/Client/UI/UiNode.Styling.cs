@@ -6,12 +6,46 @@ namespace PanguEngine.Client.UI;
 
 public abstract partial class UiNode
 {
-    private UiStyleSnapshot? _styleSnapshot;
+    private IReadOnlyDictionary<Property, IReadOnlyList<UiStyleValueSource>>? _styleSources;
     private readonly ObservableSet<UiPseudoClass> _pseudoClasses = new();
 
     internal bool IsStyleValid { get; private set; }
     internal bool IsStyleSubtreeValid { get; private set; }
     internal bool IsUpdatingStyles { get; private set; }
+
+    static UiNode()
+    {
+        UiCssRegistry.RegisterElement<UiNode>("UiNode");
+        UiCssRegistry.RegisterProperty<UiNode, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("width", WidthProperty, UiCssValueConverters.ParseDimension);
+        UiCssRegistry.RegisterProperty<UiNode, double>("height", HeightProperty, UiCssValueConverters.ParseDimension);
+        UiCssRegistry.RegisterProperty<UiNode, double>("min-width", MinWidthProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("min-height", MinHeightProperty, UiCssValueConverters.ParseLength);
+        UiCssRegistry.RegisterProperty<UiNode, double>("max-width", MaxWidthProperty, UiCssValueConverters.ParseMaxDimension);
+        UiCssRegistry.RegisterProperty<UiNode, double>("max-height", MaxHeightProperty, UiCssValueConverters.ParseMaxDimension);
+        UiCssRegistry.RegisterProperty<UiNode, Thickness>("margin", MarginProperty, UiCssValueConverters.ParseThickness);
+        UiCssRegistry.RegisterProperty<UiNode>("margin-top", value =>
+            new[] { UiStyleSetter.CreateEdge(MarginProperty, UiStyleEdge.Top, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<UiNode>("margin-right", value =>
+            new[] { UiStyleSetter.CreateEdge(MarginProperty, UiStyleEdge.Right, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<UiNode>("margin-bottom", value =>
+            new[] { UiStyleSetter.CreateEdge(MarginProperty, UiStyleEdge.Bottom, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<UiNode>("margin-left", value =>
+            new[] { UiStyleSetter.CreateEdge(MarginProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value)) });
+        UiCssRegistry.RegisterProperty<UiNode, double>("opacity", OpacityProperty, UiCssValueConverters.ParseNumber);
+        UiCssRegistry.RegisterProperty<UiNode, HorizontalAlignment>(
+            "horizontal-alignment",
+            HorizontalAlignmentProperty,
+            UiCssValueConverters.ParseHorizontalAlignment);
+        UiCssRegistry.RegisterProperty<UiNode, VerticalAlignment>(
+            "vertical-alignment",
+            VerticalAlignmentProperty,
+            UiCssValueConverters.ParseVerticalAlignment);
+        UiCssRegistry.RegisterProperty<UiNode, Visibility>(
+            "visibility",
+            VisibilityProperty,
+            UiCssValueConverters.ParseVisibility);
+    }
 
     internal UiNode GetStyleRoot()
     {
@@ -137,8 +171,9 @@ public abstract partial class UiNode
                     var snapshot = GetStyleResolver().Resolve(this);
                     snapshot.ValidateValues();
 
-                    changes = ComputeStyleChanges(_styleSnapshot, snapshot);
-                    _styleSnapshot = snapshot;
+                    changes = ComputeStyleChanges(snapshot);
+                    CommitStyleValues(snapshot.Values, _styleSources?.Keys ?? []);
+                    _styleSources = snapshot.Sources;
                 }
                 catch
                 {
@@ -146,11 +181,12 @@ public abstract partial class UiNode
                     throw;
                 }
 
+                var notifyNonInherited = true;
                 foreach (var (property, oldValue, newValue) in changes)
                 {
-                    if (!ReferenceEquals(GetStyleRoot(), root))
-                        break;
-                    if (!IsStyleValueCurrent(property, newValue))
+                    notifyNonInherited &= ReferenceEquals(GetStyleRoot(), root);
+                    if (!property.Inherits &&
+                        (!notifyNonInherited || !IsStyleValueCurrent(property, newValue)))
                         continue;
                     property.RaiseEffectiveValueChanged(this, oldValue, newValue);
                 }
@@ -195,22 +231,21 @@ public abstract partial class UiNode
         property.VerifyOwner(this);
         if (property.IsDirect)
             return Array.Empty<UiStyleValueSource>();
-        var sources = _styleSnapshot?.GetSources(property) ?? Array.Empty<UiStyleValueSource>();
+        var sources = _styleSources is not null && _styleSources.TryGetValue(property, out var value)
+            ? value : Array.Empty<UiStyleValueSource>();
         var isMasked = HasLocalValue(property);
         return isMasked
             ? Array.AsReadOnly(sources.Select(source => source.WithLocalValueMask(true)).ToArray())
             : sources;
     }
 
-    private List<(Property Property, object? Old, object? New)> ComputeStyleChanges(
-        UiStyleSnapshot? oldSnapshot,
-        UiStyleSnapshot newSnapshot)
+    private List<(Property Property, object? Old, object? New)> ComputeStyleChanges(UiStyleSnapshot newSnapshot)
     {
         var changed = new List<(Property, object?, object?)>();
         var keys = new HashSet<Property>();
-        if (oldSnapshot is not null)
+        if (_styleSources is not null)
         {
-            foreach (var property in oldSnapshot.StyledProperties)
+            foreach (var property in _styleSources.Keys)
                 keys.Add(property);
         }
 
@@ -222,10 +257,11 @@ public abstract partial class UiNode
             if (HasLocalValue(property))
                 continue;
 
-            var oldValue = oldSnapshot is null
-                ? property.DefaultValue
-                : GetSnapshotValue(oldSnapshot, property, property.DefaultValue);
-            var newValue = GetSnapshotValue(newSnapshot, property, property.DefaultValue);
+            var fallback = property.Inherits &&
+                TryGetInheritedValue(property, InheritanceParent, out var inherited)
+                    ? inherited : property.DefaultValue;
+            var oldValue = GetCommittedStyleValue(property, fallback);
+            var newValue = GetSnapshotValue(newSnapshot, property, fallback);
             if (!property.AreEqual(oldValue, newValue))
                 changed.Add((property, oldValue, newValue));
         }
@@ -262,13 +298,14 @@ public abstract partial class UiNode
     private static object? GetSnapshotValue(UiStyleSnapshot snapshot, Property property, object? defaultValue) =>
         snapshot.TryGetBoxedValue(property, out var value) ? value : defaultValue;
 
+    private object? GetCommittedStyleValue(Property property, object? fallback) =>
+        TryGetStyleValue(property, out var value) ? value : fallback;
+
     private bool IsStyleValueCurrent(Property property, object? expectedValue)
     {
         if (HasLocalValue(property))
             return false;
-        var currentValue = _styleSnapshot is null
-            ? property.DefaultValue
-            : GetSnapshotValue(_styleSnapshot, property, property.DefaultValue);
+        var currentValue = GetCommittedStyleValue(property, property.DefaultValue);
         return property.AreEqual(currentValue, expectedValue);
     }
 

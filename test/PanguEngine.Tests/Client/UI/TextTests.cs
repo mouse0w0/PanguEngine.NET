@@ -40,7 +40,6 @@ public sealed class TextTests
 
         AssertProperty(Text.ContentProperty, string.Empty);
         AssertProperty(Text.FontProperty, new Font(string.Empty));
-        AssertProperty(Text.FontSizeProperty, 16d);
         AssertProperty(Text.ColorProperty, new Color(255, 255, 255));
         AssertProperty(Text.LineHeightProperty, 1d);
         AssertProperty(Text.WrappingProperty, TextWrapping.NoWrap);
@@ -245,6 +244,31 @@ public sealed class TextTests
         screen.UseLayoutRounding = false;
         manager.UpdateFrame(new Size(800, 400), 0);
         Assert.NotSame(scaled, GetCommand(screen).Layout);
+        manager.Destroy();
+    }
+
+    [Fact]
+    public void InheritedFontSizeInvalidatesMeasurementAndReplacesTextLayout()
+    {
+        using var context = new UiTextTestContext();
+        var root = new Panel { FontSize = 18 };
+        var text = new Text { Content = "Inherited size" };
+        root.Children.Add(text);
+        var screen = new GameScreen(root);
+        var manager = new UiManager();
+        manager.Open(screen);
+        manager.UpdateFrame(new Size(400, 200), 0);
+        var before = GetCommand(screen);
+        Assert.Equal(18d, before.FontSize);
+
+        root.FontSize = 28;
+
+        Assert.False(text.IsMeasureValid);
+        manager.UpdateFrame(new Size(400, 200), 0);
+        var after = GetCommand(screen);
+        Assert.Equal(28d, after.FontSize);
+        Assert.NotSame(before.Layout, after.Layout);
+        Assert.True(after.Layout.Height > before.Layout.Height);
         manager.Destroy();
     }
 

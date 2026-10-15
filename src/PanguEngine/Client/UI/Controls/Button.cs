@@ -44,22 +44,6 @@ public class Button : Control
             validationMessage: "Font cannot be null.");
 
     /// <summary>
-    /// Identifies the <see cref="FontSize"/> property.
-    /// </summary>
-    public static readonly Property<double> FontSizeProperty =
-        Property.Register<Button, double>(
-            nameof(FontSize),
-            16d,
-            onChanged: static (node, _, _) =>
-            {
-                node.InvalidateMeasure();
-                if (node._textNode is { } text)
-                    text.FontSize = node.FontSize;
-            },
-            validate: IsFinitePositive,
-            validationMessage: "FontSize must be positive and finite.");
-
-    /// <summary>
     /// Identifies the <see cref="Foreground"/> property.
     /// </summary>
     public static readonly Property<Color> ForegroundProperty =
@@ -115,7 +99,6 @@ public class Button : Control
     static Button()
     {
         UiCssRegistry.RegisterElement<Button>("Button");
-        UiCssRegistry.RegisterProperty<Button, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<Button, Color>("foreground", ForegroundProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<Button, double>("icon-size", IconSizeProperty, UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<Button, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
@@ -152,16 +135,6 @@ public class Button : Control
     {
         get => GetValue(FontProperty);
         set => SetValue(FontProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the button text size in logical pixels.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
-    public double FontSize
-    {
-        get => GetValue(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     /// <summary>
@@ -388,7 +361,6 @@ public class Button : Control
         {
             Content = content,
             Font = Font,
-            FontSize = FontSize,
             Color = Foreground,
             Wrapping = TextWrapping.NoWrap,
             IsHitTestVisible = false

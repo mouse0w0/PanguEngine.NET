@@ -1,6 +1,6 @@
 using System.ComponentModel;
-using System.Reflection;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Styling;
 using PanguEngine.ComponentModel;
 using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
@@ -12,16 +12,23 @@ public sealed class PropertyKeyTests
     public void ReadOnlyDefaultsAndOwnerWritesDoNotResolveStyles()
     {
         var node = new ReadOnlyNode();
-        var snapshotField = typeof(UiNode).GetField("_styleSnapshot", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var screen = new UiScreen(node);
+        screen.SetStyleSheets([new UiStyleSheet([
+            new UiStyleRule(UiStyleSelector.For<ReadOnlyNode>(), [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5d)])
+        ])]);
 
         Assert.Equal(5, node.Value);
-        Assert.Null(snapshotField.GetValue(node));
+        Assert.Equal(1d, node.Opacity);
+        Assert.Empty(node.GetStyleValueSources(UiNode.OpacityProperty));
 
         node.SetValueFromOwner(9);
         node.ClearValueFromOwner();
 
         Assert.Equal(5, node.Value);
-        Assert.Null(snapshotField.GetValue(node));
+        Assert.Equal(1d, node.Opacity);
+        Assert.Empty(node.GetStyleValueSources(UiNode.OpacityProperty));
+        node.UpdateStyles();
+        Assert.Equal(0.5d, node.Opacity);
     }
 
     [Fact]

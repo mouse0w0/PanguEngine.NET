@@ -29,9 +29,6 @@ public sealed class ButtonTests
             Button.FontProperty,
             new Font(string.Empty));
         AssertProperty(
-            Button.FontSizeProperty,
-            16d);
-        AssertProperty(
             Button.ForegroundProperty,
             new Color(242, 244, 247));
         AssertProperty(

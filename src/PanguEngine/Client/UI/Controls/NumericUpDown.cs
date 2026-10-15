@@ -25,8 +25,6 @@ public abstract class NumericUpDown : Control
         Property.Register<NumericUpDown, bool>(nameof(IsReadOnly),
             onChanged: static (node, _, _) => node.OnReadOnlyChanged());
 
-    private readonly IFormatProvider _initialFormatProvider = CultureInfo.CurrentCulture;
-
     static NumericUpDown() => UiCssRegistry.RegisterElement<NumericUpDown>("NumericUpDown");
 
     /// <summary>Initializes shared numeric control settings.</summary>
@@ -41,7 +39,11 @@ public abstract class NumericUpDown : Control
         set => SetValue(FormatStringProperty, value);
     }
 
-    /// <summary>Gets or sets the provider for numeric parsing and formatting, initially the creation culture.</summary>
+    /// <summary>Gets or sets the provider for numeric parsing and formatting.</summary>
+    /// <remarks>
+    /// Typed numeric controls initialize a local value from the creation culture.
+    /// Clearing it restores the committed style or invariant culture default.
+    /// </remarks>
     public IFormatProvider FormatProvider
     {
         get => GetValue(FormatProviderProperty);
@@ -64,12 +66,6 @@ public abstract class NumericUpDown : Control
     protected virtual void OnReadOnlyChanged()
     {
     }
-
-    /// <inheritdoc />
-    protected override TValue GetFallbackValue<TValue>(Property<TValue> property) =>
-        ReferenceEquals(property, FormatProviderProperty)
-            ? (TValue)_initialFormatProvider
-            : base.GetFallbackValue(property);
 }
 
 /// <summary>Edits a typed number within a finite range and supports incremental changes.</summary>
@@ -139,6 +135,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
         _editor.LostFocus += OnEditorLostFocus;
         _increase.PropertyChanged += OnPartPropertyChanged;
         _decrease.PropertyChanged += OnPartPropertyChanged;
+        FormatProvider = CultureInfo.CurrentCulture;
         ShowValue();
         UpdatePartStates();
         Subscribe(IsPressedProperty, (_, _) =>

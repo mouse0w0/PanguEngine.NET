@@ -33,17 +33,6 @@ public sealed class Text : UiNode
             validationMessage: "Font cannot be null.");
 
     /// <summary>
-    /// Identifies the <see cref="FontSize"/> property.
-    /// </summary>
-    public static readonly Property<double> FontSizeProperty =
-        Property.Register<Text, double>(
-            nameof(FontSize),
-            16,
-            onChanged: static (node, _, _) => node.InvalidateMeasure(),
-            validate: IsFinitePositive,
-            validationMessage: "FontSize must be positive and finite.");
-
-    /// <summary>
     /// Identifies the <see cref="Color"/> property.
     /// </summary>
     public static readonly Property<Color> ColorProperty =
@@ -83,7 +72,6 @@ public sealed class Text : UiNode
     static Text()
     {
         UiCssRegistry.RegisterElement<Text>("Text");
-        UiCssRegistry.RegisterProperty<Text, double>("font-size", FontSizeProperty, UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<Text, double>("line-height", LineHeightProperty, UiCssValueConverters.ParseLength);
         UiCssRegistry.RegisterProperty<Text, Color>("color", ColorProperty, UiCssValueConverters.ParseColor);
         UiCssRegistry.RegisterProperty<Text, TextWrapping>(
@@ -123,16 +111,6 @@ public sealed class Text : UiNode
     {
         get => GetValue(FontProperty);
         set => SetValue(FontProperty, value);
-    }
-
-    /// <summary>
-    /// Gets or sets the font size in logical pixels.
-    /// </summary>
-    /// <exception cref="ArgumentException">Thrown when the value is not finite and positive.</exception>
-    public double FontSize
-    {
-        get => GetValue(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     /// <summary>

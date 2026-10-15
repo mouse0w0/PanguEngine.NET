@@ -250,6 +250,36 @@ public sealed class NumericUpDownTests
     }
 
     [Fact]
+    public void ClearingFormatProviderRestoresInvariantCultureAndDetachesBinding()
+    {
+        var previous = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("de-DE");
+            var node = new NumericUpDown<decimal> { Value = 1.25m };
+            var source = new NumericUpDown<decimal>
+            {
+                FormatProvider = CultureInfo.GetCultureInfo("fr-FR")
+            };
+            node.Bind(NumericUpDown.FormatProviderProperty, source, NumericUpDown.FormatProviderProperty);
+            using var context = new UiTextTestContext();
+            using var scene = new Scene<decimal>(node, useInvariantProvider: false);
+            Assert.Equal("1,25", scene.Editor.Text);
+
+            node.ClearValue(NumericUpDown.FormatProviderProperty);
+            source.FormatProvider = CultureInfo.GetCultureInfo("de-DE");
+
+            Assert.False(node.IsBound(NumericUpDown.FormatProviderProperty));
+            Assert.Same(CultureInfo.InvariantCulture, node.FormatProvider);
+            Assert.Equal("1.25", scene.Editor.Text);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = previous;
+        }
+    }
+
+    [Fact]
     public void SteppingConfirmsTextBeforeApplyingTheRequestedDirection()
     {
         using var context = new UiTextTestContext();

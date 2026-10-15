@@ -5,7 +5,7 @@ namespace PanguEngine.Tests.ComponentModel;
 public sealed class DirectPropertyTests
 {
     [Fact]
-    public void ReadsFieldInsteadOfDefaultOrFallback()
+    public void ReadsFieldInsteadOfRegisteredResetValue()
     {
         var host = new Host();
 
@@ -219,9 +219,6 @@ public sealed class DirectPropertyTests
 
         internal bool UpdateValue(int value) => SetField(ValueProperty, ref _value, value);
         internal void SetActive(bool value) => SetField(ActiveProperty, ref _active, value);
-
-        protected override T GetFallbackValue<T>(Property<T> property) =>
-            throw new InvalidOperationException("Direct properties must not use fallback values.");
 
         protected override void VerifyMutationAccess()
         {

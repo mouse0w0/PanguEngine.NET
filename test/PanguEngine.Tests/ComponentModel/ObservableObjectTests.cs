@@ -343,31 +343,15 @@ public sealed class ObservableObjectTests
     }
 
     [Fact]
-    public void FallbackAndWriteAccessHooksApplyToPlainObjects()
+    public void WriteAccessPolicyAppliesToPlainObjects()
     {
-        var source = new FallbackModel();
-        Assert.Equal(11, source.Value);
-        source.Value = 11;
-        source.Fallback = 15;
-        Assert.Equal(11, source.Value);
+        var source = new AccessControlledModel { Value = 11 };
         source.ClearValue(Model.ValueProperty);
-        Assert.Equal(15, source.Value);
+        Assert.Equal(3, source.Value);
         source.RejectWrites = true;
 
         Assert.Throws<InvalidOperationException>(() => source.Value = 20);
-        Assert.Equal(15, source.Value);
-    }
-
-    [Fact]
-    public void ReadOnlyPropertiesUsePlainObjectFallbackAfterClearingLocalValue()
-    {
-        var source = new FallbackModel();
-        Assert.Equal(11, source.GetValue(Model.ReadOnlyProperty));
-        source.SetReadOnly(7);
-        source.Fallback = 15;
-        Assert.Equal(7, source.GetValue(Model.ReadOnlyProperty));
-        source.ClearReadOnly();
-        Assert.Equal(15, source.GetValue(Model.ReadOnlyProperty));
+        Assert.Equal(3, source.Value);
     }
 
     [Fact]
@@ -491,6 +475,24 @@ public sealed class ObservableObjectTests
         Assert.Equal((7, 9), Assert.Single(changes));
     }
 
+    [Fact]
+    public void ClearingTheLastLocalValueAllowsReentrantWritesToRecreateState()
+    {
+        var source = new Model { Value = 7 };
+        using var subscription = source.Subscribe(Model.ValueProperty, (_, args) =>
+        {
+            if (args.NewValue == 3)
+                source.Value = 20;
+        });
+
+        source.ClearValue(Model.ValueProperty);
+
+        Assert.Equal(20, source.Value);
+        subscription.Dispose();
+        source.ClearValue(Model.ValueProperty);
+        Assert.Equal(3, source.Value);
+    }
+
     private sealed record EqualValue(int Number);
 
     private sealed class FailingComparer : IEqualityComparer<int>
@@ -593,15 +595,9 @@ public sealed class ObservableObjectTests
         internal (int Old, int New) LastChange { get; set; }
     }
 
-    private sealed class FallbackModel : Model
+    private sealed class AccessControlledModel : Model
     {
-        internal int Fallback { get; set; } = 11;
         internal bool RejectWrites { get; set; }
-
-        protected override T GetFallbackValue<T>(Property<T> property) =>
-            ReferenceEquals(property, ValueProperty) || ReferenceEquals(property, ReadOnlyProperty)
-                ? (T)(object)Fallback
-                : base.GetFallbackValue(property);
 
         protected override void VerifyMutationAccess()
         {

@@ -64,38 +64,39 @@ public sealed class PropertyValidationBindingTests
     }
 
     [Fact]
-    public void UnbindAfterRejectedInitializationDoesNotMaterializeFallback()
+    public void UnbindAfterRejectedInitializationDoesNotMaterializeDefault()
     {
         var source = new Source { Value = -1 };
-        var target = new Target { Fallback = 5 };
+        var target = new Target();
 
         Assert.Throws<ArgumentException>(() => target.Bind(Target.ValueProperty, source, Source.ValueProperty));
+        Assert.True(target.IsBound(Target.ValueProperty));
+        Assert.False(target.HasValue);
         target.Unbind(Target.ValueProperty);
 
         Assert.False(target.IsBound(Target.ValueProperty));
         Assert.False(target.HasValue);
-        Assert.Equal(5, target.Value);
-        target.Fallback = 7;
+        Assert.Equal(0, target.Value);
         source.Value = 9;
-        Assert.Equal(7, target.Value);
+        Assert.Equal(0, target.Value);
+        Assert.False(target.HasValue);
     }
 
     [Fact]
     public void UnbindAfterRejectedInitializationPreservesAnExistingLocalValue()
     {
         var source = new Source { Value = -1 };
-        var target = new Target { Fallback = 3, Value = 5 };
+        var target = new Target { Value = 5 };
 
         Assert.Throws<ArgumentException>(() => target.Bind(Target.ValueProperty, source, Source.ValueProperty));
         target.Unbind(Target.ValueProperty);
 
         Assert.False(target.IsBound(Target.ValueProperty));
         Assert.True(target.HasValue);
-        target.Fallback = 7;
         source.Value = 9;
         Assert.Equal(5, target.Value);
         target.ClearValue(Target.ValueProperty);
-        Assert.Equal(7, target.Value);
+        Assert.Equal(0, target.Value);
     }
 
     [Fact]
@@ -152,8 +153,6 @@ public sealed class PropertyValidationBindingTests
         internal static readonly Property<int> ValueProperty = Property.Register<Target, int>(
             "Value", validate: static value => value >= 0, validationMessage: "Value must be non-negative.");
 
-        internal int Fallback { get; set; }
-
         internal bool HasValue => HasLocalValue(ValueProperty);
 
         internal int Value
@@ -161,9 +160,6 @@ public sealed class PropertyValidationBindingTests
             get => GetValue(ValueProperty);
             set => SetValue(ValueProperty, value);
         }
-
-        protected override T GetFallbackValue<T>(Property<T> property) =>
-            ReferenceEquals(property, ValueProperty) ? (T)(object)Fallback : base.GetFallbackValue(property);
     }
 
     private sealed class NotifyingSource : System.ComponentModel.INotifyPropertyChanged

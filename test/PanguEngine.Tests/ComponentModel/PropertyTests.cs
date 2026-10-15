@@ -16,6 +16,7 @@ public sealed class PropertyTests
         Assert.Equal(typeof(TestNode), property.TargetType);
         Assert.Equal(typeof(int), property.ValueType);
         Assert.Equal(10, property.DefaultValue);
+        Assert.False(property.Inherits);
     }
 
     [Fact]
