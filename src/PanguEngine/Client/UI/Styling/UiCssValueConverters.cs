@@ -158,28 +158,13 @@ public static class UiCssValueConverters
     }
 
     /// <summary>Converts a trimmed CSS value into a non-premultiplied color.</summary>
-    /// <param name="value">The trimmed CSS value, either transparent or a #RRGGBB or #RRGGBBAA hex color.</param>
+    /// <param name="value">The trimmed CSS value: a standard named color, transparent, a short or long hex color, or an RGB or HSL function.</param>
     /// <returns>The parsed color.</returns>
     /// <exception cref="FormatException">Thrown when the value is not a supported color.</exception>
-    public static Color ParseColor(string value)
-    {
-        if (value.Equals("transparent", StringComparison.OrdinalIgnoreCase))
-            return new Color(0, 0, 0, 0);
-        if (value.Length is not (7 or 9) || value[0] != '#')
-            throw new FormatException($"Color '{value}' must be #RRGGBB or #RRGGBBAA.");
-        var hex = value.AsSpan(1);
-        if (!IsHex(hex))
-            throw new FormatException($"Color '{value}' contains an invalid hex digit.");
-
-        var r = ToByte(hex, 0);
-        var g = ToByte(hex, 2);
-        var b = ToByte(hex, 4);
-        var a = hex.Length == 8 ? ToByte(hex, 6) : (byte)255;
-        return new Color(r, g, b, a);
-    }
+    public static Color ParseColor(string value) => UiCssColorParser.Parse(value);
 
     /// <summary>Converts a trimmed CSS color or none into a brush.</summary>
-    /// <param name="value">The trimmed CSS value, either none, transparent, or a supported hex color.</param>
+    /// <param name="value">The trimmed CSS value: none, a standard named color, transparent, a hex color, or an RGB or HSL function.</param>
     /// <returns>Null for none, or a solid color brush with the parsed color.</returns>
     /// <exception cref="FormatException">Thrown when the value is neither none nor a supported color.</exception>
     public static Brush? ParseBrush(string value) =>
@@ -308,30 +293,4 @@ public static class UiCssValueConverters
 
     private static bool IsAsciiWhitespace(char value) =>
         value is ' ' or '\t' or '\n' or '\r' or '\f' or '\v';
-
-    private static bool IsHex(ReadOnlySpan<char> hex)
-    {
-        foreach (var c in hex)
-        {
-            if (!char.IsAsciiHexDigit(c))
-                return false;
-        }
-
-        return true;
-    }
-
-    private static byte ToByte(ReadOnlySpan<char> hex, int index)
-    {
-        var high = HexValue(hex[index]);
-        var low = HexValue(hex[index + 1]);
-        return (byte)((high << 4) | low);
-    }
-
-    private static int HexValue(char c) => c switch
-    {
-        >= '0' and <= '9' => c - '0',
-        >= 'A' and <= 'F' => c - 'A' + 10,
-        >= 'a' and <= 'f' => c - 'a' + 10,
-        _ => throw new FormatException("Invalid hex digit.")
-    };
 }

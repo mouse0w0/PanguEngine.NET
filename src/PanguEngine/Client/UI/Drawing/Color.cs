@@ -3,7 +3,7 @@ namespace PanguEngine.Client.UI.Drawing;
 /// <summary>
 /// Represents a non-premultiplied sRGB color with linear alpha coverage.
 /// </summary>
-public readonly record struct Color
+public readonly partial record struct Color
 {
     /// <summary>
     /// Initializes a color from red, green, blue, and alpha channels.
