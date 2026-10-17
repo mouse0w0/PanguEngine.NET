@@ -46,7 +46,7 @@ public abstract class Parent : UiNode
     protected internal UiNodeList Children { get; }
 
     /// <inheritdoc />
-    protected override IReadOnlyList<ObservableObject> InheritanceChildren => ReadOnlyChildren;
+    protected override IReadOnlyList<StyledObject> InheritanceChildren => ReadOnlyChildren;
 
     /// <summary>
     /// Gets or sets whether descendants are clipped to this parent's local layout bounds.

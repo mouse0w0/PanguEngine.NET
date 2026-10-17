@@ -11,7 +11,7 @@ namespace PanguEngine.Client.UI;
 /// <remarks>
 /// Properties cannot be modified while the owning screen is generating drawing commands.
 /// </remarks>
-public abstract partial class UiNode : ObservableObject
+public abstract partial class UiNode : StyledObject
 {
     private static readonly PropertyKey<Parent?> ParentPropertyKey =
         Property.RegisterReadOnly<UiNode, Parent?>(
@@ -164,7 +164,7 @@ public abstract partial class UiNode : ObservableObject
     }
 
     /// <inheritdoc />
-    protected override ObservableObject? InheritanceParent => Parent;
+    protected override StyledObject? InheritanceParent => Parent;
 
     /// <summary>
     /// Moves this node to the visual front of its siblings.

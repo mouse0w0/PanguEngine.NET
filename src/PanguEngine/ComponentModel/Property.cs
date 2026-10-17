@@ -283,7 +283,7 @@ public abstract class Property
 
     internal abstract void RaiseEffectiveValueChanged(ObservableObject host, object? oldValue, object? newValue);
 
-    internal abstract void RaiseInheritedValueChanged(ObservableObject host, object? oldValue, object? newValue);
+    internal abstract void RaiseInheritedValueChanged(StyledObject host, object? oldValue, object? newValue);
 
     internal abstract bool AreEqual(object? left, object? right);
 
@@ -352,7 +352,7 @@ public class Property<T> : Property
     internal override void RaiseEffectiveValueChanged(ObservableObject host, object? oldValue, object? newValue) =>
         host.RaiseEffectiveValueChanged(this, oldValue, newValue);
 
-    internal override void RaiseInheritedValueChanged(ObservableObject host, object? oldValue, object? newValue) =>
+    internal override void RaiseInheritedValueChanged(StyledObject host, object? oldValue, object? newValue) =>
         host.RaiseInheritedValueChanged(this, oldValue, newValue);
 
     internal bool ValuesEqual(T left, T right) => _comparer.Equals(left, right);

@@ -319,7 +319,7 @@ public sealed class PropertyInheritanceTests
     }
 
     [Fact]
-    public void ObservableObjectSupportsInheritedPropertiesThroughParentHook()
+    public void StyledObjectSupportsInheritedPropertiesThroughParentHook()
     {
         var firstParent = new PlainHost();
         var secondParent = new PlainHost();
@@ -348,6 +348,34 @@ public sealed class PropertyInheritanceTests
         child.SetParent(null);
         Assert.Equal(7, child.GetValue(PlainHost.ValueProperty));
         Assert.Equal(new[] { (20, 25), (25, 40), (40, 50), (50, 30), (30, 35), (35, 7) }, changes);
+    }
+
+    [Fact]
+    public void InheritedChangesDrivePlainObjectBindingsAfterLocalOverridesAreCleared()
+    {
+        var targetProperty = Property.Register<PropertyOwner, int>(Guid.NewGuid().ToString(), 3);
+        var parent = new PlainHost();
+        parent.SetValue(PlainHost.ValueProperty, 20);
+        var child = new PlainHost(parent);
+        var target = new PropertyOwner();
+        var changes = new List<(int Old, int New)>();
+        using var subscription = target.Subscribe(targetProperty,
+            (_, args) => changes.Add((args.OldValue, args.NewValue)));
+
+        target.Bind(targetProperty, child, PlainHost.ValueProperty);
+        Assert.Equal(20, target.GetValue(targetProperty));
+
+        parent.SetValue(PlainHost.ValueProperty, 25);
+        Assert.Equal(25, target.GetValue(targetProperty));
+
+        child.SetValue(PlainHost.ValueProperty, 40);
+        parent.SetValue(PlainHost.ValueProperty, 50);
+        Assert.Equal(40, target.GetValue(targetProperty));
+
+        child.ClearValue(PlainHost.ValueProperty);
+
+        Assert.Equal(50, target.GetValue(targetProperty));
+        Assert.Equal(new[] { (3, 20), (20, 25), (25, 40), (40, 50) }, changes);
     }
 
     [Fact]
@@ -705,6 +733,29 @@ public sealed class PropertyInheritanceTests
     }
 
     [Fact]
+    public void DifferentLocalOverrideDuringInheritedNotificationPreservesCapturedDescendantEvent()
+    {
+        var parent = new PlainHost();
+        parent.SetValue(PlainHost.ValueProperty, 20);
+        var child = new PlainHost(parent);
+        var leaf = new PlainHost(child);
+        using var childSubscription = child.Subscribe(PlainHost.ValueProperty, (_, args) =>
+        {
+            if (args.NewValue == 30)
+                child.SetValue(PlainHost.ValueProperty, 40);
+        });
+        var changes = new List<(int Old, int New)>();
+        using var leafSubscription = leaf.Subscribe(PlainHost.ValueProperty,
+            (_, args) => changes.Add((args.OldValue, args.NewValue)));
+
+        parent.SetValue(PlainHost.ValueProperty, 30);
+
+        Assert.Equal(40, child.GetValue(PlainHost.ValueProperty));
+        Assert.Equal(40, leaf.GetValue(PlainHost.ValueProperty));
+        Assert.Equal(new[] { (30, 40), (20, 30) }, changes);
+    }
+
+    [Fact]
     public void ReparentedSiblingIsSkippedByOuterChildSnapshot()
     {
         var parent = new Panel { FontSize = 20 };
@@ -725,10 +776,10 @@ public sealed class PropertyInheritanceTests
         Assert.Equal(new[] { (30d, 16d), (16d, 40d) }, changes);
     }
 
-    private abstract class TestTreeHost : ObservableObject
+    private abstract class TestTreeHost : StyledObject
     {
         private TestTreeHost? _parent;
-        private readonly List<ObservableObject> _children = [];
+        private readonly List<StyledObject> _children = [];
 
         protected TestTreeHost(TestTreeHost? parent = null)
         {
@@ -736,8 +787,8 @@ public sealed class PropertyInheritanceTests
             parent?._children.Add(this);
         }
 
-        protected override ObservableObject? InheritanceParent => _parent;
-        protected override IReadOnlyList<ObservableObject> InheritanceChildren => _children;
+        protected override StyledObject? InheritanceParent => _parent;
+        protected override IReadOnlyList<StyledObject> InheritanceChildren => _children;
 
         internal void SetParent(TestTreeHost? parent)
         {
