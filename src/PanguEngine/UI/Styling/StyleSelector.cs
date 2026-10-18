@@ -19,7 +19,7 @@ internal enum StyleCombinator
 }
 
 /// <summary>
-/// Provides an immutable compound selector segment that constrains a single node's element type, classes, id and pseudo classes.
+/// Provides an immutable compound selector segment that constrains a single element's type, classes, id and pseudo classes.
 /// </summary>
 internal sealed class StyleSelectorSegment
 {
@@ -43,7 +43,7 @@ internal sealed class StyleSelectorSegment
     /// <summary>Gets the CLR target type of this segment, or null for a CSS segment.</summary>
     internal Type? TargetType { get; }
 
-    /// <summary>Gets the CSS node name, or <c>*</c> when the element type is unrestricted.</summary>
+    /// <summary>Gets the CSS element name, or <c>*</c> when the element type is unrestricted.</summary>
     internal string TypeName { get; }
 
     /// <summary>Gets the required classes, deduplicated and kept in first-seen order.</summary>
@@ -77,7 +77,7 @@ internal sealed class StyleSelectorSegment
     /// <summary>Gets whether the presence of children affects this segment's match.</summary>
     internal bool HasEmptyPseudoClass => PseudoClasses.Contains(PseudoClass.Empty);
 
-    /// <summary>Gets a value indicating whether this segment constrains the node element type.</summary>
+    /// <summary>Gets a value indicating whether this segment constrains the element type.</summary>
     internal bool HasTypeConstraint => TargetType is not null || TypeName != "*";
 
     /// <summary>Creates a normalized segment from raw conditions.</summary>
@@ -132,7 +132,7 @@ internal sealed class StyleSelectorSegment
             orderedNthConditions.AsReadOnly());
     }
 
-    /// <summary>Resolves the CLR type matched by this segment for the supplied node type, or null when unmatched.</summary>
+    /// <summary>Resolves the CLR type matched by this segment for the supplied element type, or null when unmatched.</summary>
     internal Type? MatchTargetType(Type nodeType)
     {
         if (TargetType != null)
@@ -142,8 +142,8 @@ internal sealed class StyleSelectorSegment
         return CssRegistry.MatchElement(nodeType, TypeName);
     }
 
-    /// <summary>Determines whether the supplied node satisfies this segment's id, class and pseudo-class conditions.</summary>
-    internal bool MatchesConditions(Node node)
+    /// <summary>Determines whether the supplied element satisfies this segment's id, class and pseudo-class conditions.</summary>
+    internal bool MatchesConditions(UIElement node)
     {
         if (Id is not null && !string.Equals(Id, node.StyleId, StringComparison.Ordinal))
             return false;
@@ -168,8 +168,8 @@ internal sealed class StyleSelectorSegment
         return true;
     }
 
-    /// <summary>Matches this segment against a single node and reports its element contribution.</summary>
-    internal bool TryMatch(Node node, out int elementDepth)
+    /// <summary>Matches this segment against a single element and reports its element contribution.</summary>
+    internal bool TryMatch(UIElement node, out int elementDepth)
     {
         var matched = MatchTargetType(node.GetType());
         if (matched is null || !MatchesConditions(node))
@@ -258,7 +258,7 @@ public sealed class StyleSelector
     public Type? TargetType { get; }
 
     /// <summary>
-    /// Gets the CSS node name of the rightmost segment, <c>*</c> when the element type is unrestricted,
+    /// Gets the CSS element name of the rightmost segment, <c>*</c> when the element type is unrestricted,
     /// or the simple name of the CLR target type.
     /// </summary>
     public string TypeName { get; }
@@ -271,7 +271,7 @@ public sealed class StyleSelector
 
     /// <summary>
     /// Gets the rightmost segment's required pseudo-class identifiers, deduplicated and sorted by ordinal name;
-    /// every identifier must match the target node's state or structure. Function arguments are represented in <see cref="SelectorText"/>.
+    /// every identifier must match the target element's state or structure. Function arguments are represented in <see cref="SelectorText"/>.
     /// </summary>
     public IReadOnlyList<PseudoClass> PseudoClasses { get; }
 
@@ -282,7 +282,7 @@ public sealed class StyleSelector
     public int ClassAndPseudoCount { get; }
 
     /// <summary>
-    /// Gets the inheritance distance from the rightmost CLR target type to <see cref="Node"/> plus one,
+    /// Gets the inheritance distance from the rightmost CLR target type to <see cref="UIElement"/> plus one,
     /// or zero for a CSS selector. A CSS chain's element specificity is determined during matching.
     /// </summary>
     public int TargetTypeDepth { get; }
@@ -310,8 +310,8 @@ public sealed class StyleSelector
     /// <summary>Gets whether any segment depends on the presence of child nodes.</summary>
     internal bool HasEmptyPseudoClass => _segments.Any(static segment => segment.HasEmptyPseudoClass);
 
-    /// <summary>Creates a selector for a target node type as a single-segment chain.</summary>
-    /// <typeparam name="TNode">The target node type.</typeparam>
+    /// <summary>Creates a selector for a target element type as a single-segment chain.</summary>
+    /// <typeparam name="TNode">The target element type.</typeparam>
     /// <param name="classes">The optional required classes; duplicates are removed and invalid identifiers rejected.</param>
     /// <param name="id">The optional required id; must be an ASCII identifier.</param>
     /// <param name="pseudoClasses">
@@ -323,7 +323,7 @@ public sealed class StyleSelector
         IEnumerable<string>? classes = null,
         string? id = null,
         IEnumerable<PseudoClass>? pseudoClasses = null)
-        where TNode : Node
+        where TNode : UIElement
     {
         var segment = StyleSelectorSegment.Create(typeof(TNode), typeof(TNode).Name, classes, id, pseudoClasses);
         return Create([segment], []);
@@ -341,26 +341,26 @@ public sealed class StyleSelector
         return new StyleSelector(normalizedSegments, normalizedCombinators, targetTypeDepth);
     }
 
-    /// <summary>Determines whether the supplied node matches this whole selector chain.</summary>
-    /// <param name="node">The target node to test.</param>
-    /// <returns>true when the node and its relationships satisfy the whole chain.</returns>
-    public bool Matches(Node node)
+    /// <summary>Determines whether the supplied element matches this whole selector chain.</summary>
+    /// <param name="node">The target element to test.</param>
+    /// <returns>true when the element and its relationships satisfy the whole chain.</returns>
+    public bool Matches(UIElement node)
     {
         ArgumentNullException.ThrowIfNull(node);
         return TryMatch(node, out _);
     }
 
-    /// <summary>Resolves the rightmost segment's matched CLR type for the supplied node type, or null when unmatched.</summary>
+    /// <summary>Resolves the rightmost segment's matched CLR type for the supplied element type, or null when unmatched.</summary>
     internal Type? MatchTargetType(Type nodeType) => _segments[^1].MatchTargetType(nodeType);
 
     /// <summary>
     /// Matches the whole chain from the rightmost segment and reports the maximum element contribution
     /// across every successful matching path, or zero when the chain does not match.
     /// </summary>
-    internal bool TryMatch(Node node, out int typeDepth) =>
+    internal bool TryMatch(UIElement node, out int typeDepth) =>
         TryMatchAt(_segments.Count - 1, node, out typeDepth);
 
-    private bool TryMatchAt(int index, Node node, out int typeDepth)
+    private bool TryMatchAt(int index, UIElement node, out int typeDepth)
     {
         if (!_segments[index].TryMatch(node, out var ownDepth))
         {
@@ -417,13 +417,13 @@ public sealed class StyleSelector
         return true;
     }
 
-    private void TryMatchPrefix(int prefixIndex, Node candidate, ref int bestPrefixDepth)
+    private void TryMatchPrefix(int prefixIndex, UIElement candidate, ref int bestPrefixDepth)
     {
         if (TryMatchAt(prefixIndex, candidate, out var prefixDepth) && prefixDepth > bestPrefixDepth)
             bestPrefixDepth = prefixDepth;
     }
 
-    private static int IndexOfChild(IReadOnlyList<Node> children, Node node)
+    private static int IndexOfChild(IReadOnlyList<UIElement> children, UIElement node)
     {
         for (var index = 0; index < children.Count; index++)
         {
@@ -456,7 +456,7 @@ public sealed class StyleSelector
     {
         var depth = 1;
         var current = type;
-        while (current != typeof(Node))
+        while (current != typeof(UIElement))
         {
             current = current.BaseType!;
             depth++;

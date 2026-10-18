@@ -5,13 +5,13 @@ using PanguEngine.UI.Drawing.Geometry;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Provides the base class for UI nodes that draw filled and stroked vector geometry.
+/// Provides the base class for UI elements that draw filled and stroked vector geometry.
 /// </summary>
 /// <remarks>
 /// Geometry meshes are rebuilt lazily only when the data, stroke parameters, arranged size, or screen scale
 /// change. Changing a brush color never rebuilds geometry.
 /// </remarks>
-public abstract partial class Shape : Node
+public abstract partial class Shape : UIElement
 {
     /// <summary>
     /// Identifies the <see cref="Fill"/> property.
@@ -171,6 +171,7 @@ public abstract partial class Shape : Node
             if (mesh.Vertices.Length > 0)
                 context.DrawGeometry(mesh, fill);
         }
+
         if (strokeColor is { } stroke)
         {
             var mesh = Geometry.StrokeMesh;

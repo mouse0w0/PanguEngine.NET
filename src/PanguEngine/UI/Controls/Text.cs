@@ -8,7 +8,7 @@ namespace PanguEngine.UI.Controls;
 /// <summary>
 /// Displays an immutable layout of plain text.
 /// </summary>
-public sealed class Text : Node
+public sealed class Text : UIElement
 {
     /// <summary>
     /// Identifies the <see cref="Content"/> property.
@@ -55,7 +55,7 @@ public sealed class Text : Node
     private TextLayout? _layout;
 
     /// <summary>
-    /// Initializes a text node.
+    /// Initializes a text element.
     /// </summary>
     public Text()
     {

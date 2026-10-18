@@ -308,7 +308,8 @@ public sealed class NumericUpDownTests
     public void DecimalAndArbitraryPrecisionIntegerStepsKeepTheirTypePrecision()
     {
         using var context = new TextTestContext();
-        using var decimalScene = new Scene<decimal>(new() { Value = 1.000000000000000000000000001m, Increment = 0.000000000000000000000000001m });
+        using var decimalScene = new Scene<decimal>(new()
+            { Value = 1.000000000000000000000000001m, Increment = 0.000000000000000000000000001m });
         decimalScene.Node.Focus();
         decimalScene.Key(Key.Up);
         Assert.Equal(1.000000000000000000000000002m, decimalScene.Node.Value);
@@ -323,7 +324,11 @@ public sealed class NumericUpDownTests
     public void FloatingOverflowSaturatesToTheFiniteBoundary()
     {
         using var context = new TextTestContext();
-        using var scene = new Scene<double>(new() { Minimum = -double.MaxValue, Maximum = double.MaxValue, Value = double.MaxValue / 2, Increment = double.MaxValue });
+        using var scene = new Scene<double>(new()
+        {
+            Minimum = -double.MaxValue, Maximum = double.MaxValue, Value = double.MaxValue / 2,
+            Increment = double.MaxValue
+        });
         scene.Node.Focus();
         scene.Key(Key.Up);
         Assert.Equal(double.MaxValue, scene.Node.Value);
@@ -412,7 +417,7 @@ public sealed class NumericUpDownTests
         var otherScreen = new GameScreen(otherRoot);
         var otherManager = new UiManager();
         var transferred = false;
-        using var subscription = scene.Editor.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = scene.Editor.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             if (args.NewValue || transferred)
                 return;
@@ -588,14 +593,36 @@ public sealed class NumericUpDownTests
         scene.Frame(0);
         switch (change)
         {
-            case "readonly": scene.Node.IsReadOnly = true; scene.Node.IsReadOnly = false; break;
-            case "disabled": scene.Node.IsEnabled = false; scene.Node.IsEnabled = true; break;
-            case "hidden": scene.Node.Visibility = Visibility.Hidden; scene.Node.Visibility = Visibility.Visible; break;
-            case "zero": scene.Node.Increment = 0; scene.Node.Increment = 1; break;
-            case "detach": scene.Root.Children.Remove(scene.Node); scene.Root.Children.Add(scene.Node); break;
-            case "window": scene.Manager.ProcessFocusChanged(false); scene.Manager.ProcessFocusChanged(true); break;
-            case "close": scene.Manager.Close(); scene.Manager.Open(scene.Screen); break;
+            case "readonly":
+                scene.Node.IsReadOnly = true;
+                scene.Node.IsReadOnly = false;
+                break;
+            case "disabled":
+                scene.Node.IsEnabled = false;
+                scene.Node.IsEnabled = true;
+                break;
+            case "hidden":
+                scene.Node.Visibility = Visibility.Hidden;
+                scene.Node.Visibility = Visibility.Visible;
+                break;
+            case "zero":
+                scene.Node.Increment = 0;
+                scene.Node.Increment = 1;
+                break;
+            case "detach":
+                scene.Root.Children.Remove(scene.Node);
+                scene.Root.Children.Add(scene.Node);
+                break;
+            case "window":
+                scene.Manager.ProcessFocusChanged(false);
+                scene.Manager.ProcessFocusChanged(true);
+                break;
+            case "close":
+                scene.Manager.Close();
+                scene.Manager.Open(scene.Screen);
+                break;
         }
+
         scene.Frame(400);
         scene.Frame(1000);
         Assert.Equal(11, scene.Node.Value);
@@ -728,6 +755,7 @@ public sealed class NumericUpDownTests
         {
             scene.Key(Key.Escape);
         }
+
         Assert.Equal(0m, scene.Node.Value.Number);
     }
 
@@ -800,10 +828,17 @@ public sealed class NumericUpDownTests
                 Manager.ProcessTextInput(text);
         }
 
-        internal void Key(Key key, KeyModifiers modifiers = KeyModifiers.None) => Manager.ProcessKeyDown(key, modifiers);
-        internal void Frame(int milliseconds) => Manager.UpdateFrame(new Size(400, 120), 0, TimeSpan.FromMilliseconds(milliseconds));
+        internal void Key(Key key, KeyModifiers modifiers = KeyModifiers.None) =>
+            Manager.ProcessKeyDown(key, modifiers);
+
+        internal void Frame(int milliseconds) =>
+            Manager.UpdateFrame(new Size(400, 120), 0, TimeSpan.FromMilliseconds(milliseconds));
+
         internal void Press(Point point) => Manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
-        internal void Release(Point point) => Manager.ProcessPointerReleased(point, MouseButton.Left, KeyModifiers.None);
+
+        internal void Release(Point point) =>
+            Manager.ProcessPointerReleased(point, MouseButton.Left, KeyModifiers.None);
+
         internal Point PartCenter(string role)
         {
             var part = Node.ReadOnlyChildren.Single(child => child.Classes.Contains($"numeric-up-down-{role}"));

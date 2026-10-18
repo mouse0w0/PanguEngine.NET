@@ -448,15 +448,15 @@ public sealed class StyleCombinatorTests
 
         var sharedFirst = new StyleResolver([], [
             StyleSheet.Parse("""
-                               shared Panel { background: #010101; }
-                               FixedDepth Panel { background: #040404; }
-                               """)
+                             shared Panel { background: #010101; }
+                             FixedDepth Panel { background: #040404; }
+                             """)
         ]);
         var shallowFirst = new StyleResolver([], [
             StyleSheet.Parse("""
-                               FixedDepth Panel { background: #040404; }
-                               shared Panel { background: #010101; }
-                               """)
+                             FixedDepth Panel { background: #040404; }
+                             shared Panel { background: #010101; }
+                             """)
         ]);
 
         Assert.Equal(Brush(1), sharedFirst.Resolve(target).GetValue(Region.BackgroundProperty));
@@ -481,15 +481,15 @@ public sealed class StyleCombinatorTests
 
         var sharedFirst = new StyleResolver([], [
             StyleSheet.Parse("""
-                               shared ~ Panel { background: #010101; }
-                               FixedDepth > Panel { background: #040404; }
-                               """)
+                             shared ~ Panel { background: #010101; }
+                             FixedDepth > Panel { background: #040404; }
+                             """)
         ]);
         var shallowFirst = new StyleResolver([], [
             StyleSheet.Parse("""
-                               FixedDepth > Panel { background: #040404; }
-                               shared ~ Panel { background: #010101; }
-                               """)
+                             FixedDepth > Panel { background: #040404; }
+                             shared ~ Panel { background: #010101; }
+                             """)
         ]);
 
         Assert.Equal(Brush(1), sharedFirst.Resolve(target).GetValue(Region.BackgroundProperty));
@@ -501,9 +501,9 @@ public sealed class StyleCombinatorTests
     {
         var resolver = new StyleResolver([], [
             StyleSheet.Parse("""
-                               shared Panel { background: #010101; }
-                               FixedDepth Panel { background: #040404; }
-                               """)
+                             shared Panel { background: #010101; }
+                             FixedDepth Panel { background: #040404; }
+                             """)
         ]);
         var nearOnly = new SharedBase();
         var target = new Panel();
@@ -527,9 +527,9 @@ public sealed class StyleCombinatorTests
     {
         var resolver = new StyleResolver([], [
             StyleSheet.Parse("""
-                               .host Button { opacity: 0.4; }
-                               .host Panel { opacity: 0.7; }
-                               """)
+                             .host Button { opacity: 0.4; }
+                             .host Panel { opacity: 0.7; }
+                             """)
         ]);
         var host = MakePanel("host");
         var button = new Button();
@@ -537,8 +537,8 @@ public sealed class StyleCombinatorTests
         host.Children.Add(button);
         host.Children.Add(panel);
 
-        Assert.Equal(0.4, resolver.Resolve(button).GetValue(Node.OpacityProperty));
-        Assert.Equal(0.7, resolver.Resolve(panel).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(button).GetValue(UIElement.OpacityProperty));
+        Assert.Equal(0.7, resolver.Resolve(panel).GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
@@ -573,7 +573,7 @@ public sealed class StyleCombinatorTests
         var rule = SingleRule(".panel:hover .button { width: 10; }");
 
         var declaration = Assert.Single(rule.Bind(new Button().GetType()));
-        Assert.Same(Node.WidthProperty, declaration.Setter.Property);
+        Assert.Same(UIElement.WidthProperty, declaration.Setter.Property);
         Assert.Equal(10d, declaration.Setter.BoxedValue);
     }
 
@@ -585,13 +585,13 @@ public sealed class StyleCombinatorTests
         var target = new PseudoNode("target");
         host.Children.Add(target);
 
-        Assert.Equal(1d, resolver.Resolve(target).GetValue(Node.OpacityProperty));
+        Assert.Equal(1d, resolver.Resolve(target).GetValue(UIElement.OpacityProperty));
 
         target.Activate("loading", true);
-        Assert.Equal(0.4, resolver.Resolve(target).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(target).GetValue(UIElement.OpacityProperty));
 
         target.Activate("loading", false);
-        Assert.Equal(1d, resolver.Resolve(target).GetValue(Node.OpacityProperty));
+        Assert.Equal(1d, resolver.Resolve(target).GetValue(UIElement.OpacityProperty));
     }
 
     private sealed class PseudoPanel : Panel
@@ -605,7 +605,7 @@ public sealed class StyleCombinatorTests
         internal void Set(string name, bool active) => SetPseudoClass(PseudoClass.Get(name), active);
     }
 
-    private sealed class PseudoNode : Node
+    private sealed class PseudoNode : UIElement
     {
         internal PseudoNode(params string[] classes)
         {
@@ -634,7 +634,7 @@ public sealed class StyleCombinatorTests
         }
     }
 
-    private sealed class CountingNode : Node
+    private sealed class CountingNode : UIElement
     {
         static CountingNode()
         {

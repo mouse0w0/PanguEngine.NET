@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 
@@ -12,7 +11,7 @@ namespace PanguEngine.Client.Screens.Showcase;
 internal sealed class UiShowcaseGallery(double minimumColumnWidth = 360, int maximumColumns = 2) : Panel
 {
     private const double Gap = 16;
-    private Node[] _items = [];
+    private UIElement[] _items = [];
     private double[] _rowHeights = [];
     private int _columns = 1;
 
@@ -60,6 +59,7 @@ internal sealed class UiShowcaseGallery(double minimumColumnWidth = 360, int max
                 _items[index].Arrange(new Rect(
                     contentBounds.X + column * (columnWidth + Gap), top, columnWidth, _rowHeights[row]));
             }
+
             top += _rowHeights[row] + Gap;
         }
     }

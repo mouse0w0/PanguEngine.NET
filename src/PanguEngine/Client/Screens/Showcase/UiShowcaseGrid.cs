@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.Graphics.Text;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
@@ -33,7 +32,7 @@ internal static class UiShowcaseGrid
                 CreateLimitsSample()));
     }
 
-    private static Node CreateSizingSample()
+    private static UIElement CreateSizingSample()
     {
         var grid = CreateGrid("showcase-grid-sizing", 74,
             new(64, GridLength.Auto, GridLength.Star, new GridLength(2, GridUnitType.Star)),
@@ -45,7 +44,7 @@ internal static class UiShowcaseGrid
         return UiShowcaseWidgets.Sample("尺寸分配 · 64px / Auto / * / 2*", grid);
     }
 
-    private static Node CreateSpanSample()
+    private static UIElement CreateSpanSample()
     {
         var grid = CreateGrid("showcase-grid-spans", 180,
             new(64, GridLength.Star, GridLength.Star),
@@ -58,7 +57,7 @@ internal static class UiShowcaseGrid
         return UiShowcaseWidgets.Sample("跨行跨列 · 列：64px / * / *；行：36px / * / *", grid);
     }
 
-    private static Node CreateSpacingSample()
+    private static UIElement CreateSpacingSample()
     {
         var samples = new UiShowcaseGallery(170, 3);
         foreach (var spacing in new[] { 0, 8, 16 })
@@ -74,10 +73,11 @@ internal static class UiShowcaseGrid
             AddCell(grid, "D", 1, 1, Blue);
             samples.Children.Add(UiShowcaseWidgets.Sample($"行列间距 {spacing}px", grid));
         }
+
         return UiShowcaseWidgets.Sample("行列间距 · 0 / 8 / 16", samples);
     }
 
-    private static Node CreateLimitsSample()
+    private static UIElement CreateLimitsSample()
     {
         var equal = CreateGrid("showcase-grid-equal", 74,
             new(GridLength.Star, GridLength.Star), new(GridLength.Star));
@@ -89,6 +89,7 @@ internal static class UiShowcaseGrid
             AddCell(grid, "左列", 0, 0, Blue);
             AddCell(grid, "右列", 0, 1, Green);
         }
+
         var samples = new UiShowcaseGallery(170, 2);
         samples.Children.Add(UiShowcaseWidgets.Sample("两列等分：* / *", equal));
         samples.Children.Add(UiShowcaseWidgets.Sample("左列：Min 64 / Max 96；右列：*", constrained));

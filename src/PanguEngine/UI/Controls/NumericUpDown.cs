@@ -211,7 +211,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected internal override Node GetFocusTarget() => _editor;
+    protected internal override UIElement GetFocusTarget() => _editor;
 
     private void OnValueChanged()
     {
@@ -289,6 +289,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
         {
             Value = parsed;
         }
+
         UpdatePartStates();
     }
 
@@ -363,6 +364,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
             else
                 throw new InvalidOperationException("The numeric step produced an invalid non-finite result.");
         }
+
         Value = result;
         ShowValue();
         UpdatePartStates();
@@ -486,6 +488,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
             CancelRepeat();
             return;
         }
+
         if (!part.IsHovered)
             return;
         if (!_hasRepeatBaseline)
@@ -538,7 +541,8 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     /// <inheritdoc />
     protected override void ArrangeContent(Rect contentBounds)
     {
-        var columnWidth = Math.Min(contentBounds.Width, Math.Max(_increase.DesiredSize.Width, _decrease.DesiredSize.Width));
+        var columnWidth = Math.Min(contentBounds.Width,
+            Math.Max(_increase.DesiredSize.Width, _decrease.DesiredSize.Width));
         var editorWidth = Math.Max(0, contentBounds.Width - columnWidth);
         var halfHeight = contentBounds.Height / 2;
         _editor.Arrange(new Rect(contentBounds.X, contentBounds.Y, editorWidth, contentBounds.Height));

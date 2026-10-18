@@ -373,7 +373,7 @@ public class Button : Control
         RefreshPressedPseudoClass();
     }
 
-    private static void ArrangeCentered(Node child, Rect contentBounds)
+    private static void ArrangeCentered(UIElement child, Rect contentBounds)
     {
         var desiredSize = child.DesiredSize;
         child.Arrange(new Rect(

@@ -9,10 +9,10 @@ namespace PanguEngine.Client.UI;
 public class GameScreen : Screen
 {
     /// <summary>
-    /// Initializes a game screen with an optional root node.
+    /// Initializes a game screen with an optional root element.
     /// </summary>
-    /// <param name="root">The initial root node, or null to create an empty screen.</param>
-    public GameScreen(Node? root = null) : base(root)
+    /// <param name="root">The initial root element, or null to create an empty screen.</param>
+    public GameScreen(UIElement? root = null) : base(root)
     {
     }
 

@@ -26,8 +26,8 @@ public sealed class ButtonTests
         AssertProperty(
             Button.TextProperty,
             string.Empty);
-        Assert.Equal(typeof(Node), Button.FontFamilyProperty.OwnerType);
-        Assert.Equal(typeof(Node), Button.ColorProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), Button.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), Button.ColorProperty.OwnerType);
         Assert.Equal(new Color(242, 244, 247), button.Color);
         AssertProperty(
             Button.IconProperty,
@@ -57,9 +57,9 @@ public sealed class ButtonTests
         }
 
         Assert.Null(typeof(Button).GetProperty(
-            nameof(Parent.Children),
+            nameof(Container.Children),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
-        Assert.IsAssignableFrom<IReadOnlyList<Node>>(button.ReadOnlyChildren);
+        Assert.IsAssignableFrom<IReadOnlyList<UIElement>>(button.ReadOnlyChildren);
     }
 
     [Fact]
@@ -429,29 +429,33 @@ public sealed class ButtonTests
     {
         var button = new Button();
         var screen = new Screen(button);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(
-                StyleSelector.For<Button>(),
-                [StyleSetter.Create(Button.TextProperty, "Old")]),
-            new StyleRule(
-                StyleSelector.For<Text>(),
-                [StyleSetter.Create(Node.OpacityProperty, 0.4)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(
+                    StyleSelector.For<Button>(),
+                    [StyleSetter.Create(Button.TextProperty, "Old")]),
+                new StyleRule(
+                    StyleSelector.For<Text>(),
+                    [StyleSetter.Create(UIElement.OpacityProperty, 0.4)])
+            ])
+        ]);
         screen.Root!.UpdateStyles();
         var oldText = Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
         screen.Root!.UpdateStyles();
         var opacityNotifications = 0;
         oldText.PropertyChanged += (_, e) =>
-            opacityNotifications += ReferenceEquals(e.Property, Node.OpacityProperty) ? 1 : 0;
+            opacityNotifications += ReferenceEquals(e.Property, UIElement.OpacityProperty) ? 1 : 0;
 
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(
-                StyleSelector.For<Button>(),
-                [StyleSetter.Create(Button.TextProperty, string.Empty)]),
-            new StyleRule(
-                StyleSelector.For<Text>(),
-                [StyleSetter.Create(Node.OpacityProperty, 0.8)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(
+                    StyleSelector.For<Button>(),
+                    [StyleSetter.Create(Button.TextProperty, string.Empty)]),
+                new StyleRule(
+                    StyleSelector.For<Text>(),
+                    [StyleSetter.Create(UIElement.OpacityProperty, 0.8)])
+            ])
+        ]);
         screen.Root!.UpdateStyles();
 
         Assert.Empty(button.ReadOnlyChildren);
@@ -524,7 +528,7 @@ public sealed class ButtonTests
         Assert.Equal(new Color(139, 148, 160), text.Color);
         button.Color = new Color(240, 230, 220);
         Assert.Equal(new Color(240, 230, 220), text.Color);
-        button.ClearValue(Node.ColorProperty);
+        button.ClearValue(UIElement.ColorProperty);
         Assert.Equal(new Color(139, 148, 160), text.Color);
     }
 
@@ -606,7 +610,7 @@ public sealed class ButtonTests
             40);
         var manager = new UiManager();
         var screen = new GameScreen(root);
-        Node? source = null;
+        UIElement? source = null;
         var clicks = 0;
         button.PointerClicked += (_, eventArgs) => source = eventArgs.Source;
         button.Click += (_, _) => clicks++;
@@ -1134,7 +1138,7 @@ public sealed class ButtonTests
         double y,
         double width,
         double height)
-        where T : Node
+        where T : UIElement
     {
         child.Width = width;
         child.Height = height;
@@ -1156,7 +1160,7 @@ public sealed class ButtonTests
         return screen.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
     }
 
-    private static StyleValueSource? StyleSource(Node node, Property property) =>
+    private static StyleValueSource? StyleSource(UIElement node, Property property) =>
         node.GetStyleValueSources(property).SingleOrDefault();
 
     private static Image CreateImage(int width, int height) =>

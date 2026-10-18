@@ -5,19 +5,19 @@ namespace PanguEngine.UI.Input;
 /// </summary>
 public sealed class FocusChangedEventArgs : EventArgs
 {
-    internal FocusChangedEventArgs(Node? oldFocus, Node? newFocus)
+    internal FocusChangedEventArgs(UIElement? oldFocus, UIElement? newFocus)
     {
         OldFocus = oldFocus;
         NewFocus = newFocus;
     }
 
     /// <summary>
-    /// Gets the node that lost focus, if any.
+    /// Gets the element that lost focus, if any.
     /// </summary>
-    public Node? OldFocus { get; }
+    public UIElement? OldFocus { get; }
 
     /// <summary>
-    /// Gets the node that received focus, if any.
+    /// Gets the element that received focus, if any.
     /// </summary>
-    public Node? NewFocus { get; }
+    public UIElement? NewFocus { get; }
 }

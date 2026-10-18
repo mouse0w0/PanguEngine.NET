@@ -20,7 +20,7 @@ public sealed partial class TabView
     private void UpdateSelection(TabItem? oldItem, TabItem? newItem, int oldIndex)
     {
         var focusWasInOldContent = oldItem?.ContentHost is { } oldHost &&
-            IsDescendantOrSelf(Screen?.FocusedNode, oldHost);
+                                   IsDescendantOrSelf(Screen?.FocusedNode, oldHost);
 
         _selectionUpdateDepth++;
         try
@@ -83,7 +83,7 @@ public sealed partial class TabView
     private static bool IsAvailable(TabItem item) =>
         item.IsEnabled && item.Visibility == Visibility.Visible;
 
-    private static bool IsDescendantOrSelf(Node? node, Node ancestor)
+    private static bool IsDescendantOrSelf(UIElement? node, UIElement ancestor)
     {
         for (var current = node; current is not null; current = current.Parent)
         {

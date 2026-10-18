@@ -7,7 +7,7 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Provides a checkable control with optional text or node content and an indeterminate state.
+/// Provides a checkable control with optional text or element content and an indeterminate state.
 /// </summary>
 public sealed class CheckBox : Control
 {
@@ -41,7 +41,7 @@ public sealed class CheckBox : Control
     private bool _spaceKeyDown;
     private int _focusVersion;
 
-    private Node? ContentNode => _contentPanel.Children.Count == 0 ? null : _contentPanel.Children[0];
+    private UIElement? ContentNode => _contentPanel.Children.Count == 0 ? null : _contentPanel.Children[0];
 
     static CheckBox()
     {
@@ -81,9 +81,9 @@ public sealed class CheckBox : Control
         set => SetValue(IsThreeStateProperty, value);
     }
 
-    /// <summary>Gets or sets the label as a node, text, another object's text representation, or null.</summary>
+    /// <summary>Gets or sets the label as an element, text, another object's text representation, or null.</summary>
     /// <remarks>
-    /// A node moves from its previous owner and clears this slot when moved elsewhere.
+    /// An element moves from its previous owner and clears this slot when moved elsewhere.
     /// Assignments of the same content instance do not refresh text, and changes inside an ordinary object are not observed.
     /// </remarks>
     public object? Content
@@ -91,14 +91,16 @@ public sealed class CheckBox : Control
         get => _content;
         set
         {
-            if (value is Node node)
+            if (value is UIElement node)
             {
-                for (Node? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
+                for (UIElement? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
                     if (ReferenceEquals(node, ancestor))
                         throw new ArgumentException("Content cannot be this check box or an ancestor.", nameof(value));
                 if (ReferenceEquals(node, _box) || ReferenceEquals(node, _mark) || ReferenceEquals(node, _contentPanel))
-                    throw new ArgumentException("An internal check box node cannot be assigned as content.", nameof(value));
+                    throw new ArgumentException("An internal check box node cannot be assigned as content.",
+                        nameof(value));
             }
+
             SetField(ContentProperty, ref _content, value);
         }
     }
@@ -175,6 +177,7 @@ public sealed class CheckBox : Control
             base.OnKeyDown(eventArgs);
             return;
         }
+
         if (!eventArgs.IsRepeat)
             SetSpaceKeyDown(IsEnabled && IsFocused);
         base.OnKeyDown(eventArgs);
@@ -189,6 +192,7 @@ public sealed class CheckBox : Control
             base.OnKeyUp(eventArgs);
             return;
         }
+
         var activate = _spaceKeyDown;
         var screen = Screen;
         var focusVersion = _focusVersion;
@@ -212,7 +216,7 @@ public sealed class CheckBox : Control
 
     private void SynchronizeContent(object? value)
     {
-        Node? node = value as Node;
+        UIElement? node = value as UIElement;
         if (node is null && value is not null)
         {
             var text = value is string content ? content : value.ToString();
@@ -222,11 +226,12 @@ public sealed class CheckBox : Control
                 node.Classes.Add("checkbox-text");
             }
         }
+
         if (ReferenceEquals(Content, value))
             SetContentNode(node, value);
     }
 
-    private void SetContentNode(Node? node, object? expectedValue)
+    private void SetContentNode(UIElement? node, object? expectedValue)
     {
         if (ReferenceEquals(ContentNode, node))
             return;
@@ -247,7 +252,7 @@ public sealed class CheckBox : Control
         _contentPanel.Children.Add(node);
     }
 
-    private void OnContentChildrenChanged(object? sender, ListChangedEventArgs<Node> change)
+    private void OnContentChildrenChanged(object? sender, ListChangedEventArgs<UIElement> change)
     {
         foreach (var node in change.OldItems)
             if (!ReferenceEquals(node.Parent, _contentPanel) && ReferenceEquals(Content, node))
@@ -295,13 +300,14 @@ public sealed class CheckBox : Control
     {
         if (screen is null || !screen.IsOpen() || !ReferenceEquals(Screen, screen))
             return false;
-        for (Node? node = this; node is not null; node = node.Parent)
+        for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;
             if (ReferenceEquals(node, screen.Root))
                 return true;
         }
+
         return false;
     }
 }

@@ -4,7 +4,7 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Arranges child nodes sequentially along one axis.
+/// Arranges child elements sequentially along one axis.
 /// </summary>
 public sealed class StackPanel : Panel
 {

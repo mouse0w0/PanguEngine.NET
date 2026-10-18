@@ -466,7 +466,7 @@ public sealed class StackPanelTests
         Assert.Equal(1, secondGap * 1.25, 10);
     }
 
-    private static void ValidateLayout(Node node)
+    private static void ValidateLayout(UIElement node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
@@ -476,7 +476,7 @@ public sealed class StackPanelTests
     {
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }

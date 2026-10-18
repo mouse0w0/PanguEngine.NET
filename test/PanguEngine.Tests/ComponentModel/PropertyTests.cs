@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
 using PanguEngine.UI;
 
@@ -418,7 +417,7 @@ public sealed class PropertyTests
         return weakHandler;
     }
 
-    private class TestNode : Node
+    private class TestNode : UIElement
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<TestNode, int>(nameof(Value), 10,
@@ -444,15 +443,15 @@ public sealed class PropertyTests
     {
     }
 
-    private sealed class ForeignNode : Node
+    private sealed class ForeignNode : UIElement
     {
     }
 
-    private sealed class ConcurrentNode : Node
+    private sealed class ConcurrentNode : UIElement
     {
     }
 
-    private sealed class AttachedOwner : Node
+    private sealed class AttachedOwner : UIElement
     {
         internal static readonly Property<int> ValueProperty =
             Property.RegisterAttached<AttachedOwner, AttachedTarget, int>(
@@ -461,7 +460,7 @@ public sealed class PropertyTests
                 onChanged: static (node, _, _) => node.InvalidateArrange());
     }
 
-    private class AttachedTarget : Node
+    private class AttachedTarget : UIElement
     {
     }
 

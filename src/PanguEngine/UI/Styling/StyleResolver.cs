@@ -68,11 +68,11 @@ internal sealed partial class StyleResolver
         }
     }
 
-    /// <summary>Resolves the winning style declarations for the supplied node.</summary>
-    /// <param name="node">The node whose runtime type, classes, id and pseudo states select rules.</param>
+    /// <summary>Resolves the winning style declarations for the supplied element.</summary>
+    /// <param name="node">The element whose runtime type, classes, id and pseudo states select rules.</param>
     /// <returns>An immutable snapshot of the resolved style values and their sources.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
-    internal StyleSnapshot Resolve(Node node)
+    internal StyleSnapshot Resolve(UIElement node)
     {
         ArgumentNullException.ThrowIfNull(node);
         var variables = HasVariables
@@ -160,7 +160,7 @@ internal sealed partial class StyleResolver
         }
     }
 
-    private IReadOnlyList<BoundRuleEntry> GetBoundRules(Node node)
+    private IReadOnlyList<BoundRuleEntry> GetBoundRules(UIElement node)
     {
         var nodeType = node.GetType();
 

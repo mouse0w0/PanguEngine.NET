@@ -239,8 +239,10 @@ public sealed class WrapPanelTests
     {
         var panel = new WrapPanel();
         var screen = new Screen(panel);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            "WrapPanel { orientation: vertical; item-spacing: 10px; line-spacing: 5px; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse(
+                "WrapPanel { orientation: vertical; item-spacing: 10px; line-spacing: 5px; }")
+        ]);
         panel.Children.Add(new TestNode(new Size(10, 40)));
         panel.Children.Add(new TestNode(new Size(20, 40)));
         panel.Children.Add(new TestNode(new Size(15, 40)));
@@ -568,7 +570,8 @@ public sealed class WrapPanelTests
     private static Size AxisSize(Orientation orientation, double main, double cross) =>
         orientation == Orientation.Horizontal ? new Size(main, cross) : new Size(cross, main);
 
-    private static Rect AxisRect(Orientation orientation, double main, double cross, double mainSize, double crossSize) =>
+    private static Rect AxisRect(Orientation orientation, double main, double cross, double mainSize,
+        double crossSize) =>
         orientation == Orientation.Horizontal
             ? new Rect(main, cross, mainSize, crossSize)
             : new Rect(cross, main, crossSize, mainSize);
@@ -585,7 +588,7 @@ public sealed class WrapPanelTests
     private static double CrossOrigin(Rect rect, Orientation orientation) =>
         orientation == Orientation.Horizontal ? rect.Y : rect.X;
 
-    private sealed class TestNode(Size desiredSize) : Node
+    private sealed class TestNode(Size desiredSize) : UIElement
     {
         internal Size LastMeasureConstraint { get; private set; }
         internal int MeasureCount { get; private set; }

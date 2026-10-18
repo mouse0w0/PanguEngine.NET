@@ -1,22 +1,22 @@
 namespace PanguEngine.UI;
 
 /// <summary>
-/// Runs a callback tied to a UI node once per prepared frame while active.
+/// Runs a callback tied to a UI element once per prepared frame while active.
 /// </summary>
 /// <remarks>
 /// The owning screen supplies the same absolute monotonic time to all tickers in a client frame.
-/// Changing the node's screen ownership or closing its screen stops the current run without invoking business callbacks.
+/// Changing the element's screen ownership or closing its screen stops the current run without invoking business callbacks.
 /// Remounting or reopening does not resume a stopped run. Callback exceptions propagate immediately.
-/// Consumers retain tickers for reuse. Nodes and screens register active runs only.
+/// Consumers retain tickers for reuse. Elements and screens register active runs only.
 /// </remarks>
 public sealed class Ticker
 {
-    private readonly Node _owner;
+    private readonly UIElement _owner;
     private readonly Action<TimeSpan> _onTick;
     private Screen? _screen;
     private LinkedListNode<Ticker>? _registration;
 
-    internal Ticker(Node owner, Action<TimeSpan> onTick)
+    internal Ticker(UIElement owner, Action<TimeSpan> onTick)
     {
         _owner = owner;
         _onTick = onTick;
@@ -32,17 +32,17 @@ public sealed class Ticker
     /// </summary>
     /// <remarks>
     /// Requires screen ownership, the owning screen's UI thread, and an open screen that has not begun closing.
-    /// Screen ownership is determined by the node's Screen property.
+    /// Screen ownership is determined by the element's Screen property.
     /// Starting after the owning screen begins frame preparation takes effect no earlier than its next prepared frame.
     /// No callback runs synchronously; consumers reset their time baseline for each new run.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the node has no screen ownership, its screen is closed or closing, or access is on the wrong thread.
+    /// Thrown when the element has no screen ownership, its screen is closed or closing, or access is on the wrong thread.
     /// </exception>
     public void Start()
     {
         var screen = _owner.Screen
-            ?? throw new InvalidOperationException("The UI node has no screen ownership.");
+                     ?? throw new InvalidOperationException("The UI node has no screen ownership.");
         screen.VerifyTickerStart();
         if (_registration is not null)
             return;

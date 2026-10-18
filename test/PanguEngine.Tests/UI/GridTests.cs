@@ -79,7 +79,8 @@ public sealed class GridTests
         var grid = new Grid
         {
             ColumnDefinitions = new(new GridDefinition(GridLength.Star, 60, 20),
-                new GridDefinition(GridLength.Star, 60)), ColumnSpacing = 5
+                new GridDefinition(GridLength.Star, 60)),
+            ColumnSpacing = 5
         };
         var nodes = AddColumns(grid, 0, 0);
         Layout(grid, 100, 10);
@@ -362,6 +363,7 @@ public sealed class GridTests
         {
             Layout(grid, 1e300, 20);
         }
+
         Assert.InRange(nodes[0].LayoutBounds.Width / 1e-100, 0.999999999999, 1.000000000001);
     }
 
@@ -429,6 +431,7 @@ public sealed class GridTests
             Grid.SetColumn(nodes[index], index);
             grid.Children.Add(nodes[index]);
         }
+
         return nodes;
     }
 
@@ -438,7 +441,7 @@ public sealed class GridTests
         grid.Arrange(new Rect(0, 0, width, height));
     }
 
-    private sealed class ProbeNode(Func<Size, Size> measure) : Node
+    private sealed class ProbeNode(Func<Size, Size> measure) : UIElement
     {
         public Size Constraint { get; private set; }
 

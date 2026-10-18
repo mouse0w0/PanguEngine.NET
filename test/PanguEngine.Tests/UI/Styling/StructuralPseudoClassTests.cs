@@ -295,13 +295,15 @@ public sealed class StructuralPseudoClassTests
         var node = new Panel();
         node.Classes.Add("row");
         var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse("""
-            .row:nth-child(odd) { opacity: 0.4; }
-            .row { opacity: 0.8; }
-            """)]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse("""
+                             .row:nth-child(odd) { opacity: 0.4; }
+                             .row { opacity: 0.8; }
+                             """)
+        ]);
         node.UpdateStyles();
         Assert.Equal(0.4, node.Opacity);
-        var source = Assert.Single(node.GetStyleValueSources(Node.OpacityProperty));
+        var source = Assert.Single(node.GetStyleValueSources(UIElement.OpacityProperty));
         Assert.Equal(".row:nth-child(2n+1)", source.Selector.SelectorText);
     }
 

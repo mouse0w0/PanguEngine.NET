@@ -183,6 +183,7 @@ public sealed class UniformGridTests
             var previous = grid.Children[index - 1].LayoutBounds;
             Assert.Equal(previous.X + previous.Width, grid.Children[index].LayoutBounds.X, 10);
         }
+
         var last = grid.Children[2].LayoutBounds;
         Assert.Equal(80, last.X + last.Width, 10);
     }
@@ -411,8 +412,10 @@ public sealed class UniformGridTests
         var grid = new UniformGrid();
         var screen = new Screen(grid);
         Layout(grid);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            "UniformGrid { rows: 2; columns: +3; row-spacing: 4px; column-spacing: 5; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse(
+                "UniformGrid { rows: 2; columns: +3; row-spacing: 4px; column-spacing: 5; }")
+        ]);
 
         grid.UpdateStyles();
 
@@ -473,13 +476,13 @@ public sealed class UniformGridTests
         Assert.Equal(0, grid.ColumnSpacing);
     }
 
-    private static void Layout(Node node)
+    private static void Layout(UIElement node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Size CoreDesiredSize { get; init; }
         internal Size LastMeasureConstraint { get; private set; }

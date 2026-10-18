@@ -229,6 +229,7 @@ public sealed class ScreenStyleSheetsTests
             Assert.False(node.IsStyleValid);
             Assert.Equal(1d, node.Opacity);
         };
+
         IEnumerable<StyleSheet> Input()
         {
             node.Classes.Add("pending");
@@ -394,7 +395,7 @@ public sealed class ScreenStyleSheetsTests
         yield return new StyleSheet([]);
     }
 
-    private sealed class CallbackNode : Node
+    private sealed class CallbackNode : UIElement
     {
         static CallbackNode()
         {

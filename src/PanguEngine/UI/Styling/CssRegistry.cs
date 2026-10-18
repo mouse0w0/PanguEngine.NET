@@ -3,12 +3,12 @@ using PanguEngine.ComponentModel;
 namespace PanguEngine.UI.Styling;
 
 /// <summary>
-/// Registers CSS element names and property definitions for UI node types.
+/// Registers CSS element names and property definitions for UI element types.
 /// </summary>
 /// <remarks>
 /// Definitions are registered from control static constructors and resolved along the CLR base type chain.
 /// Queries read already registered definitions without initializing control types.
-/// Later registrations are used when invalidated node styles are recomputed.
+/// Later registrations are used when invalidated element styles are recomputed.
 /// </remarks>
 public static class CssRegistry
 {
@@ -28,16 +28,16 @@ public static class CssRegistry
     }
 
     /// <summary>
-    /// Registers a stable CSS element name for a node type.
+    /// Registers a stable CSS element name for an element type.
     /// </summary>
-    /// <typeparam name="TNode">The node type to name.</typeparam>
+    /// <typeparam name="TNode">The element type to name.</typeparam>
     /// <param name="name">The ASCII identifier element name, compared with ordinal case sensitivity.</param>
     /// <exception cref="ArgumentException">Thrown when the name is not a valid ASCII identifier.</exception>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the target type already has a registered element name.
     /// </exception>
     public static void RegisterElement<TNode>(string name)
-        where TNode : Node
+        where TNode : UIElement
     {
         StyleIdentifier.ThrowIfInvalid(name, nameof(name));
         var targetType = typeof(TNode);
@@ -54,7 +54,7 @@ public static class CssRegistry
     /// <summary>
     /// Registers a CSS property that converts text into a strongly typed value.
     /// </summary>
-    /// <typeparam name="TTarget">The node type on which the CSS property applies.</typeparam>
+    /// <typeparam name="TTarget">The element type on which the CSS property applies.</typeparam>
     /// <typeparam name="TValue">The property value type.</typeparam>
     /// <param name="name">The CSS property name.</param>
     /// <param name="property">The property assigned by the converted value.</param>
@@ -71,7 +71,7 @@ public static class CssRegistry
         string name,
         Property<TValue> property,
         Func<string, TValue> converter)
-        where TTarget : Node
+        where TTarget : UIElement
     {
         ArgumentNullException.ThrowIfNull(property);
         ArgumentNullException.ThrowIfNull(converter);
@@ -96,7 +96,7 @@ public static class CssRegistry
     /// <summary>
     /// Registers a CSS property whose converter expands into one or more style setters.
     /// </summary>
-    /// <typeparam name="TTarget">The node type on which the CSS property applies.</typeparam>
+    /// <typeparam name="TTarget">The element type on which the CSS property applies.</typeparam>
     /// <param name="name">The CSS property name.</param>
     /// <param name="converter">The converter from a trimmed CSS value to the resulting setters.</param>
     /// <remarks>
@@ -110,7 +110,7 @@ public static class CssRegistry
     public static void RegisterProperty<TTarget>(
         string name,
         Func<string, IReadOnlyList<StyleSetter>> converter)
-        where TTarget : Node
+        where TTarget : UIElement
     {
         ArgumentNullException.ThrowIfNull(converter);
         StyleIdentifier.ThrowIfInvalid(name, nameof(name));
@@ -120,7 +120,7 @@ public static class CssRegistry
     /// <summary>
     /// Finds the nearest CLR type in the base chain whose element name matches ordinally.
     /// </summary>
-    /// <param name="runtimeType">The node runtime type the search starts from.</param>
+    /// <param name="runtimeType">The element runtime type the search starts from.</param>
     /// <param name="name">The case-sensitive element name to match.</param>
     /// <returns>The nearest matching type, or null when no level matches.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="runtimeType"/> or <paramref name="name"/> is null.</exception>
@@ -132,7 +132,7 @@ public static class CssRegistry
         lock (RegistryLock)
         {
             for (var current = runtimeType;
-                 current is not null && typeof(Node).IsAssignableFrom(current);
+                 current is not null && typeof(UIElement).IsAssignableFrom(current);
                  current = current.BaseType)
             {
                 var currentName = ElementNames.TryGetValue(current, out var registered)
@@ -149,7 +149,7 @@ public static class CssRegistry
     /// <summary>
     /// Finds the CSS property nearest to a target type for a case-insensitive CSS name.
     /// </summary>
-    /// <param name="targetType">The node type being styled.</param>
+    /// <param name="targetType">The element type being styled.</param>
     /// <param name="name">The CSS property name to resolve.</param>
     /// <returns>The closest registered definition, or null when none is registered for the name.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="targetType"/> or <paramref name="name"/> is null.</exception>
@@ -161,7 +161,7 @@ public static class CssRegistry
         lock (RegistryLock)
         {
             for (var current = targetType;
-                 current is not null && typeof(Node).IsAssignableFrom(current);
+                 current is not null && typeof(UIElement).IsAssignableFrom(current);
                  current = current.BaseType)
             {
                 if (PropertyRegistry.TryGetValue(current, out var properties) &&

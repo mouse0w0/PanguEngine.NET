@@ -1123,7 +1123,7 @@ public sealed class InputManagerTests
         manager.UpdateFrame(size ?? new Size(100, 100), 0);
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
     }
 

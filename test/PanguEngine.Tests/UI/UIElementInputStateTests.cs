@@ -7,35 +7,35 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
-public sealed class NodeInputStateTests
+public sealed class UIElementInputStateTests
 {
     [Fact]
-    public void UiNodePropertiesExposeExpectedMetadataAndDefaults()
+    public void UIElementPropertiesExposeExpectedMetadataAndDefaults()
     {
         var node = new TestNode();
 
         AssertProperty(
-            Node.IsEnabledProperty,
-            typeof(Node),
-            nameof(Node.IsEnabled),
+            UIElement.IsEnabledProperty,
+            typeof(UIElement),
+            nameof(UIElement.IsEnabled),
             defaultValue: true,
             isReadOnly: false);
         AssertProperty(
-            Node.IsHoveredProperty,
-            typeof(Node),
-            nameof(Node.IsHovered),
+            UIElement.IsHoveredProperty,
+            typeof(UIElement),
+            nameof(UIElement.IsHovered),
             defaultValue: false,
             isReadOnly: true);
         AssertProperty(
-            Node.IsFocusedProperty,
-            typeof(Node),
-            nameof(Node.IsFocused),
+            UIElement.IsFocusedProperty,
+            typeof(UIElement),
+            nameof(UIElement.IsFocused),
             defaultValue: false,
             isReadOnly: true);
         AssertProperty(
-            Node.IsFocusWithinProperty,
-            typeof(Node),
-            nameof(Node.IsFocusWithin),
+            UIElement.IsFocusWithinProperty,
+            typeof(UIElement),
+            nameof(UIElement.IsFocusWithin),
             defaultValue: false,
             isReadOnly: true);
 
@@ -103,13 +103,13 @@ public sealed class NodeInputStateTests
         var innerChanges = new List<bool>();
         var childChanges = new List<bool>();
         using var outerSubscription = outer.Subscribe(
-            Node.IsHoveredProperty,
+            UIElement.IsHoveredProperty,
             (_, args) => outerChanges.Add(args.NewValue));
         using var innerSubscription = inner.Subscribe(
-            Node.IsHoveredProperty,
+            UIElement.IsHoveredProperty,
             (_, args) => innerChanges.Add(args.NewValue));
         using var childSubscription = first.Subscribe(
-            Node.IsHoveredProperty,
+            UIElement.IsHoveredProperty,
             (_, args) => childChanges.Add(args.NewValue));
         var outerMoveCalls = 0;
         first.PointerEntered += (_, _) =>
@@ -160,11 +160,11 @@ public sealed class NodeInputStateTests
         var screen = new GameScreen(root);
         var states = new List<bool>();
         using var subscription = container.Subscribe(
-            Node.IsFocusedProperty,
+            UIElement.IsFocusedProperty,
             (_, args) => states.Add(args.NewValue));
         var childStates = new List<bool>();
         using var childSubscription = child.Subscribe(
-            Node.IsFocusedProperty,
+            UIElement.IsFocusedProperty,
             (_, args) => childStates.Add(args.NewValue));
         var events = new List<string>();
         container.GotFocus += (_, _) => events.Add($"got:{container.IsFocused}");
@@ -230,7 +230,7 @@ public sealed class NodeInputStateTests
         var leaf = Place(branch, new TestNode(), 0, 0, 20, 20);
         var manager = new UiManager();
         var screen = new GameScreen(root);
-        var exits = new List<(Node Node, Node Source)>();
+        var exits = new List<(UIElement Node, UIElement Source)>();
         leaf.PointerExited += (_, args) => exits.Add((leaf, args.Source));
         branch.PointerExited += (_, args) => exits.Add((branch, args.Source));
         manager.Open(screen);
@@ -261,7 +261,7 @@ public sealed class NodeInputStateTests
         var screen = new GameScreen(root);
         var enabledNotifications = 0;
         using var subscription = container.Subscribe(
-            Node.IsEnabledProperty,
+            UIElement.IsEnabledProperty,
             (_, args) =>
             {
                 if (args.NewValue)
@@ -347,7 +347,7 @@ public sealed class NodeInputStateTests
         var root = new Canvas();
         var container = Place(root, new Canvas(), 0, 0, 40, 40);
         var child = Place(container, new TestControl { Focusable = true }, 0, 0, 40, 40);
-        Node target = hideParent ? container : child;
+        UIElement target = hideParent ? container : child;
         var manager = new UiManager();
         var screen = new GameScreen(root);
         var events = new List<string>();
@@ -373,7 +373,7 @@ public sealed class NodeInputStateTests
             events.Add("child-exit");
         };
         container.PointerExited += (_, _) => events.Add("parent-exit");
-        using var subscription = target.Subscribe(Node.VisibilityProperty, (_, _) =>
+        using var subscription = target.Subscribe(UIElement.VisibilityProperty, (_, _) =>
         {
             AssertCleared();
             events.Add("visibility");
@@ -565,7 +565,7 @@ public sealed class NodeInputStateTests
         var screen = new GameScreen(root);
         var movedCalls = 0;
         using var subscription = outer.Subscribe(
-            Node.IsHoveredProperty,
+            UIElement.IsHoveredProperty,
             (_, args) =>
             {
                 if (args.NewValue)
@@ -594,14 +594,14 @@ public sealed class NodeInputStateTests
         var outerError = new InvalidOperationException("outer hover");
         var innerError = new InvalidOperationException("inner hover");
         using var outerSubscription = outer.Subscribe(
-            Node.IsHoveredProperty,
+            UIElement.IsHoveredProperty,
             (_, args) =>
             {
                 if (args.NewValue)
                     throw outerError;
             });
         using var innerSubscription = inner.Subscribe(
-            Node.IsHoveredProperty,
+            UIElement.IsHoveredProperty,
             (_, args) =>
             {
                 if (args.NewValue)
@@ -660,7 +660,7 @@ public sealed class NodeInputStateTests
     }
 
     private static T Place<T>(Canvas parent, T child, double x, double y, double width, double height)
-        where T : Node
+        where T : UIElement
     {
         child.Width = width;
         child.Height = height;
@@ -698,7 +698,7 @@ public sealed class NodeInputStateTests
     {
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
     }
 }

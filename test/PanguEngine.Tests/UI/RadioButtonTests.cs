@@ -210,7 +210,7 @@ public sealed class RadioButtonTests
         var newNode = new Panel();
         var button = new RadioButton<string> { Content = oldNode };
         var notifications = 0;
-        using var subscription = oldNode.Subscribe(Node.ParentProperty, (_, change) =>
+        using var subscription = oldNode.Subscribe(UIElement.ParentProperty, (_, change) =>
         {
             if (change.NewValue is null)
             {
@@ -328,7 +328,7 @@ public sealed class RadioButtonTests
         button.Arrange(new Rect(0, 0, 100, 30));
         var indicator = Descendants(button).Single(node => node.Classes.Contains("radio-button-indicator"));
         var gap = content.LocalToScreen(new Point(0, 0)).X -
-            indicator.LocalToScreen(new Point(0, 0)).X - indicator.LayoutBounds.Width;
+                  indicator.LocalToScreen(new Point(0, 0)).X - indicator.LayoutBounds.Width;
         Assert.Equal(rounding ? 2d / 1.5 : 1.1, gap, 10);
     }
 
@@ -346,7 +346,8 @@ public sealed class RadioButtonTests
         var dot = Descendants(button).OfType<Ellipse>().Single(node => node.Classes.Contains("radio-button-dot"));
         var text = Descendants(button).OfType<Text>().Single();
         Assert.Null(dot.Fill);
-        Assert.Equal("stroke-width", Assert.Single(ring.GetStyleValueSources(Shape.StrokeThicknessProperty)).CssPropertyName);
+        Assert.Equal("stroke-width",
+            Assert.Single(ring.GetStyleValueSources(Shape.StrokeThicknessProperty)).CssPropertyName);
         Assert.Equal(16, text.FontSize);
         group.Select(button);
         button.GetStyleRoot().UpdateStyles();
@@ -387,7 +388,9 @@ public sealed class RadioButtonTests
         root.Children.Add(first);
         root.Children.Add(second);
         var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("RadioButton { spacing: 5px; } RadioButton:checked { background-color: #010203; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse("RadioButton { spacing: 5px; } RadioButton:checked { background-color: #010203; }")
+        ]);
         firstGroup.Select(first);
         secondGroup.Select(second);
         root.UpdateStyles();
@@ -468,6 +471,7 @@ public sealed class RadioButtonTests
     {
         var (manager, screen, _, group, buttons) = OpenScene();
         Assert.True(buttons[0].Focus());
+
         void LoseAndReturnFocus(object? sender, KeyEventArgs args)
         {
             if (args.Key == key)
@@ -476,6 +480,7 @@ public sealed class RadioButtonTests
                 Assert.True(buttons[0].Focus());
             }
         }
+
         if (key == Key.Enter)
             buttons[0].KeyDown += LoseAndReturnFocus;
         else
@@ -604,6 +609,7 @@ public sealed class RadioButtonTests
             Canvas.SetTop(buttons[index], index * 40);
             root.Children.Add(buttons[index]);
         }
+
         var screen = new GameScreen(root);
         var manager = new UiManager();
         manager.Open(screen);
@@ -617,20 +623,21 @@ public sealed class RadioButtonTests
         manager.ProcessPointerReleased(point, MouseButton.Left, KeyModifiers.None);
     }
 
-    private static Point ToScreen(Node node, Point local)
+    private static Point ToScreen(UIElement node, Point local)
     {
-        for (Node? current = node; current is not null; current = current.Parent)
+        for (UIElement? current = node; current is not null; current = current.Parent)
             local = new Point(local.X + current.LayoutBounds.X, local.Y + current.LayoutBounds.Y);
         return local;
     }
 
-    private static IEnumerable<Node> Descendants(Parent parent)
+    private static IEnumerable<UIElement> Descendants(Container parent)
     {
         foreach (var child in parent.ReadOnlyChildren)
         {
             yield return child;
-            if (child is Parent branch)
-                foreach (var descendant in Descendants(branch)) yield return descendant;
+            if (child is Container branch)
+                foreach (var descendant in Descendants(branch))
+                    yield return descendant;
         }
     }
 

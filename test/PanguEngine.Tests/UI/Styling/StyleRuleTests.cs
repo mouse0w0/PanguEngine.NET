@@ -58,7 +58,7 @@ public sealed class StyleRuleTests
     [Fact]
     public void RuleRejectsIncompatibleTargetType()
     {
-        var selector = StyleSelector.For<Node>();
+        var selector = StyleSelector.For<UIElement>();
         var setter = StyleSetter.Create(Region.BackgroundProperty, new SolidColorBrush(1, 2, 3));
 
         Assert.Throws<ArgumentException>(() => new StyleRule(selector, [setter]));
@@ -166,7 +166,7 @@ public sealed class StyleRuleTests
     [Fact]
     public void MultiSelectorRuleValidatesSetterAgainstEveryClrTarget()
     {
-        var selectors = new[] { StyleSelector.For<Button>(), StyleSelector.For<Node>() };
+        var selectors = new[] { StyleSelector.For<Button>(), StyleSelector.For<UIElement>() };
         var setter = StyleSetter.Create(Region.BackgroundProperty, new SolidColorBrush(1, 2, 3));
 
         Assert.Throws<ArgumentException>(() => new StyleRule(selectors, [setter]));
@@ -216,10 +216,10 @@ public sealed class StyleRuleTests
     }
 
     [Fact]
-    public void TargetTypeDepthStartsAtOneForUiNodeAndGrowsWithInheritance()
+    public void TargetTypeDepthStartsAtOneForUIElementAndGrowsWithInheritance()
     {
-        Assert.Equal(1, StyleSelector.For<Node>().TargetTypeDepth);
-        Assert.True(StyleSelector.For<Control>().TargetTypeDepth > StyleSelector.For<Node>().TargetTypeDepth);
+        Assert.Equal(1, StyleSelector.For<UIElement>().TargetTypeDepth);
+        Assert.True(StyleSelector.For<Control>().TargetTypeDepth > StyleSelector.For<UIElement>().TargetTypeDepth);
         Assert.True(StyleSelector.For<Button>().TargetTypeDepth > StyleSelector.For<Control>().TargetTypeDepth);
     }
 

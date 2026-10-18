@@ -1359,7 +1359,7 @@ public sealed class UiManagerTests
         errors.Add(Record.Exception(() => manager.UpdateFrame(new Size(10, 10), 0)));
     }
 
-    private static ResourceKey InitializeHud(UiManager manager, Node root)
+    private static ResourceKey InitializeHud(UiManager manager, UIElement root)
     {
         var key = ResourceKey.Create("test", "hud");
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
@@ -1393,7 +1393,7 @@ public sealed class UiManagerTests
         return result;
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }
@@ -1424,7 +1424,7 @@ public sealed class UiManagerTests
         protected override void DrawCore(DrawingContext context) => DrawAction?.Invoke(context);
     }
 
-    private sealed class RecordingHud(Node root) : Hud(root)
+    private sealed class RecordingHud(UIElement root) : Hud(root)
     {
         internal Action? FixedAction { get; init; }
         internal Action<double>? FrameAction { get; set; }
@@ -1433,7 +1433,7 @@ public sealed class UiManagerTests
         protected override void OnFrameUpdate(double alpha) => FrameAction?.Invoke(alpha);
     }
 
-    private sealed class RecordingScreen(Node? root = null) : GameScreen(root)
+    private sealed class RecordingScreen(UIElement? root = null) : GameScreen(root)
     {
         internal Action? Opening { get; set; }
         internal Action? Opened { get; set; }

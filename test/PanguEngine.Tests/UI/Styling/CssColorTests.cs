@@ -53,13 +53,13 @@ public sealed class CssColorTests
     {
         var panel = new Panel();
         Apply(panel, """
-            Panel {
-                --accent: CornflowerBlue;
-                color: ReBeCcApUrPlE;
-                background: var(--accent);
-                border-color: darkslategrey;
-            }
-            """);
+                     Panel {
+                         --accent: CornflowerBlue;
+                         color: ReBeCcApUrPlE;
+                         background: var(--accent);
+                         border-color: darkslategrey;
+                     }
+                     """);
 
         Assert.Equal(Color.RebeccaPurple, panel.Color);
         Assert.Equal(new SolidColorBrush(Color.CornflowerBlue), Assert.IsType<SolidColorBrush>(panel.Background));
@@ -142,16 +142,16 @@ public sealed class CssColorTests
     {
         var panel = new Panel();
         Apply(panel, """
-            Panel {
-                --accent: #3698;
-                --hue: 30deg;
-                --channels: 255 50% 0;
-                --alpha: 50%;
-                color: var(--accent);
-                background: hsl(var(--hue) /* channel gap */ 100% 50% / var(--alpha));
-                border-color: rgb(var(--channels) / var(--alpha));
-            }
-            """);
+                     Panel {
+                         --accent: #3698;
+                         --hue: 30deg;
+                         --channels: 255 50% 0;
+                         --alpha: 50%;
+                         color: var(--accent);
+                         background: hsl(var(--hue) /* channel gap */ 100% 50% / var(--alpha));
+                         border-color: rgb(var(--channels) / var(--alpha));
+                     }
+                     """);
 
         Assert.Equal(new Color(51, 102, 153, 136), panel.Color);
         var expected = new SolidColorBrush(255, 128, 0, 128);
@@ -185,7 +185,7 @@ public sealed class CssColorTests
         Assert.IsType<FormatException>(error.InnerException);
     }
 
-    private static void Apply(Node root, string css)
+    private static void Apply(UIElement root, string css)
     {
         var screen = new Screen(root);
         screen.SetBaseStyleSheets([]);

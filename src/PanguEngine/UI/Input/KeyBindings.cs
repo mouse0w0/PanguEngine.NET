@@ -3,14 +3,14 @@ using PanguEngine.Input;
 namespace PanguEngine.UI.Input;
 
 /// <summary>
-/// Stores and dispatches key bindings for a specific UI node type.
+/// Stores and dispatches key bindings for a specific UI element type.
 /// </summary>
-/// <typeparam name="TNode">The type of UI node handled by the bindings.</typeparam>
+/// <typeparam name="TNode">The type of UI element handled by the bindings.</typeparam>
 /// <remarks>
 /// Configure bindings before input dispatch. Instances do not provide thread synchronization.
 /// </remarks>
 public sealed class KeyBindings<TNode>
-    where TNode : Node
+    where TNode : UIElement
 {
     private readonly Dictionary<
         (Key Key, KeyModifiers Modifiers, KeyAction Action),
@@ -73,7 +73,7 @@ public sealed class KeyBindings<TNode>
     /// <summary>
     /// Invokes the binding that matches a keyboard event and key action.
     /// </summary>
-    /// <param name="node">The node passed to the matched binding callback.</param>
+    /// <param name="node">The element passed to the matched binding callback.</param>
     /// <param name="eventArgs">The keyboard event to match.</param>
     /// <param name="action">The key action to match.</param>
     /// <returns><see langword="true"/> if a binding was found and invoked; otherwise, <see langword="false"/>.</returns>

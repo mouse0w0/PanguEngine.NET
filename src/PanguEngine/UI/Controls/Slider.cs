@@ -18,7 +18,8 @@ public abstract class Slider : Control
         onChanged: static (slider, _, _) => slider.OnGeometryConfigurationChanged());
 
     /// <summary>Identifies whether tick labels are displayed.</summary>
-    public static readonly Property<bool> ShowTickLabelsProperty = Property.Register<Slider, bool>(nameof(ShowTickLabels),
+    public static readonly Property<bool> ShowTickLabelsProperty = Property.Register<Slider, bool>(
+        nameof(ShowTickLabels),
         onChanged: static (slider, _, _) => slider.OnGeometryConfigurationChanged());
 
     /// <summary>Identifies the visible track thickness.</summary>
@@ -39,39 +40,77 @@ public abstract class Slider : Control
     static Slider()
     {
         CssRegistry.RegisterElement<Slider>("Slider");
-        CssRegistry.RegisterProperty<Slider, Orientation>("orientation", OrientationProperty, CssValueConverters.ParseOrientation);
+        CssRegistry.RegisterProperty<Slider, Orientation>("orientation", OrientationProperty,
+            CssValueConverters.ParseOrientation);
         CssRegistry.RegisterProperty<Slider, bool>("show-ticks", ShowTicksProperty, CssValueConverters.ParseBool);
-        CssRegistry.RegisterProperty<Slider, bool>("show-tick-labels", ShowTickLabelsProperty, CssValueConverters.ParseBool);
-        CssRegistry.RegisterProperty<Slider, double>("track-thickness", TrackThicknessProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Slider, double>("thumb-length", ThumbLengthProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Slider, double>("thumb-thickness", ThumbThicknessProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, bool>("show-tick-labels", ShowTickLabelsProperty,
+            CssValueConverters.ParseBool);
+        CssRegistry.RegisterProperty<Slider, double>("track-thickness", TrackThicknessProperty,
+            CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, double>("thumb-length", ThumbLengthProperty,
+            CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, double>("thumb-thickness", ThumbThicknessProperty,
+            CssValueConverters.ParseLength);
         CssRegistry.RegisterProperty<Slider, double>("tick-length", TickLengthProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Slider, double>("tick-label-spacing", TickLabelSpacingProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, double>("tick-label-spacing", TickLabelSpacingProperty,
+            CssValueConverters.ParseLength);
     }
 
     /// <summary>Gets or sets the slider axis. Vertical values increase upwards.</summary>
-    public Orientation Orientation { get => GetValue(OrientationProperty); set => SetValue(OrientationProperty, value); }
+    public Orientation Orientation
+    {
+        get => GetValue(OrientationProperty);
+        set => SetValue(OrientationProperty, value);
+    }
 
     /// <summary>Gets or sets whether tick marks are displayed independently of value snapping.</summary>
-    public bool ShowTicks { get => GetValue(ShowTicksProperty); set => SetValue(ShowTicksProperty, value); }
+    public bool ShowTicks
+    {
+        get => GetValue(ShowTicksProperty);
+        set => SetValue(ShowTicksProperty, value);
+    }
 
     /// <summary>Gets or sets whether non-overlapping tick labels are displayed.</summary>
-    public bool ShowTickLabels { get => GetValue(ShowTickLabelsProperty); set => SetValue(ShowTickLabelsProperty, value); }
+    public bool ShowTickLabels
+    {
+        get => GetValue(ShowTickLabelsProperty);
+        set => SetValue(ShowTickLabelsProperty, value);
+    }
 
     /// <summary>Gets or sets the visible track thickness in logical pixels.</summary>
-    public double TrackThickness { get => GetValue(TrackThicknessProperty); set => SetValue(TrackThicknessProperty, value); }
+    public double TrackThickness
+    {
+        get => GetValue(TrackThicknessProperty);
+        set => SetValue(TrackThicknessProperty, value);
+    }
 
     /// <summary>Gets or sets the thumb size along the track in logical pixels.</summary>
-    public double ThumbLength { get => GetValue(ThumbLengthProperty); set => SetValue(ThumbLengthProperty, value); }
+    public double ThumbLength
+    {
+        get => GetValue(ThumbLengthProperty);
+        set => SetValue(ThumbLengthProperty, value);
+    }
 
     /// <summary>Gets or sets the thumb size across the track in logical pixels.</summary>
-    public double ThumbThickness { get => GetValue(ThumbThicknessProperty); set => SetValue(ThumbThicknessProperty, value); }
+    public double ThumbThickness
+    {
+        get => GetValue(ThumbThicknessProperty);
+        set => SetValue(ThumbThicknessProperty, value);
+    }
 
     /// <summary>Gets or sets the tick mark length in logical pixels.</summary>
-    public double TickLength { get => GetValue(TickLengthProperty); set => SetValue(TickLengthProperty, value); }
+    public double TickLength
+    {
+        get => GetValue(TickLengthProperty);
+        set => SetValue(TickLengthProperty, value);
+    }
 
     /// <summary>Gets or sets the spacing before tick labels in logical pixels.</summary>
-    public double TickLabelSpacing { get => GetValue(TickLabelSpacingProperty); set => SetValue(TickLabelSpacingProperty, value); }
+    public double TickLabelSpacing
+    {
+        get => GetValue(TickLabelSpacingProperty);
+        set => SetValue(TickLabelSpacingProperty, value);
+    }
 
     /// <summary>Responds to changes in the slider's geometry configuration.</summary>
     protected virtual void OnGeometryConfigurationChanged() => InvalidateMeasure();
@@ -83,10 +122,11 @@ public abstract class Slider : Control
         SetPseudoClass(PseudoClass.NoValue, !hasValue);
     }
 
-    private static Property<double> RegisterLength(string name, double defaultValue) => Property.Register<Slider, double>(
-        name, defaultValue, onChanged: static (slider, _, _) => slider.OnGeometryConfigurationChanged(),
-        validate: static value => double.IsFinite(value) && value >= 0,
-        validationMessage: $"{name} must be finite and non-negative.");
+    private static Property<double> RegisterLength(string name, double defaultValue) =>
+        Property.Register<Slider, double>(
+            name, defaultValue, onChanged: static (slider, _, _) => slider.OnGeometryConfigurationChanged(),
+            validate: static value => double.IsFinite(value) && value >= 0,
+            validationMessage: $"{name} must be finite and non-negative.");
 
     /// <summary>Provides a styled slider region with an optional hit target.</summary>
     protected sealed class SliderPart : Control
@@ -125,9 +165,10 @@ public sealed class Slider<T> : Slider
             comparer: ReferenceEqualityComparer.Instance);
 
     /// <summary>Identifies the formatter used for tick labels.</summary>
-    public static readonly Property<Func<T, string>> ValueFormatterProperty = Property.Register<Slider<T>, Func<T, string>>(
-        nameof(ValueFormatter), static value => value?.ToString() ?? string.Empty,
-        onChanged: static (slider, _, _) => slider.InvalidateMeasure());
+    public static readonly Property<Func<T, string>> ValueFormatterProperty =
+        Property.Register<Slider<T>, Func<T, string>>(
+            nameof(ValueFormatter), static value => value?.ToString() ?? string.Empty,
+            onChanged: static (slider, _, _) => slider.InvalidateMeasure());
 
     private SliderValueModel<T> _valueModel;
     private T _value;
@@ -228,7 +269,11 @@ public sealed class Slider<T> : Slider
     }
 
     /// <summary>Gets or sets the formatter used for tick labels.</summary>
-    public Func<T, string> ValueFormatter { get => GetValue(ValueFormatterProperty); set => SetValue(ValueFormatterProperty, value); }
+    public Func<T, string> ValueFormatter
+    {
+        get => GetValue(ValueFormatterProperty);
+        set => SetValue(ValueFormatterProperty, value);
+    }
 
     /// <summary>Occurs after a normal pointer release or an effective keyboard adjustment.</summary>
     public event EventHandler<SliderValueCommittedEventArgs<T>>? ValueCommitted;
@@ -283,6 +328,7 @@ public sealed class Slider<T> : Slider
             UpdateValueVisibility();
             InvalidateMeasure();
         }
+
         RefreshGeometry();
     }
 
@@ -298,7 +344,8 @@ public sealed class Slider<T> : Slider
         return (_stateVersion, _availabilityVersion);
     }
 
-    private void PublishState(SliderValueState<T> oldState, SliderValueState<T> state, (int State, int Availability) version)
+    private void PublishState(SliderValueState<T> oldState, SliderValueState<T> state,
+        (int State, int Availability) version)
     {
         if (oldState.HasValue != state.HasValue)
         {
@@ -377,6 +424,7 @@ public sealed class Slider<T> : Slider
             CancelInteraction();
             return;
         }
+
         UpdatePointerValue(Main(eventArgs.GetPosition(this)));
         eventArgs.Handled = true;
     }
@@ -392,6 +440,7 @@ public sealed class Slider<T> : Slider
             CancelInteraction();
             return;
         }
+
         var version = _interactionVersion;
         UpdatePointerValue(Main(eventArgs.GetPosition(this)));
         if (version != _interactionVersion || !_isDragging)
@@ -401,6 +450,7 @@ public sealed class Slider<T> : Slider
             CancelInteraction();
             return;
         }
+
         var start = _dragStart;
         var end = _state;
         CancelInteraction();
@@ -453,7 +503,7 @@ public sealed class Slider<T> : Slider
     {
         if (!HasValue || Screen is not { } screen || !screen.IsOpen())
             return false;
-        for (Node? node = this; node is not null; node = node.Parent)
+        for (UIElement? node = this; node is not null; node = node.Parent)
             if (!node.IsEnabled || !node.IsHitTestVisible || node.Visibility != Visibility.Visible)
                 return false;
         return true;
@@ -474,7 +524,8 @@ public sealed class Slider<T> : Slider
         return new Rect(origin.X, origin.Y, _hitBounds.Width, _hitBounds.Height);
     }
 
-    private bool HasStableDragGeometry() => Screen!.Scale.Equals(_dragScale) && GetScreenTrackBounds() == _dragScreenBounds;
+    private bool HasStableDragGeometry() =>
+        Screen!.Scale.Equals(_dragScale) && GetScreenTrackBounds() == _dragScreenBounds;
 
     private void CancelInteraction()
     {
@@ -500,8 +551,8 @@ public sealed class Slider<T> : Slider
         SynchronizeTicks(_tickPlanMain.Value);
         var labelCross = MeasureTickLabels();
         var cross = Math.Max(InteractionThickness, Math.Max(ThumbThickness, TrackThickness)) +
-            (HasValue && ShowTicks ? TickLength : 0) +
-            (HasValue && ShowTickLabels ? TickLabelSpacing + labelCross : 0);
+                    (HasValue && ShowTicks ? TickLength : 0) +
+                    (HasValue && ShowTickLabels ? TickLabelSpacing + labelCross : 0);
         var availableCross = Cross(availableSize);
         foreach (var part in new[] { _hitArea, _track, _fill, _thumb })
             part.Measure(availableSize);
@@ -520,11 +571,12 @@ public sealed class Slider<T> : Slider
             InvalidateMeasure();
             return;
         }
+
         SynchronizeTicks(main);
         var labelCross = MeasureTickLabels();
         var barCross = Math.Min(cross, Math.Max(InteractionThickness, Math.Max(ThumbThickness, TrackThickness)));
         var extras = (HasValue && ShowTicks ? TickLength : 0) +
-            (HasValue && ShowTickLabels ? TickLabelSpacing + labelCross : 0);
+                     (HasValue && ShowTickLabels ? TickLabelSpacing + labelCross : 0);
         var barOrigin = CrossOrigin(contentBounds) + Math.Max(0, (cross - barCross - extras) / 2);
         var mainOrigin = MainOrigin(contentBounds);
         var thumbLength = Math.Min(main, ThumbLength);
@@ -547,7 +599,8 @@ public sealed class Slider<T> : Slider
             var visualPosition = Orientation == Orientation.Vertical ? 1 - position : position;
             var centerMain = start + visualPosition * travel;
             var fillStart = Orientation == Orientation.Vertical ? centerMain : start;
-            ArrangePart(_fill, AxisRect(fillStart, centerCross - trackThickness / 2, travel * position, trackThickness));
+            ArrangePart(_fill,
+                AxisRect(fillStart, centerCross - trackThickness / 2, travel * position, trackThickness));
             ArrangePart(_thumb, AxisRect(centerMain - thumbLength / 2,
                 centerCross - Math.Min(barCross, ThumbThickness) / 2, thumbLength, Math.Min(barCross, ThumbThickness)));
         }
@@ -559,8 +612,11 @@ public sealed class Slider<T> : Slider
             var center = start + VisualPosition(tick.Tick.Position) * travel;
             tick.Mark.Visibility = ShowTicks ? Visibility.Visible : Visibility.Collapsed;
             if (ShowTicks)
-                ArrangePart(tick.Mark, AxisRect(center - .5, tickOrigin, 1, Math.Min(TickLength, Math.Max(0, CrossOrigin(contentBounds) + cross - tickOrigin))));
+                ArrangePart(tick.Mark,
+                    AxisRect(center - .5, tickOrigin, 1,
+                        Math.Min(TickLength, Math.Max(0, CrossOrigin(contentBounds) + cross - tickOrigin))));
         }
+
         ArrangeTickLabels(contentBounds, labelOrigin);
     }
 
@@ -575,6 +631,7 @@ public sealed class Slider<T> : Slider
             Children.Remove(part.Label);
             _ticks.RemoveAt(_ticks.Count - 1);
         }
+
         for (var index = 0; index < ticks.Count; index++)
         {
             if (index == _ticks.Count)
@@ -585,6 +642,7 @@ public sealed class Slider<T> : Slider
                 Children.Add(label);
                 _ticks.Add(new TickPart(mark, label));
             }
+
             var part = _ticks[index];
             part.Tick = ticks[index];
             part.Label.Content = ValueFormatter(ticks[index].Value);
@@ -605,6 +663,7 @@ public sealed class Slider<T> : Slider
             part.Label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
             cross = Math.Max(cross, Cross(part.Label.DesiredSize));
         }
+
         return cross;
     }
 
@@ -620,7 +679,9 @@ public sealed class Slider<T> : Slider
             var crossExtent = Cross(part.Label.DesiredSize);
             var center = _trackStart + VisualPosition(part.Tick.Position) * _travel;
             var fits = extent <= Main(bounds) && crossOrigin + crossExtent <= CrossOrigin(bounds) + Cross(bounds);
-            var origin = fits ? Math.Clamp(center - extent / 2, MainOrigin(bounds), MainOrigin(bounds) + Main(bounds) - extent) : MainOrigin(bounds);
+            var origin = fits
+                ? Math.Clamp(center - extent / 2, MainOrigin(bounds), MainOrigin(bounds) + Main(bounds) - extent)
+                : MainOrigin(bounds);
             if (fits)
                 fits = occupied.All(interval => origin + extent + 4 <= interval.Start || origin >= interval.End + 4);
             part.Label.Visibility = fits ? Visibility.Visible : Visibility.Hidden;
@@ -634,7 +695,9 @@ public sealed class Slider<T> : Slider
 
     private int LabelPriority(SliderTick<T> tick)
     {
-        if (_state.Index >= 0 ? tick.Index == _state.Index : EqualityComparer<T>.Default.Equals(tick.Value, _state.Value))
+        if (_state.Index >= 0
+                ? tick.Index == _state.Index
+                : EqualityComparer<T>.Default.Equals(tick.Value, _state.Value))
             return 0;
         return tick.Position.Equals(0d) ? 1 : tick.Position.Equals(1d) ? 2 : 3;
     }
@@ -659,10 +722,14 @@ public sealed class Slider<T> : Slider
     private double Cross(Rect bounds) => Orientation == Orientation.Vertical ? bounds.Width : bounds.Height;
     private double MainOrigin(Rect bounds) => Orientation == Orientation.Vertical ? bounds.Y : bounds.X;
     private double CrossOrigin(Rect bounds) => Orientation == Orientation.Vertical ? bounds.X : bounds.Y;
-    private Size AxisSize(double main, double cross) => Orientation == Orientation.Vertical ? new Size(cross, main) : new Size(main, cross);
-    private Rect AxisRect(double main, double cross, double mainExtent, double crossExtent) => Orientation == Orientation.Vertical
-        ? new Rect(cross, main, crossExtent, mainExtent)
-        : new Rect(main, cross, mainExtent, crossExtent);
+
+    private Size AxisSize(double main, double cross) =>
+        Orientation == Orientation.Vertical ? new Size(cross, main) : new Size(main, cross);
+
+    private Rect AxisRect(double main, double cross, double mainExtent, double crossExtent) =>
+        Orientation == Orientation.Vertical
+            ? new Rect(cross, main, crossExtent, mainExtent)
+            : new Rect(main, cross, mainExtent, crossExtent);
 
     private SliderPart AddPart(string role, bool hitTestVisible)
     {

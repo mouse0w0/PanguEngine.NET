@@ -160,14 +160,14 @@ public sealed class ScreenLayoutStabilityTests
         }
     }
 
-    private sealed class CountingScreen(Node root) : GameScreen(root)
+    private sealed class CountingScreen(UIElement root) : GameScreen(root)
     {
         internal int Updates { get; private set; }
 
         protected override void OnFrameUpdate(double alpha) => Updates++;
     }
 
-    private sealed class InvalidatingNode(int invalidations) : Node
+    private sealed class InvalidatingNode(int invalidations) : UIElement
     {
         internal int Measures { get; private set; }
 

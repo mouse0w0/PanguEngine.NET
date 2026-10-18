@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
 using PanguEngine.UI;
 using PanguEngine.UI.Styling;
@@ -123,7 +122,7 @@ public sealed class ObservableObjectTests
         object replacement = useStrings ? new string('a', 1) : 7;
         var source = new ReferenceModel();
         source.SetValue(ReferenceModel.ObjectProperty, original);
-        var changes = new List<PanguEngine.ComponentModel.PropertyChangedEventArgs<object?>>();
+        var changes = new List<PropertyChangedEventArgs<object?>>();
         using var subscription = source.Subscribe(ReferenceModel.ObjectProperty, (_, change) => changes.Add(change));
 
         source.SetValue(ReferenceModel.ObjectProperty, replacement);
@@ -143,8 +142,10 @@ public sealed class ObservableObjectTests
         target.BindTwoWay(ReferenceModel.ReferenceValueProperty, source, ReferenceModel.ReferenceValueProperty);
         var sourceChanges = 0;
         var targetChanges = 0;
-        using var sourceSubscription = source.Subscribe(ReferenceModel.ReferenceValueProperty, (_, _) => sourceChanges++);
-        using var targetSubscription = target.Subscribe(ReferenceModel.ReferenceValueProperty, (_, _) => targetChanges++);
+        using var sourceSubscription =
+            source.Subscribe(ReferenceModel.ReferenceValueProperty, (_, _) => sourceChanges++);
+        using var targetSubscription =
+            target.Subscribe(ReferenceModel.ReferenceValueProperty, (_, _) => targetChanges++);
         var fromTarget = new EqualValue(7);
 
         target.ReferenceValue = fromTarget;
@@ -167,8 +168,10 @@ public sealed class ObservableObjectTests
         target.BindTwoWay(ReferenceModel.ReferenceValueProperty, source, ReferenceModel.ValueComparedProperty);
         var sourceChanges = 0;
         var targetChanges = 0;
-        using var sourceSubscription = source.Subscribe(ReferenceModel.ValueComparedProperty, (_, _) => sourceChanges++);
-        using var targetSubscription = target.Subscribe(ReferenceModel.ReferenceValueProperty, (_, _) => targetChanges++);
+        using var sourceSubscription =
+            source.Subscribe(ReferenceModel.ValueComparedProperty, (_, _) => sourceChanges++);
+        using var targetSubscription =
+            target.Subscribe(ReferenceModel.ReferenceValueProperty, (_, _) => targetChanges++);
         var replacement = new EqualValue(7);
 
         target.ReferenceValue = replacement;
@@ -280,17 +283,21 @@ public sealed class ObservableObjectTests
         var node = new ReferenceNode();
         var property = useReferenceComparer ? ReferenceNode.ReferenceValueProperty : ReferenceNode.ValueProperty;
         var screen = new Screen(node);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, original)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, original)])
+            ])
+        ]);
         screen.Root!.UpdateStyles();
         var changes = new List<(EqualValue? OldValue, EqualValue? NewValue)>();
         using var subscription = node.Subscribe(property,
             (_, change) => changes.Add((change.OldValue, change.NewValue)));
 
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, replacement)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, replacement)])
+            ])
+        ]);
         screen.Root.UpdateStyles();
 
         Assert.Same(replacement, node.GetValue(property));
@@ -423,9 +430,11 @@ public sealed class ObservableObjectTests
         var source = new Model { Value = 7 };
         var node = new ValueNode();
         var screen = new Screen(node);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 20)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 20)])
+            ])
+        ]);
         screen.Root!.UpdateStyles();
         var changes = new List<(int Old, int New)>();
         using var subscription = node.Subscribe(ValueNode.ValueProperty,
@@ -448,9 +457,11 @@ public sealed class ObservableObjectTests
     {
         var node = new ValueNode();
         var screen = new Screen(node);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 7)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 7)])
+            ])
+        ]);
         screen.Root!.UpdateStyles();
         var changes = new List<(int OldValue, int NewValue)>();
         using var subscription = node.Subscribe(ValueNode.ValueProperty,
@@ -462,9 +473,11 @@ public sealed class ObservableObjectTests
             node.SetValue(ValueNode.ValueProperty, 7);
 
         Assert.True(Assert.Single(node.GetStyleValueSources(ValueNode.ValueProperty)).IsMaskedByLocalValue);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 9)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 9)])
+            ])
+        ]);
         screen.Root.UpdateStyles();
         Assert.Equal(7, node.GetValue(ValueNode.ValueProperty));
         Assert.Empty(changes);
@@ -510,32 +523,55 @@ public sealed class ObservableObjectTests
     {
         internal static readonly Property<EqualValue?> ValueProperty =
             Property.Register<ReferenceModel, EqualValue?>(nameof(Value), new EqualValue(7));
+
         internal static readonly Property<EqualValue?> ValueComparedProperty =
             Property.Register<ReferenceModel, EqualValue?>("ValueCompared", new EqualValue(7),
                 comparer: EqualityComparer<EqualValue?>.Default);
+
         internal static readonly Property<EqualValue?> ReferenceValueProperty =
             Property.Register<ReferenceModel, EqualValue?>(nameof(ReferenceValue), new EqualValue(7),
                 comparer: ReferenceEqualityComparer.Instance);
-        internal static readonly Property<string> TextProperty = Property.Register<ReferenceModel, string>("Text", string.Empty);
-        internal static readonly Property<object?> ObjectProperty = Property.Register<ReferenceModel, object?>("Object");
+
+        internal static readonly Property<string> TextProperty =
+            Property.Register<ReferenceModel, string>("Text", string.Empty);
+
+        internal static readonly Property<object?>
+            ObjectProperty = Property.Register<ReferenceModel, object?>("Object");
+
         private static readonly PropertyKey<string> ReadOnlyTextKey = Property.RegisterReadOnly<ReferenceModel, string>(
             "ReadOnlyText", "alpha", comparer: StringComparer.OrdinalIgnoreCase);
-        internal static readonly Property<string> ReadOnlyTextProperty = ReadOnlyTextKey.Property;
-        internal static readonly Property<string> AttachedTextProperty = Property.RegisterAttached<ReferenceModel, ReferenceNode, string>(
-            "AttachedText", "alpha", comparer: StringComparer.OrdinalIgnoreCase);
 
-        internal EqualValue? Value { get => GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
-        internal EqualValue? ReferenceValue { get => GetValue(ReferenceValueProperty); set => SetValue(ReferenceValueProperty, value); }
+        internal static readonly Property<string> ReadOnlyTextProperty = ReadOnlyTextKey.Property;
+
+        internal static readonly Property<string> AttachedTextProperty =
+            Property.RegisterAttached<ReferenceModel, ReferenceNode, string>(
+                "AttachedText", "alpha", comparer: StringComparer.OrdinalIgnoreCase);
+
+        internal EqualValue? Value
+        {
+            get => GetValue(ValueProperty);
+            set => SetValue(ValueProperty, value);
+        }
+
+        internal EqualValue? ReferenceValue
+        {
+            get => GetValue(ReferenceValueProperty);
+            set => SetValue(ReferenceValueProperty, value);
+        }
+
         internal void SetReadOnlyText(string value) => SetValue(ReadOnlyTextKey, value);
         internal void ClearReadOnlyText() => ClearValue(ReadOnlyTextKey);
     }
 
-    private sealed class ReferenceNode : Node
+    private sealed class ReferenceNode : UIElement
     {
-        internal static readonly Property<EqualValue?> ValueProperty = Property.Register<ReferenceNode, EqualValue?>("Value",
+        internal static readonly Property<EqualValue?> ValueProperty = Property.Register<ReferenceNode, EqualValue?>(
+            "Value",
             comparer: EqualityComparer<EqualValue?>.Default);
-        internal static readonly Property<EqualValue?> ReferenceValueProperty = Property.Register<ReferenceNode, EqualValue?>(
-            "ReferenceValue", comparer: ReferenceEqualityComparer.Instance);
+
+        internal static readonly Property<EqualValue?> ReferenceValueProperty =
+            Property.Register<ReferenceNode, EqualValue?>(
+                "ReferenceValue", comparer: ReferenceEqualityComparer.Instance);
     }
 
     private sealed class ClrReferenceModel : INotifyPropertyChanged
@@ -568,13 +604,16 @@ public sealed class ObservableObjectTests
                 if (owner.FailCallback)
                     throw new InvalidOperationException("callback");
             });
+
         private static readonly PropertyKey<int> ReadOnlyKey = Property.RegisterReadOnly<Model, int>("ReadOnly");
         internal static readonly Property<int> ReadOnlyProperty = ReadOnlyKey.Property;
+
         internal static readonly Property<int> AttachedProperty = Property.RegisterAttached<Model, OtherModel, int>(
             "Attached", onChanged: static (target, oldValue, newValue) => target.LastChange = (oldValue, newValue));
 
         internal List<string> Trace { get; } = [];
         internal bool FailCallback { get; init; }
+
         internal int Value
         {
             get => GetValue(ValueProperty);
@@ -607,7 +646,7 @@ public sealed class ObservableObjectTests
         }
     }
 
-    private sealed class ValueNode : Node
+    private sealed class ValueNode : UIElement
     {
         internal static readonly Property<int> ValueProperty = Property.Register<ValueNode, int>("Value");
     }

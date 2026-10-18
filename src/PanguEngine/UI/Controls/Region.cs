@@ -6,9 +6,9 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Provides the shared rectangular box model for UI parent nodes.
+/// Provides the shared rectangular box model for UI parent elements.
 /// </summary>
-public abstract class Region : Parent
+public abstract class Region : Container
 {
     /// <summary>
     /// Identifies the <see cref="Padding"/> property.
@@ -250,12 +250,14 @@ public abstract class Region : Parent
                     ((SolidColorBrush?)BorderBrush)?.Color ?? default);
                 return;
             }
+
             if (Background is { } roundedBackground)
                 context.FillRoundedRectangle(_roundedBackground!, roundedBackground);
             if (BorderBrush is { } roundedBorder)
                 context.FillRoundedBorder(_roundedBorder!, roundedBorder);
             return;
         }
+
         if (Background is { } background)
             context.FillRectangle(borderInnerBounds, background);
 

@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
 using PanguEngine.UI;
 using PanguEngine.UI.Styling;
@@ -161,7 +160,7 @@ public sealed class PropertyCallbackTests
         Assert.Equal([(0, 7), (7, 9), (9, 7), (7, 0)], node.Changes);
     }
 
-    private class CallbackNode : Node
+    private class CallbackNode : UIElement
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<CallbackNode, int>("Value", onChanged: static (node, oldValue, newValue) =>

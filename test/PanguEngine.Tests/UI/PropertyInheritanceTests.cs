@@ -8,16 +8,16 @@ namespace PanguEngine.Tests.UI;
 public sealed class PropertyInheritanceTests
 {
     private static readonly Property<double> NumberProperty =
-        Property.RegisterAttached<PropertyOwner, Node, double>("Number", 7, inherits: true);
+        Property.RegisterAttached<PropertyOwner, UIElement, double>("Number", 7, inherits: true);
 
     private static readonly Property<string?> LabelProperty =
-        Property.RegisterAttached<PropertyOwner, Node, string?>("Label", "default", inherits: true);
+        Property.RegisterAttached<PropertyOwner, UIElement, string?>("Label", "default", inherits: true);
 
     private static readonly Property<double> PlainProperty =
-        Property.RegisterAttached<PropertyOwner, Node, double>("Plain", 7);
+        Property.RegisterAttached<PropertyOwner, UIElement, double>("Plain", 7);
 
     private static readonly Property<double> OtherNumberProperty =
-        Property.RegisterAttached<OtherOwner, Node, double>("Number", 3, inherits: true);
+        Property.RegisterAttached<OtherOwner, UIElement, double>("Number", 3, inherits: true);
 
     [Fact]
     public void MultiplePropertyTypesInheritAndUnmarkedPropertiesDoNot()
@@ -114,6 +114,7 @@ public sealed class PropertyInheritanceTests
         {
             middle.SetValue(NumberProperty, 14);
         }
+
         var middleChanges = new List<(double Old, double New)>();
         var childChanges = new List<(double Old, double New)>();
         using var middleSubscription = middle.Subscribe(NumberProperty,
@@ -173,7 +174,7 @@ public sealed class PropertyInheritanceTests
         var child = new Text();
         middle.Children.Add(child);
         root.Children.Add(middle);
-        var property = Property.RegisterAttached<LateOwner, Node, int>("Late", 7, inherits: true);
+        var property = Property.RegisterAttached<LateOwner, UIElement, int>("Late", 7, inherits: true);
         var changes = new List<(int Old, int New)>();
         using var subscription = child.Subscribe(property,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
@@ -282,13 +283,17 @@ public sealed class PropertyInheritanceTests
         child.Children.Add(leaf);
         root.Children.Add(child);
         var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            "#root { inherited-number: 20; } #child { inherited-number: 14; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse(
+                "#root { inherited-number: 20; } #child { inherited-number: 14; }")
+        ]);
         root.UpdateStyles();
         Assert.Equal(14d, leaf.GetValue(NumberProperty));
         child.SetValue(NumberProperty, 40);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            "#root { inherited-number: 30; } #child { inherited-number: 15; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse(
+                "#root { inherited-number: 30; } #child { inherited-number: 15; }")
+        ]);
         root.UpdateStyles();
         Assert.Equal(40d, leaf.GetValue(NumberProperty));
         child.ClearValue(NumberProperty);
@@ -385,13 +390,13 @@ public sealed class PropertyInheritanceTests
         var first = new Panel();
         var second = new Panel();
         parent.Children.AddRange([first, second]);
-        using var firstSubscription = first.Subscribe(Node.FontSizeProperty, (_, _) =>
+        using var firstSubscription = first.Subscribe(UIElement.FontSizeProperty, (_, _) =>
         {
             parent.FontSize = 30;
             Assert.Equal(30d, second.FontSize);
         });
         var changes = new List<(double Old, double New)>();
-        using var secondSubscription = second.Subscribe(Node.FontSizeProperty,
+        using var secondSubscription = second.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         parent.Children.RemoveRange(0, 2);
@@ -445,8 +450,8 @@ public sealed class PropertyInheritanceTests
         using var secondSubscription = second.Subscribe(PlainHost.ValueProperty,
             (_, _) => laterNotifications++);
 
-        Assert.Same(failure, Assert.Throws<InvalidOperationException>(
-            () => parent.SetValue(PlainHost.ValueProperty, 30)));
+        Assert.Same(failure,
+            Assert.Throws<InvalidOperationException>(() => parent.SetValue(PlainHost.ValueProperty, 30)));
 
         Assert.Equal(30, parent.GetValue(PlainHost.ValueProperty));
         Assert.Equal(30, first.GetValue(PlainHost.ValueProperty));
@@ -471,6 +476,7 @@ public sealed class PropertyInheritanceTests
         {
             child.SetParent(parent);
         }
+
         parent.OnValueChanged = () => Assert.Equal(20, child.GetValue(CallbackHost.ValueProperty));
         var changes = new List<(int Old, int New)>();
         using var subscription = child.Subscribe(CallbackHost.ValueProperty,
@@ -551,10 +557,12 @@ public sealed class PropertyInheritanceTests
         var child = new InheritedPanel();
         root.Children.Add(child);
         var screen = new Screen(root);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<InheritedPanel>(),
-                [StyleSetter.Create(LabelProperty, (string?)null)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<InheritedPanel>(),
+                    [StyleSetter.Create(LabelProperty, (string?)null)])
+            ])
+        ]);
         root.UpdateStyles();
         Assert.Null(child.GetValue(LabelProperty));
 
@@ -580,10 +588,12 @@ public sealed class PropertyInheritanceTests
         root.Children.Add(child);
         Assert.Null(child.GetValue(LabelProperty));
         var screen = new Screen(root);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<InheritedPanel>(),
-                [StyleSetter.Create(LabelProperty, (string?)"styled")])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<InheritedPanel>(),
+                    [StyleSetter.Create(LabelProperty, (string?)"styled")])
+            ])
+        ]);
         root.UpdateStyles();
         Assert.Equal("styled", child.GetValue(LabelProperty));
         var changes = new List<(string? Old, string? New)>();
@@ -604,7 +614,7 @@ public sealed class PropertyInheritanceTests
     [InlineData(true)]
     public void UnbindAfterRejectedInitializationDoesNotMaterializeFallback(bool useStyle)
     {
-        var property = Property.RegisterAttached<LateOwner, Node, int>(
+        var property = Property.RegisterAttached<LateOwner, UIElement, int>(
             Guid.NewGuid().ToString(), 7, validate: static value => value >= 0, inherits: true);
         var root = new Panel();
         root.SetValue(property, 20);
@@ -630,6 +640,7 @@ public sealed class PropertyInheritanceTests
             root.UpdateStyles();
             Assert.False(Assert.Single(child.GetStyleValueSources(property)).IsMaskedByLocalValue);
         }
+
         Assert.Equal(useStyle ? 35 : 30, child.GetValue(property));
 
         StyleSheet CreateStyle(int value) => new([
@@ -763,10 +774,10 @@ public sealed class PropertyInheritanceTests
         var first = new Panel();
         var second = new Panel();
         parent.Children.AddRange([first, second]);
-        using var firstSubscription = first.Subscribe(Node.FontSizeProperty,
+        using var firstSubscription = first.Subscribe(UIElement.FontSizeProperty,
             (_, _) => otherParent.Children.Add(second));
         var changes = new List<(double Old, double New)>();
-        using var secondSubscription = second.Subscribe(Node.FontSizeProperty,
+        using var secondSubscription = second.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         parent.FontSize = 30;
@@ -819,6 +830,7 @@ public sealed class PropertyInheritanceTests
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<PlainHost, int>("Value", 7, inherits: true);
+
         internal static readonly Property<int> OtherValueProperty =
             Property.Register<PlainHost, int>("OtherValue", 9, inherits: true);
 

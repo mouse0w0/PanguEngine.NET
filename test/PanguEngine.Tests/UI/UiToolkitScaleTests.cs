@@ -175,7 +175,7 @@ public sealed class UiToolkitScaleTests
         }
     }
 
-    private sealed class LayoutNode : Node
+    private sealed class LayoutNode : UIElement
     {
         internal Size LastMeasureConstraint { get; private set; }
         internal int MeasureCalls { get; private set; }

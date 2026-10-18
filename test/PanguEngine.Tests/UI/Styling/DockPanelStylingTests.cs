@@ -9,9 +9,11 @@ public sealed class DockPanelStylingTests
     [Fact]
     public void DockPanelSelectorResolvesFillAndInheritedBoxProperties()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            DockPanel { last-child-fill: false; padding: 3px; }
-            """)]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             DockPanel { last-child-fill: false; padding: 3px; }
+                             """)
+        ]);
         var snapshot = resolver.Resolve(new DockPanel());
 
         Assert.False(snapshot.GetValue(DockPanel.LastChildFillProperty));
@@ -29,14 +31,14 @@ public sealed class DockPanelStylingTests
     }
 
     [Theory]
-    [InlineData("UiNode { dock: center; }", false)]
-    [InlineData("UiNode { dock: 0; }", false)]
+    [InlineData("UIElement { dock: center; }", false)]
+    [InlineData("UIElement { dock: 0; }", false)]
     [InlineData("DockPanel { last-child-fill: yes; }", true)]
     public void InvalidDockAndFillValuesProduceCssDiagnostics(string css, bool targetsPanel)
     {
         var panel = new DockPanel();
         var resolver = new StyleResolver([], [StyleSheet.Parse(css)]);
-        Node node = targetsPanel ? panel : new TestNode();
+        UIElement node = targetsPanel ? panel : new TestNode();
 
         var error = Assert.Throws<StyleParseException>(() => resolver.Resolve(node));
 
@@ -52,11 +54,13 @@ public sealed class DockPanelStylingTests
         edge.Classes.Add("edge");
         panel.Children.AddRange([edge, fill]);
         var screen = new Screen(panel);
-        screen.SetStyleSheets([StyleSheet.Parse("""
-            DockPanel { last-child-fill: false; }
-            .edge { dock: top; }
-            .bottom { dock: bottom; }
-            """)]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse("""
+                             DockPanel { last-child-fill: false; }
+                             .edge { dock: top; }
+                             .bottom { dock: bottom; }
+                             """)
+        ]);
         panel.UpdateStyles();
         ValidateLayout(panel);
 
@@ -97,13 +101,13 @@ public sealed class DockPanelStylingTests
         Assert.Equal(new Rect(0, 0, 0, 50), fill.LayoutBounds);
     }
 
-    private static void ValidateLayout(Node node)
+    private static void ValidateLayout(UIElement node)
     {
         node.Measure(new Size(100, 60));
         node.Arrange(new Rect(0, 0, 100, 60));
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Size CoreDesiredSize { get; set; }
 

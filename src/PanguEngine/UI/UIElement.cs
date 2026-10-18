@@ -6,25 +6,25 @@ using PanguEngine.UI.Drawing;
 namespace PanguEngine.UI;
 
 /// <summary>
-/// Provides the base property host for retained-mode UI nodes.
+/// Provides the base property host for retained-mode UI elements.
 /// </summary>
 /// <remarks>
 /// Properties cannot be modified while the owning screen is generating drawing commands.
 /// </remarks>
-public abstract partial class Node : StyledObject
+public abstract partial class UIElement : StyledObject
 {
-    private static readonly PropertyKey<Parent?> ParentPropertyKey =
-        Property.RegisterReadOnly<Node, Parent?>(
+    private static readonly PropertyKey<Container?> ParentPropertyKey =
+        Property.RegisterReadOnly<UIElement, Container?>(
             nameof(Parent),
             onChanged: static (node, oldParent, _) => node.OnInheritanceParentChanged(oldParent));
 
     private static readonly PropertyKey<Screen?> ScreenPropertyKey =
-        Property.RegisterReadOnly<Node, Screen?>(nameof(Screen));
+        Property.RegisterReadOnly<UIElement, Screen?>(nameof(Screen));
 
     /// <summary>
     /// Identifies the <see cref="Parent"/> property.
     /// </summary>
-    public static readonly Property<Parent?> ParentProperty = ParentPropertyKey.Property;
+    public static readonly Property<Container?> ParentProperty = ParentPropertyKey.Property;
 
     /// <summary>
     /// Identifies the <see cref="Screen"/> property.
@@ -33,7 +33,7 @@ public abstract partial class Node : StyledObject
 
     /// <summary>Identifies the inherited <see cref="FontFamily"/> property.</summary>
     public static readonly Property<string> FontFamilyProperty =
-        Property.Register<Node, string>(
+        Property.Register<UIElement, string>(
             nameof(FontFamily), string.Empty,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             validate: static value => value is not null,
@@ -42,21 +42,21 @@ public abstract partial class Node : StyledObject
 
     /// <summary>Identifies the inherited <see cref="FontWeight"/> property.</summary>
     public static readonly Property<FontWeight> FontWeightProperty =
-        Property.Register<Node, FontWeight>(
+        Property.Register<UIElement, FontWeight>(
             nameof(FontWeight), FontWeight.Normal,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             inherits: true);
 
     /// <summary>Identifies the inherited <see cref="FontStyle"/> property.</summary>
     public static readonly Property<FontStyle> FontStyleProperty =
-        Property.Register<Node, FontStyle>(
+        Property.Register<UIElement, FontStyle>(
             nameof(FontStyle), FontStyle.Normal,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             inherits: true);
 
     /// <summary>Identifies the inherited <see cref="FontSize"/> property.</summary>
     public static readonly Property<double> FontSizeProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(FontSize), 16d,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             validate: IsFinitePositive,
@@ -65,7 +65,7 @@ public abstract partial class Node : StyledObject
 
     /// <summary>Identifies the inherited <see cref="LineHeight"/> property.</summary>
     public static readonly Property<double> LineHeightProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(LineHeight), 1d,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             validate: IsFinitePositive,
@@ -74,34 +74,34 @@ public abstract partial class Node : StyledObject
 
     /// <summary>Identifies the inherited <see cref="Color"/> property.</summary>
     public static readonly Property<Color> ColorProperty =
-        Property.Register<Node, Color>(
+        Property.Register<UIElement, Color>(
             nameof(Color), new Color(255, 255, 255),
             inherits: true);
 
     /// <summary>
-    /// Initializes a UI node.
+    /// Initializes a UI element.
     /// </summary>
-    protected Node()
+    protected UIElement()
     {
         Classes = new ObservableSet<string>(StringComparer.Ordinal);
         Classes.Changed += (_, _) => InvalidateStyle();
     }
 
     /// <summary>
-    /// Gets the framework-maintained direct parent of this node.
+    /// Gets the framework-maintained direct parent of this element.
     /// </summary>
     /// <remarks>
-    /// The value is null when this node has no parent. Property change notifications occur after
+    /// The value is null when this element has no parent. Property change notifications occur after
     /// this value changes, before any resulting screen ownership change.
     /// </remarks>
-    public Parent? Parent => GetValue(ParentProperty);
+    public Container? Parent => GetValue(ParentProperty);
 
     /// <summary>
-    /// Gets the UI screen that owns this node.
+    /// Gets the UI screen that owns this element.
     /// </summary>
     /// <remarks>
-    /// The value is null when this node has no owning screen. Property change notifications occur
-    /// after this node's value changes and before its descendants are updated.
+    /// The value is null when this element has no owning screen. Property change notifications occur
+    /// after this element's value changes and before its descendants are updated.
     /// </remarks>
     public Screen? Screen => GetValue(ScreenProperty);
 
@@ -167,10 +167,10 @@ public abstract partial class Node : StyledObject
     protected override StyledObject? InheritanceParent => Parent;
 
     /// <summary>
-    /// Moves this node to the visual front of its siblings.
+    /// Moves this element to the visual front of its siblings.
     /// </summary>
     /// <remarks>
-    /// The node becomes the last child in drawing order. Calling this method without a parent or
+    /// The element becomes the last child in drawing order. Calling this method without a parent or
     /// while already at the front has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
@@ -180,10 +180,10 @@ public abstract partial class Node : StyledObject
         Parent?.MoveChildToFront(this);
 
     /// <summary>
-    /// Moves this node to the visual back of its siblings.
+    /// Moves this element to the visual back of its siblings.
     /// </summary>
     /// <remarks>
-    /// The node becomes the first child in drawing order. Calling this method without a parent or
+    /// The element becomes the first child in drawing order. Calling this method without a parent or
     /// while already at the back has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
@@ -194,7 +194,7 @@ public abstract partial class Node : StyledObject
 
     internal Font CreateFontRequest() => new(FontFamily, FontWeight, FontStyle);
 
-    internal void SetParent(Parent? parent) =>
+    internal void SetParent(Container? parent) =>
         SetValue(ParentPropertyKey, parent);
 
     internal void SetScreenRecursive(Screen? screen)
@@ -202,7 +202,7 @@ public abstract partial class Node : StyledObject
         if (!ReferenceEquals(Screen, screen))
             StopActiveTickers();
         SetValue(ScreenPropertyKey, screen);
-        if (this is not Parent parent)
+        if (this is not Container parent)
             return;
 
         foreach (var child in parent.ReadOnlyChildren)

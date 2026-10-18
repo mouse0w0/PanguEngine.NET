@@ -23,20 +23,20 @@ public sealed class CssBindingTests
     public void CustomCssTypeNameReplacesConcreteClassName()
     {
         var badgeTheme = new StyleResolver([], [StyleSheet.Parse("Badge { opacity: 0.25; }")]);
-        Assert.Equal(0.25, badgeTheme.Resolve(new ThemedBadge()).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.25, badgeTheme.Resolve(new ThemedBadge()).GetValue(UIElement.OpacityProperty));
 
         var wrongNameTheme = new StyleResolver([], [StyleSheet.Parse("ThemedBadge { opacity: 0.25; }")]);
-        Assert.Equal(1d, wrongNameTheme.Resolve(new ThemedBadge()).GetValue(Node.OpacityProperty));
+        Assert.Equal(1d, wrongNameTheme.Resolve(new ThemedBadge()).GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
     public void BaseClassNameStillMatchesWhenCustomNameOverrides()
     {
         var regionTheme = new StyleResolver([], [StyleSheet.Parse("Region { opacity: 0.4; }")]);
-        Assert.Equal(0.4, regionTheme.Resolve(new ThemedPanel()).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, regionTheme.Resolve(new ThemedPanel()).GetValue(UIElement.OpacityProperty));
 
         var panelTheme = new StyleResolver([], [StyleSheet.Parse("Panel { opacity: 0.6; }")]);
-        Assert.Equal(0.6, panelTheme.Resolve(new ThemedPanel()).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.6, panelTheme.Resolve(new ThemedPanel()).GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
@@ -97,9 +97,9 @@ public sealed class CssBindingTests
         CountingNode.Conversions = 0;
         var node = new CountingNode();
         var sheet = StyleSheet.Parse("""
-                                       CountingNode { counted-value: a; }
-                                       CountingNode.primary#save:hover { counted-value: abc; }
-                                       """);
+                                     CountingNode { counted-value: a; }
+                                     CountingNode.primary#save:hover { counted-value: abc; }
+                                     """);
         var root = new Panel();
         root.Children.Add(node);
         var screen = new Screen(root);
@@ -135,8 +135,8 @@ public sealed class CssBindingTests
 
         var result = theme.Resolve(new Button());
 
-        Assert.Equal(0.6, result.GetValue(Node.OpacityProperty));
-        Assert.Equal(3, Assert.Single(result.GetSources(Node.OpacityProperty)).DeclarationIndex);
+        Assert.Equal(0.6, result.GetValue(UIElement.OpacityProperty));
+        Assert.Equal(3, Assert.Single(result.GetSources(UIElement.OpacityProperty)).DeclarationIndex);
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public sealed class CssBindingTests
 
         var result = theme.Resolve(new Button());
 
-        Assert.Equal(1d, result.GetValue(Node.OpacityProperty));
+        Assert.Equal(1d, result.GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
@@ -207,10 +207,10 @@ public sealed class CssBindingTests
         var screen = new Screen(node);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               .danger { opacity: 0.25; }
-                               #save { opacity: 0.6; }
-                               :hover { background: #040404; }
-                               """)
+                             .danger { opacity: 0.25; }
+                             #save { opacity: 0.6; }
+                             :hover { background: #040404; }
+                             """)
         ]);
 
         Assert.Equal(1d, node.Opacity);
@@ -415,7 +415,7 @@ public sealed class CssBindingTests
         screen.Root!.UpdateStyles();
         if (localOverride)
             node.Opacity = 0.8;
-        var previousSource = node.GetStyleValueSources(Node.OpacityProperty);
+        var previousSource = node.GetStyleValueSources(UIElement.OpacityProperty);
         SourceQueryNode.Current = node;
         SourceQueryNode.Conversions = 0;
         try
@@ -434,7 +434,7 @@ public sealed class CssBindingTests
             Assert.Equal(localOverride ? 0.8 : 0.6, node.Opacity);
             Assert.Equal(
                 "new.css",
-                Assert.Single(node.GetStyleValueSources(Node.OpacityProperty)).SheetSourceName);
+                Assert.Single(node.GetStyleValueSources(UIElement.OpacityProperty)).SheetSourceName);
         }
         finally
         {
@@ -490,7 +490,7 @@ public sealed class CssBindingTests
         var changes = new List<PropertyChangedEventArgs<double>>();
         sibling.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, Node.OpacityProperty))
+            if (ReferenceEquals(args.Property, UIElement.OpacityProperty))
                 changes.Add(Assert.IsType<PropertyChangedEventArgs<double>>(args));
         };
         SourceQueryNode.Current = reader;
@@ -521,7 +521,7 @@ public sealed class CssBindingTests
                 Assert.Equal(1d, change.OldValue);
                 Assert.Equal(0.6, change.NewValue);
                 Assert.Equal(0.6, sibling.Opacity);
-                Assert.NotEmpty(sibling.GetStyleValueSources(Node.OpacityProperty));
+                Assert.NotEmpty(sibling.GetStyleValueSources(UIElement.OpacityProperty));
             }
 
             reader.StyleId = "ready";
@@ -534,7 +534,7 @@ public sealed class CssBindingTests
         }
     }
 
-    private sealed class PseudoMutationNode : Node
+    private sealed class PseudoMutationNode : UIElement
     {
         static PseudoMutationNode()
         {
@@ -554,7 +554,7 @@ public sealed class CssBindingTests
             "Value", 0);
     }
 
-    private sealed class SourceQueryNode : Node
+    private sealed class SourceQueryNode : UIElement
     {
         static SourceQueryNode()
         {
@@ -571,7 +571,7 @@ public sealed class CssBindingTests
         }
 
         internal static SourceQueryNode? Current;
-        internal static Node? QueryTarget;
+        internal static UIElement? QueryTarget;
         internal static int Conversions;
         internal IReadOnlyList<StyleValueSource>? SourceDuringBinding { get; private set; }
         internal double ValueDuringBinding { get; private set; }
@@ -580,7 +580,7 @@ public sealed class CssBindingTests
             "Value", 0);
     }
 
-    private sealed class ThemedBadge : Node
+    private sealed class ThemedBadge : UIElement
     {
         static ThemedBadge()
         {
@@ -596,7 +596,7 @@ public sealed class CssBindingTests
         }
     }
 
-    private sealed class AliasNode : Node
+    private sealed class AliasNode : UIElement
     {
         static AliasNode()
         {
@@ -611,7 +611,7 @@ public sealed class CssBindingTests
             Property.Register<AliasNode, double>("Level", 0);
     }
 
-    private sealed class CustomConvNode : Node
+    private sealed class CustomConvNode : UIElement
     {
         static CustomConvNode()
         {
@@ -625,7 +625,7 @@ public sealed class CssBindingTests
             Property.Register<CustomConvNode, double>("Value", 0);
     }
 
-    private sealed class CountingNode : Node
+    private sealed class CountingNode : UIElement
     {
         static CountingNode()
         {
@@ -642,7 +642,7 @@ public sealed class CssBindingTests
             Property.Register<CountingNode, double>("Value", 0);
     }
 
-    private sealed class FlakyNode : Node
+    private sealed class FlakyNode : UIElement
     {
         static FlakyNode()
         {
@@ -661,7 +661,7 @@ public sealed class CssBindingTests
             Property.Register<FlakyNode, double>("Flaky", 0);
     }
 
-    private sealed class NumericNode : Node
+    private sealed class NumericNode : UIElement
     {
         static NumericNode()
         {
@@ -674,7 +674,7 @@ public sealed class CssBindingTests
             Property.Register<NumericNode, double>("Level", 0);
     }
 
-    private sealed class LengthNode : Node
+    private sealed class LengthNode : UIElement
     {
         static LengthNode()
         {

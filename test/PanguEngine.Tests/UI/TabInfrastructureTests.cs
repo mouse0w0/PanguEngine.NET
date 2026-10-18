@@ -1,4 +1,5 @@
 using PanguEngine.Client.UI;
+using PanguEngine.ComponentModel;
 using PanguEngine.Input;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
@@ -19,12 +20,12 @@ public sealed class TabInfrastructureTests
 
         Assert.True(parent.Remove(first));
 
-        Assert.Equal(new Node[] { first }, parent.Removed);
+        Assert.Equal(new UIElement[] { first }, parent.Removed);
         Assert.Null(parent.RemovedParentAtCallback);
 
         parent.Clear();
 
-        Assert.Equal(new Node[] { first, second }, parent.Removed);
+        Assert.Equal(new UIElement[] { first, second }, parent.Removed);
         Assert.Null(parent.RemovedParentAtCallback);
 
         var replaced = new TestNode();
@@ -32,7 +33,7 @@ public sealed class TabInfrastructureTests
         parent.Add(replaced);
         parent.Replace(0, incoming);
 
-        Assert.Equal(new Node[] { first, second, replaced }, parent.Removed);
+        Assert.Equal(new UIElement[] { first, second, replaced }, parent.Removed);
         Assert.Null(parent.RemovedParentAtCallback);
     }
 
@@ -47,7 +48,7 @@ public sealed class TabInfrastructureTests
 
         newParent.Add(child);
 
-        Assert.Equal(new Node[] { child }, oldParent.Removed);
+        Assert.Equal(new UIElement[] { child }, oldParent.Removed);
         Assert.Null(oldParent.RemovedParentAtCallback);
         Assert.Same(newParent, child.Parent);
         Assert.Empty(newParent.Removed);
@@ -74,7 +75,7 @@ public sealed class TabInfrastructureTests
         var screen = new Screen();
         screen.Root = child;
 
-        Assert.Equal(new Node[] { child }, sourceParent.Removed);
+        Assert.Equal(new UIElement[] { child }, sourceParent.Removed);
         Assert.Null(sourceParent.RemovedParentAtCallback);
         Assert.Null(child.Parent);
         Assert.Same(screen, child.Screen);
@@ -105,7 +106,7 @@ public sealed class TabInfrastructureTests
     }
 
     private static T Place<T>(Canvas parent, T child, double x, double y, double width, double height)
-        where T : Node
+        where T : UIElement
     {
         child.Width = width;
         child.Height = height;
@@ -115,15 +116,15 @@ public sealed class TabInfrastructureTests
         return child;
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
     }
 
-    private sealed class TrackingParent : Parent
+    private sealed class TrackingParent : Container
     {
-        internal List<Node> Removed { get; } = [];
+        internal List<UIElement> Removed { get; } = [];
 
-        internal Node? RemovedParentAtCallback { get; private set; }
+        internal UIElement? RemovedParentAtCallback { get; private set; }
 
         internal TrackingParent()
         {
@@ -139,16 +140,16 @@ public sealed class TabInfrastructureTests
             };
         }
 
-        internal void Add(Node child) =>
+        internal void Add(UIElement child) =>
             Children.Add(child);
 
-        internal bool Remove(Node child) =>
+        internal bool Remove(UIElement child) =>
             Children.Remove(child);
 
         internal void Clear() =>
             Children.Clear();
 
-        internal void Replace(int index, Node child) =>
+        internal void Replace(int index, UIElement child) =>
             Children[index] = child;
 
         internal void Move(int oldIndex, int newIndex) =>
@@ -157,7 +158,7 @@ public sealed class TabInfrastructureTests
 
     private sealed class NoBaseControl : Control
     {
-        protected override void OnPropertyChanged(PanguEngine.ComponentModel.PropertyChangedEventArgs eventArgs)
+        protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
         {
         }
     }

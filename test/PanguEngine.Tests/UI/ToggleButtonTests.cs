@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
 using PanguEngine.Input;
@@ -5,6 +6,7 @@ using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
 using PanguEngine.UI.Styling;
+using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.UI;
 
@@ -329,7 +331,7 @@ public sealed class ToggleButtonTests
         manager.ProcessPointerReleased(new Point(5, 5), button, KeyModifiers.None);
     }
 
-    private static string? BackgroundSelector(Node node) =>
+    private static string? BackgroundSelector(UIElement node) =>
         node.GetStyleValueSources(Region.BackgroundProperty).SingleOrDefault()?.SelectorText;
 
     private sealed class BooleanModel : ObservableObject
@@ -343,11 +345,11 @@ public sealed class ToggleButtonTests
         }
     }
 
-    private sealed class NotifyingBooleanModel : System.ComponentModel.INotifyPropertyChanged
+    private sealed class NotifyingBooleanModel : INotifyPropertyChanged
     {
         private bool _value;
 
-        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
 
         public bool RejectTrue { get; init; }
         public Exception? WriteError { get; init; }
@@ -363,7 +365,7 @@ public sealed class ToggleButtonTests
                 if (_value == accepted)
                     return;
                 _value = accepted;
-                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Value)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
             }
         }
     }

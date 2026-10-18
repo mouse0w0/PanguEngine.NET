@@ -55,10 +55,10 @@ public sealed class TextBoxTests
         Assert.Equal(typeof(Control), typeof(TextBox).BaseType);
         AssertProperty(TextBox.TextProperty, string.Empty);
         AssertProperty(TextBox.PlaceholderProperty, string.Empty);
-        Assert.Equal(typeof(Node), TextBox.FontFamilyProperty.OwnerType);
-        Assert.Equal(typeof(Node), TextBox.ColorProperty.OwnerType);
-        Assert.Equal(string.Empty, Node.FontFamilyProperty.DefaultValue);
-        Assert.Equal(new Color(255, 255, 255), Node.ColorProperty.DefaultValue);
+        Assert.Equal(typeof(UIElement), TextBox.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), TextBox.ColorProperty.OwnerType);
+        Assert.Equal(string.Empty, UIElement.FontFamilyProperty.DefaultValue);
+        Assert.Equal(new Color(255, 255, 255), UIElement.ColorProperty.DefaultValue);
         Assert.Equal(new Color(242, 244, 247), textBox.Color);
         AssertProperty(TextBox.PlaceholderColorProperty, new Color(139, 148, 160));
         AssertProperty(TextBox.SelectionBackgroundColorProperty, new Color(47, 100, 160));
@@ -89,9 +89,9 @@ public sealed class TextBoxTests
         screen.Root!.UpdateStyles();
         var properties = new Property[]
         {
-            Node.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
+            UIElement.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
             Region.BorderBrushProperty, Region.BorderThicknessProperty,
-            Node.ColorProperty, TextBox.PlaceholderColorProperty,
+            UIElement.ColorProperty, TextBox.PlaceholderColorProperty,
             TextBox.SelectionBackgroundColorProperty, TextBox.CaretColorProperty
         };
         foreach (var property in properties)
@@ -105,13 +105,13 @@ public sealed class TextBoxTests
             Assert.NotEmpty(node.GetStyleValueSources(property));
         }
 
-        Assert.Empty(node.GetStyleValueSources(Node.FontSizeProperty));
+        Assert.Empty(node.GetStyleValueSources(UIElement.FontSizeProperty));
         Assert.Equal(16d, node.FontSize);
 
         screen.SetBaseStyleSheets([]);
         screen.Root!.UpdateStyles();
 
-        Assert.Equal(Node.MinWidthProperty.DefaultValue, node.MinWidth);
+        Assert.Equal(UIElement.MinWidthProperty.DefaultValue, node.MinWidth);
         Assert.Equal(Region.PaddingProperty.DefaultValue, node.Padding);
         Assert.Equal(Region.BackgroundProperty.DefaultValue, node.Background);
         Assert.Equal(Region.BorderBrushProperty.DefaultValue, node.BorderBrush);
@@ -152,19 +152,19 @@ public sealed class TextBoxTests
         var screen = new Screen(node);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               TextBox {
-                                   min-width: 90px;
-                                   padding: 2px;
-                                   background-color: #010203;
-                                   border-color: #040506;
-                                   border-thickness: 2px;
-                                   font-size: 20px;
-                                   color: #070809;
-                                   placeholder-color: #101112;
-                                   selection-background-color: #131415;
-                                   caret-color: #161718;
-                               }
-                               """)
+                             TextBox {
+                                 min-width: 90px;
+                                 padding: 2px;
+                                 background-color: #010203;
+                                 border-color: #040506;
+                                 border-thickness: 2px;
+                                 font-size: 20px;
+                                 color: #070809;
+                                 placeholder-color: #101112;
+                                 selection-background-color: #131415;
+                                 caret-color: #161718;
+                             }
+                             """)
         ]);
         node.SetHovered(true);
         node.SetFocused(true);

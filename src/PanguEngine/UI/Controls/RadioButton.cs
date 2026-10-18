@@ -36,7 +36,7 @@ public abstract class RadioButton : Control
     private readonly RadioButtonIndicator _indicator;
     private readonly RadioButtonContentHost _contentHost;
     private object? _content;
-    private Node? _contentNode;
+    private UIElement? _contentNode;
     private bool _isChecked;
     private bool _changingContent;
     private bool _enterKeyDown;
@@ -54,9 +54,9 @@ public abstract class RadioButton : Control
         ClipToBounds = true;
     }
 
-    /// <summary>Gets or sets a node, text, or object to display, or null for indicator-only content.</summary>
+    /// <summary>Gets or sets an element, text, or object to display, or null for indicator-only content.</summary>
     /// <remarks>
-    /// Other objects are displayed using ToString. Moving the displayed node elsewhere clears this property.
+    /// Other objects are displayed using ToString. Moving the displayed element elsewhere clears this property.
     /// Changing content during its conversion, tree changes, or notifications is rejected; same-reference confirmation is allowed.
     /// </remarks>
     public object? Content
@@ -68,11 +68,12 @@ public abstract class RadioButton : Control
             if (ContentProperty.ValuesEqual(_content, value))
                 return;
             if (_changingContent)
-                throw new InvalidOperationException("Radio button content cannot change during its update or notifications.");
+                throw new InvalidOperationException(
+                    "Radio button content cannot change during its update or notifications.");
             _changingContent = true;
             try
             {
-                if (value is Node node)
+                if (value is UIElement node)
                     ValidateContentAssignment(node);
                 SetField(ContentProperty, ref _content, value);
             }
@@ -235,6 +236,7 @@ public abstract class RadioButton : Control
     internal void VerifyGroupAccess() => VerifyMutationAccess();
     internal void CommitChecked(bool value) => _isChecked = value;
     internal void RefreshCheckedPseudoClass() => SetPseudoClass(PseudoClass.Checked, IsChecked);
+
     internal void PublishCheckedChanged(bool oldValue, bool newValue) =>
         RaisePropertyChanged(IsCheckedProperty, oldValue, newValue);
 
@@ -255,7 +257,7 @@ public abstract class RadioButton : Control
         InvalidateMeasure();
     }
 
-    private void NotifyContentDetached(Node node)
+    private void NotifyContentDetached(UIElement node)
     {
         if (!ReferenceEquals(node, _contentNode))
             return;
@@ -271,28 +273,31 @@ public abstract class RadioButton : Control
         }
     }
 
-    private void ValidateContentAssignment(Node value)
+    private void ValidateContentAssignment(UIElement value)
     {
         value.Screen?.VerifyTreeMutationAccess();
-        for (Node? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
+        for (UIElement? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
         {
             if (ReferenceEquals(ancestor, value))
                 throw new InvalidOperationException("Radio button content cannot create a parent cycle.");
         }
+
         for (var part = value; part is not null; part = part.Parent)
         {
             if (part is RadioButtonIndicator || value is RadioButtonContentHost)
                 throw new InvalidOperationException("An internal radio button part cannot be used as content.");
         }
+
         if (value.Parent is null && value.Screen is not null)
-            throw new InvalidOperationException("A UI screen root must be cleared before it can be radio button content.");
+            throw new InvalidOperationException(
+                "A UI screen root must be cleared before it can be radio button content.");
     }
 
-    private static Node? CreateContentNode(object? content)
+    private static UIElement? CreateContentNode(object? content)
     {
         if (content is null)
             return null;
-        if (content is Node node)
+        if (content is UIElement node)
             return node;
         var text = new Text
         {
@@ -318,13 +323,14 @@ public abstract class RadioButton : Control
         var screen = Screen;
         if (screen is null || !screen.IsOpen())
             return false;
-        for (Node? node = this; node is not null; node = node.Parent)
+        for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;
             if (ReferenceEquals(node, screen.Root))
                 return true;
         }
+
         return false;
     }
 
@@ -346,7 +352,8 @@ public sealed class RadioButton<T> : RadioButton
         Property.RegisterDirect<RadioButton<T>, RadioGroup<T>?>(nameof(Group),
             static button => button.Group,
             static (button, value) => button.Group = value,
-            onChanged: static (button, oldGroup, newGroup) => RadioGroup<T>.SynchronizeMembership(button, oldGroup, newGroup));
+            onChanged: static (button, oldGroup, newGroup) =>
+                RadioGroup<T>.SynchronizeMembership(button, oldGroup, newGroup));
 
     /// <summary>Identifies the <see cref="Value"/> property.</summary>
     public static readonly DirectProperty<RadioButton<T>, T?> ValueProperty =
@@ -454,6 +461,7 @@ public sealed class RadioButton<T> : RadioButton
                 group.Select(candidate);
             return true;
         }
+
         return true;
     }
 }
@@ -501,7 +509,7 @@ internal sealed class RadioButtonIndicator : Control
 
 internal sealed class RadioButtonContentHost : Control
 {
-    internal RadioButtonContentHost(Action<Node> notifyDetached)
+    internal RadioButtonContentHost(Action<UIElement> notifyDetached)
     {
         Classes.Add("radio-button-content");
         Children.Changed += (_, change) =>
@@ -514,7 +522,7 @@ internal sealed class RadioButtonContentHost : Control
         };
     }
 
-    internal void SetContent(Node? content)
+    internal void SetContent(UIElement? content)
     {
         if (Children.Count > 0 && !ReferenceEquals(Children[0], content))
             Children.Remove(Children[0]);

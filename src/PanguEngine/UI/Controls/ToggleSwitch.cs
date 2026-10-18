@@ -118,6 +118,7 @@ public sealed class ToggleSwitch : Control
                     _enterKeyDown = true;
                     IsOn = !IsOn;
                 }
+
                 break;
             case Key.Space:
                 eventArgs.Handled = true;
@@ -164,7 +165,7 @@ public sealed class ToggleSwitch : Control
         if (screen is null || !ReferenceEquals(Screen, screen) || !screen.IsOpen())
             return false;
 
-        for (Node? node = this; node is not null; node = node.Parent)
+        for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;

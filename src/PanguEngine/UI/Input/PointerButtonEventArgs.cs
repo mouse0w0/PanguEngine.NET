@@ -8,7 +8,7 @@ namespace PanguEngine.UI.Input;
 public sealed class PointerButtonEventArgs : PointerEventArgs
 {
     internal PointerButtonEventArgs(
-        Node source,
+        UIElement source,
         Point screenPosition,
         MouseButton button,
         KeyModifiers modifiers,

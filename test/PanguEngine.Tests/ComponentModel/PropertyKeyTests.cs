@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
 using PanguEngine.UI;
 using PanguEngine.UI.Styling;
@@ -14,20 +13,22 @@ public sealed class PropertyKeyTests
     {
         var node = new ReadOnlyNode();
         var screen = new Screen(node);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<ReadOnlyNode>(), [StyleSetter.Create(Node.OpacityProperty, 0.5d)])
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<ReadOnlyNode>(), [StyleSetter.Create(UIElement.OpacityProperty, 0.5d)])
+            ])
+        ]);
 
         Assert.Equal(5, node.Value);
         Assert.Equal(1d, node.Opacity);
-        Assert.Empty(node.GetStyleValueSources(Node.OpacityProperty));
+        Assert.Empty(node.GetStyleValueSources(UIElement.OpacityProperty));
 
         node.SetValueFromOwner(9);
         node.ClearValueFromOwner();
 
         Assert.Equal(5, node.Value);
         Assert.Equal(1d, node.Opacity);
-        Assert.Empty(node.GetStyleValueSources(Node.OpacityProperty));
+        Assert.Empty(node.GetStyleValueSources(UIElement.OpacityProperty));
         node.UpdateStyles();
         Assert.Equal(0.5d, node.Opacity);
     }
@@ -71,7 +72,7 @@ public sealed class PropertyKeyTests
         var subscribedChanges = new List<(int OldValue, int NewValue)>();
         node.PropertyChanged += (_, args) =>
         {
-            var typedArgs = Assert.IsType<PanguEngine.ComponentModel.PropertyChangedEventArgs<int>>(args);
+            var typedArgs = Assert.IsType<PropertyChangedEventArgs<int>>(args);
             globalChanges.Add((typedArgs.OldValue, typedArgs.NewValue));
         };
         var subscription = node.Subscribe(
@@ -293,7 +294,7 @@ public sealed class PropertyKeyTests
         Assert.Equal("Property 'Value' is read-only.", error.Message);
     }
 
-    private class ReadOnlyNode : Node
+    private class ReadOnlyNode : UIElement
     {
         private static readonly PropertyKey<int> ValuePropertyKey =
             Property.RegisterReadOnly<ReadOnlyNode, int>(
@@ -312,7 +313,7 @@ public sealed class PropertyKeyTests
             ClearValue(propertyKey);
     }
 
-    private sealed class WritableNode : Node
+    private sealed class WritableNode : UIElement
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<WritableNode, int>(nameof(Value));
@@ -333,23 +334,23 @@ public sealed class PropertyKeyTests
         }
     }
 
-    private sealed class ForeignReadOnlyNode : Node
+    private sealed class ForeignReadOnlyNode : UIElement
     {
         internal static readonly PropertyKey<int> ValuePropertyKey =
             Property.RegisterReadOnly<ForeignReadOnlyNode, int>("Value");
     }
 
-    private sealed class ForeignNode : Node
+    private sealed class ForeignNode : UIElement
     {
     }
 
-    private sealed class AttachedOwner : Node
+    private sealed class AttachedOwner : UIElement
     {
         internal static readonly Property<int> ValueProperty =
             Property.RegisterAttached<AttachedOwner, AttachedTarget, int>("Value");
     }
 
-    private sealed class AttachedTarget : Node
+    private sealed class AttachedTarget : UIElement
     {
     }
 

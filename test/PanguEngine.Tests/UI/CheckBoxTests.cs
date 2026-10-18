@@ -1,9 +1,11 @@
+using System.ComponentModel;
 using PanguEngine.Client.UI;
 using PanguEngine.Input;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
 using PanguEngine.UI.Styling;
+using Container = PanguEngine.UI.Container;
 
 namespace PanguEngine.Tests.UI;
 
@@ -269,6 +271,7 @@ public sealed class CheckBoxTests
         }
         else
             screen.ClearFocus();
+
         Assert.True(box.Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None, isRepeat: true);
         Assert.False(box.HasPseudoClass(PseudoClass.Pressed));
@@ -349,7 +352,8 @@ public sealed class CheckBoxTests
         var text = AutomaticText(box);
         Assert.Equal(23, text.FontSize);
         Assert.Equal(new Color(18, 52, 86), text.Color);
-        Assert.All(text.GetStyleValueSources(Text.FontSizeProperty), source => Assert.False(source.IsMaskedByLocalValue));
+        Assert.All(text.GetStyleValueSources(Text.FontSizeProperty),
+            source => Assert.False(source.IsMaskedByLocalValue));
     }
 
     [Fact]
@@ -408,12 +412,12 @@ public sealed class CheckBoxTests
     private static Text AutomaticText(CheckBox box) =>
         Descendants(box).OfType<Text>().Single(text => text.Classes.Contains("checkbox-text"));
 
-    private static IEnumerable<Node> Descendants(Parent parent)
+    private static IEnumerable<UIElement> Descendants(Container parent)
     {
         foreach (var child in parent.ReadOnlyChildren)
         {
             yield return child;
-            if (child is Parent nested)
+            if (child is Container nested)
                 foreach (var descendant in Descendants(nested))
                     yield return descendant;
         }
@@ -432,6 +436,7 @@ public sealed class CheckBoxTests
     {
         public string? Value { get; set; }
         public int Calls { get; private set; }
+
         public override string? ToString()
         {
             Calls++;
@@ -439,10 +444,11 @@ public sealed class CheckBoxTests
         }
     }
 
-    private sealed class ContentSource : System.ComponentModel.INotifyPropertyChanged
+    private sealed class ContentSource : INotifyPropertyChanged
     {
         private object? _value;
-        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public object? Value
         {
             get => _value;
@@ -451,7 +457,7 @@ public sealed class CheckBoxTests
                 if (Equals(_value, value))
                     return;
                 _value = value;
-                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Value)));
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
             }
         }
     }

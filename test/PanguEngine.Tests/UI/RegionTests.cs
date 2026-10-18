@@ -727,7 +727,7 @@ public sealed class RegionTests
         screen.Close();
     }
 
-    private static void ValidateLayout(Node node)
+    private static void ValidateLayout(UIElement node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
@@ -757,7 +757,7 @@ public sealed class RegionTests
 
     private sealed class TestRegion : Region
     {
-        internal void Add(Node child) => Children.Add(child);
+        internal void Add(UIElement child) => Children.Add(child);
     }
 
     private sealed class HookRegion : Region
@@ -788,7 +788,7 @@ public sealed class RegionTests
         }
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }

@@ -472,7 +472,7 @@ public sealed class GameScreenTests
         }
     }
 
-    private sealed class RecordingGameScreen(Node? root = null) : GameScreen(root)
+    private sealed class RecordingGameScreen(UIElement? root = null) : GameScreen(root)
     {
         internal Action? FixedAction { get; set; }
         internal Action<double>? FrameAction { get; set; }

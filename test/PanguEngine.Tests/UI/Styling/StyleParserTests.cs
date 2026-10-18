@@ -17,13 +17,13 @@ public sealed class StyleParserTests
 
     private static StyleRule SingleRule(string css) => Assert.Single(ParseCss(css).Rules);
 
-    private static IReadOnlyList<StyleRule.BoundDeclaration> BoundDeclarations(string css, Node node) =>
+    private static IReadOnlyList<StyleRule.BoundDeclaration> BoundDeclarations(string css, UIElement node) =>
         SingleRule(css).Bind(node.GetType());
 
-    private static IReadOnlyList<StyleSetter> BoundSetters(string css, Node node) =>
+    private static IReadOnlyList<StyleSetter> BoundSetters(string css, UIElement node) =>
         BoundDeclarations(css, node).Select(declaration => declaration.Setter).ToArray();
 
-    private static T ParsedValue<T>(Node node, string css)
+    private static T ParsedValue<T>(UIElement node, string css)
     {
         var setter = Assert.Single(BoundSetters(css, node));
         return (T)setter.BoxedValue!;
@@ -33,11 +33,11 @@ public sealed class StyleParserTests
     public void ParsesCompoundSelectorAndBuiltInValues()
     {
         var sheet = StyleSheet.Parse("""
-                                       Button.primary#save:hover:focus {
-                                           background: #112233cc;
-                                           opacity: 0.8;
-                                       }
-                                       """, "menu.css");
+                                     Button.primary#save:hover:focus {
+                                         background: #112233cc;
+                                         opacity: 0.8;
+                                     }
+                                     """, "menu.css");
 
         var rule = Assert.Single(sheet.Rules);
         var selector = rule.Selectors[0];
@@ -438,7 +438,7 @@ public sealed class StyleParserTests
     [Fact]
     public void DoubleRejectsExponentSyntax()
     {
-        var rule = SingleRule("UiNode { width: 1e2; }");
+        var rule = SingleRule("UIElement { width: 1e2; }");
 
         var node = new Panel();
         var error = Assert.Throws<StyleParseException>(() => rule.Bind(node.GetType()));
@@ -469,9 +469,9 @@ public sealed class StyleParserTests
             ParsedValue<Orientation>(new StackPanel(), "StackPanel { orientation: HORIZONTAL; }"));
         var node = new Panel();
         Assert.Equal(Visibility.Collapsed,
-            ParsedValue<Visibility>(node, "UiNode { visibility: collapsed; }"));
+            ParsedValue<Visibility>(node, "UIElement { visibility: collapsed; }"));
         Assert.Equal(HorizontalAlignment.Center,
-            ParsedValue<HorizontalAlignment>(node, "UiNode { horizontal-alignment: CENTER; }"));
+            ParsedValue<HorizontalAlignment>(node, "UIElement { horizontal-alignment: CENTER; }"));
         var text = new Text();
         Assert.Equal(TextWrapping.Wrap, ParsedValue<TextWrapping>(text, "Text { wrapping: wrap; }"));
         Assert.Equal(TextAlignment.Right, ParsedValue<TextAlignment>(text, "Text { text-alignment: right; }"));
@@ -620,7 +620,7 @@ public sealed class StyleParserTests
     [InlineData("0.5 /*!important*/ !important /* tail */")]
     public void ImportantSuffixIsRemovedBeforeConversion(string value)
     {
-        var declaration = Assert.Single(BoundDeclarations($"UiNode {{ opacity: {value}; }}", new Panel()));
+        var declaration = Assert.Single(BoundDeclarations($"UIElement {{ opacity: {value}; }}", new Panel()));
 
         Assert.Equal(0.5, (double)declaration.Setter.BoxedValue!);
         Assert.True(declaration.IsImportant);
@@ -677,13 +677,13 @@ public sealed class StyleParserTests
     [Fact]
     public void UnknownPropertyWithMalformedImportantIsIgnored()
     {
-        Assert.Empty(BoundDeclarations("UiNode { ghost: !important !important; }", new Panel()));
+        Assert.Empty(BoundDeclarations("UIElement { ghost: !important !important; }", new Panel()));
     }
 
     [Fact]
     public void EmptyValueStillFailsDuringParsing()
     {
-        var error = Assert.Throws<StyleParseException>(() => ParseCss("UiNode { opacity: ; }"));
+        var error = Assert.Throws<StyleParseException>(() => ParseCss("UIElement { opacity: ; }"));
 
         Assert.Equal(StyleParseError.InvalidSyntax, error.Error);
     }
@@ -698,7 +698,7 @@ public sealed class StyleParserTests
         Assert.True(declaration.IsImportant);
     }
 
-    private sealed class FlagConvNode : Node
+    private sealed class FlagConvNode : UIElement
     {
         static FlagConvNode()
         {
@@ -717,7 +717,7 @@ public sealed class StyleParserTests
             Property.Register<FlagConvNode, bool>("Flag", false);
     }
 
-    private sealed class BoolNode : Node
+    private sealed class BoolNode : UIElement
     {
         static BoolNode()
         {
@@ -728,7 +728,7 @@ public sealed class StyleParserTests
             Property.Register<BoolNode, bool>("Flag", false);
     }
 
-    private sealed class TrimNode : Node
+    private sealed class TrimNode : UIElement
     {
         static TrimNode()
         {
@@ -741,7 +741,7 @@ public sealed class StyleParserTests
             Property.Register<TrimNode, string>("Raw", string.Empty);
     }
 
-    private sealed class ThrowingNode : Node
+    private sealed class ThrowingNode : UIElement
     {
         static ThrowingNode()
         {
@@ -754,7 +754,7 @@ public sealed class StyleParserTests
             Property.Register<ThrowingNode, string>("Raw", string.Empty);
     }
 
-    private class BaseStyleNode : Node
+    private class BaseStyleNode : UIElement
     {
         static BaseStyleNode()
         {

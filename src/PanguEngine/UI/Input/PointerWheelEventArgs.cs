@@ -8,7 +8,7 @@ namespace PanguEngine.UI.Input;
 public sealed class PointerWheelEventArgs : PointerEventArgs
 {
     internal PointerWheelEventArgs(
-        Node source,
+        UIElement source,
         Point screenPosition,
         double deltaX,
         double deltaY,

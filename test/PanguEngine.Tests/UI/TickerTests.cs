@@ -737,7 +737,7 @@ public sealed class TickerTests
         var childTicker = child.AddTicker(_ => calls.Add("child"));
         root.PropertyChanged += (_, args) =>
         {
-            if (args.Property == Node.ScreenProperty && ReferenceEquals(root.Screen, target))
+            if (args.Property == UIElement.ScreenProperty && ReferenceEquals(root.Screen, target))
                 throw expected;
         };
         source.Open();
@@ -774,7 +774,7 @@ public sealed class TickerTests
         var ticker = second.AddTicker(_ => { });
         first.PropertyChanged += (_, args) =>
         {
-            if (args.Property == Node.ScreenProperty && ReferenceEquals(first.Screen, target))
+            if (args.Property == UIElement.ScreenProperty && ReferenceEquals(first.Screen, target))
                 root.Children.Remove(second);
         };
         source.Open();
@@ -833,7 +833,7 @@ public sealed class TickerTests
         var notifications = new List<string>();
         node.PropertyChanged += (_, args) =>
         {
-            if (args.Property == Node.ParentProperty && node.Parent is null)
+            if (args.Property == UIElement.ParentProperty && node.Parent is null)
             {
                 notifications.Add("parent");
                 Assert.Same(screen, node.Screen);
@@ -843,7 +843,7 @@ public sealed class TickerTests
                 Assert.True(ticker.IsActive);
             }
 
-            if (args.Property == Node.ScreenProperty && node.Screen is null)
+            if (args.Property == UIElement.ScreenProperty && node.Screen is null)
             {
                 notifications.Add("node:screen");
                 Assert.False(ticker.IsActive);
@@ -853,7 +853,7 @@ public sealed class TickerTests
         };
         child.PropertyChanged += (_, args) =>
         {
-            if (args.Property == Node.ScreenProperty && child.Screen is null)
+            if (args.Property == UIElement.ScreenProperty && child.Screen is null)
             {
                 notifications.Add("child:screen");
                 Assert.False(ticker.IsActive);
@@ -960,7 +960,7 @@ public sealed class TickerTests
         }
     }
 
-    private sealed class CallbackScreen(Node root) : GameScreen(root)
+    private sealed class CallbackScreen(UIElement root) : GameScreen(root)
     {
         internal Action? OpeningAction { get; init; }
         internal Action? FrameAction { get; set; }
@@ -971,7 +971,7 @@ public sealed class TickerTests
         protected override void OnClosing() => ClosingAction?.Invoke();
     }
 
-    private sealed class CallbackHud(Node root, Action destroy) : Hud(root)
+    private sealed class CallbackHud(UIElement root, Action destroy) : Hud(root)
     {
         protected override void OnDestroy() => destroy();
     }

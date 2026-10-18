@@ -12,25 +12,25 @@ public sealed class CanvasTests
     {
         Assert.Equal("Left", Canvas.LeftProperty.Name);
         Assert.Equal(typeof(Canvas), Canvas.LeftProperty.OwnerType);
-        Assert.Equal(typeof(Node), Canvas.LeftProperty.TargetType);
+        Assert.Equal(typeof(UIElement), Canvas.LeftProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.LeftProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.LeftProperty.DefaultValue));
 
         Assert.Equal("Top", Canvas.TopProperty.Name);
         Assert.Equal(typeof(Canvas), Canvas.TopProperty.OwnerType);
-        Assert.Equal(typeof(Node), Canvas.TopProperty.TargetType);
+        Assert.Equal(typeof(UIElement), Canvas.TopProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.TopProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.TopProperty.DefaultValue));
 
         Assert.Equal("Right", Canvas.RightProperty.Name);
         Assert.Equal(typeof(Canvas), Canvas.RightProperty.OwnerType);
-        Assert.Equal(typeof(Node), Canvas.RightProperty.TargetType);
+        Assert.Equal(typeof(UIElement), Canvas.RightProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.RightProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.RightProperty.DefaultValue));
 
         Assert.Equal("Bottom", Canvas.BottomProperty.Name);
         Assert.Equal(typeof(Canvas), Canvas.BottomProperty.OwnerType);
-        Assert.Equal(typeof(Node), Canvas.BottomProperty.TargetType);
+        Assert.Equal(typeof(UIElement), Canvas.BottomProperty.TargetType);
         Assert.Equal(typeof(double), Canvas.BottomProperty.ValueType);
         Assert.True(double.IsNaN(Canvas.BottomProperty.DefaultValue));
     }
@@ -407,7 +407,7 @@ public sealed class CanvasTests
     {
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }

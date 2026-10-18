@@ -961,7 +961,7 @@ public sealed class ScreenTests
         screen.Close();
     }
 
-    private sealed class RecordingScreen(Node? root = null) : Screen(root)
+    private sealed class RecordingScreen(UIElement? root = null) : Screen(root)
     {
         internal Action? Opening { get; set; }
         internal Action? Opened { get; set; }
@@ -1346,7 +1346,7 @@ public sealed class ScreenTests
                     [StyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(2))]),
                 new StyleRule(
                     StyleSelector.For<FailOnceStyleNode>(pseudoClasses: [PseudoClass.Disabled]),
-                    [StyleSetter.Create(Node.OpacityProperty, 0.5)])
+                    [StyleSetter.Create(UIElement.OpacityProperty, 0.5)])
             ])
         };
         var source = new Screen(node);
@@ -1376,7 +1376,7 @@ public sealed class ScreenTests
         Assert.Equal(1d, node.Value);
     }
 
-    private sealed class ProbeNode : Node
+    private sealed class ProbeNode : UIElement
     {
         public static readonly Property<int> ValueProperty =
             Property.Register<ProbeNode, int>(nameof(Value));
@@ -1417,7 +1417,7 @@ public sealed class ScreenTests
         ])
     ];
 
-    private sealed class LayoutNode : Node
+    private sealed class LayoutNode : UIElement
     {
         internal Action? MeasureAction { get; set; }
         internal Action? ArrangeAction { get; set; }
@@ -1442,21 +1442,21 @@ public sealed class ScreenTests
         }
     }
 
-    private sealed class DrawingNode : Node
+    private sealed class DrawingNode : UIElement
     {
         internal Action? DrawAction { get; set; }
 
         protected override void DrawCore(DrawingContext context) => DrawAction?.Invoke();
     }
 
-    private sealed class ThrowingStyleNode : Node
+    private sealed class ThrowingStyleNode : UIElement
     {
         internal static readonly Property<GuardedValue> ValueProperty =
             Property.Register<ThrowingStyleNode, GuardedValue>("Value", new GuardedValue(0),
                 comparer: EqualityComparer<GuardedValue>.Default);
     }
 
-    private sealed class FailOnceStyleNode : Node
+    private sealed class FailOnceStyleNode : UIElement
     {
         internal static readonly Property<GuardedValue> ValueProperty =
             Property.Register<FailOnceStyleNode, GuardedValue>("Value", new GuardedValue(0),

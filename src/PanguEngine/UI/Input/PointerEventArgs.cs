@@ -8,7 +8,7 @@ public class PointerEventArgs : InputEventArgs
     private readonly IReadOnlyList<HitPathEntry> _path;
 
     internal PointerEventArgs(
-        Node source,
+        UIElement source,
         Point screenPosition,
         IReadOnlyList<HitPathEntry> path)
         : base(source)
@@ -23,21 +23,21 @@ public class PointerEventArgs : InputEventArgs
     public Point ScreenPosition { get; }
 
     /// <summary>
-    /// Gets the pointer position relative to a node.
+    /// Gets the pointer position relative to an element.
     /// </summary>
-    /// <param name="relativeTo">The node whose local coordinates are requested.</param>
-    /// <returns>The event position in the node's local coordinates.</returns>
+    /// <param name="relativeTo">The element whose local coordinates are requested.</param>
+    /// <returns>The event position in the element's local coordinates.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="relativeTo"/> is null.</exception>
     /// <exception cref="ArgumentException">
-    /// Thrown when the node is not in the event's root tree.
+    /// Thrown when the element is not in the event's root tree.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active node outside the event path is queried from the wrong thread.
+    /// Thrown when an active element outside the event path is queried from the wrong thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
     /// </exception>
-    public Point GetPosition(Node relativeTo)
+    public Point GetPosition(UIElement relativeTo)
     {
         ArgumentNullException.ThrowIfNull(relativeTo);
         foreach (var entry in _path)
@@ -48,7 +48,7 @@ public class PointerEventArgs : InputEventArgs
 
         relativeTo.Screen?.VerifyTreeAccess();
         var eventRoot = _path[0].Node;
-        var ancestors = new List<Node>();
+        var ancestors = new List<UIElement>();
         for (var current = relativeTo; current is not null; current = current.Parent)
         {
             ancestors.Add(current);

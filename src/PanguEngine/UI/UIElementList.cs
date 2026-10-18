@@ -3,32 +3,33 @@ using PanguEngine.Collections;
 namespace PanguEngine.UI;
 
 /// <summary>
-/// Provides observable, validated mutable access to the direct children of a UI parent.
+/// Provides observable, validated mutable access to the direct children of a UI container.
 /// </summary>
 /// <remarks>
 /// Changes are published after the corresponding tree update. Other collections notify synchronously
 /// during their own updates. A collection involved in an active update cannot be modified recursively.
-/// Sorting requires comparable nodes or an explicit comparer.
+/// Sorting requires comparable elements or an explicit comparer.
 /// </remarks>
-public sealed partial class NodeList : ObservableList<Node>
+public sealed partial class UIElementList : ObservableList<UIElement>
 {
-    private readonly Parent _owner;
+    private readonly Container _owner;
 
-    internal NodeList(Parent owner) => _owner = owner;
+    internal UIElementList(Container owner) => _owner = owner;
 
     /// <inheritdoc />
-    protected override int IndexOfItem(Node? item)
+    protected override int IndexOfItem(UIElement? item)
     {
         for (var index = 0; index < Count; index++)
         {
             if (ReferenceEquals(this[index], item))
                 return index;
         }
+
         return -1;
     }
 
     /// <inheritdoc />
-    protected override void SetItem(int index, Node value)
+    protected override void SetItem(int index, UIElement value)
     {
         ArgumentNullException.ThrowIfNull(value);
         if (ReferenceEquals(this[index], value))
@@ -37,7 +38,7 @@ public sealed partial class NodeList : ObservableList<Node>
     }
 
     /// <inheritdoc />
-    protected override void InsertItem(int index, Node item) =>
+    protected override void InsertItem(int index, UIElement item) =>
         ReplaceChildren(index, 0, [item], () => base.InsertItem(index, item));
 
     /// <inheritdoc />
@@ -49,7 +50,7 @@ public sealed partial class NodeList : ObservableList<Node>
         ReplaceChildren(0, Count, [], () => base.ClearItems());
 
     /// <inheritdoc />
-    protected override void InsertItems(int index, IReadOnlyList<Node> items) =>
+    protected override void InsertItems(int index, IReadOnlyList<UIElement> items) =>
         ReplaceChildren(index, 0, items, () => base.InsertItems(index, items));
 
     /// <inheritdoc />
@@ -57,7 +58,7 @@ public sealed partial class NodeList : ObservableList<Node>
         ReplaceChildren(index, count, [], () => base.RemoveItems(index, count));
 
     /// <inheritdoc />
-    protected override void ReplaceItems(IReadOnlyList<Node> items) =>
+    protected override void ReplaceItems(IReadOnlyList<UIElement> items) =>
         ReplaceChildren(0, Count, items, () => base.ReplaceItems(items));
 
     /// <inheritdoc />

@@ -273,7 +273,7 @@ public sealed partial class TabView
             : null;
     }
 
-    private TabItem? FindTabItem(Node? source)
+    private TabItem? FindTabItem(UIElement? source)
     {
         for (var node = source; node is not null; node = node.Parent)
         {
@@ -286,7 +286,7 @@ public sealed partial class TabView
         return null;
     }
 
-    private static bool IsInteractiveChild(Node? source, TabItem tab)
+    private static bool IsInteractiveChild(UIElement? source, TabItem tab)
     {
         for (var node = source; node is not null && !ReferenceEquals(node, tab); node = node.Parent)
         {

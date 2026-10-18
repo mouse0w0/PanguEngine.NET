@@ -1,17 +1,17 @@
 namespace PanguEngine.UI;
 
-public abstract partial class Node
+public abstract partial class UIElement
 {
     private HashSet<Ticker>? _activeTickers;
 
     /// <summary>
-    /// Creates an inactive frame ticker associated with this node.
+    /// Creates an inactive frame ticker associated with this element.
     /// </summary>
     /// <param name="onTick">The callback receiving the absolute monotonic frame time.</param>
-    /// <returns>An independent ticker that can be started while this node's screen is open.</returns>
+    /// <returns>An independent ticker that can be started while this element's screen is open.</returns>
     /// <remarks>
-    /// Tickers may be created before mounting. When the node's screen is open, creation and use require its UI thread.
-    /// Keep a reference to reuse the ticker. Only active tickers are registered with this node.
+    /// Tickers may be created before mounting. When the element's screen is open, creation and use require its UI thread.
+    /// Keep a reference to reuse the ticker. Only active tickers are registered with this element.
     /// Frame time uses the monotonic clock's origin, not the start of a ticker run.
     /// Consumers establish a baseline on the first callback of each new run and calculate subsequent differences.
     /// </remarks>

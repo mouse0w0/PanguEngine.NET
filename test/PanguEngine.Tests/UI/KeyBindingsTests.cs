@@ -20,9 +20,9 @@ public sealed class KeyBindingsTests
         Assert.True(openType.IsPublic);
         Assert.True(openType.IsSealed);
         Assert.Single(openType.GetConstructors(BindingFlags.Public | BindingFlags.Instance));
-        Assert.Equal([typeof(Node)], genericParameter.GetGenericParameterConstraints());
-        Assert.Equal(3, methods.Count(method => method.Name == nameof(KeyBindings<Node>.AddBinding)));
-        Assert.Single(methods, method => method.Name == nameof(KeyBindings<Node>.TryHandle));
+        Assert.Equal([typeof(UIElement)], genericParameter.GetGenericParameterConstraints());
+        Assert.Equal(3, methods.Count(method => method.Name == nameof(KeyBindings<UIElement>.AddBinding)));
+        Assert.Single(methods, method => method.Name == nameof(KeyBindings<UIElement>.TryHandle));
     }
 
     [Fact]
@@ -224,7 +224,7 @@ public sealed class KeyBindingsTests
     }
 
     private static (UiManager Manager, GameScreen Screen, TNode Node) Open<TNode>(TNode node)
-        where TNode : Node
+        where TNode : UIElement
     {
         node.Focusable = true;
         node.Width = 40;
@@ -238,7 +238,7 @@ public sealed class KeyBindingsTests
         return (manager, screen, node);
     }
 
-    private sealed class PressBindingNode : Node
+    private sealed class PressBindingNode : UIElement
     {
         private static readonly KeyBindings<PressBindingNode> KeyBindings =
             new KeyBindings<PressBindingNode>()
@@ -263,7 +263,7 @@ public sealed class KeyBindingsTests
         }
     }
 
-    private sealed class ReleaseBindingNode : Node
+    private sealed class ReleaseBindingNode : UIElement
     {
         private static readonly KeyBindings<ReleaseBindingNode> KeyBindings =
             new KeyBindings<ReleaseBindingNode>()
@@ -290,7 +290,7 @@ public sealed class KeyBindingsTests
         }
     }
 
-    private sealed class ExactModifiersNode : Node
+    private sealed class ExactModifiersNode : UIElement
     {
         private static readonly KeyBindings<ExactModifiersNode> KeyBindings =
             new KeyBindings<ExactModifiersNode>()
@@ -309,7 +309,7 @@ public sealed class KeyBindingsTests
         }
     }
 
-    private sealed class FirstComponentNode : Node
+    private sealed class FirstComponentNode : UIElement
     {
         private static readonly KeyBindings<FirstComponentNode> KeyBindings =
             new KeyBindings<FirstComponentNode>()
@@ -327,7 +327,7 @@ public sealed class KeyBindingsTests
         }
     }
 
-    private sealed class SecondComponentNode : Node
+    private sealed class SecondComponentNode : UIElement
     {
         private static readonly KeyBindings<SecondComponentNode> KeyBindings =
             new KeyBindings<SecondComponentNode>()
@@ -345,19 +345,19 @@ public sealed class KeyBindingsTests
         }
     }
 
-    private sealed class DuplicateBindingNode : Node
+    private sealed class DuplicateBindingNode : UIElement
     {
     }
 
-    private sealed class OverloadNode : Node
+    private sealed class OverloadNode : UIElement
     {
     }
 
-    private sealed class NullHandlerNode : Node
+    private sealed class NullHandlerNode : UIElement
     {
     }
 
-    private sealed class ExceptionBindingNode : Node
+    private sealed class ExceptionBindingNode : UIElement
     {
         private static readonly KeyBindings<ExceptionBindingNode> KeyBindings =
             new KeyBindings<ExceptionBindingNode>()
@@ -380,7 +380,7 @@ public sealed class KeyBindingsTests
         }
     }
 
-    private sealed class HandledBindingNode : Node
+    private sealed class HandledBindingNode : UIElement
     {
         private static readonly KeyBindings<HandledBindingNode> KeyBindings =
             new KeyBindings<HandledBindingNode>()

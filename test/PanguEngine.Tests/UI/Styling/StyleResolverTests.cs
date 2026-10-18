@@ -32,7 +32,8 @@ public sealed class StyleResolverTests
     {
         var sheet = Sheet(
             Rule(StyleSelector.For<Control>(), StyleSetter.Create(Region.BackgroundProperty, Brush(1))),
-            Rule(StyleSelector.For<Button>(classes: ["primary"]), StyleSetter.Create(Region.BackgroundProperty, Brush(2))));
+            Rule(StyleSelector.For<Button>(classes: ["primary"]),
+                StyleSetter.Create(Region.BackgroundProperty, Brush(2))));
         var button = new Button();
         button.Classes.Add("primary");
 
@@ -46,7 +47,8 @@ public sealed class StyleResolverTests
             Rule(StyleSelector.For<Button>(), StyleSetter.Create(Region.BackgroundProperty, Brush(1))),
             Rule(StyleSelector.For<Button>(), StyleSetter.Create(Region.BackgroundProperty, Brush(2))));
 
-        Assert.Equal(Brush(2), new StyleResolver([], [sheet]).Resolve(new Button()).GetValue(Region.BackgroundProperty));
+        Assert.Equal(Brush(2),
+            new StyleResolver([], [sheet]).Resolve(new Button()).GetValue(Region.BackgroundProperty));
     }
 
     [Fact]
@@ -56,7 +58,8 @@ public sealed class StyleResolverTests
             Rule(StyleSelector.For<Control>(), StyleSetter.Create(Region.BackgroundProperty, Brush(1))),
             Rule(StyleSelector.For<Button>(), StyleSetter.Create(Region.BackgroundProperty, Brush(2))));
 
-        Assert.Equal(Brush(2), new StyleResolver([], [sheet]).Resolve(new Button()).GetValue(Region.BackgroundProperty));
+        Assert.Equal(Brush(2),
+            new StyleResolver([], [sheet]).Resolve(new Button()).GetValue(Region.BackgroundProperty));
     }
 
     [Fact]
@@ -64,10 +67,10 @@ public sealed class StyleResolverTests
     {
         var sheet = Sheet(Rule(
             StyleSelector.For<Button>(classes: ["absent"]),
-            StyleSetter.Create(Node.OpacityProperty, 0.5)));
+            StyleSetter.Create(UIElement.OpacityProperty, 0.5)));
         var result = new StyleResolver([], [sheet]).Resolve(new Button());
 
-        Assert.Equal(1, result.GetValue(Node.OpacityProperty));
+        Assert.Equal(1, result.GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
@@ -82,7 +85,7 @@ public sealed class StyleResolverTests
         Assert.Equal(new SolidColorBrush(48, 54, 62), result.GetValue(Region.BackgroundProperty));
         Assert.Equal(new SolidColorBrush(92, 103, 116), result.GetValue(Region.BorderBrushProperty));
         Assert.Equal(new Thickness(1), result.GetValue(Region.BorderThicknessProperty));
-        Assert.Equal(new Color(242, 244, 247), result.GetValue(Node.ColorProperty));
+        Assert.Equal(new Color(242, 244, 247), result.GetValue(UIElement.ColorProperty));
         var source = Assert.Single(result.GetSources(Region.BackgroundProperty));
         Assert.Equal("pangu/ui/default.css", source.SheetSourceName);
         Assert.Equal(StyleOrigin.Base, source.Origin);
@@ -149,39 +152,45 @@ public sealed class StyleResolverTests
     [Fact]
     public void SelectorListAppliesOneDeclarationWhenAnyBranchMatches()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            ".missing, .active { opacity: 0.4; }")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                ".missing, .active { opacity: 0.4; }")
+        ]);
         var button = new Button();
         button.Classes.Add("active");
 
-        Assert.Equal(0.4, resolver.Resolve(button).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(button).GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
     public void SelectorListUsesHighestMatchingBranchSpecificity()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            ".active, #target { opacity: 0.4; } Button.active { opacity: 0.8; }")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                ".active, #target { opacity: 0.4; } Button.active { opacity: 0.8; }")
+        ]);
         var button = new Button { StyleId = "target" };
         button.Classes.Add("active");
 
         var result = resolver.Resolve(button);
-        var source = Assert.Single(result.GetSources(Node.OpacityProperty));
+        var source = Assert.Single(result.GetSources(UIElement.OpacityProperty));
 
-        Assert.Equal(0.4, result.GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, result.GetValue(UIElement.OpacityProperty));
         Assert.Equal("#target", source.SelectorText);
     }
 
     [Fact]
     public void EqualMatchingBranchSpecificityKeepsFirstBranchSource()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            ".first, .second { opacity: 0.4; }")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                ".first, .second { opacity: 0.4; }")
+        ]);
         var button = new Button();
         button.Classes.Add("first");
         button.Classes.Add("second");
 
-        var source = Assert.Single(resolver.Resolve(button).GetSources(Node.OpacityProperty));
+        var source = Assert.Single(resolver.Resolve(button).GetSources(UIElement.OpacityProperty));
 
         Assert.Equal(".first", source.SelectorText);
     }
@@ -189,36 +198,42 @@ public sealed class StyleResolverTests
     [Fact]
     public void DuplicateMatchingBranchesApplyOneDeclaration()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            ".active, .active { opacity: 0.4; }")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                ".active, .active { opacity: 0.4; }")
+        ]);
         var button = new Button();
         button.Classes.Add("active");
 
         var result = resolver.Resolve(button);
 
-        Assert.Equal(0.4, result.GetValue(Node.OpacityProperty));
-        Assert.Single(result.GetSources(Node.OpacityProperty));
+        Assert.Equal(0.4, result.GetValue(UIElement.OpacityProperty));
+        Assert.Single(result.GetSources(UIElement.OpacityProperty));
     }
 
     [Fact]
     public void UnmatchedHighSpecificityBranchDoesNotAffectMatchingBranch()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            "#absent, .active { opacity: 0.4; }\nButton.active { opacity: 0.8; }")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                "#absent, .active { opacity: 0.4; }\nButton.active { opacity: 0.8; }")
+        ]);
         var button = new Button();
         button.Classes.Add("active");
 
         var result = resolver.Resolve(button);
 
-        Assert.Equal(0.8, result.GetValue(Node.OpacityProperty));
-        Assert.Equal("Button.active", Assert.Single(result.GetSources(Node.OpacityProperty)).SelectorText);
+        Assert.Equal(0.8, result.GetValue(UIElement.OpacityProperty));
+        Assert.Equal("Button.active", Assert.Single(result.GetSources(UIElement.OpacityProperty)).SelectorText);
     }
 
     [Fact]
     public void SelectorListCanBindDifferentTargetTypesWithoutDroppingAvailableProperties()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            "Region#target, Button.active { font-size: 12px; }")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                "Region#target, Button.active { font-size: 12px; }")
+        ]);
         var button = new Button { StyleId = "target" };
         button.Classes.Add("active");
 
@@ -228,10 +243,12 @@ public sealed class StyleResolverTests
     [Fact]
     public void CssTargetDepthWinsBeforeRuleOrder()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            Button { background: #010203; }
-            Control { background: #040506; }
-            """)]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             Button { background: #010203; }
+                             Control { background: #040506; }
+                             """)
+        ]);
 
         Assert.Equal(new SolidColorBrush(1, 2, 3), resolver.Resolve(new Button()).GetValue(Region.BackgroundProperty));
     }
@@ -239,10 +256,12 @@ public sealed class StyleResolverTests
     [Fact]
     public void SourceDeclarationIndexIncludesEarlierRules()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            Button { padding: 2px; background: #010203; }
-            Button { background: #040506; }
-            """, "order.css")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             Button { padding: 2px; background: #010203; }
+                             Button { background: #040506; }
+                             """, "order.css")
+        ]);
 
         var source = Assert.Single(resolver.Resolve(new Button()).GetSources(Region.BackgroundProperty));
 
@@ -256,15 +275,15 @@ public sealed class StyleResolverTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void UiNodeElementSelectorBeatsWildcardRegardlessOfOrder(bool wildcardFirst)
+    public void UIElementSelectorBeatsWildcardRegardlessOfOrder(bool wildcardFirst)
     {
         const string wildcard = "*.danger { opacity: 0.1; }";
-        const string typed = "UiNode.danger { opacity: 0.4; }";
+        const string typed = "UIElement.danger { opacity: 0.4; }";
         var css = wildcardFirst ? wildcard + typed : typed + wildcard;
         var node = new Button();
         node.Classes.Add("danger");
 
-        var value = new StyleResolver([], [StyleSheet.Parse(css)]).Resolve(node).GetValue(Node.OpacityProperty);
+        var value = new StyleResolver([], [StyleSheet.Parse(css)]).Resolve(node).GetValue(UIElement.OpacityProperty);
 
         Assert.Equal(0.4, value);
     }
@@ -340,8 +359,8 @@ public sealed class StyleResolverTests
     {
         var resolver = new StyleResolver([], [StyleSheet.Parse("* { opacity: 0.4; }")]);
 
-        Assert.Equal(0.4, resolver.Resolve(new Panel()).GetValue(Node.OpacityProperty));
-        Assert.Equal(0.4, resolver.Resolve(new Button()).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(new Panel()).GetValue(UIElement.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(new Button()).GetValue(UIElement.OpacityProperty));
     }
 
     [Theory]
@@ -350,8 +369,8 @@ public sealed class StyleResolverTests
     public void StronglyTypedSelectorBeatsWildcardRegardlessOfOrder(bool csharpFirst)
     {
         var csharp = Sheet(Rule(
-            StyleSelector.For<Node>(classes: ["danger"]),
-            StyleSetter.Create(Node.OpacityProperty, 0.4)));
+            StyleSelector.For<UIElement>(classes: ["danger"]),
+            StyleSetter.Create(UIElement.OpacityProperty, 0.4)));
         var wildcard = StyleSheet.Parse("*.danger { opacity: 0.1; }");
         var resolver = csharpFirst
             ? new StyleResolver([], [csharp, wildcard])
@@ -359,33 +378,35 @@ public sealed class StyleResolverTests
         var node = new Button();
         node.Classes.Add("danger");
 
-        Assert.Equal(0.4, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
     public void UnqualifiedConditionsRequireAllClassesAndExactIdCase()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            ".primary.large { opacity: 0.5; } #Save { background: #010203; }")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                ".primary.large { opacity: 0.5; } #Save { background: #010203; }")
+        ]);
 
         var partial = new Button();
         partial.Classes.Add("primary");
         var partialSnapshot = resolver.Resolve(partial);
-        Assert.Equal(1d, partialSnapshot.GetValue(Node.OpacityProperty));
+        Assert.Equal(1d, partialSnapshot.GetValue(UIElement.OpacityProperty));
         Assert.Empty(partialSnapshot.GetSources(Region.BackgroundProperty));
 
         var matched = new Button { StyleId = "Save" };
         matched.Classes.Add("primary");
         matched.Classes.Add("large");
         var matchedSnapshot = resolver.Resolve(matched);
-        Assert.Equal(0.5, matchedSnapshot.GetValue(Node.OpacityProperty));
+        Assert.Equal(0.5, matchedSnapshot.GetValue(UIElement.OpacityProperty));
         Assert.Equal(new SolidColorBrush(1, 2, 3), matchedSnapshot.GetValue(Region.BackgroundProperty));
 
         var wrongCase = new Button { StyleId = "save" };
         wrongCase.Classes.Add("primary");
         wrongCase.Classes.Add("large");
         var wrongCaseSnapshot = resolver.Resolve(wrongCase);
-        Assert.Equal(0.5, wrongCaseSnapshot.GetValue(Node.OpacityProperty));
+        Assert.Equal(0.5, wrongCaseSnapshot.GetValue(UIElement.OpacityProperty));
         Assert.Empty(wrongCaseSnapshot.GetSources(Region.BackgroundProperty));
     }
 
@@ -411,21 +432,23 @@ public sealed class StyleResolverTests
         var resolver = new StyleResolver([], [StyleSheet.Parse("PseudoHost:loading { opacity: 0.4; }")]);
         var node = new PseudoHost();
 
-        Assert.Empty(resolver.Resolve(node).GetSources(Node.OpacityProperty));
+        Assert.Empty(resolver.Resolve(node).GetSources(UIElement.OpacityProperty));
 
         node.Activate(PseudoClass.Get("loading"), true);
-        Assert.Equal(0.4, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
 
         node.Activate(PseudoClass.Get("loading"), false);
-        Assert.Empty(resolver.Resolve(node).GetSources(Node.OpacityProperty));
+        Assert.Empty(resolver.Resolve(node).GetSources(UIElement.OpacityProperty));
     }
 
     [Fact]
     public void MultiDeclarationRuleRechecksConditionsForEachNodeAndResolve()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            Button.primary#target:hover { opacity: 0.5; background: #070707; opacity: 0.4; }
-            """)]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             Button.primary#target:hover { opacity: 0.5; background: #070707; opacity: 0.4; }
+                             """)
+        ]);
         var node = new Button { StyleId = "target" };
         node.Classes.Add("primary");
         AssertNoMatch(node);
@@ -453,17 +476,17 @@ public sealed class StyleResolverTests
         void AssertNoMatch(Button button)
         {
             var snapshot = resolver.Resolve(button);
-            Assert.Equal(1d, snapshot.GetValue(Node.OpacityProperty));
-            Assert.Empty(snapshot.GetSources(Node.OpacityProperty));
+            Assert.Equal(1d, snapshot.GetValue(UIElement.OpacityProperty));
+            Assert.Empty(snapshot.GetSources(UIElement.OpacityProperty));
             Assert.Empty(snapshot.GetSources(Region.BackgroundProperty));
         }
 
         void AssertMatch(Button button)
         {
             var snapshot = resolver.Resolve(button);
-            Assert.Equal(0.4, snapshot.GetValue(Node.OpacityProperty));
+            Assert.Equal(0.4, snapshot.GetValue(UIElement.OpacityProperty));
             Assert.Equal(Brush(7), snapshot.GetValue(Region.BackgroundProperty));
-            Assert.Equal(2, Assert.Single(snapshot.GetSources(Node.OpacityProperty)).DeclarationIndex);
+            Assert.Equal(2, Assert.Single(snapshot.GetSources(UIElement.OpacityProperty)).DeclarationIndex);
             Assert.Equal(1, Assert.Single(snapshot.GetSources(Region.BackgroundProperty)).DeclarationIndex);
         }
     }
@@ -471,18 +494,20 @@ public sealed class StyleResolverTests
     [Fact]
     public void MixedDeclarationsPreserveEdgeCascadeAndSourceOrderAcrossRules()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            Button.absent { opacity: 0.1; }
-            Button.primary { padding: 1px 2px; opacity: 0.4; padding-left: 9px; }
-            Button.primary { padding-top: 7px; opacity: 0.6; }
-            """, "grouped.css")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             Button.absent { opacity: 0.1; }
+                             Button.primary { padding: 1px 2px; opacity: 0.4; padding-left: 9px; }
+                             Button.primary { padding-top: 7px; opacity: 0.6; }
+                             """, "grouped.css")
+        ]);
         var node = new Button();
         node.Classes.Add("primary");
 
         var snapshot = resolver.Resolve(node);
 
         Assert.Equal(new Thickness(9, 7, 2, 1), snapshot.GetValue(Region.PaddingProperty));
-        Assert.Equal(0.6, snapshot.GetValue(Node.OpacityProperty));
+        Assert.Equal(0.6, snapshot.GetValue(UIElement.OpacityProperty));
         var sources = snapshot.GetSources(Region.PaddingProperty);
         Assert.Equal(4, sources.Count);
         foreach (var source in sources)
@@ -504,7 +529,8 @@ public sealed class StyleResolverTests
                 _ => "padding"
             }, source.CssPropertyName);
         }
-        var opacitySource = Assert.Single(snapshot.GetSources(Node.OpacityProperty));
+
+        var opacitySource = Assert.Single(snapshot.GetSources(UIElement.OpacityProperty));
         Assert.Equal(2, opacitySource.RuleIndex);
         Assert.Equal(5, opacitySource.DeclarationIndex);
     }
@@ -513,16 +539,16 @@ public sealed class StyleResolverTests
     public void ReusedRuleRetainsEachOccurrenceInCascadeAndSources()
     {
         var rule = Rule(StyleSelector.For<Button>(),
-            StyleSetter.Create(Node.OpacityProperty, 0.4),
+            StyleSetter.Create(UIElement.OpacityProperty, 0.4),
             StyleSetter.Create(Region.BackgroundProperty, Brush(7)));
         var sheet = Sheet(rule, rule);
         var resolver = new StyleResolver([sheet], [sheet, sheet]);
 
         var snapshot = resolver.Resolve(new Button());
 
-        Assert.Equal(0.4, snapshot.GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, snapshot.GetValue(UIElement.OpacityProperty));
         Assert.Equal(Brush(7), snapshot.GetValue(Region.BackgroundProperty));
-        var opacitySource = Assert.Single(snapshot.GetSources(Node.OpacityProperty));
+        var opacitySource = Assert.Single(snapshot.GetSources(UIElement.OpacityProperty));
         var backgroundSource = Assert.Single(snapshot.GetSources(Region.BackgroundProperty));
         Assert.Equal(2, opacitySource.DeclarationIndex);
         Assert.Equal(3, backgroundSource.DeclarationIndex);
@@ -541,12 +567,14 @@ public sealed class StyleResolverTests
     {
         const string important = "Button { opacity: 0.8 !important; }";
         const string normal = "#save.primary { opacity: 0.1; }";
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            importantFirst ? important + normal : normal + important)]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                importantFirst ? important + normal : normal + important)
+        ]);
         var button = new Button { StyleId = "save" };
         button.Classes.Add("primary");
 
-        Assert.Equal(0.8, resolver.Resolve(button).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.8, resolver.Resolve(button).GetValue(UIElement.OpacityProperty));
     }
 
     [Theory]
@@ -561,7 +589,7 @@ public sealed class StyleResolverTests
         var button = new Button { StyleId = "save" };
 
         Assert.Equal(expected, new StyleResolver([baseSheet], [authorSheet])
-            .Resolve(button).GetValue(Node.OpacityProperty));
+            .Resolve(button).GetValue(UIElement.OpacityProperty));
     }
 
     [Theory]
@@ -574,8 +602,8 @@ public sealed class StyleResolverTests
 
         var snapshot = resolver.Resolve(new Button());
 
-        Assert.Equal(0.8, snapshot.GetValue(Node.OpacityProperty));
-        var source = Assert.Single(snapshot.GetSources(Node.OpacityProperty));
+        Assert.Equal(0.8, snapshot.GetValue(UIElement.OpacityProperty));
+        var source = Assert.Single(snapshot.GetSources(UIElement.OpacityProperty));
         Assert.Equal(expectedIndex, source.DeclarationIndex);
         Assert.Equal("important.css", source.SheetSourceName);
         Assert.Equal("opacity", source.CssPropertyName);
@@ -589,12 +617,14 @@ public sealed class StyleResolverTests
     [InlineData("Button", "Button", 0.8)]
     public void ImportantDeclarationsRetainSpecificityAndRuleOrder(string first, string second, double expected)
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            $"{first} {{ opacity: 0.2 !important; }} {second} {{ opacity: 0.8 !important; }}")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                $"{first} {{ opacity: 0.2 !important; }} {second} {{ opacity: 0.8 !important; }}")
+        ]);
         var button = new Button { StyleId = "save" };
         button.Classes.Add("primary");
 
-        Assert.Equal(expected, resolver.Resolve(button).GetValue(Node.OpacityProperty));
+        Assert.Equal(expected, resolver.Resolve(button).GetValue(UIElement.OpacityProperty));
     }
 
     [Fact]
@@ -604,8 +634,8 @@ public sealed class StyleResolverTests
         var second = StyleSheet.Parse("Button { opacity: 0.8 !important; }");
         var snapshot = new StyleResolver([], [first, second]).Resolve(new Button());
 
-        Assert.Equal(0.8, snapshot.GetValue(Node.OpacityProperty));
-        Assert.Equal(1, Assert.Single(snapshot.GetSources(Node.OpacityProperty)).SheetIndex);
+        Assert.Equal(0.8, snapshot.GetValue(UIElement.OpacityProperty));
+        Assert.Equal(1, Assert.Single(snapshot.GetSources(UIElement.OpacityProperty)).SheetIndex);
     }
 
     [Theory]
@@ -620,32 +650,36 @@ public sealed class StyleResolverTests
         Assert.Equal(new Thickness(left, 1, 2, 1), snapshot.GetValue(Region.PaddingProperty));
         var sources = snapshot.GetSources(Region.PaddingProperty);
         Assert.Equal(4, sources.Count);
-        Assert.Equal(leftIndex, Assert.Single(sources.Where(source => source.Component == StyleEdge.Left)).DeclarationIndex);
+        Assert.Equal(leftIndex,
+            Assert.Single(sources.Where(source => source.Component == StyleEdge.Left)).DeclarationIndex);
     }
 
     [Fact]
     public void ImportantCssBeatsProgrammaticSetter()
     {
         var css = StyleSheet.Parse("Button { opacity: 0.8 !important; }");
-        var code = Sheet(Rule(StyleSelector.For<Button>(id: "save"), StyleSetter.Create(Node.OpacityProperty, 0.1)));
+        var code = Sheet(
+            Rule(StyleSelector.For<Button>(id: "save"), StyleSetter.Create(UIElement.OpacityProperty, 0.1)));
         var resolver = new StyleResolver([], [css, code]);
 
-        Assert.Equal(0.8, resolver.Resolve(new Button { StyleId = "save" }).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.8, resolver.Resolve(new Button { StyleId = "save" }).GetValue(UIElement.OpacityProperty));
         Assert.False(Assert.Single(code.Rules[0].Bind(typeof(Button))).IsImportant);
     }
 
     [Fact]
     public void ImportantMetadataSurvivesBindingCacheAcrossNodeTypesAndStates()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            ".primary { opacity: 0.8 !important; } UiNode { opacity: 0.1; }")]);
-        foreach (var node in new Node[] { new Button(), new Panel(), new Button() })
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                ".primary { opacity: 0.8 !important; } UIElement { opacity: 0.1; }")
+        ]);
+        foreach (var node in new UIElement[] { new Button(), new Panel(), new Button() })
         {
-            Assert.Equal(0.1, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+            Assert.Equal(0.1, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
             node.Classes.Add("primary");
-            Assert.Equal(0.8, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+            Assert.Equal(0.8, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
             node.Classes.Remove("primary");
-            Assert.Equal(0.1, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+            Assert.Equal(0.1, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
         }
     }
 
@@ -654,18 +688,20 @@ public sealed class StyleResolverTests
     [InlineData(".primary, Button")]
     public void ImportantSelectorListBeatsNormalRuleAcrossNodeTypes(string selectors)
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            $"{selectors} {{ opacity: 0.8 !important; }} #save.primary {{ opacity: 0.1; }}")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                $"{selectors} {{ opacity: 0.8 !important; }} #save.primary {{ opacity: 0.1; }}")
+        ]);
 
-        foreach (var node in new Node[] { new Button(), new Panel(), new Button() })
+        foreach (var node in new UIElement[] { new Button(), new Panel(), new Button() })
         {
             node.StyleId = "save";
             node.Classes.Add("primary");
 
             var snapshot = resolver.Resolve(node);
 
-            Assert.Equal(0.8, snapshot.GetValue(Node.OpacityProperty));
-            var source = Assert.Single(snapshot.GetSources(Node.OpacityProperty));
+            Assert.Equal(0.8, snapshot.GetValue(UIElement.OpacityProperty));
+            var source = Assert.Single(snapshot.GetSources(UIElement.OpacityProperty));
             Assert.Equal(".primary", source.SelectorText);
             Assert.Equal(0, source.RuleIndex);
             Assert.Equal(0, source.DeclarationIndex);
@@ -677,8 +713,10 @@ public sealed class StyleResolverTests
     [InlineData("#save, Button")]
     public void ImportantSelectorListUsesOnlyMatchingBranchSpecificity(string selectors)
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse(
-            $"{selectors} {{ opacity: 0.8 !important; }} .primary {{ opacity: 0.4 !important; }}")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse(
+                $"{selectors} {{ opacity: 0.8 !important; }} .primary {{ opacity: 0.4 !important; }}")
+        ]);
         var button = new Button { StyleId = "save" };
         button.Classes.Add("primary");
 
@@ -687,8 +725,8 @@ public sealed class StyleResolverTests
             button.StyleId = matchesId ? "save" : "other";
             var snapshot = resolver.Resolve(button);
 
-            Assert.Equal(matchesId ? 0.8 : 0.4, snapshot.GetValue(Node.OpacityProperty));
-            var source = Assert.Single(snapshot.GetSources(Node.OpacityProperty));
+            Assert.Equal(matchesId ? 0.8 : 0.4, snapshot.GetValue(UIElement.OpacityProperty));
+            var source = Assert.Single(snapshot.GetSources(UIElement.OpacityProperty));
             Assert.Equal(matchesId ? "#save" : ".primary", source.SelectorText);
             Assert.Equal(matchesId ? 0 : 1, source.RuleIndex);
             Assert.Equal(matchesId ? 0 : 1, source.DeclarationIndex);
@@ -698,10 +736,12 @@ public sealed class StyleResolverTests
     [Fact]
     public void ImportantSelectorListPreservesEdgePriorityWhenCachedBranchChanges()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            .primary, .secondary { padding: 1px 2px !important; }
-            #save { padding-left: 9px; padding-top: 7px !important; }
-            """)]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             .primary, .secondary { padding: 1px 2px !important; }
+                             #save { padding-left: 9px; padding-top: 7px !important; }
+                             """)
+        ]);
         var button = new Button { StyleId = "save" };
 
         foreach (var className in new[] { "primary", "secondary", "primary" })
@@ -725,7 +765,7 @@ public sealed class StyleResolverTests
         }
     }
 
-    private sealed class PseudoHost : Node
+    private sealed class PseudoHost : UIElement
     {
         internal void Activate(PseudoClass pseudoClass, bool active) => SetPseudoClass(pseudoClass, active);
     }

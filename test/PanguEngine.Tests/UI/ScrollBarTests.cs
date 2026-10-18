@@ -285,7 +285,8 @@ public sealed class ScrollBarTests
         var bar = new ScrollBar { Minimum = 10, Maximum = 200, ViewportSize = 50, Value = 80 };
 
         Assert.Throws<ArgumentOutOfRangeException>(() => bar.SetValue(ScrollBar.MinimumProperty, double.NaN));
-        Assert.Throws<ArgumentOutOfRangeException>(() => bar.SetValue(ScrollBar.MaximumProperty, double.PositiveInfinity));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            bar.SetValue(ScrollBar.MaximumProperty, double.PositiveInfinity));
         Assert.Throws<ArgumentOutOfRangeException>(() => bar.SetValue(ScrollBar.ViewportSizeProperty, -1d));
         Assert.Throws<ArgumentOutOfRangeException>(() => bar.SetValue(ScrollBar.ValueProperty, double.NaN));
 
@@ -742,8 +743,12 @@ public sealed class ScrollBarTests
         {
             var track = FindPart(bar, "track");
             var thumb = FindPart(bar, "thumb");
-            var trackEnd = vertical ? track.LayoutBounds.Y + track.LayoutBounds.Height : track.LayoutBounds.X + track.LayoutBounds.Width;
-            var thumbEnd = vertical ? thumb.LayoutBounds.Y + thumb.LayoutBounds.Height : thumb.LayoutBounds.X + thumb.LayoutBounds.Width;
+            var trackEnd = vertical
+                ? track.LayoutBounds.Y + track.LayoutBounds.Height
+                : track.LayoutBounds.X + track.LayoutBounds.Width;
+            var thumbEnd = vertical
+                ? thumb.LayoutBounds.Y + thumb.LayoutBounds.Height
+                : thumb.LayoutBounds.X + thumb.LayoutBounds.Width;
             Assert.Equal(trackEnd, thumbEnd, 8);
 
             bar.Value = 50;
@@ -793,7 +798,7 @@ public sealed class ScrollBarTests
             var thumb = FindPart(bar, "thumb");
             var decrease = FindPart(bar, "decrease");
             var increase = FindPart(bar, "increase");
-            Node disabledNode = disabledLevel switch { 0 => bar, 1 => view, _ => host };
+            UIElement disabledNode = disabledLevel switch { 0 => bar, 1 => view, _ => host };
             disabledNode.IsEnabled = false;
             manager.UpdateFrame(new Size(200, 200), 0);
 
@@ -1244,8 +1249,7 @@ public sealed class ScrollBarTests
     }
 
     private static ScrollBarPart FindPart(ScrollBar bar, string role) =>
-        Assert.IsType<ScrollBarPart>(bar.Children.Single(
-            node => node.Classes.Contains($"scrollbar-{role}")));
+        Assert.IsType<ScrollBarPart>(bar.Children.Single(node => node.Classes.Contains($"scrollbar-{role}")));
 
     private sealed class SyncHost : Control
     {

@@ -11,9 +11,9 @@ public sealed class FocusWithinTests
     {
         var node = new Canvas();
         AssertFocusWithin(node, false);
-        Assert.Throws<InvalidOperationException>(() => node.SetValue(Node.IsFocusWithinProperty, true));
+        Assert.Throws<InvalidOperationException>(() => node.SetValue(UIElement.IsFocusWithinProperty, true));
         Assert.Throws<InvalidOperationException>(() =>
-            node.Bind(Node.IsFocusWithinProperty, new Canvas(), Node.IsEnabledProperty));
+            node.Bind(UIElement.IsFocusWithinProperty, new Canvas(), UIElement.IsEnabledProperty));
         AssertFocusWithin(node, false);
     }
 
@@ -77,9 +77,11 @@ public sealed class FocusWithinTests
         group.Children.Add(first);
         group.Children.Add(second);
         var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            ".group:focus-within { opacity: 0.4; }" +
-            ".group:focus-within > .target { opacity: 0.7; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse(
+                ".group:focus-within { opacity: 0.4; }" +
+                ".group:focus-within > .target { opacity: 0.7; }")
+        ]);
         var internalTransitions = 0;
         first.LostFocus += (_, args) =>
         {
@@ -269,7 +271,7 @@ public sealed class FocusWithinTests
         root.Children.Add(group);
         group.Children.Add(child);
         var screen = new Screen(root);
-        using var subscription = child.Subscribe(Node.IsFocusedProperty, (_, args) =>
+        using var subscription = child.Subscribe(UIElement.IsFocusedProperty, (_, args) =>
         {
             if (args.NewValue)
                 group.IsEnabled = false;
@@ -305,14 +307,14 @@ public sealed class FocusWithinTests
         group.Children.Add(second);
         var values = new List<bool>();
         var propertyValues = new List<bool>();
-        using var subscription = group.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = group.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             AssertFocusWithin(group, args.NewValue);
             values.Add(args.NewValue);
         });
         group.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, Node.IsFocusWithinProperty))
+            if (ReferenceEquals(args.Property, UIElement.IsFocusWithinProperty))
             {
                 AssertFocusWithin(group, group.IsFocusWithin);
                 propertyValues.Add(group.IsFocusWithin);
@@ -347,7 +349,7 @@ public sealed class FocusWithinTests
         root.Children.Add(outside);
         group.Children.Add(child);
         var receiver = new Canvas();
-        receiver.Bind(Node.IsHitTestVisibleProperty, group, Node.IsFocusWithinProperty);
+        receiver.Bind(UIElement.IsHitTestVisibleProperty, group, UIElement.IsFocusWithinProperty);
         var screen = new Screen(root);
         screen.Open();
         try
@@ -402,7 +404,7 @@ public sealed class FocusWithinTests
         root.Children.Add(group);
         group.Children.Add(child);
         var screen = new Screen(root);
-        using var subscription = group.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = group.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             AssertFocusWithin(group, args.NewValue);
             if (!args.NewValue)
@@ -442,7 +444,7 @@ public sealed class FocusWithinTests
         root.Children.Add(newGroup);
         oldGroup.Children.Add(oldLeaf);
         newGroup.Children.Add(newLeaf);
-        using var subscription = oldLeaf.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = oldLeaf.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             if (!args.NewValue)
                 newGroup.IsEnabled = false;
@@ -477,7 +479,7 @@ public sealed class FocusWithinTests
         root.Children.Add(child);
         root.Children.Add(other);
         var rejectedCalls = 0;
-        using var subscription = child.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = child.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             if (!args.NewValue)
             {
@@ -521,7 +523,7 @@ public sealed class FocusWithinTests
         var otherRoot = new Canvas();
         var otherScreen = new Screen(otherRoot);
         var transferred = false;
-        using var subscription = child.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = child.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             if (args.NewValue || transferred)
                 return;
@@ -570,7 +572,7 @@ public sealed class FocusWithinTests
         var otherRoot = new Canvas();
         var otherScreen = new Screen(otherRoot);
         var transferred = false;
-        using var subscription = group.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = group.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             if (!args.NewValue || transferred)
                 return;
@@ -606,7 +608,7 @@ public sealed class FocusWithinTests
         var child = new Canvas { Focusable = true };
         root.Children.Add(child);
         var failure = new InvalidOperationException("range notification");
-        using var subscription = child.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
+        using var subscription = child.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             if (args.NewValue)
                 throw failure;
@@ -629,7 +631,7 @@ public sealed class FocusWithinTests
         }
     }
 
-    private static void AssertFocusWithin(Node node, bool expected)
+    private static void AssertFocusWithin(UIElement node, bool expected)
     {
         Assert.Equal(expected, node.IsFocusWithin);
         Assert.Equal(expected, node.HasPseudoClass(PseudoClass.FocusWithin));

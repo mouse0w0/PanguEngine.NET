@@ -23,6 +23,7 @@ internal static class CssFontConverters
                         throw new FormatException("Expected one non-empty font family.");
                     return result.ToString();
                 }
+
                 if (current == '\\')
                 {
                     index++;
@@ -30,10 +31,12 @@ internal static class CssFontConverters
                         throw new FormatException("Unsupported font family escape.");
                     current = value[index];
                 }
+
                 if (current is '\r' or '\n')
                     throw new FormatException("A font family string cannot contain a line break.");
                 result.Append(current);
             }
+
             throw new FormatException("Unterminated font family string.");
         }
 
@@ -46,6 +49,7 @@ internal static class CssFontConverters
                     throw new FormatException("Expected a single font family name.");
             }
         }
+
         return string.Join(" ", words);
     }
 
@@ -89,6 +93,7 @@ internal static class CssFontConverters
                 size = CssValueConverters.ParseLength(token);
                 break;
             }
+
             if (token.Equals("normal", StringComparison.OrdinalIgnoreCase))
             {
                 normals++;
@@ -119,15 +124,16 @@ internal static class CssFontConverters
             position++;
             lineHeight = ParseLineHeight(ReadToken(value, ref position));
         }
+
         SkipWhitespace(value, ref position);
         var family = ParseFamily(value[position..]);
         return
         [
-            StyleSetter.Create(Node.FontFamilyProperty, family),
-            StyleSetter.Create(Node.FontWeightProperty, weight ?? FontWeight.Normal),
-            StyleSetter.Create(Node.FontStyleProperty, style ?? FontStyle.Normal),
-            StyleSetter.Create(Node.FontSizeProperty, size),
-            StyleSetter.Create(Node.LineHeightProperty, lineHeight)
+            StyleSetter.Create(UIElement.FontFamilyProperty, family),
+            StyleSetter.Create(UIElement.FontWeightProperty, weight ?? FontWeight.Normal),
+            StyleSetter.Create(UIElement.FontStyleProperty, style ?? FontStyle.Normal),
+            StyleSetter.Create(UIElement.FontSizeProperty, size),
+            StyleSetter.Create(UIElement.LineHeightProperty, lineHeight)
         ];
     }
 

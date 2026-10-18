@@ -7,7 +7,7 @@ namespace PanguEngine.UI.Controls;
 /// <summary>
 /// Draws a configurable crosshair directly into the UI command stream.
 /// </summary>
-public sealed class Crosshair : Node
+public sealed class Crosshair : UIElement
 {
     /// <summary>Identifies the <see cref="Color"/> property.</summary>
     public new static readonly Property<Color> ColorProperty =

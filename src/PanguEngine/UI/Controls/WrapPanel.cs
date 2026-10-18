@@ -4,7 +4,7 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Arranges child nodes sequentially along one axis and wraps them onto new lines.
+/// Arranges child elements sequentially along one axis and wraps them onto new lines.
 /// </summary>
 public sealed class WrapPanel : Panel
 {
@@ -185,7 +185,7 @@ public sealed class WrapPanel : Panel
             var nextMain = count == 0 ? childMain : main + itemSpacing + childMain;
 
             if (count != 0 && (ExceedsConstraint(main, availableMain)
-                || ExceedsConstraint(nextMain, availableMain)))
+                               || ExceedsConstraint(nextMain, availableMain)))
             {
                 lines.Add(new Line(count, main, cross));
                 count = 0;

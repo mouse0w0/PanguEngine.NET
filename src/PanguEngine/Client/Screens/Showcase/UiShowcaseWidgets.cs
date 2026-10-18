@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.Graphics.Text;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
@@ -17,7 +16,7 @@ internal static class UiShowcaseWidgets
         return button;
     }
 
-    internal static StackPanel Column(params Node[] children) => Stack(Orientation.Vertical, children);
+    internal static StackPanel Column(params UIElement[] children) => Stack(Orientation.Vertical, children);
 
     internal static Text Caption(string text)
     {
@@ -26,9 +25,9 @@ internal static class UiShowcaseWidgets
         return caption;
     }
 
-    internal static StackPanel Sample(string title, Node node) => Column(Caption(title), node);
+    internal static StackPanel Sample(string title, UIElement node) => Column(Caption(title), node);
 
-    internal static UiShowcaseGallery Samples(params Node[] children)
+    internal static UiShowcaseGallery Samples(params UIElement[] children)
     {
         var gallery = new UiShowcaseGallery(170, 3);
         foreach (var child in children)
@@ -36,7 +35,7 @@ internal static class UiShowcaseWidgets
         return gallery;
     }
 
-    internal static StackPanel Preview(params Node[] children)
+    internal static StackPanel Preview(params UIElement[] children)
     {
         var preview = Column(children);
         preview.Classes.Add("showcase-preview");
@@ -65,7 +64,7 @@ internal static class UiShowcaseWidgets
         return gallery;
     }
 
-    private static StackPanel Stack(Orientation orientation, Node[] children)
+    private static StackPanel Stack(Orientation orientation, UIElement[] children)
     {
         var panel = new StackPanel { Orientation = orientation, Spacing = 8 };
         foreach (var child in children)

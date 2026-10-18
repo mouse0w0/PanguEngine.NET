@@ -4,7 +4,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
-public sealed class NodeParentTests
+public sealed class UIElementParentTests
 {
     [Fact]
     public void ParentDefaultsToNullAndRejectsPublicWrites()
@@ -12,11 +12,11 @@ public sealed class NodeParentTests
         var node = new Panel();
         var parent = new Panel();
 
-        Assert.True(Node.ParentProperty.IsReadOnly);
+        Assert.True(UIElement.ParentProperty.IsReadOnly);
         Assert.Null(node.Parent);
-        Assert.Null(node.GetValue(Node.ParentProperty));
-        Assert.Throws<InvalidOperationException>(() => node.SetValue(Node.ParentProperty, parent));
-        Assert.Throws<InvalidOperationException>(() => node.ClearValue(Node.ParentProperty));
+        Assert.Null(node.GetValue(UIElement.ParentProperty));
+        Assert.Throws<InvalidOperationException>(() => node.SetValue(UIElement.ParentProperty, parent));
+        Assert.Throws<InvalidOperationException>(() => node.ClearValue(UIElement.ParentProperty));
         Assert.Null(node.Parent);
     }
 
@@ -27,8 +27,8 @@ public sealed class NodeParentTests
         var node = new Panel();
         parent.Children.Add(node);
         parent.Children.Add(new Panel());
-        var changes = new List<(Parent? OldValue, Parent? NewValue)>();
-        using var subscription = node.Subscribe(Node.ParentProperty, (_, args) =>
+        var changes = new List<(Container? OldValue, Container? NewValue)>();
+        using var subscription = node.Subscribe(UIElement.ParentProperty, (_, args) =>
         {
             Assert.Same(args.NewValue, node.Parent);
             changes.Add((args.OldValue, args.NewValue));
@@ -57,11 +57,11 @@ public sealed class NodeParentTests
         var original = new Panel();
         var replacement = new Panel();
         parent.Children.Add(original);
-        var originalChanges = new List<(Parent? OldValue, Parent? NewValue)>();
-        var replacementChanges = new List<(Parent? OldValue, Parent? NewValue)>();
-        using var originalSubscription = original.Subscribe(Node.ParentProperty,
+        var originalChanges = new List<(Container? OldValue, Container? NewValue)>();
+        var replacementChanges = new List<(Container? OldValue, Container? NewValue)>();
+        using var originalSubscription = original.Subscribe(UIElement.ParentProperty,
             (_, args) => originalChanges.Add((args.OldValue, args.NewValue)));
-        using var replacementSubscription = replacement.Subscribe(Node.ParentProperty,
+        using var replacementSubscription = replacement.Subscribe(UIElement.ParentProperty,
             (_, args) => replacementChanges.Add((args.OldValue, args.NewValue)));
 
         parent.Children[0] = replacement;
@@ -82,11 +82,11 @@ public sealed class NodeParentTests
         node.Children.Add(descendant);
         parent.Children.Add(node);
         var screen = new Screen(parent);
-        var changes = new List<(Parent? OldValue, Parent? NewValue)>();
+        var changes = new List<(Container? OldValue, Container? NewValue)>();
         var descendantNotifications = 0;
-        using var subscription = node.Subscribe(Node.ParentProperty,
+        using var subscription = node.Subscribe(UIElement.ParentProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
-        using var descendantSubscription = descendant.Subscribe(Node.ParentProperty,
+        using var descendantSubscription = descendant.Subscribe(UIElement.ParentProperty,
             (_, _) => descendantNotifications++);
 
         screen.Root = node;
@@ -104,13 +104,13 @@ public sealed class NodeParentTests
         var node = new Panel();
         var first = new Panel();
         var second = new Panel();
-        var changes = new List<(Parent? OldValue, Parent? NewValue)>();
+        var changes = new List<(Container? OldValue, Container? NewValue)>();
         node.PropertyChanged += (_, args) =>
         {
-            if (args.Property.Name != nameof(Node.Parent))
+            if (args.Property.Name != nameof(UIElement.Parent))
                 return;
 
-            var change = Assert.IsType<PropertyChangedEventArgs<Parent?>>(args);
+            var change = Assert.IsType<PropertyChangedEventArgs<Container?>>(args);
             Assert.Same(change.NewValue, node.Parent);
             changes.Add((change.OldValue, change.NewValue));
         };
@@ -131,16 +131,16 @@ public sealed class NodeParentTests
         firstParent.Children.Add(node);
         var firstScreen = new Screen(firstParent);
         var secondScreen = new Screen(secondParent);
-        var changes = new List<(string Property, Parent? Parent, Screen? Screen)>();
+        var changes = new List<(string Property, Container? Parent, Screen? Screen)>();
         node.PropertyChanged += (_, args) =>
         {
-            if (args.Property.Name == nameof(Node.Parent))
+            if (args.Property.Name == nameof(UIElement.Parent))
             {
-                var change = Assert.IsType<PropertyChangedEventArgs<Parent?>>(args);
+                var change = Assert.IsType<PropertyChangedEventArgs<Container?>>(args);
                 Assert.Same(change.NewValue, node.Parent);
                 changes.Add(("parent", node.Parent, node.Screen));
             }
-            else if (ReferenceEquals(args.Property, Node.ScreenProperty))
+            else if (ReferenceEquals(args.Property, UIElement.ScreenProperty))
             {
                 var change = Assert.IsType<PropertyChangedEventArgs<Screen?>>(args);
                 Assert.Same(change.NewValue, node.Screen);

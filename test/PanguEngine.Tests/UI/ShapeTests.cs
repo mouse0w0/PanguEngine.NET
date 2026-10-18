@@ -467,13 +467,13 @@ public sealed class ShapeTests
         }
     }
 
-    private static void Arrange(Node node, Rect bounds)
+    private static void Arrange(UIElement node, Rect bounds)
     {
         node.Measure(new Size(bounds.Width, bounds.Height));
         node.Arrange(bounds);
     }
 
-    private static Screen CreateScreen(Node child)
+    private static Screen CreateScreen(UIElement child)
     {
         var root = new Panel();
         root.Children.Add(child);

@@ -170,11 +170,12 @@ public sealed partial class TabView : Control
         TabStripPlacement is TabStripPlacement.Top or TabStripPlacement.Bottom;
 
     /// <summary>
-    /// Determines whether a node is an internal layout part owned by a tab view.
+    /// Determines whether an element is an internal layout part owned by a tab view.
     /// </summary>
-    internal static bool IsInternalPartNode(Node node) =>
+    internal static bool IsInternalPartNode(UIElement node) =>
         node.Parent is TabView ||
-        node is TabStripPanel or TabStripViewport or TabScrollButton or TabContentArea or TabContentHost or TabHeaderHost or TabCloseButton;
+        node is TabStripPanel or TabStripViewport or TabScrollButton or TabContentArea or TabContentHost
+            or TabHeaderHost or TabCloseButton;
 
     internal (double Min, double Max) GetTabWidthBounds()
     {

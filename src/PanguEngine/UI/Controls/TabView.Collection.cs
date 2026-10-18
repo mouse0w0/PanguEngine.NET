@@ -95,6 +95,7 @@ public sealed partial class TabView
             CaptureCollectionState([]);
             return;
         }
+
         ValidateNewItems([item]);
         CaptureCollectionState([oldItem]);
         CancelDrag();
@@ -235,7 +236,7 @@ public sealed partial class TabView
         _selectionBeforeCollectionIndex = -1;
 
         var selectionWasRemoved = previousSelection is not null &&
-            change.OldItems.Any(item => ReferenceEquals(item, previousSelection));
+                                  change.OldItems.Any(item => ReferenceEquals(item, previousSelection));
         var shouldChooseFirst = previousSelection is null && change.Kind == ListChangeKind.Add;
         if (Selection.SelectedItem is null && (selectionWasRemoved || shouldChooseFirst))
         {
@@ -323,11 +324,11 @@ public sealed partial class TabView
         }
     }
 
-    private void ValidateSlotNode(Node? node)
+    private void ValidateSlotNode(UIElement? node)
     {
         if (node is null)
             return;
-        if (TabView.IsInternalPartNode(node))
+        if (IsInternalPartNode(node))
             throw new InvalidOperationException("A tab view internal node cannot be used as a tab slot.");
         if (node.Parent is null && node.Screen is not null)
             throw new InvalidOperationException("A UI screen root must be cleared before it can be a tab slot.");
@@ -335,9 +336,9 @@ public sealed partial class TabView
             throw new InvalidOperationException("A tab slot node cannot contain the tab view.");
     }
 
-    private bool IsAncestorOfView(Node node)
+    private bool IsAncestorOfView(UIElement node)
     {
-        for (Node? current = this; current is not null; current = current.Parent)
+        for (UIElement? current = this; current is not null; current = current.Parent)
         {
             if (ReferenceEquals(current, node))
                 return true;

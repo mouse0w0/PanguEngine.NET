@@ -4,20 +4,20 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.UI;
 
-public abstract partial class Node
+public abstract partial class UIElement
 {
     private static readonly PropertyKey<bool> IsHoveredPropertyKey =
-        Property.RegisterReadOnly<Node, bool>(
+        Property.RegisterReadOnly<UIElement, bool>(
             nameof(IsHovered),
             onChanged: static (node, _, _) => node.SetPseudoClass(PseudoClass.Hover, node.IsHovered));
 
     private static readonly PropertyKey<bool> IsFocusedPropertyKey =
-        Property.RegisterReadOnly<Node, bool>(
+        Property.RegisterReadOnly<UIElement, bool>(
             nameof(IsFocused),
             onChanged: static (node, _, _) => node.SetPseudoClass(PseudoClass.Focus, node.IsFocused));
 
     private static readonly PropertyKey<bool> IsFocusWithinPropertyKey =
-        Property.RegisterReadOnly<Node, bool>(
+        Property.RegisterReadOnly<UIElement, bool>(
             nameof(IsFocusWithin),
             onChanged: static (node, _, _) => node.SetPseudoClass(PseudoClass.FocusWithin, node.IsFocusWithin));
 
@@ -25,14 +25,14 @@ public abstract partial class Node
     /// Identifies the <see cref="Focusable"/> property.
     /// </summary>
     public static readonly Property<bool> FocusableProperty =
-        Property.Register<Node, bool>(
+        Property.Register<UIElement, bool>(
             nameof(Focusable));
 
     /// <summary>
     /// Identifies the <see cref="IsHitTestVisible"/> property.
     /// </summary>
     public static readonly Property<bool> IsHitTestVisibleProperty =
-        Property.Register<Node, bool>(
+        Property.Register<UIElement, bool>(
             nameof(IsHitTestVisible),
             true);
 
@@ -40,7 +40,7 @@ public abstract partial class Node
     /// Identifies the <see cref="IsEnabled"/> property.
     /// </summary>
     public static readonly Property<bool> IsEnabledProperty =
-        Property.Register<Node, bool>(
+        Property.Register<UIElement, bool>(
             nameof(IsEnabled),
             true,
             onChanged: static (node, _, newValue) =>
@@ -66,7 +66,7 @@ public abstract partial class Node
     public static readonly Property<bool> IsFocusWithinProperty = IsFocusWithinPropertyKey.Property;
 
     /// <summary>
-    /// Gets or sets whether this node can receive keyboard focus.
+    /// Gets or sets whether this element can receive keyboard focus.
     /// </summary>
     public bool Focusable
     {
@@ -75,7 +75,7 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Gets or sets whether this node and its subtree participate in hit testing.
+    /// Gets or sets whether this element and its subtree participate in hit testing.
     /// </summary>
     public bool IsHitTestVisible
     {
@@ -84,7 +84,7 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Gets or sets whether this node and its subtree can receive input.
+    /// Gets or sets whether this element and its subtree can receive input.
     /// </summary>
     public bool IsEnabled
     {
@@ -93,93 +93,93 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Gets whether the pointer currently targets this node or its subtree.
+    /// Gets whether the pointer currently targets this element or its subtree.
     /// </summary>
     public bool IsHovered => GetValue(IsHoveredProperty);
 
     /// <summary>
-    /// Gets whether this node currently owns keyboard focus.
+    /// Gets whether this element currently owns keyboard focus.
     /// </summary>
     public bool IsFocused => GetValue(IsFocusedProperty);
 
     /// <summary>
-    /// Gets whether this node or one of its descendants currently owns keyboard focus.
+    /// Gets whether this element or one of its descendants currently owns keyboard focus.
     /// </summary>
     public bool IsFocusWithin => GetValue(IsFocusWithinProperty);
 
     /// <summary>
-    /// Occurs when the pointer enters this node's hit path.
+    /// Occurs when the pointer enters this element's hit path.
     /// </summary>
     public event EventHandler<PointerEventArgs>? PointerEntered;
 
     /// <summary>
-    /// Occurs when the pointer leaves this node's hit path.
+    /// Occurs when the pointer leaves this element's hit path.
     /// </summary>
     public event EventHandler<PointerEventArgs>? PointerExited;
 
     /// <summary>
-    /// Occurs when the pointer moves through this node's hit path.
+    /// Occurs when the pointer moves through this element's hit path.
     /// </summary>
     public event EventHandler<PointerEventArgs>? PointerMoved;
 
     /// <summary>
-    /// Occurs when a pointer button is pressed on this node's hit path.
+    /// Occurs when a pointer button is pressed on this element's hit path.
     /// </summary>
     public event EventHandler<PointerButtonEventArgs>? PointerPressed;
 
     /// <summary>
-    /// Occurs when a pointer button is released on this node's hit path.
+    /// Occurs when a pointer button is released on this element's hit path.
     /// </summary>
     public event EventHandler<PointerButtonEventArgs>? PointerReleased;
 
     /// <summary>
-    /// Occurs when window focus loss cancels an active pointer button interaction on this node's route.
+    /// Occurs when window focus loss cancels an active pointer button interaction on this element's route.
     /// </summary>
     /// <remarks>
     /// This event bubbles from the original pressed target after input state has been cleared.
     /// Each canceled button reports the last known pointer position and no key modifiers.
     /// Cancellation does not produce a release or click and does not require reverting interaction results.
-    /// Screen closure and node unavailability use lifecycle cleanup without raising this event.
+    /// Screen closure and element unavailability use lifecycle cleanup without raising this event.
     /// </remarks>
     public event EventHandler<PointerButtonEventArgs>? PointerCanceled;
 
     /// <summary>
-    /// Occurs when a pointer button press and release form a click on this node.
+    /// Occurs when a pointer button press and release form a click on this element.
     /// </summary>
     public event EventHandler<PointerButtonEventArgs>? PointerClicked;
 
     /// <summary>
-    /// Occurs when the pointer wheel moves through this node's hit path.
+    /// Occurs when the pointer wheel moves through this element's hit path.
     /// </summary>
     public event EventHandler<PointerWheelEventArgs>? PointerWheel;
 
     /// <summary>
-    /// Occurs when a key is pressed while this node has focus.
+    /// Occurs when a key is pressed while this element has focus.
     /// </summary>
     public event EventHandler<KeyEventArgs>? KeyDown;
 
     /// <summary>
-    /// Occurs when a key is released while this node has focus.
+    /// Occurs when a key is released while this element has focus.
     /// </summary>
     public event EventHandler<KeyEventArgs>? KeyUp;
 
     /// <summary>
-    /// Occurs when committed text is entered while this node has focus.
+    /// Occurs when committed text is entered while this element has focus.
     /// </summary>
     public event EventHandler<TextInputEventArgs>? TextInput;
 
     /// <summary>
-    /// Occurs when this node receives focus.
+    /// Occurs when this element receives focus.
     /// </summary>
     public event EventHandler<FocusChangedEventArgs>? GotFocus;
 
     /// <summary>
-    /// Occurs when this node loses focus.
+    /// Occurs when this element loses focus.
     /// </summary>
     public event EventHandler<FocusChangedEventArgs>? LostFocus;
 
     /// <summary>
-    /// Requests keyboard focus for this node.
+    /// Requests keyboard focus for this element.
     /// </summary>
     /// <returns>Whether the focus request was accepted.</returns>
     /// <remarks>Notification callbacks may make the resolved target unavailable before this method returns.</remarks>
@@ -189,21 +189,21 @@ public abstract partial class Node
     public bool Focus() =>
         Screen is not null && Screen.TryFocus(this);
 
-    /// <summary>Gets the node that receives a direct or pointer focus request for this node.</summary>
+    /// <summary>Gets the element that receives a direct or pointer focus request for this element.</summary>
     /// <returns>The desired keyboard focus target.</returns>
     /// <remarks>
     /// The target is resolved once and must satisfy the current screen's focus eligibility rules.
-    /// Overrides must not request focus, dispatch input, or modify the node tree.
+    /// Overrides must not request focus, dispatch input, or modify the element tree.
     /// </remarks>
-    protected internal virtual Node GetFocusTarget() => this;
+    protected internal virtual UIElement GetFocusTarget() => this;
 
     /// <summary>
-    /// Converts a point from screen coordinates to this node's local coordinates.
+    /// Converts a point from screen coordinates to this element's local coordinates.
     /// </summary>
     /// <param name="screenPoint">The point in screen coordinates.</param>
-    /// <returns>The point in this node's local coordinates.</returns>
+    /// <returns>The point in this element's local coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this node does not belong to a UI screen or its open screen is accessed from the wrong thread.
+    /// Thrown when this element does not belong to a UI screen or its open screen is accessed from the wrong thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
@@ -227,12 +227,12 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Converts a point from this node's local coordinates to screen coordinates.
+    /// Converts a point from this element's local coordinates to screen coordinates.
     /// </summary>
-    /// <param name="localPoint">The point in this node's local coordinates.</param>
+    /// <param name="localPoint">The point in this element's local coordinates.</param>
     /// <returns>The point in screen coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this node does not belong to a UI screen or its open screen is accessed from the wrong thread.
+    /// Thrown when this element does not belong to a UI screen or its open screen is accessed from the wrong thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
@@ -385,12 +385,12 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Determines whether a point lies within this node's local geometry.
+    /// Determines whether a point lies within this element's local geometry.
     /// </summary>
     /// <param name="localPoint">The point in local coordinates.</param>
-    /// <returns>Whether the point lies within this node's local geometry.</returns>
+    /// <returns>Whether the point lies within this element's local geometry.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a node owned by an open screen is queried from the wrong thread.
+    /// Thrown when an element owned by an open screen is queried from the wrong thread.
     /// </exception>
     public bool Contains(Point localPoint)
     {
@@ -399,14 +399,14 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Finds the frontmost deepest node at a point in this node's local coordinates.
+    /// Finds the frontmost deepest element at a point in this element's local coordinates.
     /// </summary>
     /// <param name="localPoint">The point in local coordinates.</param>
-    /// <returns>The deepest hit node, or null when the subtree is not hit.</returns>
+    /// <returns>The deepest hit element, or null when the subtree is not hit.</returns>
     /// <exception cref="InvalidOperationException">
     /// Thrown when a tree owned by an open screen is queried from the wrong thread.
     /// </exception>
-    public Node? HitTest(Point localPoint)
+    public UIElement? HitTest(Point localPoint)
     {
         Screen?.VerifyTreeAccess();
         var path = new List<HitPathEntry>();
@@ -414,10 +414,10 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Determines whether a point lies within this node's local geometry.
+    /// Determines whether a point lies within this element's local geometry.
     /// </summary>
     /// <param name="localPoint">The point in local coordinates.</param>
-    /// <returns>Whether the point lies within this node's local geometry.</returns>
+    /// <returns>Whether the point lies within this element's local geometry.</returns>
     protected virtual bool ContainsCore(Point localPoint) =>
         IsWithinLayoutBounds(localPoint);
 
@@ -431,7 +431,7 @@ public abstract partial class Node
 
         var originalCount = path.Count;
         path.Add(new HitPathEntry(this, localPoint));
-        if (this is Parent parent &&
+        if (this is Container parent &&
             (!parent.ClipToBounds || parent.ContainsDescendantClip(localPoint)))
         {
             for (var index = parent.ReadOnlyChildren.Count - 1; index >= 0; index--)
@@ -465,4 +465,4 @@ public abstract partial class Node
         localPoint.Y < LayoutBounds.Height;
 }
 
-internal readonly record struct HitPathEntry(Node Node, Point LocalPosition);
+internal readonly record struct HitPathEntry(UIElement Node, Point LocalPosition);

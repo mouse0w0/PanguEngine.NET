@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
@@ -71,9 +70,10 @@ internal static class UiShowcaseStyles
             }
             else
             {
-                overridden.ClearValue(Node.FontSizeProperty);
-                overridden.ClearValue(Node.ColorProperty);
+                overridden.ClearValue(UIElement.FontSizeProperty);
+                overridden.ClearValue(UIElement.ColorProperty);
             }
+
             overrideButton.Text = enabled ? "清除局部覆盖" : "恢复局部覆盖";
         }
 
@@ -143,9 +143,10 @@ internal static class UiShowcaseStyles
             "配色与表面",
             "统一强调色、语义色与深色表面层次。",
             UiShowcaseWidgets.Samples(palette.Select(entry => UiShowcaseWidgets.Sample(entry.Item1,
-                UiShowcaseWidgets.Column(
-                    new Panel { Height = 36, Background = new SolidColorBrush(entry.Item2) },
-                    UiShowcaseWidgets.Caption($"#{entry.Item2.R:X2}{entry.Item2.G:X2}{entry.Item2.B:X2}")))).ToArray()));
+                    UiShowcaseWidgets.Column(
+                        new Panel { Height = 36, Background = new SolidColorBrush(entry.Item2) },
+                        UiShowcaseWidgets.Caption($"#{entry.Item2.R:X2}{entry.Item2.G:X2}{entry.Item2.B:X2}"))))
+                .ToArray()));
     }
 
     internal static UiShowcaseExample CreateTypographyExample()
@@ -159,7 +160,8 @@ internal static class UiShowcaseStyles
         return new UiShowcaseExample(
             "文本",
             "标题、正文和辅助信息使用不同字号与颜色。",
-            UiShowcaseWidgets.Preview(heading, section, body, UiShowcaseWidgets.Caption("辅助说明 · Caption · 0123456789")));
+            UiShowcaseWidgets.Preview(heading, section, body,
+                UiShowcaseWidgets.Caption("辅助说明 · Caption · 0123456789")));
     }
 
     private static UiShowcaseExample CreateNineSliceExample()
@@ -173,7 +175,8 @@ internal static class UiShowcaseStyles
             "九宫格图像画刷",
             "蓝色角部固定，绿色横边与紫色竖边随尺寸拉伸，中心填充剩余空间。",
             UiShowcaseWidgets.Column(
-                UiShowcaseWidgets.Sample("原图（放大）", new ImageView { Source = source, Stretch = ImageStretch.Fill, Width = 64, Height = 64 }),
+                UiShowcaseWidgets.Sample("原图（放大）",
+                    new ImageView { Source = source, Stretch = ImageStretch.Fill, Width = 64, Height = 64 }),
                 UiShowcaseWidgets.Samples(
                     UiShowcaseWidgets.Sample("小尺寸", small),
                     UiShowcaseWidgets.Sample("横向拉伸", wide),
@@ -202,6 +205,7 @@ internal static class UiShowcaseStyles
             pixels[offset + 2] = color.B;
             pixels[offset + 3] = color.A;
         }
+
         return Image.FromRgba(pixels, size, size);
     }
 }

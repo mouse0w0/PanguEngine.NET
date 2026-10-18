@@ -5,15 +5,15 @@ namespace PanguEngine.UI.Input;
 /// </summary>
 public class InputEventArgs : EventArgs
 {
-    internal InputEventArgs(Node source)
+    internal InputEventArgs(UIElement source)
     {
         Source = source;
     }
 
     /// <summary>
-    /// Gets the original deepest node that received the event.
+    /// Gets the original deepest element that received the event.
     /// </summary>
-    public Node Source { get; }
+    public UIElement Source { get; }
 
     /// <summary>
     /// Gets or sets whether the current routed event has been handled.

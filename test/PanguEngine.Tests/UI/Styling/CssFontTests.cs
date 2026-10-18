@@ -31,9 +31,9 @@ public sealed class CssFontTests
         var child = new Text();
         root.Children.Add(child);
         Apply(root, """
-            #root { font-weight: bold; font-style: italic; line-height: 1.8; color: #123456; }
-            Text { font: 16px "Family"; font-weight: 600; }
-            """);
+                    #root { font-weight: bold; font-style: italic; line-height: 1.8; color: #123456; }
+                    Text { font: 16px "Family"; font-weight: 600; }
+                    """);
 
         Assert.Equal(FontWeight.SemiBold, child.FontWeight);
         Assert.Equal(FontStyle.Normal, child.FontStyle);
@@ -46,20 +46,20 @@ public sealed class CssFontTests
     {
         var root = new Panel { FontSize = 22 };
         Apply(root, """
-            Panel {
-                --font: italic 700 18px/1.5 "Family";
-                font: var(--font) !important;
-                font-weight: 100;
-                font-style: normal !important;
-            }
-            """);
+                    Panel {
+                        --font: italic 700 18px/1.5 "Family";
+                        font: var(--font) !important;
+                        font-weight: 100;
+                        font-style: normal !important;
+                    }
+                    """);
 
         Assert.Equal(22d, root.FontSize);
         Assert.Equal(FontWeight.Bold, root.FontWeight);
         Assert.Equal(FontStyle.Normal, root.FontStyle);
-        Assert.Equal("font", Assert.Single(root.GetStyleValueSources(Node.FontFamilyProperty)).CssPropertyName);
-        Assert.True(Assert.Single(root.GetStyleValueSources(Node.FontSizeProperty)).IsMaskedByLocalValue);
-        root.ClearValue(Node.FontSizeProperty);
+        Assert.Equal("font", Assert.Single(root.GetStyleValueSources(UIElement.FontFamilyProperty)).CssPropertyName);
+        Assert.True(Assert.Single(root.GetStyleValueSources(UIElement.FontSizeProperty)).IsMaskedByLocalValue);
+        root.ClearValue(UIElement.FontSizeProperty);
         Assert.Equal(18d, root.FontSize);
     }
 
@@ -76,7 +76,7 @@ public sealed class CssFontTests
         child.FontWeight = FontWeight.Normal;
         first.FontWeight = FontWeight.Black;
         Assert.Equal(FontWeight.Normal, child.FontWeight);
-        child.ClearValue(Node.FontWeightProperty);
+        child.ClearValue(UIElement.FontWeightProperty);
         Assert.Equal(FontWeight.Black, child.FontWeight);
 
         first.Children.Remove(child);
@@ -95,13 +95,13 @@ public sealed class CssFontTests
         var source = new Panel { FontFamily = "Bound" };
         var child = new Text();
         root.Children.Add(child);
-        child.Bind(Node.FontFamilyProperty, source, Node.FontFamilyProperty);
+        child.Bind(UIElement.FontFamilyProperty, source, UIElement.FontFamilyProperty);
 
         root.FontFamily = "Changed parent";
         Assert.Equal("Bound", child.FontFamily);
         source.FontFamily = "Changed source";
         Assert.Equal("Changed source", child.FontFamily);
-        child.ClearValue(Node.FontFamilyProperty);
+        child.ClearValue(UIElement.FontFamilyProperty);
         Assert.Equal("Changed parent", child.FontFamily);
     }
 
@@ -182,7 +182,7 @@ public sealed class CssFontTests
         Assert.True(error.Column > 0);
     }
 
-    private static Screen Apply(Node root, string css)
+    private static Screen Apply(UIElement root, string css)
     {
         var screen = new Screen(root);
         screen.SetBaseStyleSheets([]);

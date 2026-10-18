@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Client.UI;
 using PanguEngine.UI;
@@ -14,9 +15,9 @@ public sealed class DrawingTests
     {
         var node = new DrawingNode();
 
-        Assert.Equal(typeof(Node), Node.OpacityProperty.OwnerType);
-        Assert.Equal(typeof(Node), Node.OpacityProperty.TargetType);
-        Assert.Equal(1, Node.OpacityProperty.DefaultValue);
+        Assert.Equal(typeof(UIElement), UIElement.OpacityProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), UIElement.OpacityProperty.TargetType);
+        Assert.Equal(1, UIElement.OpacityProperty.DefaultValue);
         Assert.Equal(1, node.Opacity);
     }
 
@@ -407,7 +408,7 @@ public sealed class DrawingTests
         builder.Build(list, 100, 100, false);
         Assert.Equal(new Scissor(0, 0, 100, 100), Assert.Single(builder.Batches.ToArray()).Scissor);
         var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
-        Assert.Equal(new System.Numerics.Vector4(10, 20, 40, 50), builder.ClipData[(int)data.ClipIndex].Bounds);
+        Assert.Equal(new Vector4(10, 20, 40, 50), builder.ClipData[(int)data.ClipIndex].Bounds);
         Assert.Equal(0.25f, builder.Vertices[0].A);
     }
 
@@ -723,7 +724,7 @@ public sealed class DrawingTests
         Assert.Equal(new Scissor(0, 0, 200, 200), Assert.Single(builder.Batches.ToArray()).Scissor);
         var clipped = builder.Vertices.ToArray().First(vertex => vertex.DrawDataIndex != 0);
         var data = builder.DrawData[(int)clipped.DrawDataIndex];
-        Assert.Equal(new System.Numerics.Vector4(10, 20, 40, 50), builder.ClipData[(int)data.ClipIndex].Bounds);
+        Assert.Equal(new Vector4(10, 20, 40, 50), builder.ClipData[(int)data.ClipIndex].Bounds);
         Assert.Equal(0.25f, builder.Vertices[0].A);
     }
 
@@ -1142,7 +1143,7 @@ public sealed class DrawingTests
         Assert.Equal(14, errors.Count);
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
         Assert.Same(root, screen.Root);
-        Assert.Equal(new Node[] { first, second }, root.Children);
+        Assert.Equal(new UIElement[] { first, second }, root.Children);
         Assert.Null(added.Parent);
         Assert.Null(replacement.Screen);
         Assert.Equal(1, root.Opacity);
@@ -1182,7 +1183,7 @@ public sealed class DrawingTests
         _ = screen.CreateDrawCommandList();
 
         Assert.All(errors, Assert.Null);
-        Assert.Equal(new Node[] { first, emptyFront }, root.Children);
+        Assert.Equal(new UIElement[] { first, emptyFront }, root.Children);
         Assert.Null(foreign.Parent);
         Assert.Null(independent.Parent);
     }
@@ -1406,7 +1407,7 @@ public sealed class DrawingTests
     private static Image CreateImage(int width, int height) =>
         Image.FromRgba(new byte[checked(width * height * 4)], width, height);
 
-    private static void Arrange(Node node, Rect bounds)
+    private static void Arrange(UIElement node, Rect bounds)
     {
         node.Measure(new Size(bounds.Width, bounds.Height));
         node.Arrange(bounds);
@@ -1436,7 +1437,7 @@ public sealed class DrawingTests
         return result;
     }
 
-    private sealed class DrawingNode : Node
+    private sealed class DrawingNode : UIElement
     {
         internal Action<DrawingContext>? DrawAction { get; set; }
 
@@ -1449,7 +1450,7 @@ public sealed class DrawingTests
         internal bool DrawBase { get; set; } = true;
         internal Action<DrawingContext>? DrawAction { get; set; }
 
-        internal void Add(Node child) =>
+        internal void Add(UIElement child) =>
             Children.Add(child);
 
         protected override void DrawCore(DrawingContext context)
@@ -1460,14 +1461,14 @@ public sealed class DrawingTests
         }
     }
 
-    private sealed class DrawingParent : Parent
+    private sealed class DrawingParent : Container
     {
         internal Action<DrawingContext>? DrawAction { get; set; }
 
-        internal void Add(Node child) =>
+        internal void Add(UIElement child) =>
             Children.Add(child);
 
-        internal bool Remove(Node child) =>
+        internal bool Remove(UIElement child) =>
             Children.Remove(child);
 
         internal void Clear() =>
@@ -1476,5 +1477,4 @@ public sealed class DrawingTests
         protected override void DrawCore(DrawingContext context) =>
             DrawAction?.Invoke(context);
     }
-
 }

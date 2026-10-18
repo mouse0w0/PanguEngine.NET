@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 
@@ -89,7 +88,7 @@ internal static class UiShowcaseTabs
         return text;
     }
 
-    private static StackPanel CreateStack(string cssClass, params Node[] children)
+    private static StackPanel CreateStack(string cssClass, params UIElement[] children)
     {
         var stack = new StackPanel();
         stack.Classes.Add(cssClass);

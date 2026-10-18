@@ -8,7 +8,7 @@ namespace PanguEngine.UI.Controls;
 /// </summary>
 /// <remarks>
 /// A tab item can belong to at most one <see cref="TabView"/> at a time. The header and content
-/// slots hold arbitrary nodes; assigning a node that already belongs elsewhere moves it and clears
+/// slots hold arbitrary elements; assigning an element that already belongs elsewhere moves it and clears
 /// the previous slot owner. A stable internal content host keeps content ownership even while the
 /// item is not hosted by a view.
 /// </remarks>
@@ -52,8 +52,8 @@ public sealed class TabItem : Control
 
     private readonly TabContentHost _contentHost;
     private readonly TabHeaderHost _headerHost;
-    private Node? _header;
-    private Node? _content;
+    private UIElement? _header;
+    private UIElement? _content;
     private TabCloseButton? _closeButton;
 
     /// <summary>Initializes a focusable tab item with a stable internal content host.</summary>
@@ -67,13 +67,13 @@ public sealed class TabItem : Control
         Subscribe(IsEnabledProperty, (_, _) => OwnerView?.OnItemStateChanged(this));
     }
 
-    /// <summary>Gets or sets the node displayed in the tab header, or null for an empty header.</summary>
+    /// <summary>Gets or sets the element displayed in the tab header, or null for an empty header.</summary>
     /// <remarks>
-    /// The header cannot be this item, the content node, the internal content host, an ancestor, or
-    /// another child of this item. Moving the header node out of this item through the tree API
+    /// The header cannot be this item, the content element, the internal content host, an ancestor, or
+    /// another child of this item. Moving the header element out of this item through the tree API
     /// clears this slot.
     /// </remarks>
-    public Node? Header
+    public UIElement? Header
     {
         get => _header;
         set
@@ -87,13 +87,13 @@ public sealed class TabItem : Control
         }
     }
 
-    /// <summary>Gets or sets the node displayed as the tab page content, or null for no content.</summary>
+    /// <summary>Gets or sets the element displayed as the tab page content, or null for no content.</summary>
     /// <remarks>
-    /// The content cannot be this item, the header node, the internal content host, or an ancestor
-    /// of this item or its owning view. Moving the content node out of the host through the tree API
+    /// The content cannot be this item, the header element, the internal content host, or an ancestor
+    /// of this item or its owning view. Moving the content element out of the host through the tree API
     /// clears this slot.
     /// </remarks>
-    public Node? Content
+    public UIElement? Content
     {
         get => _content;
         set
@@ -141,13 +141,13 @@ public sealed class TabItem : Control
 
     internal void NotifyCloseRequested() => OwnerView?.RequestClose(this);
 
-    internal void NotifyContentDetached(Node child)
+    internal void NotifyContentDetached(UIElement child)
     {
         if (ReferenceEquals(_content, child))
             _content = null;
     }
 
-    internal void NotifyHeaderDetached(Node child)
+    internal void NotifyHeaderDetached(UIElement child)
     {
         if (ReferenceEquals(_header, child))
             _header = null;
@@ -192,7 +192,7 @@ public sealed class TabItem : Control
         _headerHost.Arrange(new Rect(contentBounds.X, contentBounds.Y, headerWidth, contentBounds.Height));
     }
 
-    private void ValidateHeaderAssignment(Node? value)
+    private void ValidateHeaderAssignment(UIElement? value)
     {
         Screen?.VerifyTreeMutationAccess();
         if (value is null)
@@ -209,7 +209,7 @@ public sealed class TabItem : Control
         if (TabView.IsInternalPartNode(value))
             throw new InvalidOperationException("A tab view internal node cannot be used as a header.");
 
-        for (Node? node = this; node is not null; node = node.Parent)
+        for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (ReferenceEquals(node, value))
                 throw new InvalidOperationException("Adding the node would create a parent cycle.");
@@ -219,7 +219,7 @@ public sealed class TabItem : Control
             throw new InvalidOperationException("The node is already a child of this tab item.");
     }
 
-    private void ValidateContentAssignment(Node? value)
+    private void ValidateContentAssignment(UIElement? value)
     {
         Screen?.VerifyTreeMutationAccess();
         if (value is null)
@@ -236,7 +236,7 @@ public sealed class TabItem : Control
         if (TabView.IsInternalPartNode(value))
             throw new InvalidOperationException("A tab view internal node cannot be used as content.");
 
-        for (Node? node = this; node is not null; node = node.Parent)
+        for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (ReferenceEquals(node, value))
                 throw new InvalidOperationException("Adding the node would create a parent cycle.");

@@ -13,7 +13,7 @@ public class Panel : Region
     }
 
     /// <summary>
-    /// Gets the mutable collection of direct child nodes in drawing order.
+    /// Gets the mutable collection of direct child elements in drawing order.
     /// </summary>
-    public new NodeList Children => base.Children;
+    public new UIElementList Children => base.Children;
 }

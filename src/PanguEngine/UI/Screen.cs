@@ -4,7 +4,7 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI;
 
 /// <summary>
-/// Represents a retained UI screen with an optional root node.
+/// Represents a retained UI screen with an optional root element.
 /// </summary>
 /// <remarks>
 /// The root and its owned tree cannot change while this screen is generating drawing commands.
@@ -15,7 +15,7 @@ public partial class Screen
     private const int MaxLayoutPasses = 16;
     private readonly Lock _stateSync = new();
     private readonly Queue<Action> _pendingActions = [];
-    private Node? _root;
+    private UIElement? _root;
     private StyleResolver _styleResolver = StyleResolver.Default;
     private int? _ownerThreadId;
     private int _operationDepth;
@@ -26,27 +26,27 @@ public partial class Screen
     private bool _isPreparingStyleSheets;
 
     /// <summary>
-    /// Initializes a UI screen with an optional root node.
+    /// Initializes a UI screen with an optional root element.
     /// </summary>
-    /// <param name="root">The initial root node, or null to create an empty screen.</param>
-    public Screen(Node? root = null)
+    /// <param name="root">The initial root element, or null to create an empty screen.</param>
+    public Screen(UIElement? root = null)
     {
         _scale = UiToolkit.DefaultScale;
         Root = root;
     }
 
     /// <summary>
-    /// Gets or sets the root node of this screen.
+    /// Gets or sets the root element of this screen.
     /// </summary>
     /// <remarks>
-    /// Assigning a node moves it from its current parent or screen. Closing the screen preserves
+    /// Assigning an element moves it from its current parent or screen. Closing the screen preserves
     /// the root and its screen ownership.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when an involved open screen is accessed from the wrong thread, is updating layout,
     /// or is generating drawing commands.
     /// </exception>
-    public Node? Root
+    public UIElement? Root
     {
         get => _root;
         set => SetRoot(value);
@@ -256,7 +256,7 @@ public partial class Screen
 
     internal bool IsUpdatingLayout { get; private set; }
 
-    private void SetRoot(Node? root)
+    private void SetRoot(UIElement? root)
     {
         if (ReferenceEquals(_root, root))
             return;

@@ -17,7 +17,7 @@ public sealed class DockPanelTests
         Assert.True(panel.LastChildFill);
         Assert.Equal(Dock.Left, DockPanel.GetDock(child));
         Assert.Equal(typeof(DockPanel), DockPanel.DockProperty.OwnerType);
-        Assert.Equal(typeof(Node), DockPanel.DockProperty.TargetType);
+        Assert.Equal(typeof(UIElement), DockPanel.DockProperty.TargetType);
         Assert.Equal(typeof(DockPanel), DockPanel.LastChildFillProperty.OwnerType);
         Assert.Equal(typeof(DockPanel), DockPanel.LastChildFillProperty.TargetType);
         Assert.True(DockPanel.LastChildFillProperty.DefaultValue);
@@ -436,13 +436,13 @@ public sealed class DockPanelTests
         Assert.Same(screen, panel.Screen);
     }
 
-    private static void ValidateLayout(Node node)
+    private static void ValidateLayout(UIElement node)
     {
         node.Measure(new Size(100, 60));
         node.Arrange(new Rect(0, 0, 100, 60));
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }

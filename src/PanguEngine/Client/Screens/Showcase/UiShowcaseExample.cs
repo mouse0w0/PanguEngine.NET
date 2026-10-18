@@ -1,6 +1,5 @@
-using PanguEngine.Client.UI;
 using PanguEngine.UI;
 
 namespace PanguEngine.Client.Screens.Showcase;
 
-internal sealed record UiShowcaseExample(string Title, string Instructions, Node Content);
+internal sealed record UiShowcaseExample(string Title, string Instructions, UIElement Content);

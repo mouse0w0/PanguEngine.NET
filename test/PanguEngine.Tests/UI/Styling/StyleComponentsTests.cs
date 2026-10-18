@@ -16,7 +16,7 @@ public sealed class StyleComponentsTests
         var snapshot = resolver.Resolve(new Panel());
 
         Assert.Equal(new Thickness(2, 5, 2, 8), snapshot.GetValue(Region.PaddingProperty));
-        Assert.Equal(new Thickness(3, 1, 3, 4), snapshot.GetValue(Node.MarginProperty));
+        Assert.Equal(new Thickness(3, 1, 3, 4), snapshot.GetValue(UIElement.MarginProperty));
     }
 
     [Theory]
@@ -24,7 +24,7 @@ public sealed class StyleComponentsTests
     [InlineData("margin")]
     public void ShorthandAndLonghandResolveByDeclarationOrderInBothDirections(string name)
     {
-        var property = name == "padding" ? Region.PaddingProperty : Node.MarginProperty;
+        var property = name == "padding" ? Region.PaddingProperty : UIElement.MarginProperty;
         var shorthandFirst = new StyleResolver([], [StyleSheet.Parse($"Panel {{ {name}: 4px; {name}-left: 9px; }}")]);
         Assert.Equal(new Thickness(9, 4, 4, 4), shorthandFirst.Resolve(new Panel()).GetValue(property));
 
@@ -37,7 +37,7 @@ public sealed class StyleComponentsTests
     [InlineData("margin")]
     public void LonghandsTargetTheirNamedEdges(string name)
     {
-        var property = name == "padding" ? Region.PaddingProperty : Node.MarginProperty;
+        var property = name == "padding" ? Region.PaddingProperty : UIElement.MarginProperty;
         var rule = Assert.Single(StyleSheet.Parse(
             $"Panel {{ {name}-top: 1; {name}-right: 2; {name}-bottom: 3; {name}-left: 4; }}").Rules);
 
@@ -51,16 +51,19 @@ public sealed class StyleComponentsTests
         var node = PanelWithClasses("primary");
 
         var specificEarlier = new StyleResolver([], [
-            StyleSheet.Parse("Panel.primary { padding: 4px; } Panel { padding-left: 9px; }")]);
+            StyleSheet.Parse("Panel.primary { padding: 4px; } Panel { padding-left: 9px; }")
+        ]);
         Assert.Equal(new Thickness(4), specificEarlier.Resolve(node).GetValue(Region.PaddingProperty));
 
         var specificLater = new StyleResolver([], [
-            StyleSheet.Parse("Panel { padding: 4px; } Panel.primary { padding-left: 9px; }")]);
+            StyleSheet.Parse("Panel { padding: 4px; } Panel.primary { padding-left: 9px; }")
+        ]);
         Assert.Equal(new Thickness(9, 4, 4, 4), specificLater.Resolve(node).GetValue(Region.PaddingProperty));
 
         var acrossFiles = new StyleResolver([], [
             StyleSheet.Parse("Panel.primary { padding: 4px; }", "specific.css"),
-            StyleSheet.Parse("Panel { padding-left: 9px; }", "later.css")]);
+            StyleSheet.Parse("Panel { padding-left: 9px; }", "later.css")
+        ]);
         Assert.Equal(new Thickness(4), acrossFiles.Resolve(node).GetValue(Region.PaddingProperty));
     }
 
@@ -148,22 +151,26 @@ public sealed class StyleComponentsTests
         screen.Root!.UpdateStyles();
 
         Assert.Equal(new Thickness(8, 4, 8, 4), node.Padding);
-        Assert.All(node.GetStyleValueSources(Region.PaddingProperty), source => Assert.False(source.IsMaskedByLocalValue));
+        Assert.All(node.GetStyleValueSources(Region.PaddingProperty),
+            source => Assert.False(source.IsMaskedByLocalValue));
 
         node.Padding = new Thickness(1, 2, 3, 4);
         Assert.Equal(new Thickness(1, 2, 3, 4), node.Padding);
-        Assert.All(node.GetStyleValueSources(Region.PaddingProperty), source => Assert.True(source.IsMaskedByLocalValue));
+        Assert.All(node.GetStyleValueSources(Region.PaddingProperty),
+            source => Assert.True(source.IsMaskedByLocalValue));
 
         node.ClearValue(Region.PaddingProperty);
         Assert.Equal(new Thickness(8, 4, 8, 4), node.Padding);
-        Assert.All(node.GetStyleValueSources(Region.PaddingProperty), source => Assert.False(source.IsMaskedByLocalValue));
+        Assert.All(node.GetStyleValueSources(Region.PaddingProperty),
+            source => Assert.False(source.IsMaskedByLocalValue));
 
         var source = new Panel { Padding = new Thickness(5) };
         node.Bind(Region.PaddingProperty, source, Region.PaddingProperty);
         source.Padding = new Thickness(6);
 
         Assert.Equal(new Thickness(6), node.Padding);
-        Assert.All(node.GetStyleValueSources(Region.PaddingProperty), styleSource => Assert.True(styleSource.IsMaskedByLocalValue));
+        Assert.All(node.GetStyleValueSources(Region.PaddingProperty),
+            styleSource => Assert.True(styleSource.IsMaskedByLocalValue));
 
         node.Unbind(Region.PaddingProperty);
         source.Padding = new Thickness(7);
@@ -176,10 +183,12 @@ public sealed class StyleComponentsTests
     [Fact]
     public void PerEdgeSourcesKeepOriginalDeclarationIndicesAcrossRules()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            Panel { padding: 1px; opacity: 0.5; }
-            Panel { padding-left: 9px; }
-            """, "edges.css")]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             Panel { padding: 1px; opacity: 0.5; }
+                             Panel { padding-left: 9px; }
+                             """, "edges.css")
+        ]);
 
         var snapshot = resolver.Resolve(new Panel());
 
@@ -201,7 +210,7 @@ public sealed class StyleComponentsTests
         Assert.Equal(1, left.RuleIndex);
         Assert.Equal("edges.css", left.SheetSourceName);
 
-        var opacity = Assert.Single(snapshot.GetSources(Node.OpacityProperty));
+        var opacity = Assert.Single(snapshot.GetSources(UIElement.OpacityProperty));
         Assert.Equal(1, opacity.DeclarationIndex);
         Assert.Equal(0, opacity.RuleIndex);
     }
@@ -243,8 +252,10 @@ public sealed class StyleComponentsTests
     [InlineData("background-color", "background")]
     public void BackgroundNamesCompeteByDeclarationOrderAndOrigin(string first, string second)
     {
-        var sameRule = new StyleResolver([], [StyleSheet.Parse(
-            $"Panel {{ {first}: #010203; {second}: #040506; }}")]);
+        var sameRule = new StyleResolver([], [
+            StyleSheet.Parse(
+                $"Panel {{ {first}: #010203; {second}: #040506; }}")
+        ]);
 
         var snapshot = sameRule.Resolve(new Panel());
 
@@ -269,12 +280,18 @@ public sealed class StyleComponentsTests
         var whole = StyleSetter.Create(Region.PaddingProperty, new Thickness(1, 2, 3, 4));
         var edge = StyleSetter.CreateEdge(Region.PaddingProperty, StyleEdge.Left, 9);
 
-        var edgeLater = new StyleResolver([], [new StyleSheet([
-            new StyleRule(StyleSelector.For<Panel>(), [whole, edge])])]);
+        var edgeLater = new StyleResolver([], [
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<Panel>(), [whole, edge])
+            ])
+        ]);
         Assert.Equal(new Thickness(9, 2, 3, 4), edgeLater.Resolve(new Panel()).GetValue(Region.PaddingProperty));
 
-        var wholeLater = new StyleResolver([], [new StyleSheet([
-            new StyleRule(StyleSelector.For<Panel>(), [edge, whole])])]);
+        var wholeLater = new StyleResolver([], [
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<Panel>(), [edge, whole])
+            ])
+        ]);
         Assert.Equal(new Thickness(1, 2, 3, 4), wholeLater.Resolve(new Panel()).GetValue(Region.PaddingProperty));
     }
 
@@ -295,16 +312,18 @@ public sealed class StyleComponentsTests
     [Fact]
     public void CustomMultiOutputAcrossRulesKeepsFollowingDeclarationIndices()
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse("""
-            ExpandIndexNode { index-sides: 2; opacity: 0.5; }
-            ExpandIndexNode { index-left: 3; }
-            """)]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse("""
+                             ExpandIndexNode { index-sides: 2; opacity: 0.5; }
+                             ExpandIndexNode { index-left: 3; }
+                             """)
+        ]);
 
         var snapshot = resolver.Resolve(new ExpandIndexNode());
 
         Assert.Equal(new Thickness(3, 0, 2, 0), snapshot.GetValue(ExpandIndexNode.PaddingProperty));
 
-        var opacity = Assert.Single(snapshot.GetSources(Node.OpacityProperty));
+        var opacity = Assert.Single(snapshot.GetSources(UIElement.OpacityProperty));
         Assert.Equal(1, opacity.DeclarationIndex);
 
         var left = Assert.Single(
@@ -350,7 +369,7 @@ public sealed class StyleComponentsTests
         return panel;
     }
 
-    private sealed class DefaultThicknessNode : Node
+    private sealed class DefaultThicknessNode : UIElement
     {
         static DefaultThicknessNode()
         {
@@ -359,7 +378,10 @@ public sealed class StyleComponentsTests
                 PaddingProperty,
                 CssValueConverters.ParseThickness);
             CssRegistry.RegisterProperty<DefaultThicknessNode>("default-pad-left", value =>
-                new[] { StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Left, CssValueConverters.ParseLength(value)) });
+                new[]
+                {
+                    StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Left, CssValueConverters.ParseLength(value))
+                });
         }
 
         internal static readonly Property<Thickness> PaddingProperty =
@@ -369,7 +391,7 @@ public sealed class StyleComponentsTests
                 onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 
-    private sealed class ExpandIndexNode : Node
+    private sealed class ExpandIndexNode : UIElement
     {
         static ExpandIndexNode()
         {
@@ -383,7 +405,10 @@ public sealed class StyleComponentsTests
                 ];
             });
             CssRegistry.RegisterProperty<ExpandIndexNode>("index-left", value =>
-                new[] { StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Left, CssValueConverters.ParseLength(value)) });
+                new[]
+                {
+                    StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Left, CssValueConverters.ParseLength(value))
+                });
         }
 
         internal static readonly Property<Thickness> PaddingProperty =

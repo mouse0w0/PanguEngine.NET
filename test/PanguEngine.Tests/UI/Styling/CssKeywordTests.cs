@@ -123,18 +123,20 @@ public sealed class CssKeywordTests
     [InlineData("120px")]
     public void NumericLengthsRemainSupportedForAllDimensions(string value)
     {
-        var resolver = new StyleResolver([], [StyleSheet.Parse($$"""
-            Panel { width: {{value}}; height: {{value}}; min-width: {{value}}; min-height: {{value}};
-                    max-width: {{value}}; max-height: {{value}}; }
-            """)]);
+        var resolver = new StyleResolver([], [
+            StyleSheet.Parse($$"""
+                               Panel { width: {{value}}; height: {{value}}; min-width: {{value}}; min-height: {{value}};
+                                       max-width: {{value}}; max-height: {{value}}; }
+                               """)
+        ]);
         var style = resolver.Resolve(new Panel());
 
-        Assert.Equal(120d, style.GetValue(Node.WidthProperty));
-        Assert.Equal(120d, style.GetValue(Node.HeightProperty));
-        Assert.Equal(120d, style.GetValue(Node.MinWidthProperty));
-        Assert.Equal(120d, style.GetValue(Node.MinHeightProperty));
-        Assert.Equal(120d, style.GetValue(Node.MaxWidthProperty));
-        Assert.Equal(120d, style.GetValue(Node.MaxHeightProperty));
+        Assert.Equal(120d, style.GetValue(UIElement.WidthProperty));
+        Assert.Equal(120d, style.GetValue(UIElement.HeightProperty));
+        Assert.Equal(120d, style.GetValue(UIElement.MinWidthProperty));
+        Assert.Equal(120d, style.GetValue(UIElement.MinHeightProperty));
+        Assert.Equal(120d, style.GetValue(UIElement.MaxWidthProperty));
+        Assert.Equal(120d, style.GetValue(UIElement.MaxHeightProperty));
     }
 
     [Theory]
@@ -144,8 +146,10 @@ public sealed class CssKeywordTests
     {
         var panel = new Panel();
         var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([StyleSheet.Parse(
-            "Panel { width: 20px; height: 10px; min-width: 100px; min-height: 50px; }")]);
+        screen.SetBaseStyleSheets([
+            StyleSheet.Parse(
+                "Panel { width: 20px; height: 10px; min-width: 100px; min-height: 50px; }")
+        ]);
         panel.UpdateStyles();
         panel.Measure(new Size(500, 500));
         panel.Arrange(new Rect(0, 0, 500, 500));
@@ -217,18 +221,22 @@ public sealed class CssKeywordTests
         var rectangle = new Rectangle();
         panel.Children.Add(rectangle);
         var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("""
-            #target { width: 80px; height: 40px; max-width: 100px; max-height: 50px;
-                      background: #123456; border-color: #654321; }
-            Rectangle { fill: #123456; stroke: #654321; }
-            """)]);
-        screen.SetStyleSheets([StyleSheet.Parse("""
-            #target { --size: AuTo; --empty: NoNe;
-                      width: var(--size); height: var(--size);
-                      max-width: var(--empty); max-height: var(--empty);
-                      background-color: var(--empty); border-color: var(--empty); }
-            Rectangle { fill: var(--empty); stroke: var(--empty); }
-            """)]);
+        screen.SetBaseStyleSheets([
+            StyleSheet.Parse("""
+                             #target { width: 80px; height: 40px; max-width: 100px; max-height: 50px;
+                                       background: #123456; border-color: #654321; }
+                             Rectangle { fill: #123456; stroke: #654321; }
+                             """)
+        ]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse("""
+                             #target { --size: AuTo; --empty: NoNe;
+                                       width: var(--size); height: var(--size);
+                                       max-width: var(--empty); max-height: var(--empty);
+                                       background-color: var(--empty); border-color: var(--empty); }
+                             Rectangle { fill: var(--empty); stroke: var(--empty); }
+                             """)
+        ]);
 
         panel.UpdateStyles();
 

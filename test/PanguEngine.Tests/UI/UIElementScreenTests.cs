@@ -4,7 +4,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
-public sealed class NodeScreenTests
+public sealed class UIElementScreenTests
 {
     [Fact]
     public void ScreenDefaultsToNullAndRejectsPublicWrites()
@@ -12,11 +12,11 @@ public sealed class NodeScreenTests
         var node = new Panel();
         var screen = new Screen();
 
-        Assert.True(Node.ScreenProperty.IsReadOnly);
+        Assert.True(UIElement.ScreenProperty.IsReadOnly);
         Assert.Null(node.Screen);
-        Assert.Null(node.GetValue(Node.ScreenProperty));
-        Assert.Throws<InvalidOperationException>(() => node.SetValue(Node.ScreenProperty, screen));
-        Assert.Throws<InvalidOperationException>(() => node.ClearValue(Node.ScreenProperty));
+        Assert.Null(node.GetValue(UIElement.ScreenProperty));
+        Assert.Throws<InvalidOperationException>(() => node.SetValue(UIElement.ScreenProperty, screen));
+        Assert.Throws<InvalidOperationException>(() => node.ClearValue(UIElement.ScreenProperty));
         Assert.Null(node.Screen);
     }
 
@@ -33,7 +33,7 @@ public sealed class NodeScreenTests
         var first = new Screen(root);
         var second = new Screen();
         var changes = new List<(Screen? OldValue, Screen? NewValue)>();
-        using var subscription = node.Subscribe(Node.ScreenProperty, (_, args) =>
+        using var subscription = node.Subscribe(UIElement.ScreenProperty, (_, args) =>
         {
             Assert.Same(args.NewValue, node.Screen);
             changes.Add((args.OldValue, args.NewValue));
@@ -65,7 +65,7 @@ public sealed class NodeScreenTests
         var changes = new List<(Screen? OldValue, Screen? NewValue)>();
         node.PropertyChanged += (_, args) =>
         {
-            if (args.Property.Name != nameof(Node.Screen))
+            if (args.Property.Name != nameof(UIElement.Screen))
                 return;
 
             var change = Assert.IsType<PropertyChangedEventArgs<Screen?>>(args);
@@ -93,7 +93,7 @@ public sealed class NodeScreenTests
         var order = new List<string>();
         parent.PropertyChanged += (_, args) =>
         {
-            if (args.Property.Name != nameof(Node.Screen))
+            if (args.Property.Name != nameof(UIElement.Screen))
                 return;
 
             Assert.Same(second, parent.Screen);
@@ -102,7 +102,7 @@ public sealed class NodeScreenTests
         };
         child.PropertyChanged += (_, args) =>
         {
-            if (args.Property.Name != nameof(Node.Screen))
+            if (args.Property.Name != nameof(UIElement.Screen))
                 return;
 
             Assert.Same(second, parent.Screen);

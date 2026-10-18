@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.Graphics.Text;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
@@ -124,8 +123,10 @@ internal sealed class UiShowcaseShell : Region
                 Classes.Remove("showcase-compact");
                 _pageTabs.ClearValue(TabView.VerticalTabStripWidthProperty);
             }
+
             InvalidateMeasure();
         }
+
         if (warning != _showWarning)
         {
             _showWarning = warning;
@@ -137,7 +138,7 @@ internal sealed class UiShowcaseShell : Region
     protected override Size MeasureContent(Size availableSize)
     {
         var width = availableSize.Width;
-        foreach (var node in new Node[] { _header, _feedback, _warning, _scaleRow, _scaleValue, _returnButton })
+        foreach (var node in new UIElement[] { _header, _feedback, _warning, _scaleRow, _scaleValue, _returnButton })
             node.Measure(new Size(width, double.PositiveInfinity));
         var footerHeight = _isCompact
             ? _returnButton.DesiredSize.Height + Gap + _scaleRow.DesiredSize.Height
@@ -151,8 +152,13 @@ internal sealed class UiShowcaseShell : Region
             : Math.Max(0, availableSize.Height - reservedHeight);
         _pageTabs.Measure(new Size(width, pageHeight));
         return new Size(
-            double.IsFinite(width) ? width : Math.Max(_header.DesiredSize.Width, Math.Max(_pageTabs.DesiredSize.Width, _scaleRow.DesiredSize.Width)),
-            double.IsFinite(availableSize.Height) ? availableSize.Height : _pageTabs.DesiredSize.Height + reservedHeight);
+            double.IsFinite(width)
+                ? width
+                : Math.Max(_header.DesiredSize.Width,
+                    Math.Max(_pageTabs.DesiredSize.Width, _scaleRow.DesiredSize.Width)),
+            double.IsFinite(availableSize.Height)
+                ? availableSize.Height
+                : _pageTabs.DesiredSize.Height + reservedHeight);
     }
 
     /// <inheritdoc />
@@ -180,11 +186,13 @@ internal sealed class UiShowcaseShell : Region
             var footerTop = bottom - Math.Max(_returnButton.DesiredSize.Height, _scaleRow.DesiredSize.Height);
             var returnWidth = Math.Min(_returnButton.DesiredSize.Width, width);
             ArrangeNode(_scaleRow, left, footerTop, width, _scaleRow.DesiredSize.Height);
-            ArrangeNode(_returnButton, left + width - returnWidth, footerTop, returnWidth, _returnButton.DesiredSize.Height);
+            ArrangeNode(_returnButton, left + width - returnWidth, footerTop, returnWidth,
+                _returnButton.DesiredSize.Height);
             var valueTop = footerTop - Gap - _scaleValue.DesiredSize.Height;
             ArrangeNode(_scaleValue, left, valueTop, width, _scaleValue.DesiredSize.Height);
             middleBottom = valueTop - Gap;
         }
+
         if (_showWarning)
         {
             middleBottom -= _warning.DesiredSize.Height;
@@ -193,16 +201,18 @@ internal sealed class UiShowcaseShell : Region
         }
         else
             _warning.Arrange(Rect.Zero);
+
         if (!_isCompact)
         {
             middleBottom -= _feedback.DesiredSize.Height;
             ArrangeNode(_feedback, left, middleBottom, width, _feedback.DesiredSize.Height);
             middleBottom -= Gap;
         }
+
         ArrangeNode(_pageTabs, left, middleTop, width, Math.Max(0, middleBottom - middleTop));
     }
 
-    private static void ArrangeNode(Node node, double x, double y, double width, double height) =>
+    private static void ArrangeNode(UIElement node, double x, double y, double width, double height) =>
         node.Arrange(new Rect(x, y, Math.Max(0, width), Math.Max(0, height)));
 
     private static Text CreateClassedText(string text, string cssClass)
@@ -212,5 +222,6 @@ internal sealed class UiShowcaseShell : Region
         return node;
     }
 
-    private static Button CreateScaleButton(string text, string id) => new() { Text = text, MinHeight = 32, StyleId = id };
+    private static Button CreateScaleButton(string text, string id) =>
+        new() { Text = text, MinHeight = 32, StyleId = id };
 }

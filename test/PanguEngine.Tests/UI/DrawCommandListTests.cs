@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Numerics;
 using PanguEngine.UI;
 using PanguEngine.UI.Drawing;
 using PanguEngine.UI.Rendering;
@@ -18,6 +20,7 @@ public sealed class DrawCommandListTests
                     DrawRectangle(context);
                 DrawRectangle(context);
             }
+
             DrawRectangle(context);
         }, 2, new Point(3, 4));
         var builder = new DrawBuilder();
@@ -50,6 +53,7 @@ public sealed class DrawCommandListTests
                     DrawRectangle(context);
                 DrawRectangle(context);
             }
+
             DrawRectangle(context);
         }, 2, new Point(3, 4));
         var builder = new DrawBuilder();
@@ -81,6 +85,7 @@ public sealed class DrawCommandListTests
                     DrawRectangle(context);
                 DrawRectangle(context);
             }
+
             DrawRectangle(context);
         }, 2, new Point(3, 4));
         var builder = new DrawBuilder();
@@ -108,6 +113,7 @@ public sealed class DrawCommandListTests
                     DrawRectangle(context);
                 DrawRectangle(context);
             }
+
             DrawRectangle(context);
         }, 2, new Point(3, 4));
         var commands = screen.CreateDrawCommandList();
@@ -149,8 +155,10 @@ public sealed class DrawCommandListTests
                         DrawRectangle(context);
                     DrawRectangle(context);
                 }
+
                 DrawRectangle(context);
             }
+
             DrawRectangle(context);
         }, 2, new Point(5, 5));
         var builder = new DrawBuilder();
@@ -159,17 +167,19 @@ public sealed class DrawCommandListTests
 
         Assert.Equal(5, builder.RectangleCount);
         Assert.Equal(new Vertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[0]);
-        Assert.Equal(new Vertex(21, 21, 1, 1, 1, 0.25f, drawDataIndex: builder.Vertices[4].DrawDataIndex), builder.Vertices[4]);
+        Assert.Equal(new Vertex(21, 21, 1, 1, 1, 0.25f, drawDataIndex: builder.Vertices[4].DrawDataIndex),
+            builder.Vertices[4]);
         Assert.Equal(new Vertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[8]);
-        Assert.Equal(new Vertex(10, 10, 1, 1, 1, 0.25f, drawDataIndex: builder.Vertices[12].DrawDataIndex), builder.Vertices[12]);
+        Assert.Equal(new Vertex(10, 10, 1, 1, 1, 0.25f, drawDataIndex: builder.Vertices[12].DrawDataIndex),
+            builder.Vertices[12]);
         Assert.Equal(new Vertex(10, 10, 1, 1, 1, 1), builder.Vertices[16]);
         Assert.Equal(
             [new Batch(new Scissor(0, 0, 100, 100), 0, 30)],
             builder.Batches.ToArray());
         var nested = builder.DrawData[(int)builder.Vertices[4].DrawDataIndex];
-        Assert.Equal(new System.Numerics.Vector4(21, 21, 22, 22), builder.ClipData[(int)nested.ClipIndex].Bounds);
+        Assert.Equal(new Vector4(21, 21, 22, 22), builder.ClipData[(int)nested.ClipIndex].Bounds);
         var parent = builder.DrawData[(int)builder.Vertices[12].DrawDataIndex];
-        Assert.Equal(new System.Numerics.Vector4(10, 10, 30, 30), builder.ClipData[(int)parent.ClipIndex].Bounds);
+        Assert.Equal(new Vector4(10, 10, 30, 30), builder.ClipData[(int)parent.ClipIndex].Bounds);
     }
 
     [Fact]
@@ -191,15 +201,17 @@ public sealed class DrawCommandListTests
         builder.Build(commands, 100, 100, false);
 
         Assert.Equal(2, builder.RectangleCount);
-        Assert.Equal(new Vertex(8, 12, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
-        Assert.Equal(new Vertex(16, 18, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
+        Assert.Equal(new Vertex(8, 12, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
+            builder.Vertices[0]);
+        Assert.Equal(new Vertex(16, 18, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
+            builder.Vertices[2]);
         Assert.Equal(new Vertex(10.5f, 16, 0, 1, 0, 1), builder.Vertices[4]);
         Assert.Equal(new Vertex(12.5f, 19, 0, 1, 0, 1), builder.Vertices[6]);
         Assert.Equal(
             [new Batch(new Scissor(0, 0, 100, 100), 0, 12)],
             builder.Batches.ToArray());
         var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
-        Assert.Equal(new System.Numerics.Vector4(6, 8, 16, 18), builder.ClipData[(int)data.ClipIndex].Bounds);
+        Assert.Equal(new Vector4(6, 8, 16, 18), builder.ClipData[(int)data.ClipIndex].Bounds);
     }
 
     [Fact]
@@ -361,8 +373,11 @@ public sealed class DrawCommandListTests
             errors.Add(Record.Exception(commands.Clear));
             errors.Add(Record.Exception(() => { _ = commands.Count; }));
             errors.Add(Record.Exception(() => { _ = commands[0]; }));
-            errors.Add(Record.Exception(() => { using var enumerator = commands.GetEnumerator(); }));
-            errors.Add(Record.Exception(() => { _ = ((System.Collections.IEnumerable)commands).GetEnumerator(); }));
+            errors.Add(Record.Exception(() =>
+            {
+                using var enumerator = commands.GetEnumerator();
+            }));
+            errors.Add(Record.Exception(() => { _ = ((IEnumerable)commands).GetEnumerator(); }));
             errors.Add(Record.Exception(screen!.CreateDrawCommandList));
             DrawRectangle(context);
         });
@@ -437,6 +452,7 @@ public sealed class DrawCommandListTests
             {
                 orderError = exception;
             }
+
             opacity.Dispose();
             scale.Dispose();
             transform.Dispose();
@@ -448,6 +464,7 @@ public sealed class DrawCommandListTests
             using (context.PushOpacity(0.5))
             {
             }
+
             DrawRectangle(context);
         });
 
@@ -489,24 +506,30 @@ public sealed class DrawCommandListTests
                         DrawRectangle(context);
                     DrawRectangle(context);
                 }
+
                 DrawRectangle(context);
             }
+
             DrawRectangle(context);
         });
         var builder = new DrawBuilder();
         builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
 
-        Assert.Equal(new Vertex(12, 22, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
-        Assert.Equal(new Vertex(20, 30, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
-        Assert.Equal(new Vertex(10, 20, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[4].DrawDataIndex), builder.Vertices[4]);
-        Assert.Equal(new Vertex(14, 24, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[4].DrawDataIndex), builder.Vertices[6]);
+        Assert.Equal(new Vertex(12, 22, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
+            builder.Vertices[0]);
+        Assert.Equal(new Vertex(20, 30, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
+            builder.Vertices[2]);
+        Assert.Equal(new Vertex(10, 20, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[4].DrawDataIndex),
+            builder.Vertices[4]);
+        Assert.Equal(new Vertex(14, 24, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[4].DrawDataIndex),
+            builder.Vertices[6]);
         Assert.Equal(new Vertex(10, 20, 1, 1, 1, 1), builder.Vertices[8]);
         Assert.Equal(new Vertex(0, 0, 1, 1, 1, 1), builder.Vertices[12]);
         Assert.Equal(
             [new Batch(new Scissor(0, 0, 100, 100), 0, 24)],
             builder.Batches.ToArray());
         var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
-        Assert.Equal(new System.Numerics.Vector4(10, 20, 20, 30), builder.ClipData[(int)data.ClipIndex].Bounds);
+        Assert.Equal(new Vector4(10, 20, 20, 30), builder.ClipData[(int)data.ClipIndex].Bounds);
         Assert.Equal(builder.Vertices[0].DrawDataIndex, builder.Vertices[4].DrawDataIndex);
     }
 
@@ -518,7 +541,7 @@ public sealed class DrawCommandListTests
         return screen;
     }
 
-    private static void Arrange(Node node, Point origin)
+    private static void Arrange(UIElement node, Point origin)
     {
         node.Measure(new Size(40, 40));
         node.Arrange(new Rect(origin.X, origin.Y, 40, 40));
@@ -527,7 +550,7 @@ public sealed class DrawCommandListTests
     private static void DrawRectangle(DrawingContext context) =>
         context.FillRectangle(new Rect(0, 0, 2, 2), new Color(255, 255, 255));
 
-    private sealed class DrawingNode : Node
+    private sealed class DrawingNode : UIElement
     {
         internal Action<DrawingContext>? DrawAction { get; set; }
 

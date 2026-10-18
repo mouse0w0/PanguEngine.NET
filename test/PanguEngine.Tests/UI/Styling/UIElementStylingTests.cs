@@ -7,7 +7,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI.Styling;
 
-public sealed class NodeStylingTests
+public sealed class UIElementStylingTests
 {
     private static readonly PseudoClass Loading = PseudoClass.Get("loading");
     private static readonly PseudoClass Phantom = PseudoClass.Get("phantom");
@@ -139,7 +139,8 @@ public sealed class NodeStylingTests
             changes.Add(e);
             if (changes.Count == 1)
                 button.SetValue(ReferenceEquals(e.Property, Region.BackgroundProperty)
-                    ? Region.BorderBrushProperty : Region.BackgroundProperty, Brush(9));
+                    ? Region.BorderBrushProperty
+                    : Region.BackgroundProperty, Brush(9));
         };
         var sheet = new StyleSheet([
             Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
@@ -153,7 +154,8 @@ public sealed class NodeStylingTests
         Assert.NotSame(changes[0].Property, changes[1].Property);
         Assert.Equal(Brush(9), changes[1].NewValue);
         var maskedProperty = ReferenceEquals(changes[0].Property, Region.BackgroundProperty)
-            ? Region.BorderBrushProperty : Region.BackgroundProperty;
+            ? Region.BorderBrushProperty
+            : Region.BackgroundProperty;
         Assert.Equal(Brush(9), button.GetValue(maskedProperty));
     }
 
@@ -181,7 +183,8 @@ public sealed class NodeStylingTests
             changes.Add(e);
             if (changes.Count == 1)
                 button.SetValue(ReferenceEquals(e.Property, Region.BackgroundProperty)
-                    ? Region.BorderBrushProperty : Region.BackgroundProperty, Brush(9));
+                    ? Region.BorderBrushProperty
+                    : Region.BackgroundProperty, Brush(9));
         };
 
         button.Classes.Add("primary");
@@ -191,7 +194,8 @@ public sealed class NodeStylingTests
         Assert.NotSame(changes[0].Property, changes[1].Property);
         Assert.Equal(Brush(9), changes[1].NewValue);
         var maskedProperty = ReferenceEquals(changes[0].Property, Region.BackgroundProperty)
-            ? Region.BorderBrushProperty : Region.BackgroundProperty;
+            ? Region.BorderBrushProperty
+            : Region.BackgroundProperty;
         Assert.Equal(Brush(9), button.GetValue(maskedProperty));
     }
 
@@ -235,13 +239,15 @@ public sealed class NodeStylingTests
         root.Children.Add(failing);
         root.Children.Add(last);
         var screen = new Screen(root);
-        screen.SetStyleSheets([new StyleSheet([
-            Rule(Selector<Panel>(), Setter(Node.OpacityProperty, 0.4)),
-            Rule(Selector<GuardedStyleNode>(), Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                Rule(Selector<Panel>(), Setter(UIElement.OpacityProperty, 0.4)),
+                Rule(Selector<GuardedStyleNode>(), Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
+            ])
+        ]);
         var firstNotifications = 0;
         first.PropertyChanged += (_, args) =>
-            firstNotifications += args.Property == Node.OpacityProperty ? 1 : 0;
+            firstNotifications += args.Property == UIElement.OpacityProperty ? 1 : 0;
 
         GuardedValue.ThrowOnCompare = true;
         try
@@ -283,7 +289,7 @@ public sealed class NodeStylingTests
         var notifications = 0;
         first.PropertyChanged += (_, args) =>
         {
-            if (args.Property != Node.OpacityProperty)
+            if (args.Property != UIElement.OpacityProperty)
                 return;
             notifications++;
             last.Classes.Add("active");
@@ -317,7 +323,7 @@ public sealed class NodeStylingTests
         var expected = new InvalidOperationException("notification failed");
         first.PropertyChanged += (_, args) =>
         {
-            if (args.Property == Node.OpacityProperty)
+            if (args.Property == UIElement.OpacityProperty)
                 throw expected;
         };
 
@@ -368,7 +374,7 @@ public sealed class NodeStylingTests
         screen.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.4; } Button { background: #010203; }")]);
         first.PropertyChanged += (_, args) =>
         {
-            if (args.Property == Node.OpacityProperty)
+            if (args.Property == UIElement.OpacityProperty)
                 root.Children.Remove(last);
         };
 
@@ -501,7 +507,7 @@ public sealed class NodeStylingTests
         var changes = new List<SetChangedEventArgs<string>>();
         node.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 order.Add("style");
         };
         classes.Changed += (sender, change) =>
@@ -574,10 +580,12 @@ public sealed class NodeStylingTests
     {
         var node = new GuardedStyleNode();
         var screen = new Screen(node);
-        screen.SetStyleSheets([new StyleSheet([
-            Rule(StyleSelector.For<GuardedStyleNode>(),
-                Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
-        ])]);
+        screen.SetStyleSheets([
+            new StyleSheet([
+                Rule(StyleSelector.For<GuardedStyleNode>(),
+                    Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
+            ])
+        ]);
         node.Classes.Add("kept");
         screen.Root!.UpdateStyles();
         var previousSource = Assert.Single(node.GetStyleValueSources(GuardedStyleNode.ValueProperty));
@@ -618,7 +626,7 @@ public sealed class NodeStylingTests
         var collectionNotifications = 0;
         node.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Node.OpacityProperty) && failNotification)
+            if (ReferenceEquals(e.Property, UIElement.OpacityProperty) && failNotification)
                 throw expected;
         };
         node.Classes.Changed += (_, _) => collectionNotifications++;
@@ -732,6 +740,7 @@ public sealed class NodeStylingTests
     {
         var node = new Canvas();
         node.Classes.Add("kept");
+
         IEnumerable<string> Input()
         {
             yield return "next";
@@ -758,7 +767,7 @@ public sealed class NodeStylingTests
         node.Classes.Changed += removed;
         node.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty) || changedSubscription)
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty) || changedSubscription)
                 return;
             changedSubscription = true;
             node.Classes.Changed -= removed;
@@ -784,7 +793,7 @@ public sealed class NodeStylingTests
         var order = new List<(string Kind, double Opacity)>();
         node.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 return;
             order.Add(("style", node.Opacity));
             if (!node.Classes.Contains("extra"))
@@ -813,7 +822,7 @@ public sealed class NodeStylingTests
         var collectionNotifications = 0;
         node.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 return;
             styleNotifications++;
             if (!node.Classes.Contains("extra"))
@@ -851,7 +860,7 @@ public sealed class NodeStylingTests
         var collectionNotifications = 0;
         node.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty) || !reactToNotification)
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty) || !reactToNotification)
                 return;
             if (!node.Classes.Contains("extra"))
                 node.Classes.Add("extra");
@@ -935,17 +944,17 @@ public sealed class NodeStylingTests
         screen.SetStyleSheets([StyleSheet.Parse(".plain, #target { opacity: 0.4; }")]);
         button.Classes.Add("plain");
         button.GetStyleRoot().UpdateStyles();
-        Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(Node.OpacityProperty)).SelectorText);
+        Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
         button.StyleId = "target";
         button.Opacity = 0.9;
         button.GetStyleRoot().UpdateStyles();
-        var source = Assert.Single(button.GetStyleValueSources(Node.OpacityProperty));
+        var source = Assert.Single(button.GetStyleValueSources(UIElement.OpacityProperty));
         Assert.Equal("#target", source.SelectorText);
         Assert.True(source.IsMaskedByLocalValue);
         button.StyleId = null;
         button.GetStyleRoot().UpdateStyles();
-        Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(Node.OpacityProperty)).SelectorText);
-        button.ClearValue(Node.OpacityProperty);
+        Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
+        button.ClearValue(UIElement.OpacityProperty);
         Assert.Equal(0.4, button.Opacity);
         button.Classes.Remove("plain");
         button.GetStyleRoot().UpdateStyles();
@@ -957,7 +966,7 @@ public sealed class NodeStylingTests
     {
         var node = new Canvas();
 
-        Assert.Empty(node.GetStyleValueSources(Node.WidthProperty));
+        Assert.Empty(node.GetStyleValueSources(UIElement.WidthProperty));
         Assert.Throws<ArgumentException>(() =>
             node.GetStyleValueSources(Text.ContentProperty));
     }
@@ -1065,7 +1074,7 @@ public sealed class NodeStylingTests
             Setter(Region.BackgroundProperty, Brush(9))));
         button.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Node.IsHoveredProperty))
+            if (ReferenceEquals(e.Property, UIElement.IsHoveredProperty))
                 throw new InvalidOperationException("hover-handler-fail");
         };
 
@@ -1085,23 +1094,23 @@ public sealed class NodeStylingTests
             node,
             Rule(
                 StyleSelector.For<GuardedStyleNode>(),
-                Setter(Node.OpacityProperty, 0.25)),
+                Setter(UIElement.OpacityProperty, 0.25)),
             Rule(
                 StyleSelector.For<GuardedStyleNode>(),
                 Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5))),
             Rule(
                 StyleSelector.For<GuardedStyleNode>(pseudoClasses: [PseudoClass.Hover]),
-                Setter(Node.OpacityProperty, 0.75)));
+                Setter(UIElement.OpacityProperty, 0.75)));
 
         Assert.Equal(0.25, node.Opacity);
         var hoverEvents = 0;
         var hoverSubscriptions = 0;
         node.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, Node.IsHoveredProperty))
+            if (ReferenceEquals(args.Property, UIElement.IsHoveredProperty))
                 hoverEvents++;
         };
-        using var subscription = node.Subscribe(Node.IsHoveredProperty, (_, _) => hoverSubscriptions++);
+        using var subscription = node.Subscribe(UIElement.IsHoveredProperty, (_, _) => hoverSubscriptions++);
         GuardedValue.ThrowOnCompare = true;
         try
         {
@@ -1162,7 +1171,7 @@ public sealed class NodeStylingTests
             host,
             Rule(
                 StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
-                Setter(Node.OpacityProperty, 0.4)));
+                Setter(UIElement.OpacityProperty, 0.4)));
 
         Assert.Equal(1d, host.Opacity);
 
@@ -1183,7 +1192,7 @@ public sealed class NodeStylingTests
             host,
             Rule(
                 StyleSelector.For<PseudoClassHost>(pseudoClasses: [PseudoClass.Hover, Loading]),
-                Setter(Node.OpacityProperty, 0.4)));
+                Setter(UIElement.OpacityProperty, 0.4)));
 
         host.Set(PseudoClass.Hover, true);
         host.GetStyleRoot().UpdateStyles();
@@ -1204,12 +1213,12 @@ public sealed class NodeStylingTests
         var host = new PseudoClassHost();
         ApplyTheme(host, Rule(
             StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
-            Setter(Node.OpacityProperty, 0.4)));
+            Setter(UIElement.OpacityProperty, 0.4)));
         var expected = new InvalidOperationException("style notification failed");
         var notifications = 0;
         host.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 return;
             notifications++;
             throw expected;
@@ -1219,7 +1228,7 @@ public sealed class NodeStylingTests
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(host.GetStyleRoot().UpdateStyles));
         Assert.True(host.IsActive(Loading));
         Assert.Equal(0.4, host.Opacity);
-        Assert.Single(host.GetStyleValueSources(Node.OpacityProperty));
+        Assert.Single(host.GetStyleValueSources(UIElement.OpacityProperty));
 
         host.Set(Loading, true);
         host.GetStyleRoot().UpdateStyles();
@@ -1234,11 +1243,11 @@ public sealed class NodeStylingTests
             host,
             Rule(
                 StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
-                Setter(Node.OpacityProperty, 0.4)));
+                Setter(UIElement.OpacityProperty, 0.4)));
 
         var refreshes = 0;
         host.PropertyChanged += (_, e) =>
-            refreshes += ReferenceEquals(e.Property, Node.OpacityProperty) ? 1 : 0;
+            refreshes += ReferenceEquals(e.Property, UIElement.OpacityProperty) ? 1 : 0;
 
         host.Set(PseudoClass.Get("LOADING"), true);
         host.GetStyleRoot().UpdateStyles();
@@ -1257,11 +1266,11 @@ public sealed class NodeStylingTests
             host,
             Rule(
                 StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
-                Setter(Node.OpacityProperty, 0.4)));
+                Setter(UIElement.OpacityProperty, 0.4)));
 
         var refreshes = 0;
         host.PropertyChanged += (_, e) =>
-            refreshes += ReferenceEquals(e.Property, Node.OpacityProperty) ? 1 : 0;
+            refreshes += ReferenceEquals(e.Property, UIElement.OpacityProperty) ? 1 : 0;
 
         host.Set(Loading, false);
         host.GetStyleRoot().UpdateStyles();
@@ -1284,14 +1293,14 @@ public sealed class NodeStylingTests
             host,
             Rule(
                 StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
-                Setter(Node.OpacityProperty, 0.4)),
+                Setter(UIElement.OpacityProperty, 0.4)),
             Rule(
                 StyleSelector.For<PseudoClassHost>(pseudoClasses: [Phantom]),
-                Setter(Node.OpacityProperty, 0.7)));
+                Setter(UIElement.OpacityProperty, 0.7)));
         var notifications = 0;
         host.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 return;
             notifications++;
             if (host.Opacity != 0.4)
@@ -1328,7 +1337,7 @@ public sealed class NodeStylingTests
             host,
             Rule(
                 StyleSelector.For<PseudoClassHost>(pseudoClasses: [Phantom]),
-                Setter(Node.OpacityProperty, 0.4)));
+                Setter(UIElement.OpacityProperty, 0.4)));
 
         Assert.Equal(1d, host.Opacity);
 
@@ -1459,20 +1468,20 @@ public sealed class NodeStylingTests
         var screen = new Screen(host);
         screen.SetStyleSheets([
             new StyleSheet([
-                Rule(StyleSelector.For<PseudoClassHost>(), Setter(Node.OpacityProperty, 0.3))
+                Rule(StyleSelector.For<PseudoClassHost>(), Setter(UIElement.OpacityProperty, 0.3))
             ])
         ]);
         screen.Root!.UpdateStyles();
         Exception? error = null;
         host.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 error = Record.Exception(() => host.Set(Loading, true));
         };
 
         screen.SetStyleSheets([
             new StyleSheet([
-                Rule(StyleSelector.For<PseudoClassHost>(), Setter(Node.OpacityProperty, 0.8))
+                Rule(StyleSelector.For<PseudoClassHost>(), Setter(UIElement.OpacityProperty, 0.8))
             ])
         ]);
         screen.Root!.UpdateStyles();
@@ -1613,7 +1622,7 @@ public sealed class NodeStylingTests
         else
             node.PropertyChanged += (_, args) =>
             {
-                if (args.Property == Node.OpacityProperty)
+                if (args.Property == UIElement.OpacityProperty)
                     updateOther();
             };
         screen.SetStyleSheets([StyleSheet.Parse("* { opacity: 0.4; }")]);
@@ -1632,7 +1641,7 @@ public sealed class NodeStylingTests
         }
     }
 
-    private static void ApplyTheme(Node node, params StyleRule[] rules)
+    private static void ApplyTheme(UIElement node, params StyleRule[] rules)
     {
         var screen = new Screen(node);
         screen.SetStyleSheets([new StyleSheet(rules)]);
@@ -1642,7 +1651,7 @@ public sealed class NodeStylingTests
     private static StyleSelector Selector<TNode>(
         string? id = null,
         params string[] classes)
-        where TNode : Node =>
+        where TNode : UIElement =>
         StyleSelector.For<TNode>(classes, id);
 
     private static StyleRule Rule(StyleSelector selector, params StyleSetter[] setters) =>
@@ -1655,7 +1664,7 @@ public sealed class NodeStylingTests
 
     private static Brush Brush(byte r, byte g, byte b) => new SolidColorBrush(r, g, b);
 
-    private sealed class EquatableNode : Node
+    private sealed class EquatableNode : UIElement
     {
         internal static readonly Property<EquatableValue> ValueProperty =
             Property.Register<EquatableNode, EquatableValue>(
@@ -1670,7 +1679,7 @@ public sealed class NodeStylingTests
         private int Value => value;
     }
 
-    private class PseudoClassHost : Node
+    private class PseudoClassHost : UIElement
     {
         internal void Set(PseudoClass pseudoClass, bool active) => SetPseudoClass(pseudoClass, active);
 
@@ -1697,7 +1706,7 @@ public sealed class NodeStylingTests
         public override int GetHashCode() => number.GetHashCode();
     }
 
-    private sealed class GuardedStyleNode : Node
+    private sealed class GuardedStyleNode : UIElement
     {
         internal static readonly Property<GuardedValue> ValueProperty =
             Property.Register<GuardedStyleNode, GuardedValue>("Value", new GuardedValue(0),

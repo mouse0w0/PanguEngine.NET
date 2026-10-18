@@ -20,9 +20,9 @@ public sealed class ControlTests
         Assert.Equal(typeof(Region), typeof(Control).BaseType);
         Assert.False(typeof(Panel).IsAssignableFrom(typeof(Control)));
         Assert.Null(typeof(Control).GetProperty(
-            nameof(Parent.Children),
+            nameof(Container.Children),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
-        Assert.IsAssignableFrom<IReadOnlyList<Node>>(control.ReadOnlyChildren);
+        Assert.IsAssignableFrom<IReadOnlyList<UIElement>>(control.ReadOnlyChildren);
 
         control.Add(first);
         control.Add(second);
@@ -52,22 +52,22 @@ public sealed class ControlTests
             defaultValue: false,
             isReadOnly: true);
         Assert.Null(typeof(Control).GetField(
-            nameof(Node.IsEnabledProperty),
+            nameof(UIElement.IsEnabledProperty),
             BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetField(
-            nameof(Node.IsHoveredProperty),
+            nameof(UIElement.IsHoveredProperty),
             BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetField(
-            nameof(Node.IsFocusedProperty),
+            nameof(UIElement.IsFocusedProperty),
             BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetProperty(
-            nameof(Node.IsEnabled),
+            nameof(UIElement.IsEnabled),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetProperty(
-            nameof(Node.IsHovered),
+            nameof(UIElement.IsHovered),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetProperty(
-            nameof(Node.IsFocused),
+            nameof(UIElement.IsFocused),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
         Assert.False(control.IsPressed);
@@ -283,7 +283,7 @@ public sealed class ControlTests
         child.PointerClicked += (_, _) => childClicks++;
         var enabledNotifications = 0;
         using var subscription = control.Subscribe(
-            Node.IsEnabledProperty,
+            UIElement.IsEnabledProperty,
             (_, args) =>
             {
                 if (args.NewValue)
@@ -394,7 +394,7 @@ public sealed class ControlTests
         var lostError = new InvalidOperationException("lost");
         var exitError = new InvalidOperationException("exit");
         var events = new List<string>();
-        _ = inner.Subscribe(Node.IsFocusedProperty, (_, args) =>
+        _ = inner.Subscribe(UIElement.IsFocusedProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw focusedError;
@@ -409,12 +409,12 @@ public sealed class ControlTests
             if (!args.NewValue)
                 throw outerPressedError;
         });
-        _ = inner.Subscribe(Node.IsHoveredProperty, (_, args) =>
+        _ = inner.Subscribe(UIElement.IsHoveredProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw innerHoveredError;
         });
-        _ = outer.Subscribe(Node.IsHoveredProperty, (_, args) =>
+        _ = outer.Subscribe(UIElement.IsHoveredProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw outerHoveredError;
@@ -468,7 +468,7 @@ public sealed class ControlTests
         });
         control.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, Node.IsEnabledProperty))
+            if (ReferenceEquals(args.Property, UIElement.IsEnabledProperty))
                 throw enabledError;
         };
         manager.Open(screen);
@@ -498,7 +498,7 @@ public sealed class ControlTests
         screen.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<TestControl>(pseudoClasses: [PseudoClass.Disabled]), [
-                    StyleSetter.Create(Node.OpacityProperty, 0.5)
+                    StyleSetter.Create(UIElement.OpacityProperty, 0.5)
                 ])
             ])
         ]);
@@ -513,9 +513,9 @@ public sealed class ControlTests
         });
         control.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, Node.IsEnabledProperty))
+            if (ReferenceEquals(args.Property, UIElement.IsEnabledProperty))
                 enabledNotifications++;
-            if (ReferenceEquals(args.Property, Node.OpacityProperty))
+            if (ReferenceEquals(args.Property, UIElement.OpacityProperty))
             {
                 opacityNotifications++;
                 throw internalError;
@@ -627,7 +627,7 @@ public sealed class ControlTests
     }
 
     private static T Place<T>(Canvas parent, T child, double x, double y, double width, double height)
-        where T : Node
+        where T : UIElement
     {
         child.Width = width;
         child.Height = height;
@@ -639,12 +639,12 @@ public sealed class ControlTests
 
     private sealed class TestControl : Control
     {
-        internal void Add(Node child) => Children.Add(child);
-        internal bool Remove(Node child) => Children.Remove(child);
+        internal void Add(UIElement child) => Children.Add(child);
+        internal bool Remove(UIElement child) => Children.Remove(child);
         internal void Clear() => Children.Clear();
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
     }
 }

@@ -7,7 +7,7 @@ namespace PanguEngine.UI.Controls;
 /// <summary>
 /// Displays a shared UI image using retained layout and drawing semantics.
 /// </summary>
-public sealed class ImageView : Node
+public sealed class ImageView : UIElement
 {
     /// <summary>
     /// Identifies the image source property.
@@ -26,7 +26,8 @@ public sealed class ImageView : Node
             nameof(Stretch),
             ImageStretch.Uniform,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
-            validate: static value => value is ImageStretch.None or ImageStretch.Fill or ImageStretch.Uniform or ImageStretch.UniformToFill,
+            validate: static value => value is ImageStretch.None or ImageStretch.Fill or ImageStretch.Uniform
+                or ImageStretch.UniformToFill,
             validationMessage: "Image stretch has an undefined value.");
 
     /// <summary>

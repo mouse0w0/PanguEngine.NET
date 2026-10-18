@@ -99,6 +99,7 @@ public sealed class FocusTargetTests
             case "ancestor-hidden": targetGroup.Visibility = Visibility.Hidden; break;
             case "foreign": otherRoot.Children.Add(targetGroup); break;
         }
+
         screen.Open();
         otherScreen.Open();
         try
@@ -143,6 +144,7 @@ public sealed class FocusTargetTests
             case "not-focusable": proxy.Focusable = false; break;
             case "ancestor-hidden": group.Visibility = Visibility.Hidden; break;
         }
+
         var screen = new Screen(root);
         screen.Open();
         try
@@ -248,11 +250,11 @@ public sealed class FocusTargetTests
         }
     }
 
-    private sealed class FocusProxy(Node target) : Control
+    private sealed class FocusProxy(UIElement target) : Control
     {
         internal int ResolveCalls { get; private set; }
 
-        protected internal override Node GetFocusTarget()
+        protected internal override UIElement GetFocusTarget()
         {
             ResolveCalls++;
             return target;
@@ -261,6 +263,6 @@ public sealed class FocusTargetTests
 
     private sealed class ThrowingFocusProxy(Exception failure) : Control
     {
-        protected internal override Node GetFocusTarget() => throw failure;
+        protected internal override UIElement GetFocusTarget() => throw failure;
     }
 }

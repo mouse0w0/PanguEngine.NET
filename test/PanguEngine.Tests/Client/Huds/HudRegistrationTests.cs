@@ -442,7 +442,7 @@ public sealed class HudRegistrationTests
     private static Panel HudRoot(UiManager manager) =>
         Assert.IsType<Panel>(manager.Hud.Screen.Root);
 
-    private sealed class RecordingHud(Node? root = null, List<string>? events = null, string name = "hud")
+    private sealed class RecordingHud(UIElement? root = null, List<string>? events = null, string name = "hud")
         : Hud(root ?? new Panel())
     {
         internal string Name { get; } = name;

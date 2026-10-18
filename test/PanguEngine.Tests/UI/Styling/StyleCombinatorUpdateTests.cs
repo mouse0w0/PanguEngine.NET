@@ -46,8 +46,10 @@ public sealed class StyleCombinatorUpdateTests
         root.Children.Add(first);
         root.Children.Add(second);
         var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            ".unused, .leader + .target { opacity: 0.4; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse(
+                ".unused, .leader + .target { opacity: 0.4; }")
+        ]);
 
         first.Classes.Add("leader");
         screen.Root!.UpdateStyles();
@@ -130,9 +132,11 @@ public sealed class StyleCombinatorUpdateTests
         root.Children.Add(source);
         root.Children.Add(destination);
         var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            prefix + ".source > .target { opacity: 0.4; }" +
-            prefix + ".destination > .target { opacity: 0.7; }")]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse(
+                prefix + ".source > .target { opacity: 0.4; }" +
+                prefix + ".destination > .target { opacity: 0.7; }")
+        ]);
         screen.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
@@ -332,7 +336,7 @@ public sealed class StyleCombinatorUpdateTests
 
         var notifications = 0;
         target.PropertyChanged += (_, e) =>
-            notifications += ReferenceEquals(e.Property, Node.OpacityProperty) ? 1 : 0;
+            notifications += ReferenceEquals(e.Property, UIElement.OpacityProperty) ? 1 : 0;
 
         root.Children.Add(target);
 
@@ -352,10 +356,12 @@ public sealed class StyleCombinatorUpdateTests
         host.Children.Add(first);
         host.Children.Add(second);
         var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse("""
-            .host .first { opacity: 0.4; }
-            .host .second { opacity: 0.7; }
-            """)]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse("""
+                             .host .first { opacity: 0.4; }
+                             .host .second { opacity: 0.7; }
+                             """)
+        ]);
         screen.Root!.UpdateStyles();
         Assert.Equal(0.4, first.Opacity);
         Assert.Equal(0.7, second.Opacity);
@@ -368,7 +374,7 @@ public sealed class StyleCombinatorUpdateTests
         double? observed = null;
         first.PropertyChanged += (_, e) =>
         {
-            if (ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 observed ??= second.Opacity;
         };
 
@@ -386,15 +392,17 @@ public sealed class StyleCombinatorUpdateTests
         var target = MakePanel("target");
         host.Children.Add(target);
         var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse("""
-            .host .target { opacity: 0.4; }
-            .host.extra .target { opacity: 0.9; }
-            """)]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse("""
+                             .host .target { opacity: 0.4; }
+                             .host.extra .target { opacity: 0.9; }
+                             """)
+        ]);
 
         var notifications = 0;
         target.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 return;
             notifications++;
             if (!host.Classes.Contains("extra"))
@@ -500,13 +508,13 @@ public sealed class StyleCombinatorUpdateTests
 
         target.Opacity = 0.9;
 
-        var masked = Assert.Single(target.GetStyleValueSources(Node.OpacityProperty));
+        var masked = Assert.Single(target.GetStyleValueSources(UIElement.OpacityProperty));
         Assert.True(masked.IsMaskedByLocalValue);
         Assert.Equal(".host .target", masked.SelectorText);
 
-        target.ClearValue(Node.OpacityProperty);
+        target.ClearValue(UIElement.OpacityProperty);
 
-        var restored = Assert.Single(target.GetStyleValueSources(Node.OpacityProperty));
+        var restored = Assert.Single(target.GetStyleValueSources(UIElement.OpacityProperty));
         Assert.False(restored.IsMaskedByLocalValue);
         Assert.Equal(0.4, target.Opacity);
     }
@@ -578,15 +586,17 @@ public sealed class StyleCombinatorUpdateTests
         root.Children.Add(host);
         root.Children.Add(otherHost);
         var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("""
-            .host .target { opacity: 0.4; }
-            .other-host .other { opacity: 0.9; }
-            """)]);
+        screen.SetStyleSheets([
+            StyleSheet.Parse("""
+                             .host .target { opacity: 0.4; }
+                             .other-host .other { opacity: 0.9; }
+                             """)
+        ]);
 
         double? observed = null;
         target.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 return;
             otherHost.Classes.Add("other-host");
             observed = other.Opacity;
@@ -614,7 +624,7 @@ public sealed class StyleCombinatorUpdateTests
         var notifications = 0;
         target.PropertyChanged += (_, e) =>
         {
-            if (!ReferenceEquals(e.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(e.Property, UIElement.OpacityProperty))
                 return;
             notifications++;
             throw expected;
@@ -625,7 +635,7 @@ public sealed class StyleCombinatorUpdateTests
 
         Assert.Contains("host", (IReadOnlySet<string>)host.Classes);
         Assert.Equal(0.4, target.Opacity);
-        Assert.Single(target.GetStyleValueSources(Node.OpacityProperty));
+        Assert.Single(target.GetStyleValueSources(UIElement.OpacityProperty));
 
         host.Classes.Add("host");
         screen.Root!.UpdateStyles();
@@ -646,7 +656,7 @@ public sealed class StyleCombinatorUpdateTests
 
         var notifications = 0;
         target.PropertyChanged += (_, e) =>
-            notifications += ReferenceEquals(e.Property, Node.OpacityProperty) ? 1 : 0;
+            notifications += ReferenceEquals(e.Property, UIElement.OpacityProperty) ? 1 : 0;
 
         host.Set("loading", true);
         host.Classes.Add("host");
@@ -907,7 +917,7 @@ public sealed class StyleCombinatorUpdateTests
         public override int GetHashCode() => number.GetHashCode();
     }
 
-    private sealed class GuardedNode : Node
+    private sealed class GuardedNode : UIElement
     {
         static GuardedNode()
         {
@@ -922,7 +932,7 @@ public sealed class StyleCombinatorUpdateTests
                 comparer: EqualityComparer<GuardedValue>.Default);
     }
 
-    private sealed class MutationCallbackNode : Node
+    private sealed class MutationCallbackNode : UIElement
     {
         static MutationCallbackNode()
         {

@@ -211,7 +211,7 @@ public sealed class InputRoutingTests
     {
         var (manager, screen, root) = OpenScene();
         var leaf = Place(root, new TestNode { Focusable = true }, 0, 0, 20, 20);
-        var wheels = new List<(Node Source, double X, double Y)>();
+        var wheels = new List<(UIElement Source, double X, double Y)>();
         leaf.PointerWheel += (_, eventArgs) =>
             wheels.Add((eventArgs.Source, eventArgs.DeltaX, eventArgs.DeltaY));
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -248,7 +248,7 @@ public sealed class InputRoutingTests
         var target = Place(root, new TestNode(), 30, 0, 20, 20);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
-        Node? focusDuringPressed = focused;
+        UIElement? focusDuringPressed = focused;
         target.PointerPressed += (_, _) => focusDuringPressed = screen.FocusedNode;
 
         manager.ProcessPointerPressed(new Point(35, 5), MouseButton.Left, KeyModifiers.None);
@@ -802,7 +802,7 @@ public sealed class InputRoutingTests
                 leaf.GotFocus += (_, _) => RequestClose();
                 break;
             case "hover-state":
-                _ = leaf.Subscribe(Node.IsHoveredProperty, (_, args) =>
+                _ = leaf.Subscribe(UIElement.IsHoveredProperty, (_, args) =>
                 {
                     if (args.NewValue)
                         RequestClose();
@@ -1183,7 +1183,7 @@ public sealed class InputRoutingTests
         var hoveredError = new InvalidOperationException("hovered");
         var lostError = new InvalidOperationException("lost");
         var exitError = new InvalidOperationException("exit");
-        _ = control.Subscribe(Node.IsFocusedProperty, (_, args) =>
+        _ = control.Subscribe(UIElement.IsFocusedProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw focusedError;
@@ -1193,7 +1193,7 @@ public sealed class InputRoutingTests
             if (!args.NewValue)
                 throw pressedError;
         });
-        _ = control.Subscribe(Node.IsHoveredProperty, (_, args) =>
+        _ = control.Subscribe(UIElement.IsHoveredProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw hoveredError;
@@ -2445,7 +2445,7 @@ public sealed class InputRoutingTests
         source.PrepareFrame(new Size(100, 100));
         Assert.True(targetLeaf.Focus());
         Assert.True(sourceLeaf.Focus());
-        Node? sourceFocusDuringTargetNotification = source.FocusedNode;
+        UIElement? sourceFocusDuringTargetNotification = source.FocusedNode;
         targetLeaf.LostFocus += (_, _) => sourceFocusDuringTargetNotification = source.FocusedNode;
 
         target.Root = sourceRoot;
@@ -2538,7 +2538,7 @@ public sealed class InputRoutingTests
     }
 
     private static T Place<T>(Canvas parent, T child, double x, double y, double width, double height)
-        where T : Node
+        where T : UIElement
     {
         child.Width = width;
         child.Height = height;
@@ -2581,7 +2581,7 @@ public sealed class InputRoutingTests
         return result;
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
     }
 
@@ -2589,7 +2589,7 @@ public sealed class InputRoutingTests
     {
     }
 
-    private sealed class LayoutActionNode : Node
+    private sealed class LayoutActionNode : UIElement
     {
         internal Action? MeasureAction { get; set; }
         internal Action? ArrangeAction { get; set; }
@@ -2604,7 +2604,7 @@ public sealed class InputRoutingTests
             ArrangeAction?.Invoke();
     }
 
-    private sealed class RecordingScreen(Node? root = null) : GameScreen(root)
+    private sealed class RecordingScreen(UIElement? root = null) : GameScreen(root)
     {
         internal Action? Opening { get; set; }
         internal Action? Opened { get; set; }

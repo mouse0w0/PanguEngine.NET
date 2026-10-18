@@ -2,16 +2,16 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.UI;
 
-public sealed partial class NodeList
+public sealed partial class UIElementList
 {
     private void VerifyTreeAccess() => _owner.Screen?.VerifyTreeMutationAccess();
 
-    private void ReplaceChildren(int index, int count, IReadOnlyList<Node> newItems, Action updateStorage)
+    private void ReplaceChildren(int index, int count, IReadOnlyList<UIElement> newItems, Action updateStorage)
     {
         VerifyTreeAccess();
         var oldItems = this.Skip(index).Take(count).ToArray();
-        var replacements = new HashSet<Node>(oldItems, ReferenceEqualityComparer.Instance);
-        var additions = new HashSet<Node>(ReferenceEqualityComparer.Instance);
+        var replacements = new HashSet<UIElement>(oldItems, ReferenceEqualityComparer.Instance);
+        var additions = new HashSet<UIElement>(ReferenceEqualityComparer.Instance);
         foreach (var child in newItems)
         {
             ArgumentNullException.ThrowIfNull(child);
@@ -25,6 +25,7 @@ public sealed partial class NodeList
         {
             VerifyIncomingChild(child);
         }
+
         var hasSource = incoming.Any(child => child.Parent is not null);
         if (hasSource)
         {
@@ -36,24 +37,27 @@ public sealed partial class NodeList
                     throw new InvalidOperationException("The UI node was reparented during removal notification.");
                 VerifyIncomingChild(child);
             }
+
             VerifyTreeAccess();
         }
+
         UpdateChildren(incoming, outgoing, updateStorage);
     }
 
-    private void VerifyIncomingChild(Node child)
+    private void VerifyIncomingChild(UIElement child)
     {
         child.Screen?.VerifyTreeMutationAccess();
-        for (Node? ancestor = _owner; ancestor is not null; ancestor = ancestor.Parent)
+        for (UIElement? ancestor = _owner; ancestor is not null; ancestor = ancestor.Parent)
         {
             if (ReferenceEquals(ancestor, child))
                 throw new InvalidOperationException("Adding the UI node would create a parent cycle.");
         }
+
         if (child.Parent is null && child.Screen is not null)
             throw new InvalidOperationException("A UI screen root must be cleared before it can become a child.");
     }
 
-    private void UpdateChildren(Node[] incoming, Node[] outgoing, Action updateStorage)
+    private void UpdateChildren(UIElement[] incoming, UIElement[] outgoing, Action updateStorage)
     {
         var changedNodes = outgoing.Concat(incoming)
             .Select(child => (Child: child, OldScreen: child.Screen)).ToArray();
@@ -79,18 +83,21 @@ public sealed partial class NodeList
                 if (!ReferenceEquals(oldScreen, child.Screen))
                     child.InvalidateMeasureSubtree();
             }
+
             _owner.InvalidateTreeStructure();
             _owner.InvalidateStyle();
 
-            var styleEntries = new List<Node>();
-            Node.AddRelationshipRefreshEntry(styleEntries, _owner, _owner.Screen?.StyleResolver ?? StyleResolver.Default);
+            var styleEntries = new List<UIElement>();
+            UIElement.AddRelationshipRefreshEntry(styleEntries, _owner,
+                _owner.Screen?.StyleResolver ?? StyleResolver.Default);
             foreach (var (child, oldScreen) in changedNodes)
             {
-                Node.AddSubtreeRefreshEntry(styleEntries, child,
+                UIElement.AddSubtreeRefreshEntry(styleEntries, child,
                     oldScreen?.StyleResolver ?? StyleResolver.Default,
                     child.Screen?.StyleResolver ?? StyleResolver.Default,
                     screenChanged: !ReferenceEquals(oldScreen, child.Screen));
             }
+
             CommitAndNotifyWithStyle(activeScreens, styleEntries);
         }
         finally
@@ -145,6 +152,7 @@ public sealed partial class NodeList
             EndRuntimeOperations(activeScreens);
             throw;
         }
+
         return activeScreens;
     }
 
@@ -156,7 +164,7 @@ public sealed partial class NodeList
 
     private static void CommitAndNotifyWithStyle(
         List<Screen> screens,
-        IReadOnlyList<Node> styleEntries)
+        IReadOnlyList<UIElement> styleEntries)
     {
         var snapshots = new List<(Screen Screen, Screen.InputStateCleanupSnapshot Snapshot)>();
         foreach (var screen in screens)
@@ -164,7 +172,8 @@ public sealed partial class NodeList
             if (screen.CommitInputStateAfterTreeChange() is { } snapshot)
                 snapshots.Add((screen, snapshot));
         }
-        Node.InvalidateStyleSubtreeBatch(styleEntries);
+
+        UIElement.InvalidateStyleSubtreeBatch(styleEntries);
         foreach (var (screen, snapshot) in snapshots)
             screen.NotifyInputStateLoss(snapshot);
     }

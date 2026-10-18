@@ -71,9 +71,9 @@ public sealed class TextTests
         var text = new Text();
 
         AssertProperty(Text.ContentProperty, string.Empty);
-        Assert.Equal(typeof(Node), Text.FontFamilyProperty.OwnerType);
-        Assert.Equal(typeof(Node), Text.ColorProperty.OwnerType);
-        Assert.Equal(typeof(Node), Text.LineHeightProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), Text.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), Text.ColorProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), Text.LineHeightProperty.OwnerType);
         Assert.Equal(new Color(255, 255, 255), Text.ColorProperty.DefaultValue);
         Assert.Equal(1d, Text.LineHeightProperty.DefaultValue);
         AssertProperty(Text.WrappingProperty, TextWrapping.NoWrap);

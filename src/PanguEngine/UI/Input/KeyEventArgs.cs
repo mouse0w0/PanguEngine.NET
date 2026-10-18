@@ -8,7 +8,7 @@ namespace PanguEngine.UI.Input;
 public sealed class KeyEventArgs : InputEventArgs
 {
     internal KeyEventArgs(
-        Node source,
+        UIElement source,
         Key key,
         KeyModifiers modifiers,
         bool isRepeat)

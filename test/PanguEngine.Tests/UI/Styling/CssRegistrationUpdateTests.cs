@@ -52,7 +52,7 @@ public sealed class CssRegistrationUpdateTests
     public void LateAttachedDefinitionWaitsForEachScreenStyleInvalidationAndPreservesLocalValues(string value)
     {
         var name = $"late-offset-{Guid.NewGuid():N}";
-        var property = Property.RegisterAttached<AttachedOwner, Node, double>(name, 0,
+        var property = Property.RegisterAttached<AttachedOwner, UIElement, double>(name, 0,
             onChanged: static (node, _, _) => node.InvalidateMeasure());
         var sheet = StyleSheet.Parse($"* {{ --offset: 8; {name}: {value}; }}");
         var child = new Panel();
@@ -75,7 +75,7 @@ public sealed class CssRegistrationUpdateTests
             Assert.Equal(0d, child.GetValue(property));
             Assert.Equal(0d, secondRoot.GetValue(property));
 
-            CssRegistry.RegisterProperty<Node, double>(name, property, CssValueConverters.ParseLength);
+            CssRegistry.RegisterProperty<UIElement, double>(name, property, CssValueConverters.ParseLength);
 
             first.PrepareFrame(new Size(100, 100));
             second.PrepareFrame(new Size(100, 100));
@@ -127,7 +127,8 @@ public sealed class CssRegistrationUpdateTests
         node.Classes.Add("refresh");
         node.UpdateStyles();
         Assert.Equal(0.7, node.Opacity);
-        Assert.Equal("late-update-tag", Assert.Single(node.GetStyleValueSources(Node.OpacityProperty)).SelectorText);
+        Assert.Equal("late-update-tag",
+            Assert.Single(node.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
     }
 
     [Fact]
@@ -140,10 +141,10 @@ public sealed class CssRegistrationUpdateTests
         screen.SetBaseStyleSheets([]);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               late-ancestor-tag { --alpha: 0.4; }
-                               * { opacity: var(--alpha, 1); }
-                               late-ancestor-tag > Panel { padding: 5; }
-                               """)
+                             late-ancestor-tag { --alpha: 0.4; }
+                             * { opacity: var(--alpha, 1); }
+                             late-ancestor-tag > Panel { padding: 5; }
+                             """)
         ]);
         root.UpdateStyles();
         Assert.Equal(1d, child.Opacity);
@@ -166,7 +167,7 @@ public sealed class CssRegistrationUpdateTests
     public void RegistrationDuringNotificationsWaitsForTheNextStyleInvalidation()
     {
         var name = $"notification-offset-{Guid.NewGuid():N}";
-        var property = Property.RegisterAttached<AttachedOwner, Node, double>(name, 0);
+        var property = Property.RegisterAttached<AttachedOwner, UIElement, double>(name, 0);
         var root = new Panel();
         var child = new Panel();
         root.Children.Add(child);
@@ -176,10 +177,10 @@ public sealed class CssRegistrationUpdateTests
         var notifications = 0;
         root.PropertyChanged += (_, args) =>
         {
-            if (args.Property != Node.OpacityProperty)
+            if (args.Property != UIElement.OpacityProperty)
                 return;
             notifications++;
-            CssRegistry.RegisterProperty<Node, double>(name, property, CssValueConverters.ParseLength);
+            CssRegistry.RegisterProperty<UIElement, double>(name, property, CssValueConverters.ParseLength);
         };
 
         screen.Open();
@@ -241,22 +242,22 @@ public sealed class CssRegistrationUpdateTests
         var name = $"cached-offset-{Guid.NewGuid():N}";
         var conversions = 0;
         CssRegistry.RegisterElement<CachePreservationNode>("cache-preservation-tag");
-        CssRegistry.RegisterProperty<CachePreservationNode, double>(name, Node.OpacityProperty, value =>
+        CssRegistry.RegisterProperty<CachePreservationNode, double>(name, UIElement.OpacityProperty, value =>
         {
             conversions++;
             return CssValueConverters.ParseNumber(value);
         });
         var resolver = new StyleResolver([], [StyleSheet.Parse($"cache-preservation-tag {{ {name}: 0.4; }}")]);
         var node = new CachePreservationNode();
-        Assert.Equal(0.4, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
         var version = CssRegistry.Version;
 
         Assert.Throws<InvalidOperationException>(() =>
             CssRegistry.RegisterElement<CachePreservationNode>("another-tag"));
         Assert.Throws<InvalidOperationException>(() => CssRegistry.RegisterProperty<CachePreservationNode, double>(
-            name, Node.OpacityProperty, CssValueConverters.ParseNumber));
+            name, UIElement.OpacityProperty, CssValueConverters.ParseNumber));
         Assert.Equal(version, CssRegistry.Version);
-        Assert.Equal(0.4, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
         Assert.Equal(1, conversions);
     }
 
@@ -265,13 +266,13 @@ public sealed class CssRegistrationUpdateTests
     {
         var name = $"global-cache-{Guid.NewGuid():N}";
         var conversions = 0;
-        CssRegistry.RegisterProperty<GlobalCacheFirstNode, double>(name, Node.OpacityProperty, Convert);
-        CssRegistry.RegisterProperty<GlobalCacheSecondNode, double>(name, Node.OpacityProperty, Convert);
+        CssRegistry.RegisterProperty<GlobalCacheFirstNode, double>(name, UIElement.OpacityProperty, Convert);
+        CssRegistry.RegisterProperty<GlobalCacheSecondNode, double>(name, UIElement.OpacityProperty, Convert);
         var resolver = new StyleResolver([], [StyleSheet.Parse($"* {{ {name}: 0.4; }}")]);
         var first = new GlobalCacheFirstNode();
         var second = new GlobalCacheSecondNode();
-        Assert.Equal(0.4, resolver.Resolve(first).GetValue(Node.OpacityProperty));
-        Assert.Equal(0.4, resolver.Resolve(second).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(first).GetValue(UIElement.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(second).GetValue(UIElement.OpacityProperty));
         Assert.Equal(2, conversions);
         var version = CssRegistry.Version;
 
@@ -279,8 +280,8 @@ public sealed class CssRegistrationUpdateTests
 
         Assert.Equal(version + 1, CssRegistry.Version);
         Assert.Equal(2, conversions);
-        Assert.Equal(0.4, resolver.Resolve(first).GetValue(Node.OpacityProperty));
-        Assert.Equal(0.4, resolver.Resolve(second).GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(first).GetValue(UIElement.OpacityProperty));
+        Assert.Equal(0.4, resolver.Resolve(second).GetValue(UIElement.OpacityProperty));
         Assert.Equal(4, conversions);
         _ = resolver.Resolve(first);
         _ = resolver.Resolve(second);
@@ -296,22 +297,22 @@ public sealed class CssRegistrationUpdateTests
     private sealed class LateLayout : Panel
     {
         internal static readonly Property<double> OffsetProperty =
-            Property.RegisterAttached<LateLayout, Node, double>("Offset", 0);
+            Property.RegisterAttached<LateLayout, UIElement, double>("Offset", 0);
 
         static LateLayout()
         {
             LayoutInitialized = true;
             CssRegistry.RegisterElement<LateLayout>("LateLayout");
-            CssRegistry.RegisterProperty<Node, double>(
+            CssRegistry.RegisterProperty<UIElement, double>(
                 "late-layout-offset", OffsetProperty, CssValueConverters.ParseLength);
         }
     }
 
-    private sealed class AttachedOwner : Node
+    private sealed class AttachedOwner : UIElement
     {
     }
 
-    private sealed class LateAliasNode : Node
+    private sealed class LateAliasNode : UIElement
     {
     }
 
@@ -319,7 +320,7 @@ public sealed class CssRegistrationUpdateTests
     {
     }
 
-    private sealed class BindingRegistrationNode : Node
+    private sealed class BindingRegistrationNode : UIElement
     {
         internal static readonly Property<double> TriggerProperty =
             Property.Register<BindingRegistrationNode, double>("Trigger", 0);
@@ -328,19 +329,19 @@ public sealed class CssRegistrationUpdateTests
             Property.Register<BindingRegistrationNode, double>("Late", 0);
     }
 
-    private sealed class CachePreservationNode : Node
+    private sealed class CachePreservationNode : UIElement
     {
     }
 
-    private sealed class UnrelatedRegistrationNode : Node
+    private sealed class UnrelatedRegistrationNode : UIElement
     {
     }
 
-    private sealed class GlobalCacheFirstNode : Node
+    private sealed class GlobalCacheFirstNode : UIElement
     {
     }
 
-    private sealed class GlobalCacheSecondNode : Node
+    private sealed class GlobalCacheSecondNode : UIElement
     {
     }
 }

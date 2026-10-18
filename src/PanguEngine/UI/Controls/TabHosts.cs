@@ -19,7 +19,7 @@ internal sealed class TabHeaderHost : Control
         };
     }
 
-    internal void SetHeader(Node? header)
+    internal void SetHeader(UIElement? header)
     {
         if (Children.Count > 0)
             Children.Remove(Children[0]);
@@ -29,7 +29,7 @@ internal sealed class TabHeaderHost : Control
 }
 
 /// <summary>
-/// Hosts the single content node of a <see cref="TabItem"/> and reports external content migration.
+/// Hosts the single content element of a <see cref="TabItem"/> and reports external content migration.
 /// </summary>
 internal sealed class TabContentHost : Control
 {
@@ -49,9 +49,9 @@ internal sealed class TabContentHost : Control
         };
     }
 
-    internal Node? Content => Children.Count == 0 ? null : Children[0];
+    internal UIElement? Content => Children.Count == 0 ? null : Children[0];
 
-    internal void SetContent(Node? content)
+    internal void SetContent(UIElement? content)
     {
         for (var index = Children.Count - 1; index >= 0; index--)
         {

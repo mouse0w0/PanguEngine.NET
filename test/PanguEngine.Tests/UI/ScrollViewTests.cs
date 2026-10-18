@@ -1019,7 +1019,8 @@ public sealed class ScrollViewTests
         manager.UpdateFrame(new Size(200 * scale, 200 * scale), 0);
         try
         {
-            var horizontal = view.Children.OfType<ScrollBar>().Single(node => node.Orientation == Orientation.Horizontal);
+            var horizontal = view.Children.OfType<ScrollBar>()
+                .Single(node => node.Orientation == Orientation.Horizontal);
             var vertical = view.Children.OfType<ScrollBar>().Single(node => node.Orientation == Orientation.Vertical);
             var viewport = Assert.IsType<ScrollViewport>(view.Children[0]);
             var corner = view.Children.Single(node => node.Classes.Contains("scrollview-corner"));
@@ -1033,7 +1034,8 @@ public sealed class ScrollViewTests
                 vertical.LayoutBounds.Width, horizontal.LayoutBounds.Height), corner.LayoutBounds);
 
             view.ScrollTo(600, 600);
-            Assert.Equal(new Point(view.Extent.Width - view.Viewport.Width, view.Extent.Height - view.Viewport.Height), view.Offset);
+            Assert.Equal(new Point(view.Extent.Width - view.Viewport.Width, view.Extent.Height - view.Viewport.Height),
+                view.Offset);
         }
         finally
         {
@@ -1041,7 +1043,7 @@ public sealed class ScrollViewTests
         }
     }
 
-    private static bool IsSelfOrDescendant(Node? node, Node ancestor)
+    private static bool IsSelfOrDescendant(UIElement? node, UIElement ancestor)
     {
         for (var current = node; current is not null; current = current.Parent)
         {
@@ -1064,17 +1066,17 @@ public sealed class ScrollViewTests
         return (manager, screen, view);
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
     }
 
     private sealed class ContentSource : INotifyPropertyChanged
     {
-        private Node? _child;
+        private UIElement? _child;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public Node? Child
+        public UIElement? Child
         {
             get => _child;
             set

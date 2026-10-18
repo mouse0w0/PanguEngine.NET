@@ -15,7 +15,7 @@ internal sealed partial class StyleResolver
         }
     }
 
-    private CssVariableEnvironment ResolveVariables(Node node)
+    private CssVariableEnvironment ResolveVariables(UIElement node)
     {
         var parent = node.Parent is { } ancestor ? ResolveVariables(ancestor) : CssVariableEnvironment.Empty;
         var winners =

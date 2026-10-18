@@ -3,20 +3,20 @@ using PanguEngine.UI.Drawing;
 
 namespace PanguEngine.UI;
 
-public abstract partial class Node
+public abstract partial class UIElement
 {
     /// <summary>
     /// Identifies the <see cref="Opacity"/> property.
     /// </summary>
     public static readonly Property<double> OpacityProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(Opacity),
             1,
             validate: static value => IsFiniteNonNegative(value) && value <= 1,
             validationMessage: "Opacity must be finite and between zero and one.");
 
     /// <summary>
-    /// Gets or sets the opacity applied to this node and its descendants.
+    /// Gets or sets the opacity applied to this element and its descendants.
     /// </summary>
     /// <exception cref="ArgumentException">Thrown when the value is not finite or is outside the range from zero to one.</exception>
     /// <exception cref="InvalidOperationException">
@@ -29,9 +29,9 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Draws this node using local logical coordinates.
+    /// Draws this element using local logical coordinates.
     /// </summary>
-    /// <param name="context">The constrained drawing context for this node.</param>
+    /// <param name="context">The constrained drawing context for this element.</param>
     protected virtual void DrawCore(DrawingContext context)
     {
     }
@@ -67,7 +67,7 @@ public abstract partial class Node
             throw;
         }
 
-        if (this is Parent parent)
+        if (this is Container parent)
         {
             var clipIndex = parent.ClipToBounds
                 ? DrawingContext.PushCommand(commands, parent.CreateDescendantClip())

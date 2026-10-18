@@ -20,7 +20,7 @@ public sealed class CssRegistryTests
         Assert.Null(CssRegistry.FindProperty(typeof(Text), "content"));
         Assert.Null(CssRegistry.FindProperty(typeof(Button), "text"));
         Assert.Null(CssRegistry.FindProperty(typeof(ImageView), "source"));
-        Assert.Null(CssRegistry.FindProperty(typeof(Node), "not-a-css-property"));
+        Assert.Null(CssRegistry.FindProperty(typeof(UIElement), "not-a-css-property"));
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class CssRegistryTests
     {
         var resolver = new StyleResolver([], [StyleSheet.Parse("late-tag { opacity: 0.2; late-prop: 4; }")]);
         var node = new LateRegistrationNode();
-        Assert.Equal(1d, resolver.Resolve(node).GetValue(Node.OpacityProperty));
+        Assert.Equal(1d, resolver.Resolve(node).GetValue(UIElement.OpacityProperty));
 
         CssRegistry.RegisterElement<LateRegistrationNode>("late-tag");
         CssRegistry.RegisterProperty<LateRegistrationNode, double>(
@@ -142,7 +142,7 @@ public sealed class CssRegistryTests
             CssValueConverters.ParseLength);
 
         var snapshot = resolver.Resolve(node);
-        Assert.Equal(0.2, snapshot.GetValue(Node.OpacityProperty));
+        Assert.Equal(0.2, snapshot.GetValue(UIElement.OpacityProperty));
         Assert.Equal(4d, snapshot.GetValue(LateRegistrationNode.ValueProperty));
     }
 
@@ -346,13 +346,13 @@ public sealed class CssRegistryTests
         Assert.IsType<ArgumentException>(error.InnerException);
     }
 
-    private sealed class SimpleCssNode : Node
+    private sealed class SimpleCssNode : UIElement
     {
         internal static readonly Property<double> ValueProperty =
             Property.Register<SimpleCssNode, double>("Value", 0);
     }
 
-    private class FindBaseNode : Node
+    private class FindBaseNode : UIElement
     {
         internal static readonly Property<double> ValueProperty =
             Property.Register<FindBaseNode, double>("Value", 0);
@@ -368,7 +368,7 @@ public sealed class CssRegistryTests
     {
     }
 
-    private sealed class DupCssNode : Node
+    private sealed class DupCssNode : UIElement
     {
         internal static readonly Property<double> FirstProperty =
             Property.Register<DupCssNode, double>("First", 0);
@@ -377,25 +377,25 @@ public sealed class CssRegistryTests
             Property.Register<DupCssNode, double>("Second", 0);
     }
 
-    private sealed class RejectCssNode : Node
+    private sealed class RejectCssNode : UIElement
     {
     }
 
-    private sealed class ForeignOwnerNode : Node
+    private sealed class ForeignOwnerNode : UIElement
     {
     }
 
-    private sealed class AttachedCssOwner : Node
+    private sealed class AttachedCssOwner : UIElement
     {
         internal static readonly Property<double> ValueProperty =
             Property.RegisterAttached<AttachedCssOwner, AttachedCssTarget, double>("Value", 0);
     }
 
-    private sealed class AttachedCssTarget : Node
+    private sealed class AttachedCssTarget : UIElement
     {
     }
 
-    private sealed class ExpandCssNode : Node
+    private sealed class ExpandCssNode : UIElement
     {
         static ExpandCssNode()
         {
@@ -421,7 +421,7 @@ public sealed class CssRegistryTests
                 onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 
-    private class RegistrationBoundaryBase : Node
+    private class RegistrationBoundaryBase : UIElement
     {
         internal static readonly Property<double> ValueProperty =
             Property.Register<RegistrationBoundaryBase, double>("Value", 0);
@@ -433,7 +433,7 @@ public sealed class CssRegistryTests
             Property.Register<RegistrationBoundaryDerivedA, double>("Value", 0);
     }
 
-    private sealed class ExpandRejectNode : Node
+    private sealed class ExpandRejectNode : UIElement
     {
         static ExpandRejectNode()
         {
@@ -447,13 +447,13 @@ public sealed class CssRegistryTests
             Property.RegisterReadOnly<ExpandRejectNode, int>("ReadOnly", 0).Property;
     }
 
-    private sealed class ExpandForeignOwner : Node
+    private sealed class ExpandForeignOwner : UIElement
     {
         internal static readonly Property<double> ValueProperty =
             Property.Register<ExpandForeignOwner, double>("Value", 0);
     }
 
-    private sealed class ExpandMutableNode : Node
+    private sealed class ExpandMutableNode : UIElement
     {
         static ExpandMutableNode()
         {
@@ -474,11 +474,11 @@ public sealed class CssRegistryTests
                 onChanged: static (node, _, _) => node.InvalidateMeasure());
     }
 
-    private sealed class FallbackNameNode : Node
+    private sealed class FallbackNameNode : UIElement
     {
     }
 
-    private sealed class AliasedTagNode : Node
+    private sealed class AliasedTagNode : UIElement
     {
         static AliasedTagNode()
         {
@@ -486,7 +486,7 @@ public sealed class CssRegistryTests
         }
     }
 
-    private class AliasBaseNode : Node
+    private class AliasBaseNode : UIElement
     {
         static AliasBaseNode()
         {
@@ -515,7 +515,7 @@ public sealed class CssRegistryTests
             Property.Register<UnregisteredAliasDerivedNode, double>("DerivedTone", 7);
     }
 
-    private class ShadowTagBaseNode : Node
+    private class ShadowTagBaseNode : UIElement
     {
         static ShadowTagBaseNode()
         {
@@ -545,7 +545,7 @@ public sealed class CssRegistryTests
             Property.Register<ShadowTagDerivedNode, double>("DerivedTone", 0);
     }
 
-    private sealed class CaseSensitiveNode : Node
+    private sealed class CaseSensitiveNode : UIElement
     {
         static CaseSensitiveNode()
         {
@@ -560,28 +560,28 @@ public sealed class CssRegistryTests
             Property.Register<CaseSensitiveNode, double>("Level", 0);
     }
 
-    private sealed class InvalidElementNode : Node
+    private sealed class InvalidElementNode : UIElement
     {
     }
 
-    private sealed class DuplicateElementNode : Node
+    private sealed class DuplicateElementNode : UIElement
     {
     }
 
-    private sealed class LateRegistrationNode : Node
+    private sealed class LateRegistrationNode : UIElement
     {
         internal static readonly Property<double> ValueProperty =
             Property.Register<LateRegistrationNode, double>("Value", 0);
     }
 
-    private sealed class LazyAliasNode : Node
+    private sealed class LazyAliasNode : UIElement
     {
         static LazyAliasNode()
         {
             LazyAliasInitialized = true;
             CssRegistry.RegisterElement<LazyAliasNode>("lazy-tag");
             CssRegistry.RegisterProperty<LazyAliasNode, double>(
-                "lazy-alias-tone", Node.OpacityProperty, CssValueConverters.ParseNumber);
+                "lazy-alias-tone", OpacityProperty, CssValueConverters.ParseNumber);
         }
     }
 }

@@ -342,11 +342,33 @@ internal sealed class UiBatchScene : IClientTestScene
             _shapes =
             [
                 new VectorPath { Data = CreateSolidArrowGeometry(), Fill = new SolidColorBrush(245, 210, 70) },
-                new VectorPath { Data = PathGeometry.Parse("M0 0 L12 12 L0 24"), Fill = null, Stroke = new SolidColorBrush(90, 210, 240), StrokeThickness = 3, StrokeLineJoin = StrokeLineJoin.Round },
-                new VectorPath { Data = PathGeometry.Parse("M0 20 C10 -15 30 55 40 20 A10 10 0 0 1 60 20"), Fill = null, Stroke = new SolidColorBrush(240, 150, 80), StrokeThickness = 2 },
-                new VectorPath { Data = PathGeometry.Parse("M0 0 H30 V30 H0 Z M8 8 H22 V22 H8 Z"), FillRule = ShapeFillRule.EvenOdd, Fill = new SolidColorBrush(160, 100, 230) },
-                new VectorPath { Data = PathGeometry.Parse("M0 0 L30 30 M30 0 L0 30"), Fill = null, Stroke = new SolidColorBrush(240, 90, 100, 128), StrokeThickness = 6, StrokeLineCap = StrokeLineCap.Round },
-                new Ellipse { Fill = new SolidColorBrush(80, 210, 130, 180), Stroke = new SolidColorBrush(230, 245, 235), StrokeThickness = 2 }
+                new VectorPath
+                {
+                    Data = PathGeometry.Parse("M0 0 L12 12 L0 24"), Fill = null,
+                    Stroke = new SolidColorBrush(90, 210, 240), StrokeThickness = 3,
+                    StrokeLineJoin = StrokeLineJoin.Round
+                },
+                new VectorPath
+                {
+                    Data = PathGeometry.Parse("M0 20 C10 -15 30 55 40 20 A10 10 0 0 1 60 20"), Fill = null,
+                    Stroke = new SolidColorBrush(240, 150, 80), StrokeThickness = 2
+                },
+                new VectorPath
+                {
+                    Data = PathGeometry.Parse("M0 0 H30 V30 H0 Z M8 8 H22 V22 H8 Z"), FillRule = ShapeFillRule.EvenOdd,
+                    Fill = new SolidColorBrush(160, 100, 230)
+                },
+                new VectorPath
+                {
+                    Data = PathGeometry.Parse("M0 0 L30 30 M30 0 L0 30"), Fill = null,
+                    Stroke = new SolidColorBrush(240, 90, 100, 128), StrokeThickness = 6,
+                    StrokeLineCap = StrokeLineCap.Round
+                },
+                new Ellipse
+                {
+                    Fill = new SolidColorBrush(80, 210, 130, 180), Stroke = new SolidColorBrush(230, 245, 235),
+                    StrokeThickness = 2
+                }
             ];
             foreach (var shape in _shapes)
                 Children.Add(shape);
@@ -488,7 +510,7 @@ internal sealed class UiBatchScene : IClientTestScene
         {
         }
 
-        private sealed class DecorationContentNode : Node
+        private sealed class DecorationContentNode : UIElement
         {
             protected override void DrawCore(DrawingContext context) =>
                 context.FillRectangle(

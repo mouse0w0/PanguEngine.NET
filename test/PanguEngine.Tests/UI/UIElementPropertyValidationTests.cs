@@ -4,16 +4,16 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
-public sealed class NodePropertyValidationTests
+public sealed class UIElementPropertyValidationTests
 {
     [Theory]
-    [InlineData(nameof(Node.Width))]
-    [InlineData(nameof(Node.Height))]
-    [InlineData(nameof(Node.MinWidth))]
-    [InlineData(nameof(Node.MinHeight))]
-    [InlineData(nameof(Node.MaxWidth))]
-    [InlineData(nameof(Node.MaxHeight))]
-    [InlineData(nameof(Node.Opacity))]
+    [InlineData(nameof(UIElement.Width))]
+    [InlineData(nameof(UIElement.Height))]
+    [InlineData(nameof(UIElement.MinWidth))]
+    [InlineData(nameof(UIElement.MinHeight))]
+    [InlineData(nameof(UIElement.MaxWidth))]
+    [InlineData(nameof(UIElement.MaxHeight))]
+    [InlineData(nameof(UIElement.Opacity))]
     public void InvalidValuesPreserveValueNotificationsAndValidLayout(string propertyName)
     {
         var property = GetProperty(propertyName);
@@ -38,13 +38,13 @@ public sealed class NodePropertyValidationTests
     }
 
     [Theory]
-    [InlineData(nameof(Node.Width))]
-    [InlineData(nameof(Node.Height))]
-    [InlineData(nameof(Node.MinWidth))]
-    [InlineData(nameof(Node.MinHeight))]
-    [InlineData(nameof(Node.MaxWidth))]
-    [InlineData(nameof(Node.MaxHeight))]
-    [InlineData(nameof(Node.Opacity))]
+    [InlineData(nameof(UIElement.Width))]
+    [InlineData(nameof(UIElement.Height))]
+    [InlineData(nameof(UIElement.MinWidth))]
+    [InlineData(nameof(UIElement.MinHeight))]
+    [InlineData(nameof(UIElement.MaxWidth))]
+    [InlineData(nameof(UIElement.MaxHeight))]
+    [InlineData(nameof(UIElement.Opacity))]
     public void ValidBoundariesAndDefaultFallbackRemainAccepted(string propertyName)
     {
         var property = GetProperty(propertyName);
@@ -61,13 +61,13 @@ public sealed class NodePropertyValidationTests
     }
 
     [Theory]
-    [InlineData(nameof(Node.Width), "width", "-1px")]
-    [InlineData(nameof(Node.Height), "height", "-1px")]
-    [InlineData(nameof(Node.MinWidth), "min-width", "-1px")]
-    [InlineData(nameof(Node.MinHeight), "min-height", "-1px")]
-    [InlineData(nameof(Node.MaxWidth), "max-width", "-1px")]
-    [InlineData(nameof(Node.MaxHeight), "max-height", "-1px")]
-    [InlineData(nameof(Node.Opacity), "opacity", "2")]
+    [InlineData(nameof(UIElement.Width), "width", "-1px")]
+    [InlineData(nameof(UIElement.Height), "height", "-1px")]
+    [InlineData(nameof(UIElement.MinWidth), "min-width", "-1px")]
+    [InlineData(nameof(UIElement.MinHeight), "min-height", "-1px")]
+    [InlineData(nameof(UIElement.MaxWidth), "max-width", "-1px")]
+    [InlineData(nameof(UIElement.MaxHeight), "max-height", "-1px")]
+    [InlineData(nameof(UIElement.Opacity), "opacity", "2")]
     public void CssConversionUsesTheRegisteredPropertyConstraint(string propertyName, string cssName, string text)
     {
         var property = GetProperty(propertyName);
@@ -91,32 +91,32 @@ public sealed class NodePropertyValidationTests
 
     private static Property<double> GetProperty(string name) => name switch
     {
-        nameof(Node.Width) => Node.WidthProperty,
-        nameof(Node.Height) => Node.HeightProperty,
-        nameof(Node.MinWidth) => Node.MinWidthProperty,
-        nameof(Node.MinHeight) => Node.MinHeightProperty,
-        nameof(Node.MaxWidth) => Node.MaxWidthProperty,
-        nameof(Node.MaxHeight) => Node.MaxHeightProperty,
-        nameof(Node.Opacity) => Node.OpacityProperty,
+        nameof(UIElement.Width) => UIElement.WidthProperty,
+        nameof(UIElement.Height) => UIElement.HeightProperty,
+        nameof(UIElement.MinWidth) => UIElement.MinWidthProperty,
+        nameof(UIElement.MinHeight) => UIElement.MinHeightProperty,
+        nameof(UIElement.MaxWidth) => UIElement.MaxWidthProperty,
+        nameof(UIElement.MaxHeight) => UIElement.MaxHeightProperty,
+        nameof(UIElement.Opacity) => UIElement.OpacityProperty,
         _ => throw new ArgumentException("Unknown property.", nameof(name))
     };
 
     private static double[] GetInvalidValues(string name) => name switch
     {
-        nameof(Node.Width) or nameof(Node.Height) =>
+        nameof(UIElement.Width) or nameof(UIElement.Height) =>
             [-1, double.NegativeInfinity, double.PositiveInfinity],
-        nameof(Node.MinWidth) or nameof(Node.MinHeight) =>
+        nameof(UIElement.MinWidth) or nameof(UIElement.MinHeight) =>
             [-1, double.NaN, double.NegativeInfinity, double.PositiveInfinity],
-        nameof(Node.MaxWidth) or nameof(Node.MaxHeight) =>
+        nameof(UIElement.MaxWidth) or nameof(UIElement.MaxHeight) =>
             [-1, double.NaN, double.NegativeInfinity],
         _ => [-1, 1.01, double.NaN, double.NegativeInfinity, double.PositiveInfinity]
     };
 
     private static double[] GetValidValues(string name) => name switch
     {
-        nameof(Node.Width) or nameof(Node.Height) => [0, double.MaxValue, double.NaN],
-        nameof(Node.MaxWidth) or nameof(Node.MaxHeight) => [0, double.MaxValue, double.PositiveInfinity],
-        nameof(Node.Opacity) => [0, 0.5, 1],
+        nameof(UIElement.Width) or nameof(UIElement.Height) => [0, double.MaxValue, double.NaN],
+        nameof(UIElement.MaxWidth) or nameof(UIElement.MaxHeight) => [0, double.MaxValue, double.PositiveInfinity],
+        nameof(UIElement.Opacity) => [0, 0.5, 1],
         _ => [0, double.MaxValue]
     };
 
@@ -124,7 +124,7 @@ public sealed class NodePropertyValidationTests
         new StyleRule(StyleSelector.For<ValidationNode>(), [StyleSetter.Create(property, value)])
     ]);
 
-    private sealed class ValidationNode : Node
+    private sealed class ValidationNode : UIElement
     {
     }
 }

@@ -11,11 +11,11 @@ public sealed class ObservableChildrenTests
     {
         var panel = new Panel();
         var screen = new Screen(panel);
-        IList<Node> items = panel.Children;
+        IList<UIElement> items = panel.Children;
         var a = new Panel();
         var b = new Panel();
         var c = new Panel();
-        var changes = new List<ListChangedEventArgs<Node>>();
+        var changes = new List<ListChangedEventArgs<UIElement>>();
         panel.Children.Changed += (_, change) => changes.Add(change);
         items.Add(a);
         items.Insert(0, b);
@@ -26,7 +26,7 @@ public sealed class ObservableChildrenTests
         Assert.Null(a.Parent);
         Assert.Null(a.Screen);
         Assert.Null(b.Parent);
-        Assert.Equal(new Node[] { b, a }, changes[^1].OldItems);
+        Assert.Equal(new UIElement[] { b, a }, changes[^1].OldItems);
         items.RemoveAt(0);
         Assert.Null(c.Parent);
         items.Add(a);
@@ -58,7 +58,7 @@ public sealed class ObservableChildrenTests
             Assert.Same(target, child.Parent);
             order.Add("target");
         };
-        ObservableList<Node> list = target.Children;
+        ObservableList<UIElement> list = target.Children;
         list.Add(child);
         Assert.Equal(["source", "target"], order);
     }
@@ -110,15 +110,15 @@ public sealed class ObservableChildrenTests
         var b = new Panel();
         var c = new Panel();
         parent.Children.AddRange([a, b, c]);
-        var changes = new List<ListChangedEventArgs<Node>>();
+        var changes = new List<ListChangedEventArgs<UIElement>>();
         parent.Children.Changed += (_, change) => changes.Add(change);
         parent.Children.ReplaceAll([c, a]);
         Assert.Same(parent, a.Parent);
         Assert.Same(parent, c.Parent);
         Assert.Null(b.Parent);
         Assert.Equal(ListChangeKind.Replace, Assert.Single(changes).Kind);
-        Assert.Equal(new Node[] { a, b, c }, changes[0].OldItems);
-        Assert.Equal(new Node[] { c, a }, changes[0].NewItems);
+        Assert.Equal(new UIElement[] { a, b, c }, changes[0].OldItems);
+        Assert.Equal(new UIElement[] { c, a }, changes[0].NewItems);
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public sealed class ObservableChildrenTests
         source.Children.Add(child);
         Assert.Throws<InvalidOperationException>(() => target.Children.AddRange([child, child]));
         Assert.Same(source, child.Parent);
-        Assert.Equal(new Node[] { child }, source.Children);
+        Assert.Equal(new UIElement[] { child }, source.Children);
         Assert.Empty(target.Children);
         target.Children.Add(child);
         Assert.Same(target, child.Parent);
@@ -220,7 +220,8 @@ public sealed class ObservableChildrenTests
         var target = new Panel();
         var child = new Panel();
         source.Children.Add(child);
-        EventHandler<ListChangedEventArgs<Node>> handler = (_, _) => throw new InvalidOperationException("listener");
+        EventHandler<ListChangedEventArgs<UIElement>> handler = (_, _) =>
+            throw new InvalidOperationException("listener");
         source.Children.Changed += handler;
         Assert.Throws<InvalidOperationException>(() => target.Children.Add(child));
         Assert.Null(child.Parent);
@@ -256,8 +257,8 @@ public sealed class ObservableChildrenTests
         target.Children.Changed += (_, change) => events.Add(("target", change.Index));
         target.Children.AddRange([a, e, c]);
         Assert.Equal(new[] { ("first", 0), ("second", 0), ("first", 1), ("target", 0) }, events);
-        Assert.Equal(new Node[] { b, d }, first.Children);
-        Assert.Equal(new Node[] { a, e, c }, target.Children);
+        Assert.Equal(new UIElement[] { b, d }, first.Children);
+        Assert.Equal(new UIElement[] { a, e, c }, target.Children);
     }
 
     [Fact]
@@ -315,7 +316,7 @@ public sealed class ObservableChildrenTests
         parent.Children.AddRange([a, b]);
         source.Children.Add(c);
         parent.Children.ReplaceAll([b, c, a]);
-        Assert.Equal(new Node[] { b, c, a }, parent.Children);
+        Assert.Equal(new UIElement[] { b, c, a }, parent.Children);
         Assert.Empty(source.Children);
         Assert.Same(parent, c.Parent);
     }
@@ -328,15 +329,15 @@ public sealed class ObservableChildrenTests
         var b = new Panel();
         var c = new Panel();
         parent.Children.AddRange([a, b, c]);
-        var changes = new List<ListChangedEventArgs<Node>>();
+        var changes = new List<ListChangedEventArgs<UIElement>>();
         parent.Children.Changed += (_, change) => changes.Add(change);
         parent.Children.Move(0, 2);
-        Assert.Equal(new Node[] { b, c, a }, parent.Children);
+        Assert.Equal(new UIElement[] { b, c, a }, parent.Children);
         parent.Children.Reverse();
-        Assert.Equal(new Node[] { a, c, b }, parent.Children);
-        var positions = new Dictionary<Node, int> { [a] = 0, [b] = 1, [c] = 2 };
+        Assert.Equal(new UIElement[] { a, c, b }, parent.Children);
+        var positions = new Dictionary<UIElement, int> { [a] = 0, [b] = 1, [c] = 2 };
         parent.Children.Sort((left, right) => positions[left].CompareTo(positions[right]));
-        Assert.Equal(new Node[] { a, b, c }, parent.Children);
+        Assert.Equal(new UIElement[] { a, b, c }, parent.Children);
         Assert.Equal(3, changes.Count);
         Assert.All(changes, change => Assert.Equal(ListChangeKind.Reorder, change.Kind));
         Assert.All(parent.Children, child => Assert.Same(parent, child.Parent));
@@ -362,12 +363,12 @@ public sealed class ObservableChildrenTests
     public void ParentViewIsReadOnlyAndBothViewsNotifyWithTheirOwnSenders()
     {
         var panel = new Panel();
-        Parent parent = panel;
+        Container parent = panel;
         var view = parent.ReadOnlyChildren;
-        Assert.False(view is ObservableList<Node>);
-        Assert.False(view is IList<Node>);
-        var changes = new List<ListChangedEventArgs<Node>>();
-        var viewChanges = new List<ListChangedEventArgs<Node>>();
+        Assert.False(view is ObservableList<UIElement>);
+        Assert.False(view is IList<UIElement>);
+        var changes = new List<ListChangedEventArgs<UIElement>>();
+        var viewChanges = new List<ListChangedEventArgs<UIElement>>();
         panel.Children.Changed += (sender, change) =>
         {
             Assert.Same(panel.Children, sender);
@@ -403,7 +404,8 @@ public sealed class ObservableChildrenTests
     {
         var parent = new Panel();
         parent.Children.Add(new Panel());
-        parent.Children.Changed += (_, _) => Assert.Throws<InvalidOperationException>(() => parent.Children.Remove(null));
+        parent.Children.Changed +=
+            (_, _) => Assert.Throws<InvalidOperationException>(() => parent.Children.Remove(null));
         parent.Children.Clear();
         Assert.Empty(parent.Children);
     }
@@ -437,12 +439,14 @@ public sealed class ObservableChildrenTests
         var related = new Panel();
         var calls = 0;
         related.Children.Changed += (_, _) => calls++;
-        IEnumerable<Node> Input()
+
+        IEnumerable<UIElement> Input()
         {
             related.Children.Add(new Panel());
             Assert.Equal(1, calls);
             yield break;
         }
+
         target.Children.AddRange(Input());
         Assert.Empty(target.Children);
         Assert.Equal(1, calls);
@@ -457,7 +461,8 @@ public sealed class ObservableChildrenTests
         failing.Children.Add(new Panel());
         var calls = 0;
         failing.Children.Changed += (_, _) => calls++;
-        EventHandler<ListChangedEventArgs<Node>> throwing = (_, _) => throw new InvalidOperationException("listener");
+        EventHandler<ListChangedEventArgs<UIElement>> throwing = (_, _) =>
+            throw new InvalidOperationException("listener");
         failing.Children.Changed += throwing;
         parent.Children.Changed += (_, _) => Assert.Throws<InvalidOperationException>(() => failing.Children.Clear());
         parent.Children.Clear();
@@ -474,7 +479,7 @@ public sealed class ObservableChildrenTests
         var parent = new Panel();
         Assert.False(parent.Children.Contains(null));
         Assert.Equal(-1, parent.Children.IndexOf(null));
-        ObservableList<Node> list = parent.Children;
+        ObservableList<UIElement> list = parent.Children;
         Assert.False(list.Contains(null));
         Assert.Equal(-1, list.IndexOf(null));
     }
@@ -489,5 +494,4 @@ public sealed class ObservableChildrenTests
         parent.Children.Reverse();
         Assert.Throws<InvalidOperationException>(() => enumerator.MoveNext());
     }
-
 }

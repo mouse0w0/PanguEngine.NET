@@ -6,7 +6,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.UI;
 
-public abstract partial class Node
+public abstract partial class UIElement
 {
     private IReadOnlyDictionary<Property, IReadOnlyList<StyleValueSource>>? _styleSources;
     private readonly ObservableSet<PseudoClass> _pseudoClasses = new();
@@ -15,47 +15,54 @@ public abstract partial class Node
     internal bool IsStyleSubtreeValid { get; private set; }
     internal bool IsUpdatingStyles { get; private set; }
 
-    static Node()
+    static UIElement()
     {
-        CssRegistry.RegisterElement<Node>("UiNode");
-        CssRegistry.RegisterProperty<Node, string>("font-family", FontFamilyProperty, CssFontConverters.ParseFamily);
-        CssRegistry.RegisterProperty<Node, FontWeight>("font-weight", FontWeightProperty, CssFontConverters.ParseWeight);
-        CssRegistry.RegisterProperty<Node, FontStyle>("font-style", FontStyleProperty, CssFontConverters.ParseStyle);
-        CssRegistry.RegisterProperty<Node, double>("font-size", FontSizeProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Node, double>("line-height", LineHeightProperty, CssFontConverters.ParseLineHeight);
-        CssRegistry.RegisterProperty<Node, Color>("color", ColorProperty, CssValueConverters.ParseColor);
-        CssRegistry.RegisterProperty<Node>("font", CssFontConverters.ParseFont);
-        CssRegistry.RegisterProperty<Node, double>("width", WidthProperty, CssValueConverters.ParseDimension);
-        CssRegistry.RegisterProperty<Node, double>("height", HeightProperty, CssValueConverters.ParseDimension);
-        CssRegistry.RegisterProperty<Node, double>("min-width", MinWidthProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Node, double>("min-height", MinHeightProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Node, double>("max-width", MaxWidthProperty, CssValueConverters.ParseMaxDimension);
-        CssRegistry.RegisterProperty<Node, double>("max-height", MaxHeightProperty, CssValueConverters.ParseMaxDimension);
-        CssRegistry.RegisterProperty<Node, Thickness>("margin", MarginProperty, CssValueConverters.ParseThickness);
-        CssRegistry.RegisterProperty<Node>("margin-top", value =>
+        CssRegistry.RegisterElement<UIElement>("UIElement");
+        CssRegistry.RegisterProperty<UIElement, string>("font-family", FontFamilyProperty,
+            CssFontConverters.ParseFamily);
+        CssRegistry.RegisterProperty<UIElement, FontWeight>("font-weight", FontWeightProperty,
+            CssFontConverters.ParseWeight);
+        CssRegistry.RegisterProperty<UIElement, FontStyle>("font-style", FontStyleProperty,
+            CssFontConverters.ParseStyle);
+        CssRegistry.RegisterProperty<UIElement, double>("font-size", FontSizeProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UIElement, double>("line-height", LineHeightProperty,
+            CssFontConverters.ParseLineHeight);
+        CssRegistry.RegisterProperty<UIElement, Color>("color", ColorProperty, CssValueConverters.ParseColor);
+        CssRegistry.RegisterProperty<UIElement>("font", CssFontConverters.ParseFont);
+        CssRegistry.RegisterProperty<UIElement, double>("width", WidthProperty, CssValueConverters.ParseDimension);
+        CssRegistry.RegisterProperty<UIElement, double>("height", HeightProperty, CssValueConverters.ParseDimension);
+        CssRegistry.RegisterProperty<UIElement, double>("min-width", MinWidthProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UIElement, double>("min-height", MinHeightProperty,
+            CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UIElement, double>("max-width", MaxWidthProperty,
+            CssValueConverters.ParseMaxDimension);
+        CssRegistry.RegisterProperty<UIElement, double>("max-height", MaxHeightProperty,
+            CssValueConverters.ParseMaxDimension);
+        CssRegistry.RegisterProperty<UIElement, Thickness>("margin", MarginProperty, CssValueConverters.ParseThickness);
+        CssRegistry.RegisterProperty<UIElement>("margin-top", value =>
             new[] { StyleSetter.CreateEdge(MarginProperty, StyleEdge.Top, CssValueConverters.ParseLength(value)) });
-        CssRegistry.RegisterProperty<Node>("margin-right", value =>
+        CssRegistry.RegisterProperty<UIElement>("margin-right", value =>
             new[] { StyleSetter.CreateEdge(MarginProperty, StyleEdge.Right, CssValueConverters.ParseLength(value)) });
-        CssRegistry.RegisterProperty<Node>("margin-bottom", value =>
+        CssRegistry.RegisterProperty<UIElement>("margin-bottom", value =>
             new[] { StyleSetter.CreateEdge(MarginProperty, StyleEdge.Bottom, CssValueConverters.ParseLength(value)) });
-        CssRegistry.RegisterProperty<Node>("margin-left", value =>
+        CssRegistry.RegisterProperty<UIElement>("margin-left", value =>
             new[] { StyleSetter.CreateEdge(MarginProperty, StyleEdge.Left, CssValueConverters.ParseLength(value)) });
-        CssRegistry.RegisterProperty<Node, double>("opacity", OpacityProperty, CssValueConverters.ParseNumber);
-        CssRegistry.RegisterProperty<Node, HorizontalAlignment>(
+        CssRegistry.RegisterProperty<UIElement, double>("opacity", OpacityProperty, CssValueConverters.ParseNumber);
+        CssRegistry.RegisterProperty<UIElement, HorizontalAlignment>(
             "horizontal-alignment",
             HorizontalAlignmentProperty,
             CssValueConverters.ParseHorizontalAlignment);
-        CssRegistry.RegisterProperty<Node, VerticalAlignment>(
+        CssRegistry.RegisterProperty<UIElement, VerticalAlignment>(
             "vertical-alignment",
             VerticalAlignmentProperty,
             CssValueConverters.ParseVerticalAlignment);
-        CssRegistry.RegisterProperty<Node, Visibility>(
+        CssRegistry.RegisterProperty<UIElement, Visibility>(
             "visibility",
             VisibilityProperty,
             CssValueConverters.ParseVisibility);
     }
 
-    internal Node GetStyleRoot()
+    internal UIElement GetStyleRoot()
     {
         var root = this;
         while (root.Parent is { } parent)
@@ -80,7 +87,7 @@ public abstract partial class Node
         }
     }
 
-    /// <summary>Gets the observable set of style classes applied to this node.</summary>
+    /// <summary>Gets the observable set of style classes applied to this element.</summary>
     /// <remarks>
     /// The collection reference is stable. Membership uses Ordinal comparison and names are not validated.
     /// Actual changes invalidate styles before subsequent collection listeners run.
@@ -119,7 +126,7 @@ public abstract partial class Node
         InvalidateStyle();
     }
 
-    /// <summary>Determines whether this node matches the supplied structural or state pseudo class.</summary>
+    /// <summary>Determines whether this element matches the supplied structural or state pseudo class.</summary>
     /// <param name="pseudoClass">The shared pseudo-class identifier.</param>
     /// <returns>true when the node matches the pseudo class; otherwise false.</returns>
     internal bool HasPseudoClass(PseudoClass pseudoClass)
@@ -127,7 +134,7 @@ public abstract partial class Node
         if (pseudoClass == PseudoClass.Root)
             return Parent is null;
         if (pseudoClass == PseudoClass.Empty)
-            return this is not Parent parent || parent.ReadOnlyChildren.Count == 0;
+            return this is not Container parent || parent.ReadOnlyChildren.Count == 0;
         if (pseudoClass == PseudoClass.FirstChild)
             return Parent is null || ReferenceEquals(Parent.ReadOnlyChildren[0], this);
         if (pseudoClass == PseudoClass.LastChild)
@@ -137,7 +144,7 @@ public abstract partial class Node
         return _pseudoClasses.Contains(pseudoClass);
     }
 
-    /// <summary>Gets the node's one-based sibling position, treating a parentless node as a single sibling.</summary>
+    /// <summary>Gets the element's one-based sibling position, treating a parentless element as a single sibling.</summary>
     internal int GetChildPosition(bool fromEnd)
     {
         if (Parent is null)
@@ -173,7 +180,7 @@ public abstract partial class Node
     }
 
     internal static void InvalidateStyleSubtreeBatch(
-        IReadOnlyList<Node> roots)
+        IReadOnlyList<UIElement> roots)
     {
         foreach (var root in roots)
             root.InvalidateStyleSubtree();
@@ -181,7 +188,7 @@ public abstract partial class Node
 
     internal void UpdateStyles() => UpdateStylesCore(this);
 
-    private void UpdateStylesCore(Node root)
+    private void UpdateStylesCore(UIElement root)
     {
         if (IsUpdatingStyles)
             throw new InvalidOperationException("Styles are already being updated for this node.");
@@ -223,7 +230,7 @@ public abstract partial class Node
 
             if (!ReferenceEquals(GetStyleRoot(), root))
                 return;
-            if (this is Parent parent)
+            if (this is Container parent)
             {
                 foreach (var child in parent.ReadOnlyChildren.ToArray())
                 {
@@ -261,7 +268,8 @@ public abstract partial class Node
         if (property.IsDirect)
             return Array.Empty<StyleValueSource>();
         var sources = _styleSources is not null && _styleSources.TryGetValue(property, out var value)
-            ? value : Array.Empty<StyleValueSource>();
+            ? value
+            : Array.Empty<StyleValueSource>();
         var isMasked = HasLocalValue(property);
         return isMasked
             ? Array.AsReadOnly(sources.Select(source => source.WithLocalValueMask(true)).ToArray())
@@ -287,8 +295,9 @@ public abstract partial class Node
                 continue;
 
             var fallback = property.Inherits &&
-                TryGetInheritedValue(property, InheritanceParent, out var inherited)
-                    ? inherited : property.DefaultValue;
+                           TryGetInheritedValue(property, InheritanceParent, out var inherited)
+                ? inherited
+                : property.DefaultValue;
             var oldValue = GetCommittedStyleValue(property, fallback);
             var newValue = GetSnapshotValue(newSnapshot, property, fallback);
             if (!property.AreEqual(oldValue, newValue))
@@ -299,8 +308,8 @@ public abstract partial class Node
     }
 
     internal static void AddRelationshipRefreshEntry(
-        List<Node> entries,
-        Node? root,
+        List<UIElement> entries,
+        UIElement? root,
         StyleResolver resolver)
     {
         if (root is not null && (resolver.HasRelationships || resolver.HasChildIndexedPseudoClasses ||
@@ -309,8 +318,8 @@ public abstract partial class Node
     }
 
     internal static void AddSubtreeRefreshEntry(
-        List<Node> entries,
-        Node? node,
+        List<UIElement> entries,
+        UIElement? node,
         StyleResolver previousResolver,
         StyleResolver currentResolver,
         bool screenChanged = false)
@@ -340,10 +349,10 @@ public abstract partial class Node
         return property.AreEqual(currentValue, expectedValue);
     }
 
-    private static IEnumerable<Node> PreOrderTraversal(Node root)
+    private static IEnumerable<UIElement> PreOrderTraversal(UIElement root)
     {
         yield return root;
-        if (root is Parent parent)
+        if (root is Container parent)
         {
             foreach (var child in parent.ReadOnlyChildren)
             {

@@ -210,7 +210,7 @@ public sealed class WheelSettingsTests
         Content = new Panel { Width = 1000, Height = 1000 }
     };
 
-    private static UiManager Open(Node root, Size size)
+    private static UiManager Open(UIElement root, Size size)
     {
         var screen = new GameScreen(root) { Scale = 1 };
         screen.SetBaseStyleSheets([]);

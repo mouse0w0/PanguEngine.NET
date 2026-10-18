@@ -4,7 +4,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
-public sealed class ParentTests
+public sealed class ContainerTests
 {
     [Fact]
     public void ChildrenViewIsStableReadOnlyAndTracksChanges()
@@ -18,11 +18,11 @@ public sealed class ParentTests
         parent.Insert(0, second);
 
         Assert.Same(view, parent.ReadOnlyChildren);
-        Assert.Equal(new Node[] { second, first }, view);
+        Assert.Equal(new UIElement[] { second, first }, view);
         Assert.Same(parent, first.Parent);
         Assert.Same(parent, second.Parent);
-        Assert.IsNotType<List<Node>>(view);
-        Assert.False(view is IList<Node>);
+        Assert.IsNotType<List<UIElement>>(view);
+        Assert.False(view is IList<UIElement>);
     }
 
     [Fact]
@@ -62,8 +62,8 @@ public sealed class ParentTests
 
         newParent.Insert(0, child);
 
-        Assert.Equal(new Node[] { oldSibling }, oldParent.Children);
-        Assert.Equal(new Node[] { child, newSibling }, newParent.Children);
+        Assert.Equal(new UIElement[] { oldSibling }, oldParent.Children);
+        Assert.Equal(new UIElement[] { child, newSibling }, newParent.Children);
         Assert.Same(newParent, child.Parent);
     }
 
@@ -96,11 +96,11 @@ public sealed class ParentTests
         middle.Add(leaf);
 
         Assert.Throws<InvalidOperationException>(() => root.Add(root));
-        Assert.Equal(new Node[] { middle }, root.Children);
+        Assert.Equal(new UIElement[] { middle }, root.Children);
         Assert.Null(root.Parent);
 
         Assert.Throws<InvalidOperationException>(() => middle.Add(root));
-        Assert.Equal(new Node[] { leaf }, middle.Children);
+        Assert.Equal(new UIElement[] { leaf }, middle.Children);
         Assert.Same(root, middle.Parent);
         Assert.Null(root.Parent);
 
@@ -140,11 +140,11 @@ public sealed class ParentTests
         parent.Add(last);
 
         middle.MoveToFront();
-        Assert.Equal(new Node[] { first, last, middle }, parent.Children);
+        Assert.Equal(new UIElement[] { first, last, middle }, parent.Children);
         Assert.Same(parent, middle.Parent);
 
         middle.MoveToBack();
-        Assert.Equal(new Node[] { middle, first, last }, parent.Children);
+        Assert.Equal(new UIElement[] { middle, first, last }, parent.Children);
         Assert.Same(parent, middle.Parent);
     }
 
@@ -170,7 +170,7 @@ public sealed class ParentTests
 
         Assert.Null(backgroundResult.BackError);
         Assert.Null(backgroundResult.FrontError);
-        Assert.Equal(new Node[] { first, last }, parent.Children);
+        Assert.Equal(new UIElement[] { first, last }, parent.Children);
         screen.Close();
     }
 
@@ -188,10 +188,10 @@ public sealed class ParentTests
         screen.Open();
 
         middle.MoveToFront();
-        Assert.Equal(new Node[] { first, last, middle }, parent.Children);
+        Assert.Equal(new UIElement[] { first, last, middle }, parent.Children);
 
         middle.MoveToBack();
-        Assert.Equal(new Node[] { middle, first, last }, parent.Children);
+        Assert.Equal(new UIElement[] { middle, first, last }, parent.Children);
         Assert.Same(screen, middle.Screen);
         screen.Close();
     }
@@ -338,7 +338,7 @@ public sealed class ParentTests
         newParent.Children.Add(child);
 
         Assert.Empty(oldParent.Children);
-        Assert.Equal(new Node[] { child }, newParent.Children);
+        Assert.Equal(new UIElement[] { child }, newParent.Children);
         Assert.Same(newParent, child.Parent);
         Assert.Same(screen, child.Screen);
         Assert.Same(screen, leaf.Screen);
@@ -366,7 +366,7 @@ public sealed class ParentTests
         newRoot.Add(child);
 
         Assert.Empty(oldRoot.Children);
-        Assert.Equal(new Node[] { child }, newRoot.Children);
+        Assert.Equal(new UIElement[] { child }, newRoot.Children);
         Assert.Same(newRoot, child.Parent);
         Assert.Same(newScreen, child.Screen);
         Assert.Same(newScreen, leaf.Screen);
@@ -602,7 +602,7 @@ public sealed class ParentTests
         Assert.IsType<InvalidOperationException>(result.RemoveError);
         Assert.IsType<InvalidOperationException>(result.ClearError);
         Assert.IsType<InvalidOperationException>(result.MoveError);
-        Assert.Equal(new Node[] { first, second }, root.Children);
+        Assert.Equal(new UIElement[] { first, second }, root.Children);
         Assert.Same(root, first.Parent);
         Assert.Same(root, second.Parent);
         Assert.Null(added.Parent);
@@ -649,7 +649,7 @@ public sealed class ParentTests
 
         Assert.Throws<InvalidOperationException>(() => target.Add(backgroundTree.Child));
 
-        Assert.Equal(new Node[] { backgroundTree.Child }, backgroundTree.Root.Children);
+        Assert.Equal(new UIElement[] { backgroundTree.Child }, backgroundTree.Root.Children);
         Assert.Same(backgroundTree.Root, backgroundTree.Child.Parent);
         Assert.Same(backgroundTree.Screen, backgroundTree.Child.Screen);
         Assert.Same(backgroundTree.Screen, backgroundTree.Leaf.Screen);
@@ -678,7 +678,7 @@ public sealed class ParentTests
 
         Assert.Throws<InvalidOperationException>(() => backgroundTarget.Root.Add(child));
 
-        Assert.Equal(new Node[] { child }, oldRoot.Children);
+        Assert.Equal(new UIElement[] { child }, oldRoot.Children);
         Assert.Same(oldRoot, child.Parent);
         Assert.Same(oldScreen, child.Screen);
         Assert.Same(oldScreen, leaf.Screen);
@@ -729,19 +729,19 @@ public sealed class ParentTests
         Assert.Same(root, child.Parent);
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
     }
 
-    private sealed class TestParent : Parent
+    private sealed class TestParent : Container
     {
-        internal void Add(Node child) =>
+        internal void Add(UIElement child) =>
             Children.Add(child);
 
-        internal void Insert(int index, Node child) =>
+        internal void Insert(int index, UIElement child) =>
             Children.Insert(index, child);
 
-        internal bool Remove(Node child) =>
+        internal bool Remove(UIElement child) =>
             Children.Remove(child);
 
         internal void Clear() =>

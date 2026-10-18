@@ -2,7 +2,7 @@ using PanguEngine.ComponentModel;
 
 namespace PanguEngine.UI;
 
-public abstract partial class Node
+public abstract partial class UIElement
 {
     private bool _isHitTestLayoutValid;
 
@@ -10,7 +10,7 @@ public abstract partial class Node
     /// Identifies the <see cref="Width"/> property.
     /// </summary>
     public static readonly Property<double> WidthProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(Width),
             double.NaN,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
@@ -21,7 +21,7 @@ public abstract partial class Node
     /// Identifies the <see cref="Height"/> property.
     /// </summary>
     public static readonly Property<double> HeightProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(Height),
             double.NaN,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
@@ -32,7 +32,7 @@ public abstract partial class Node
     /// Identifies the <see cref="MinWidth"/> property.
     /// </summary>
     public static readonly Property<double> MinWidthProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(MinWidth),
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             validate: IsFiniteNonNegative,
@@ -42,7 +42,7 @@ public abstract partial class Node
     /// Identifies the <see cref="MinHeight"/> property.
     /// </summary>
     public static readonly Property<double> MinHeightProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(MinHeight),
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
             validate: IsFiniteNonNegative,
@@ -52,7 +52,7 @@ public abstract partial class Node
     /// Identifies the <see cref="MaxWidth"/> property.
     /// </summary>
     public static readonly Property<double> MaxWidthProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(MaxWidth),
             double.PositiveInfinity,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
@@ -63,7 +63,7 @@ public abstract partial class Node
     /// Identifies the <see cref="MaxHeight"/> property.
     /// </summary>
     public static readonly Property<double> MaxHeightProperty =
-        Property.Register<Node, double>(
+        Property.Register<UIElement, double>(
             nameof(MaxHeight),
             double.PositiveInfinity,
             onChanged: static (node, _, _) => node.InvalidateMeasure(),
@@ -74,7 +74,7 @@ public abstract partial class Node
     /// Identifies the <see cref="Margin"/> property.
     /// </summary>
     public static readonly Property<Thickness> MarginProperty =
-        Property.Register<Node, Thickness>(
+        Property.Register<UIElement, Thickness>(
             nameof(Margin),
             Thickness.Zero,
             onChanged: static (node, _, _) => node.InvalidateMeasure());
@@ -83,29 +83,31 @@ public abstract partial class Node
     /// Identifies the <see cref="HorizontalAlignment"/> property.
     /// </summary>
     public static readonly Property<HorizontalAlignment> HorizontalAlignmentProperty =
-        Property.Register<Node, HorizontalAlignment>(
+        Property.Register<UIElement, HorizontalAlignment>(
             nameof(HorizontalAlignment),
             HorizontalAlignment.Stretch,
             onChanged: static (node, _, _) => node.InvalidateArrange(),
-            validate: static value => value is HorizontalAlignment.Left or HorizontalAlignment.Center or HorizontalAlignment.Right or HorizontalAlignment.Stretch,
+            validate: static value => value is HorizontalAlignment.Left or HorizontalAlignment.Center
+                or HorizontalAlignment.Right or HorizontalAlignment.Stretch,
             validationMessage: "HorizontalAlignment has an undefined value.");
 
     /// <summary>
     /// Identifies the <see cref="VerticalAlignment"/> property.
     /// </summary>
     public static readonly Property<VerticalAlignment> VerticalAlignmentProperty =
-        Property.Register<Node, VerticalAlignment>(
+        Property.Register<UIElement, VerticalAlignment>(
             nameof(VerticalAlignment),
             VerticalAlignment.Stretch,
             onChanged: static (node, _, _) => node.InvalidateArrange(),
-            validate: static value => value is VerticalAlignment.Top or VerticalAlignment.Center or VerticalAlignment.Bottom or VerticalAlignment.Stretch,
+            validate: static value => value is VerticalAlignment.Top or VerticalAlignment.Center
+                or VerticalAlignment.Bottom or VerticalAlignment.Stretch,
             validationMessage: "VerticalAlignment has an undefined value.");
 
     /// <summary>
     /// Identifies the <see cref="Visibility"/> property.
     /// </summary>
     public static readonly Property<Visibility> VisibilityProperty =
-        Property.Register<Node, Visibility>(
+        Property.Register<UIElement, Visibility>(
             nameof(Visibility),
             Visibility.Visible,
             onChanged: static (node, _, newValue) =>
@@ -213,11 +215,11 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Gets or sets how this node participates in layout, drawing, and hit testing.
+    /// Gets or sets how this element participates in layout, drawing, and hit testing.
     /// </summary>
     /// <remarks>
-    /// Hiding or collapsing this node immediately clears focus, hover, and pressed states
-    /// for this node and its descendants. Showing it again does not restore focus or pressed states.
+    /// Hiding or collapsing this element immediately clears focus, hover, and pressed states
+    /// for this element and its descendants. Showing it again does not restore focus or pressed states.
     /// </remarks>
     public Visibility Visibility
     {
@@ -234,7 +236,7 @@ public abstract partial class Node
     /// Gets the arranged boundary in parent coordinates, excluding margin.
     /// </summary>
     /// <remarks>
-    /// A root node uses the coordinate system supplied by its arrange caller.
+    /// A root element uses the coordinate system supplied by its arrange caller.
     /// </remarks>
     public Rect LayoutBounds { get; private set; }
 
@@ -249,7 +251,7 @@ public abstract partial class Node
     public bool IsArrangeValid { get; private set; }
 
     /// <summary>
-    /// Measures this node within an available size.
+    /// Measures this element within an available size.
     /// </summary>
     /// <param name="availableSize">The available size, which may contain positive infinity.</param>
     /// <exception cref="InvalidOperationException">
@@ -331,7 +333,7 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Arranges this node within a final layout rectangle.
+    /// Arranges this element within a final layout rectangle.
     /// </summary>
     /// <param name="finalRect">The final slot in parent or caller coordinates.</param>
     /// <exception cref="InvalidOperationException">
@@ -424,7 +426,7 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Invalidates measurement and arrangement for this node and its ancestors.
+    /// Invalidates measurement and arrangement for this element and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the open screen is accessed from another thread.
@@ -436,7 +438,7 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Invalidates arrangement for this node and its ancestors.
+    /// Invalidates arrangement for this element and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the open screen is accessed from another thread.
@@ -448,7 +450,7 @@ public abstract partial class Node
     }
 
     /// <summary>
-    /// Measures the content of this node.
+    /// Measures the content of this element.
     /// </summary>
     /// <param name="availableSize">The content size available after framework constraints.</param>
     /// <returns>The finite non-negative desired content size, excluding margin.</returns>
@@ -456,7 +458,7 @@ public abstract partial class Node
         Size.Zero;
 
     /// <summary>
-    /// Arranges the content of this node within its final size.
+    /// Arranges the content of this element within its final size.
     /// </summary>
     /// <param name="finalSize">The finite non-negative content size, excluding margin.</param>
     protected virtual void ArrangeCore(Size finalSize)
@@ -485,7 +487,7 @@ public abstract partial class Node
     internal void InvalidateMeasureSubtree()
     {
         InvalidateMeasureState();
-        if (this is not Parent parent)
+        if (this is not Container parent)
             return;
 
         foreach (var child in parent.ReadOnlyChildren)

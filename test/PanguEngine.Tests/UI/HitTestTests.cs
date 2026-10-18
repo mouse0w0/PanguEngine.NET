@@ -21,17 +21,17 @@ public sealed class HitTestTests
     [Fact]
     public void InputPropertiesExposeExpectedDefaultsOwnersTargetsAndInvalidation()
     {
-        Assert.Equal(typeof(Node), Node.FocusableProperty.OwnerType);
-        Assert.Equal(typeof(Node), Node.FocusableProperty.TargetType);
-        Assert.False(Node.FocusableProperty.DefaultValue);
+        Assert.Equal(typeof(UIElement), UIElement.FocusableProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), UIElement.FocusableProperty.TargetType);
+        Assert.False(UIElement.FocusableProperty.DefaultValue);
 
-        Assert.Equal(typeof(Node), Node.IsHitTestVisibleProperty.OwnerType);
-        Assert.Equal(typeof(Node), Node.IsHitTestVisibleProperty.TargetType);
-        Assert.True(Node.IsHitTestVisibleProperty.DefaultValue);
+        Assert.Equal(typeof(UIElement), UIElement.IsHitTestVisibleProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), UIElement.IsHitTestVisibleProperty.TargetType);
+        Assert.True(UIElement.IsHitTestVisibleProperty.DefaultValue);
 
-        Assert.Equal(typeof(Parent), Parent.ClipToBoundsProperty.OwnerType);
-        Assert.Equal(typeof(Parent), Parent.ClipToBoundsProperty.TargetType);
-        Assert.False(Parent.ClipToBoundsProperty.DefaultValue);
+        Assert.Equal(typeof(Container), Container.ClipToBoundsProperty.OwnerType);
+        Assert.Equal(typeof(Container), Container.ClipToBoundsProperty.TargetType);
+        Assert.False(Container.ClipToBoundsProperty.DefaultValue);
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public sealed class HitTestTests
         Assert.Same(root, result);
     }
 
-    private static void Arrange(Node node, Rect bounds)
+    private static void Arrange(UIElement node, Rect bounds)
     {
         node.Measure(new Size(bounds.Width, bounds.Height));
         node.Arrange(bounds);
@@ -292,7 +292,7 @@ public sealed class HitTestTests
         return result;
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal Func<Point, bool>? ContainsAction { get; init; }
 
@@ -300,8 +300,8 @@ public sealed class HitTestTests
             ContainsAction?.Invoke(localPoint) ?? base.ContainsCore(localPoint);
     }
 
-    private sealed class TestParent : Parent
+    private sealed class TestParent : Container
     {
-        internal void Add(Node child) => Children.Add(child);
+        internal void Add(UIElement child) => Children.Add(child);
     }
 }

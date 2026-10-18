@@ -33,7 +33,7 @@ public partial class Screen
 
     /// <summary>Replaces the base style sheets while preserving the application style sheets.</summary>
     /// <param name="styleSheets">The ordered style sheets to copy into the new base snapshot.</param>
-    /// <remarks>Replaces the configuration immediately. Node styles are applied during screen layout.</remarks>
+    /// <remarks>Replaces the configuration immediately. Element styles are applied during screen layout.</remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="styleSheets"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown on the wrong owner thread or during a conflicting screen operation.</exception>
     public void SetBaseStyleSheets(IEnumerable<StyleSheet> styleSheets) =>
@@ -41,7 +41,7 @@ public partial class Screen
 
     /// <summary>Replaces the application style sheets while preserving the base style sheets.</summary>
     /// <param name="styleSheets">The ordered style sheets to copy into the new author snapshot.</param>
-    /// <remarks>Replaces the configuration immediately. Node styles are applied during screen layout.</remarks>
+    /// <remarks>Replaces the configuration immediately. Element styles are applied during screen layout.</remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="styleSheets"/> is null.</exception>
     /// <exception cref="InvalidOperationException">Thrown on the wrong owner thread or during a conflicting screen operation.</exception>
     public void SetStyleSheets(IEnumerable<StyleSheet> styleSheets) =>
@@ -61,7 +61,7 @@ public partial class Screen
         ArgumentNullException.ThrowIfNull(styleSheets);
         StyleResolver previous;
         IReadOnlyList<StyleSheet> currentSheets;
-        Node? root;
+        UIElement? root;
         lock (_stateSync)
         {
             previous = _styleResolver;

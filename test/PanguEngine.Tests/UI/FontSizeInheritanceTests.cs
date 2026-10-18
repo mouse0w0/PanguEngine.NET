@@ -10,14 +10,14 @@ public sealed class FontSizeInheritanceTests
     [Fact]
     public void FontSizeHasOneDescriptorAndDefaultsToSixteenOnEveryNode()
     {
-        Assert.Same(Node.FontSizeProperty, Text.FontSizeProperty);
-        Assert.Same(Node.FontSizeProperty, Button.FontSizeProperty);
-        Assert.Same(Node.FontSizeProperty, TextBox.FontSizeProperty);
-        Assert.Equal(typeof(PanguEngine.UI.Node), Node.FontSizeProperty.OwnerType);
-        Assert.Equal(typeof(PanguEngine.UI.Node), Node.FontSizeProperty.TargetType);
-        Assert.Equal(16d, Node.FontSizeProperty.DefaultValue);
-        Assert.True(Node.FontSizeProperty.Inherits);
-        Assert.All(new PanguEngine.UI.Node[] { new Panel(), new Text(), new Button(), new TextBox() },
+        Assert.Same(UIElement.FontSizeProperty, Text.FontSizeProperty);
+        Assert.Same(UIElement.FontSizeProperty, Button.FontSizeProperty);
+        Assert.Same(UIElement.FontSizeProperty, TextBox.FontSizeProperty);
+        Assert.Equal(typeof(UIElement), UIElement.FontSizeProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), UIElement.FontSizeProperty.TargetType);
+        Assert.Equal(16d, UIElement.FontSizeProperty.DefaultValue);
+        Assert.True(UIElement.FontSizeProperty.Inherits);
+        Assert.All(new UIElement[] { new Panel(), new Text(), new Button(), new TextBox() },
             node => Assert.Equal(16d, node.FontSize));
     }
 
@@ -29,7 +29,7 @@ public sealed class FontSizeInheritanceTests
         root.Children.Add(text);
 
         root.Children.Remove(text);
-        text.ClearValue(Node.FontSizeProperty);
+        text.ClearValue(UIElement.FontSizeProperty);
 
         Assert.Equal(16d, text.FontSize);
     }
@@ -41,21 +41,21 @@ public sealed class FontSizeInheritanceTests
         var source = new Text { FontSize = 30 };
         var text = new Text();
         root.Children.Add(text);
-        text.Bind(Node.FontSizeProperty, source, Node.FontSizeProperty);
+        text.Bind(UIElement.FontSizeProperty, source, UIElement.FontSizeProperty);
 
         root.FontSize = 24;
         Assert.Equal(30d, text.FontSize);
         source.FontSize = 32;
         Assert.Equal(32d, text.FontSize);
-        text.Unbind(Node.FontSizeProperty);
+        text.Unbind(UIElement.FontSizeProperty);
         source.FontSize = 36;
         root.FontSize = 26;
         Assert.Equal(32d, text.FontSize);
 
-        text.ClearValue(Node.FontSizeProperty);
+        text.ClearValue(UIElement.FontSizeProperty);
         Assert.Equal(26d, text.FontSize);
-        text.Bind(Node.FontSizeProperty, source, Node.FontSizeProperty);
-        text.ClearValue(Node.FontSizeProperty);
+        text.Bind(UIElement.FontSizeProperty, source, UIElement.FontSizeProperty);
+        text.ClearValue(UIElement.FontSizeProperty);
         source.FontSize = 40;
         Assert.Equal(26d, text.FontSize);
     }
@@ -75,14 +75,14 @@ public sealed class FontSizeInheritanceTests
         Assert.Equal(20d, root.FontSize);
         Assert.Equal(14d, text.FontSize);
         Assert.Equal(20d, input.FontSize);
-        Assert.Empty(input.GetStyleValueSources(Node.FontSizeProperty));
+        Assert.Empty(input.GetStyleValueSources(UIElement.FontSizeProperty));
 
         root.FontSize = 26;
         Assert.Equal(14d, text.FontSize);
         Assert.Equal(26d, input.FontSize);
         text.FontSize = 30;
         Assert.Equal(30d, text.FontSize);
-        text.ClearValue(Node.FontSizeProperty);
+        text.ClearValue(UIElement.FontSizeProperty);
         Assert.Equal(14d, text.FontSize);
         screen.SetStyleSheets([]);
         root.UpdateStyles();
@@ -98,10 +98,10 @@ public sealed class FontSizeInheritanceTests
         middle.Children.Add(text);
         root.Children.Add(middle);
         var screen = new Screen(root);
-        var changes = new List<(PanguEngine.UI.Node Node, double Old, double New)>();
-        foreach (var node in new Node[] { root, middle, text })
+        var changes = new List<(UIElement Node, double Old, double New)>();
+        foreach (var node in new UIElement[] { root, middle, text })
         {
-            node.Subscribe(Node.FontSizeProperty, (_, args) =>
+            node.Subscribe(UIElement.FontSizeProperty, (_, args) =>
             {
                 Assert.Equal(24d, root.FontSize);
                 Assert.Equal(24d, node.FontSize);
@@ -128,7 +128,7 @@ public sealed class FontSizeInheritanceTests
         screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; } Text { font-size: 14px; }")]);
         root.UpdateStyles();
         var changes = new List<(double Old, double New)>();
-        using var subscription = text.Subscribe(Node.FontSizeProperty,
+        using var subscription = text.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 28px; }")]);
@@ -149,7 +149,7 @@ public sealed class FontSizeInheritanceTests
         screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; }")]);
         root.UpdateStyles();
         var changes = 0;
-        using var subscription = text.Subscribe(Node.FontSizeProperty, (_, _) => changes++);
+        using var subscription = text.Subscribe(UIElement.FontSizeProperty, (_, _) => changes++);
 
         var invalidSheet = StyleSheet.Parse("#root { font-size: 28px; } Text { font-size: var(--missing); }");
         screen.SetStyleSheets([invalidSheet]);
@@ -170,13 +170,13 @@ public sealed class FontSizeInheritanceTests
         var text = new Text();
         root.Children.Add(text);
         var screen = new Screen(root);
-        using var subscription = root.Subscribe(Node.FontSizeProperty, (_, args) =>
+        using var subscription = root.Subscribe(UIElement.FontSizeProperty, (_, args) =>
         {
             if (args.NewValue == 24)
                 root.FontSize = 30;
         });
         var changes = new List<(double Old, double New)>();
-        using var childSubscription = text.Subscribe(Node.FontSizeProperty,
+        using var childSubscription = text.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
@@ -194,7 +194,7 @@ public sealed class FontSizeInheritanceTests
         root.Children.Add(text);
         var screen = new Screen(root);
         var changed = false;
-        using var subscription = root.Subscribe(Node.FontSizeProperty, (_, args) =>
+        using var subscription = root.Subscribe(UIElement.FontSizeProperty, (_, args) =>
         {
             if (args.NewValue != 24 || changed)
                 return;
@@ -203,7 +203,7 @@ public sealed class FontSizeInheritanceTests
             root.FontSize = 24;
         });
         var changes = new List<(double Old, double New)>();
-        using var childSubscription = text.Subscribe(Node.FontSizeProperty,
+        using var childSubscription = text.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
@@ -246,13 +246,13 @@ public sealed class FontSizeInheritanceTests
         var text = new Text();
         var source = new Text { FontSize = 30 };
         root.Children.Add(text);
-        text.BindTwoWay(Node.FontSizeProperty, source, Node.FontSizeProperty);
+        text.BindTwoWay(UIElement.FontSizeProperty, source, UIElement.FontSizeProperty);
         text.FontSize = 32;
         Assert.Equal(32d, source.FontSize);
         root.FontSize = 26;
         Assert.Equal(32d, text.FontSize);
 
-        text.ClearValue(Node.FontSizeProperty);
+        text.ClearValue(UIElement.FontSizeProperty);
 
         Assert.Equal(26d, text.FontSize);
         Assert.Equal(32d, source.FontSize);
@@ -272,12 +272,12 @@ public sealed class FontSizeInheritanceTests
         screen.SetStyleSheets([StyleSheet.Parse("Text { font-size: 14px; }")]);
         root.UpdateStyles();
         var changes = new List<(double Old, double New)>();
-        using var subscription = text.Subscribe(Node.FontSizeProperty,
+        using var subscription = text.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
         FontMutationNode.OnConvert = () =>
         {
             text.FontSize = 25;
-            text.ClearValue(Node.FontSizeProperty);
+            text.ClearValue(UIElement.FontSizeProperty);
         };
         try
         {
@@ -336,8 +336,8 @@ public sealed class FontSizeInheritanceTests
         }
 
         Assert.Equal(30d, root.FontSize);
-        Assert.True(Assert.Single(root.GetStyleValueSources(Node.FontSizeProperty)).IsMaskedByLocalValue);
-        root.ClearValue(Node.FontSizeProperty);
+        Assert.True(Assert.Single(root.GetStyleValueSources(UIElement.FontSizeProperty)).IsMaskedByLocalValue);
+        root.ClearValue(UIElement.FontSizeProperty);
         Assert.Equal(24d, root.FontSize);
     }
 
@@ -349,17 +349,19 @@ public sealed class FontSizeInheritanceTests
         root.Children.Add(child);
         var screen = new Screen(root);
         screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([new StyleSheet([
-            new StyleRule(StyleSelector.For<Panel>(), [
-                StyleSetter.Create(Node.OpacityProperty, 0.5d),
-                StyleSetter.Create(Node.FontSizeProperty, 24d)
+        screen.SetStyleSheets([
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<Panel>(), [
+                    StyleSetter.Create(UIElement.OpacityProperty, 0.5d),
+                    StyleSetter.Create(UIElement.FontSizeProperty, 24d)
+                ])
             ])
-        ])]);
-        using var opacitySubscription = root.Subscribe(Node.OpacityProperty, (_, _) => root.FontSize = 24);
+        ]);
+        using var opacitySubscription = root.Subscribe(UIElement.OpacityProperty, (_, _) => root.FontSize = 24);
         var parentNotifications = 0;
-        using var parentSubscription = root.Subscribe(Node.FontSizeProperty, (_, _) => parentNotifications++);
+        using var parentSubscription = root.Subscribe(UIElement.FontSizeProperty, (_, _) => parentNotifications++);
         var changes = new List<(double Old, double New)>();
-        using var childSubscription = child.Subscribe(Node.FontSizeProperty,
+        using var childSubscription = child.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         root.UpdateStyles();
@@ -386,12 +388,12 @@ public sealed class FontSizeInheritanceTests
         newScreen.SetBaseStyleSheets([]);
         oldScreen.SetStyleSheets([sheet]);
         newScreen.SetStyleSheets([sheet]);
-        using var opacitySubscription = moving.Subscribe(Node.OpacityProperty,
+        using var opacitySubscription = moving.Subscribe(UIElement.OpacityProperty,
             (_, _) => newRoot.Children.Add(moving));
         var movingNotifications = 0;
-        using var movingSubscription = moving.Subscribe(Node.FontSizeProperty, (_, _) => movingNotifications++);
+        using var movingSubscription = moving.Subscribe(UIElement.FontSizeProperty, (_, _) => movingNotifications++);
         var changes = new List<(double Old, double New)>();
-        using var childSubscription = child.Subscribe(Node.FontSizeProperty,
+        using var childSubscription = child.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         oldRoot.UpdateStyles();
@@ -407,7 +409,7 @@ public sealed class FontSizeInheritanceTests
         Assert.Equal(new[] { (16d, 24d) }, changes);
     }
 
-    private sealed class FontMutationNode : PanguEngine.UI.Node
+    private sealed class FontMutationNode : UIElement
     {
         internal static Action? OnConvert { get; set; }
 

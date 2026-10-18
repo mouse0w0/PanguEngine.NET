@@ -4,7 +4,7 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Arranges child nodes at absolute positions within a rectangular content area.
+/// Arranges child elements at absolute positions within a rectangular content area.
 /// </summary>
 public sealed class Canvas : Panel
 {
@@ -12,7 +12,7 @@ public sealed class Canvas : Panel
     /// Identifies the attached horizontal position property.
     /// </summary>
     public static readonly Property<double> LeftProperty =
-        Property.RegisterAttached<Canvas, Node, double>(
+        Property.RegisterAttached<Canvas, UIElement, double>(
             "Left",
             double.NaN,
             onChanged: static (node, _, _) => node.InvalidateArrange(),
@@ -23,7 +23,7 @@ public sealed class Canvas : Panel
     /// Identifies the attached vertical position property.
     /// </summary>
     public static readonly Property<double> TopProperty =
-        Property.RegisterAttached<Canvas, Node, double>(
+        Property.RegisterAttached<Canvas, UIElement, double>(
             "Top",
             double.NaN,
             onChanged: static (node, _, _) => node.InvalidateArrange(),
@@ -34,7 +34,7 @@ public sealed class Canvas : Panel
     /// Identifies the attached horizontal position from the right content edge.
     /// </summary>
     public static readonly Property<double> RightProperty =
-        Property.RegisterAttached<Canvas, Node, double>(
+        Property.RegisterAttached<Canvas, UIElement, double>(
             "Right",
             double.NaN,
             onChanged: static (node, _, _) => node.InvalidateArrange(),
@@ -45,7 +45,7 @@ public sealed class Canvas : Panel
     /// Identifies the attached vertical position from the bottom content edge.
     /// </summary>
     public static readonly Property<double> BottomProperty =
-        Property.RegisterAttached<Canvas, Node, double>(
+        Property.RegisterAttached<Canvas, UIElement, double>(
             "Bottom",
             double.NaN,
             onChanged: static (node, _, _) => node.InvalidateArrange(),
@@ -55,57 +55,57 @@ public sealed class Canvas : Panel
     static Canvas()
     {
         CssRegistry.RegisterElement<Canvas>("Canvas");
-        CssRegistry.RegisterProperty<Node, double>("left", LeftProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Node, double>("top", TopProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Node, double>("right", RightProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<Node, double>("bottom", BottomProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UIElement, double>("left", LeftProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UIElement, double>("top", TopProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UIElement, double>("right", RightProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UIElement, double>("bottom", BottomProperty, CssValueConverters.ParseLength);
     }
 
     /// <summary>
-    /// Gets the attached horizontal position of a node.
+    /// Gets the attached horizontal position of an element.
     /// </summary>
-    /// <param name="node">The node whose position to read.</param>
+    /// <param name="node">The element whose position to read.</param>
     /// <returns>The horizontal position, or NaN when unspecified.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
-    public static double GetLeft(Node node)
+    public static double GetLeft(UIElement node)
     {
         ArgumentNullException.ThrowIfNull(node);
         return node.GetValue(LeftProperty);
     }
 
     /// <summary>
-    /// Sets the attached horizontal position of a node.
+    /// Sets the attached horizontal position of an element.
     /// </summary>
-    /// <param name="node">The node whose position to set.</param>
+    /// <param name="node">The element whose position to set.</param>
     /// <param name="value">The horizontal position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
-    public static void SetLeft(Node node, double value)
+    public static void SetLeft(UIElement node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
         node.SetValue(LeftProperty, value);
     }
 
     /// <summary>
-    /// Gets the attached vertical position of a node.
+    /// Gets the attached vertical position of an element.
     /// </summary>
-    /// <param name="node">The node whose position to read.</param>
+    /// <param name="node">The element whose position to read.</param>
     /// <returns>The vertical position, or NaN when unspecified.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
-    public static double GetTop(Node node)
+    public static double GetTop(UIElement node)
     {
         ArgumentNullException.ThrowIfNull(node);
         return node.GetValue(TopProperty);
     }
 
     /// <summary>
-    /// Sets the attached vertical position of a node.
+    /// Sets the attached vertical position of an element.
     /// </summary>
-    /// <param name="node">The node whose position to set.</param>
+    /// <param name="node">The element whose position to set.</param>
     /// <param name="value">The vertical position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
-    public static void SetTop(Node node, double value)
+    public static void SetTop(UIElement node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
         node.SetValue(TopProperty, value);
@@ -114,10 +114,10 @@ public sealed class Canvas : Panel
     /// <summary>
     /// Gets the attached horizontal position from the right content edge.
     /// </summary>
-    /// <param name="node">The node whose position to read.</param>
+    /// <param name="node">The element whose position to read.</param>
     /// <returns>The horizontal position, or NaN when unspecified.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
-    public static double GetRight(Node node)
+    public static double GetRight(UIElement node)
     {
         ArgumentNullException.ThrowIfNull(node);
         return node.GetValue(RightProperty);
@@ -126,11 +126,11 @@ public sealed class Canvas : Panel
     /// <summary>
     /// Sets the attached horizontal position from the right content edge.
     /// </summary>
-    /// <param name="node">The node whose position to set.</param>
+    /// <param name="node">The element whose position to set.</param>
     /// <param name="value">The horizontal position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
-    public static void SetRight(Node node, double value)
+    public static void SetRight(UIElement node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
         node.SetValue(RightProperty, value);
@@ -139,10 +139,10 @@ public sealed class Canvas : Panel
     /// <summary>
     /// Gets the attached vertical position from the bottom content edge.
     /// </summary>
-    /// <param name="node">The node whose position to read.</param>
+    /// <param name="node">The element whose position to read.</param>
     /// <returns>The vertical position, or NaN when unspecified.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
-    public static double GetBottom(Node node)
+    public static double GetBottom(UIElement node)
     {
         ArgumentNullException.ThrowIfNull(node);
         return node.GetValue(BottomProperty);
@@ -151,11 +151,11 @@ public sealed class Canvas : Panel
     /// <summary>
     /// Sets the attached vertical position from the bottom content edge.
     /// </summary>
-    /// <param name="node">The node whose position to set.</param>
+    /// <param name="node">The element whose position to set.</param>
     /// <param name="value">The vertical position, or NaN to leave it unspecified.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="node"/> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is infinite.</exception>
-    public static void SetBottom(Node node, double value)
+    public static void SetBottom(UIElement node, double value)
     {
         ArgumentNullException.ThrowIfNull(node);
         node.SetValue(BottomProperty, value);
@@ -180,7 +180,7 @@ public sealed class Canvas : Panel
             child.Arrange(GetChildSlot(contentBounds, child));
     }
 
-    private static Rect GetChildSlot(Rect contentBounds, Node child)
+    private static Rect GetChildSlot(Rect contentBounds, UIElement child)
     {
         var x = ResolveAxis(
             contentBounds.X,

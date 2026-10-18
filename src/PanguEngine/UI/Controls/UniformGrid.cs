@@ -4,7 +4,7 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Arranges child nodes in uniformly sized cells in row order.
+/// Arranges child elements in uniformly sized cells in row order.
 /// </summary>
 /// <remarks>
 /// When both dimensions are fixed, children beyond the specified capacity continue into additional rows.
@@ -60,8 +60,10 @@ public sealed class UniformGrid : Panel
         CssRegistry.RegisterElement<UniformGrid>("UniformGrid");
         CssRegistry.RegisterProperty<UniformGrid, int>("rows", RowsProperty, CssValueConverters.ParseInteger);
         CssRegistry.RegisterProperty<UniformGrid, int>("columns", ColumnsProperty, CssValueConverters.ParseInteger);
-        CssRegistry.RegisterProperty<UniformGrid, double>("row-spacing", RowSpacingProperty, CssValueConverters.ParseLength);
-        CssRegistry.RegisterProperty<UniformGrid, double>("column-spacing", ColumnSpacingProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UniformGrid, double>("row-spacing", RowSpacingProperty,
+            CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UniformGrid, double>("column-spacing", ColumnSpacingProperty,
+            CssValueConverters.ParseLength);
     }
 
     /// <summary>
@@ -173,8 +175,10 @@ public sealed class UniformGrid : Panel
                 continue;
             }
 
-            var (x, width) = GetCellBounds(contentBounds.X, index % _columns, cellWidth, columnSpacing, useLayoutRounding, scale);
-            var (y, height) = GetCellBounds(contentBounds.Y, index / _columns, cellHeight, rowSpacing, useLayoutRounding, scale);
+            var (x, width) = GetCellBounds(contentBounds.X, index % _columns, cellWidth, columnSpacing,
+                useLayoutRounding, scale);
+            var (y, height) = GetCellBounds(contentBounds.Y, index / _columns, cellHeight, rowSpacing,
+                useLayoutRounding, scale);
             child.Arrange(new Rect(x, y, width, height));
             index++;
         }

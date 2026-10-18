@@ -1,3 +1,4 @@
+using System.Numerics;
 using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI;
 using PanguEngine.Input;
@@ -104,15 +105,17 @@ public sealed class HudScreenTests
             builder.Build(commands, 200, 100, false);
 
             Assert.Equal(2, builder.RectangleCount);
-            Assert.Equal(new Vertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
-            Assert.Equal(new Vertex(10, 10, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
+            Assert.Equal(new Vertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
+                builder.Vertices[0]);
+            Assert.Equal(new Vertex(10, 10, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
+                builder.Vertices[2]);
             Assert.Equal(new Vertex(0.5f, 1, 0, 1, 0, 1), builder.Vertices[4]);
             Assert.Equal(new Vertex(2.5f, 4, 0, 1, 0, 1), builder.Vertices[6]);
             Assert.Equal(
                 [new Batch(new Scissor(0, 0, 200, 100), 0, 12)],
                 builder.Batches.ToArray());
             var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
-            Assert.Equal(new System.Numerics.Vector4(0, 0, 10, 10), builder.ClipData[(int)data.ClipIndex].Bounds);
+            Assert.Equal(new Vector4(0, 0, 10, 10), builder.ClipData[(int)data.ClipIndex].Bounds);
 
             manager.Close();
             commands.Clear();
@@ -121,7 +124,8 @@ public sealed class HudScreenTests
 
             Assert.Single(commands.OfType<FillRectangleCommand>());
             Assert.Equal(1, builder.RectangleCount);
-            Assert.Equal(new Vertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
+            Assert.Equal(new Vertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
+                builder.Vertices[0]);
         }
         finally
         {
@@ -216,7 +220,7 @@ public sealed class HudScreenTests
         }
     }
 
-    private static void InitializeHud(UiManager manager, Node root)
+    private static void InitializeHud(UiManager manager, UIElement root)
     {
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
         definitions.Register(ResourceKey.Create("test", "hud"), new HudDefinition(() => new TestHud(root)));
@@ -224,18 +228,18 @@ public sealed class HudScreenTests
         manager.InitializeHud(definitions);
     }
 
-    private sealed class TestHud(Node root) : Hud(root)
+    private sealed class TestHud(UIElement root) : Hud(root)
     {
     }
 
-    private sealed class DrawingNode : Node
+    private sealed class DrawingNode : UIElement
     {
         public Action<DrawingContext>? DrawAction { get; init; }
 
         protected override void DrawCore(DrawingContext context) => DrawAction?.Invoke(context);
     }
 
-    private sealed class FocusableTestNode : Node
+    private sealed class FocusableTestNode : UIElement
     {
         public FocusableTestNode()
         {

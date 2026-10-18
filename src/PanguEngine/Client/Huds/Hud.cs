@@ -1,4 +1,3 @@
-using PanguEngine.Client.UI;
 using PanguEngine.UI;
 
 namespace PanguEngine.Client.Huds;
@@ -7,7 +6,7 @@ namespace PanguEngine.Client.Huds;
 /// Represents a business component hosted by the persistent client HUD.
 /// </summary>
 /// <remarks>
-/// Factories must create a new component instance for each host. The host mounts its root node,
+/// Factories must create a new component instance for each host. The host mounts its root element,
 /// drives the update callbacks, and invokes
 /// <see cref="OnDestroy"/> at most once after accepting the component.
 /// </remarks>
@@ -16,20 +15,20 @@ public abstract class Hud
     private bool _destroyed;
 
     /// <summary>
-    /// Initializes a HUD component with its UI root node.
+    /// Initializes a HUD component with its UI root element.
     /// </summary>
-    /// <param name="root">The non-null root node owned by this component.</param>
+    /// <param name="root">The non-null root element owned by this component.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="root"/> is null.</exception>
-    protected Hud(Node root)
+    protected Hud(UIElement root)
     {
         ArgumentNullException.ThrowIfNull(root);
         Root = root;
     }
 
     /// <summary>
-    /// Gets the UI root node owned by this component.
+    /// Gets the UI root element owned by this component.
     /// </summary>
-    public Node Root { get; }
+    public UIElement Root { get; }
 
     /// <summary>
     /// Invoked on each client fixed update.

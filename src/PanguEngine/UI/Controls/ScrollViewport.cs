@@ -3,18 +3,18 @@ using PanguEngine.Collections;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Hosts the single content node of a scroll view inside a clipped viewport.
+/// Hosts the single content element of a scroll view inside a clipped viewport.
 /// </summary>
 /// <remarks>
 /// The viewport arranges its content at the negated scroll offset so that drawing and hit testing
 /// share one geometry. It never measures its content with an infinite constraint of its own; the
 /// owning scroll view supplies the per-axis constraint through <see cref="ContentMeasureConstraint"/>.
-/// Content migration is detected through the observable child collection, so a node moved to another
+/// Content migration is detected through the observable child collection, so an element moved to another
 /// parent clears the owning scroll view's content reference without a parent-level hook.
 /// </remarks>
-internal sealed class ScrollViewport : Parent
+internal sealed class ScrollViewport : Container
 {
-    private Node? _content;
+    private UIElement? _content;
 
     internal ScrollViewport()
     {
@@ -28,20 +28,20 @@ internal sealed class ScrollViewport : Parent
     internal ScrollView? Owner { get; init; }
 
     /// <summary>
-    /// Gets or sets the constraint applied when measuring the content node.
+    /// Gets or sets the constraint applied when measuring the content element.
     /// </summary>
     internal Size ContentMeasureConstraint { get; set; } = Size.Infinite;
 
     /// <summary>
-    /// Gets or sets the effective content offset used when arranging the content node.
+    /// Gets or sets the effective content offset used when arranging the content element.
     /// </summary>
     internal Point Offset { get; set; }
 
     /// <summary>
-    /// Replaces the content node, moving nodes through the validated parent operations.
+    /// Replaces the content element, moving elements through the validated parent operations.
     /// </summary>
-    /// <param name="content">The new content node, or null to clear the content.</param>
-    internal void SetContent(Node? content)
+    /// <param name="content">The new content element, or null to clear the content.</param>
+    internal void SetContent(UIElement? content)
     {
         if (ReferenceEquals(_content, content))
             return;
@@ -78,7 +78,7 @@ internal sealed class ScrollViewport : Parent
         content.Arrange(new Rect(-Offset.X, -Offset.Y, slotWidth, slotHeight));
     }
 
-    private void OnChildrenChanged(object? sender, ListChangedEventArgs<Node> change)
+    private void OnChildrenChanged(object? sender, ListChangedEventArgs<UIElement> change)
     {
         foreach (var child in change.OldItems)
         {

@@ -33,7 +33,8 @@ public sealed class RoundedRectangleTests
         AssertClipContainsShape(builder, new RoundedRectangle(new Rect(0, 0, 32, 32),
             new Point(8, 3), new Point(8, 3), new Point(8, 3), new Point(8, 3)));
         builder.Build(new DrawCommandList([
-            new PushTransformCommand(new Point(2, 4), 1.5), .. commands, PopCommand.Instance]),
+                new PushTransformCommand(new Point(2, 4), 1.5), .. commands, PopCommand.Instance
+            ]),
             128, 128, false);
         Assert.Equal(4, builder.VertexCount);
         Assert.Equal(0, builder.CellCoverageEvaluations);
@@ -53,7 +54,8 @@ public sealed class RoundedRectangleTests
         var fill = new FillRectangleCommand(new Rect(0, 0, 32, 32), new Color(255, 255, 255));
         builder.Build(new DrawCommandList([Clip(new Rect(0, 0, 32, 32), 8), fill, PopCommand.Instance]), 64, 64, false);
         AssertClipContainsShape(builder, new RoundedRectangle(new Rect(0, 0, 32, 32), new CornerRadius(8)));
-        builder.Build(new DrawCommandList([Clip(new Rect(0, 0, 32, 32), 16), fill, PopCommand.Instance]), 64, 64, false);
+        builder.Build(new DrawCommandList([Clip(new Rect(0, 0, 32, 32), 16), fill, PopCommand.Instance]), 64, 64,
+            false);
         AssertClipContainsShape(builder, new RoundedRectangle(new Rect(0, 0, 32, 32), new CornerRadius(16)));
         Assert.Equal(4, builder.VertexCount);
         Assert.Equal(0, builder.CellCoverageEvaluations);
@@ -128,7 +130,8 @@ public sealed class RoundedRectangleTests
         Assert.Equal(4, builder.VertexCount);
         var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
         Assert.Equal(1u, data.Decoration);
-        Assert.Equal(backgroundAlpha == 0 ? Vector4.Zero : new Vector4(1, 0, 0, backgroundAlpha / 255f), data.Background);
+        Assert.Equal(backgroundAlpha == 0 ? Vector4.Zero : new Vector4(1, 0, 0, backgroundAlpha / 255f),
+            data.Background);
         Assert.Equal(borderAlpha == 0 ? Vector4.Zero : new Vector4(0, 1, 0, borderAlpha / 255f), data.Border);
         Assert.NotEqual(0u, data.InnerIndex);
     }
@@ -207,8 +210,10 @@ public sealed class RoundedRectangleTests
         DrawCommand clip = radius == 0
             ? new PushClipCommand(new Rect(0, 0, 8, 8))
             : Clip(new Rect(0, 0, 8, 8), radius);
-        var mesh = new TriangleMesh([new Point(0, 0), new Point(8, 0),
-            new Point(8, 8), new Point(0, 8)], [0u, 1u, 2u, 0u, 2u, 3u]);
+        var mesh = new TriangleMesh([
+            new Point(0, 0), new Point(8, 0),
+            new Point(8, 8), new Point(0, 8)
+        ], [0u, 1u, 2u, 0u, 2u, 3u]);
         var fill = new DrawGeometryCommand(mesh, new Color(255, 255, 255));
         var once = Build(clip, fill, PopCommand.Instance);
         var twice = Build(clip, clip, fill, PopCommand.Instance, PopCommand.Instance);
@@ -269,7 +274,9 @@ public sealed class RoundedRectangleTests
         _ = new Rectangle();
         _ = new TestRegion();
         var rule = Assert.Single(StyleSheet.Parse($"* {{ {declaration}; }}").Rules);
-        var type = declaration.StartsWith("border-radius", StringComparison.Ordinal) ? typeof(TestRegion) : typeof(Rectangle);
+        var type = declaration.StartsWith("border-radius", StringComparison.Ordinal)
+            ? typeof(TestRegion)
+            : typeof(Rectangle);
         Assert.Throws<StyleParseException>(() => rule.Bind(type));
     }
 
@@ -282,7 +289,8 @@ public sealed class RoundedRectangleTests
         builder.Build(new DrawCommandList([
             new PushRoundedClipCommand(new RoundedClipGeometry(inner, constraint: outer)),
             new FillRectangleCommand(inner.Bounds, new Color(255, 255, 255)),
-            PopCommand.Instance]), 128, 128, false);
+            PopCommand.Instance
+        ]), 128, 128, false);
         AssertClipContainsShape(builder, outer);
         AssertClipContainsShape(builder, inner);
         Assert.Equal(4, builder.VertexCount);
@@ -368,15 +376,21 @@ public sealed class RoundedRectangleTests
     [Fact]
     public void ChangingClipRadiusInvalidatesMeshCoverage()
     {
-        var mesh = new TriangleMesh([new Point(0, 0), new Point(20, 0),
-            new Point(20, 20), new Point(0, 20)], [0u, 1u, 2u, 0u, 2u, 3u]);
+        var mesh = new TriangleMesh([
+            new Point(0, 0), new Point(20, 0),
+            new Point(20, 20), new Point(0, 20)
+        ], [0u, 1u, 2u, 0u, 2u, 3u]);
         var command = new DrawGeometryCommand(mesh, new Color(255, 255, 255));
         var builder = new DrawBuilder();
-        builder.Build(new DrawCommandList([Clip(new Rect(0, 0, 20, 20), 2), command,
-            PopCommand.Instance]), 64, 64, false);
+        builder.Build(new DrawCommandList([
+            Clip(new Rect(0, 0, 20, 20), 2), command,
+            PopCommand.Instance
+        ]), 64, 64, false);
         var smallRadius = SubmittedAlphaAt(builder, 1, 1);
-        builder.Build(new DrawCommandList([Clip(new Rect(0, 0, 20, 20), 10), command,
-            PopCommand.Instance]), 64, 64, false);
+        builder.Build(new DrawCommandList([
+            Clip(new Rect(0, 0, 20, 20), 10), command,
+            PopCommand.Instance
+        ]), 64, 64, false);
         Assert.True(smallRadius > SubmittedAlphaAt(builder, 1, 1));
         Assert.Equal(1f, SubmittedAlphaAt(builder, 10, 10));
         Assert.All(builder.Vertices.ToArray(), vertex => Assert.Equal(0u, vertex.DrawDataIndex));
@@ -386,8 +400,11 @@ public sealed class RoundedRectangleTests
     [Fact]
     public void RectangleColorsAndRadiiUpdateDrawing()
     {
-        var shape = new Rectangle { RadiusX = 10, RadiusY = 10,
-            Stroke = new SolidColorBrush(255, 0, 0), StrokeThickness = 2 };
+        var shape = new Rectangle
+        {
+            RadiusX = 10, RadiusY = 10,
+            Stroke = new SolidColorBrush(255, 0, 0), StrokeThickness = 2
+        };
         var initial = Build(Record(shape, 20));
         var initialData = initial.DrawData[(int)initial.Vertices[0].DrawDataIndex];
         shape.Fill = new SolidColorBrush(0, 255, 0);
@@ -436,9 +453,11 @@ public sealed class RoundedRectangleTests
             RadiusX = 8, RadiusY = 3, Fill = filled ? new SolidColorBrush(0, 255, 0, 192) : null,
             Stroke = new SolidColorBrush(255, 0, 0, 128), StrokeThickness = 4
         }, 32);
-        var builder = Build([Clip(new Rect(0, 0, 32, 32), 8),
+        var builder = Build([
+            Clip(new Rect(0, 0, 32, 32), 8),
             new SetTransformCommand(new Point(2, 4), 1.5), .. commands,
-            PopCommand.Instance, PopCommand.Instance]);
+            PopCommand.Instance, PopCommand.Instance
+        ]);
         Assert.Equal(4, builder.VertexCount);
         Assert.Equal(0, builder.CellCoverageEvaluations);
         var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
@@ -448,7 +467,8 @@ public sealed class RoundedRectangleTests
         Assert.Equal(128 / 255f, data.Border.W);
         AssertShape(builder.ClipData[(int)data.OuterIndex], new RoundedRectangle(new Rect(5, 7, 42, 42),
             new Point(12, 4.5), new Point(12, 4.5), new Point(12, 4.5), new Point(12, 4.5)));
-        AssertShape(builder.ClipData[(int)data.ClipIndex], new RoundedRectangle(new Rect(0, 0, 32, 32), new CornerRadius(8)));
+        AssertShape(builder.ClipData[(int)data.ClipIndex],
+            new RoundedRectangle(new Rect(0, 0, 32, 32), new CornerRadius(8)));
     }
 
     [Theory]
@@ -483,7 +503,8 @@ public sealed class RoundedRectangleTests
         Assert.Equal(0, builder.CellCoverageEvaluations);
         var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
         Assert.Equal(mode, data.Decoration);
-        AssertShape(builder.ClipData[(int)data.OuterIndex], new RoundedRectangle(new Rect(2, 2, 28, 28), CornerRadius.Zero));
+        AssertShape(builder.ClipData[(int)data.OuterIndex],
+            new RoundedRectangle(new Rect(2, 2, 28, 28), CornerRadius.Zero));
         Assert.Equal(BitConverter.SingleToUInt32Bits(2f), data.InnerIndex);
         Assert.Equal(128 / 255f, data.Background.W);
         Assert.Equal(192 / 255f, data.Border.W);
@@ -513,11 +534,13 @@ public sealed class RoundedRectangleTests
     public void StrokeOnlyRectangleQuadsSkipSafeHoleWithoutOverlap(double radiusX, double radiusY, StrokeLineJoin join)
     {
         var builder = new DrawBuilder();
-        builder.Build(new DrawCommandList([.. Record(new Rectangle
-        {
-            RadiusX = radiusX, RadiusY = radiusY, Fill = null,
-            Stroke = new SolidColorBrush(255, 255, 255, 128), StrokeThickness = 4, StrokeLineJoin = join
-        }, 128)]), 160, 160, false);
+        builder.Build(new DrawCommandList([
+            .. Record(new Rectangle
+            {
+                RadiusX = radiusX, RadiusY = radiusY, Fill = null,
+                Stroke = new SolidColorBrush(255, 255, 255, 128), StrokeThickness = 4, StrokeLineJoin = join
+            }, 128)
+        ]), 160, 160, false);
         Assert.Equal(16, builder.VertexCount);
         Assert.Equal(24, builder.IndexCount);
         Assert.Single(builder.Batches.ToArray());
@@ -533,12 +556,15 @@ public sealed class RoundedRectangleTests
     [Fact]
     public void AViewportEntirelyInsideTheStrokeHoleSubmitsNoQuads()
     {
-        var builder = Build([new PushTransformCommand(new Point(-400, -400), 1),
+        var builder = Build([
+            new PushTransformCommand(new Point(-400, -400), 1),
             .. Record(new Rectangle
             {
                 RadiusX = 12, RadiusY = 5, Fill = null,
                 Stroke = new SolidColorBrush(255, 255, 255), StrokeThickness = 4
-            }, 1024), PopCommand.Instance]);
+            }, 1024),
+            PopCommand.Instance
+        ]);
         Assert.Equal(0, builder.VertexCount);
         Assert.Equal(0, builder.IndexCount);
         Assert.Equal(0, builder.CellCoverageEvaluations);
@@ -594,7 +620,8 @@ public sealed class RoundedRectangleTests
             new RoundedRectangle(new Rect(12, 12, 8, 8), radius, radius, radius, radius));
         Assert.Equal(4, builder.VertexCount);
         Assert.Equal(0, builder.CellCoverageEvaluations);
-        Assert.Equal(BitConverter.SingleToUInt32Bits(12f), builder.DrawData[(int)builder.Vertices[0].DrawDataIndex].InnerIndex);
+        Assert.Equal(BitConverter.SingleToUInt32Bits(12f),
+            builder.DrawData[(int)builder.Vertices[0].DrawDataIndex].InnerIndex);
     }
 
     [Fact]
@@ -642,9 +669,10 @@ public sealed class RoundedRectangleTests
         var image = Image.FromRgba(new byte[64], 4, 4);
         var builder = new DrawBuilder();
         builder.Build(new DrawCommandList([
-            radius == 0 ? new PushClipCommand(new Rect(0, 0, 8, 8)) : Clip(new Rect(0, 0, 8, 8), radius),
-            new DrawImageCommand(new Rect(-2, 0, 8, 8), image, new Rect(1, 1, 2, 2), sampling),
-            PopCommand.Instance]), 64, 64, false,
+                radius == 0 ? new PushClipCommand(new Rect(0, 0, 8, 8)) : Clip(new Rect(0, 0, 8, 8), radius),
+                new DrawImageCommand(new Rect(-2, 0, 8, 8), image, new Rect(1, 1, 2, 2), sampling),
+                PopCommand.Instance
+            ]), 64, 64, false,
             _ => new ImageRenderBinding(17, 16, 16, new ImageAtlasRegion(4, 8, 4, 4)));
         Assert.NotEmpty(builder.Vertices.ToArray());
         Assert.Equal(4, builder.VertexCount);
@@ -683,6 +711,7 @@ public sealed class RoundedRectangleTests
             else
                 context.FillRoundedRectangle(geometry, brush);
         }
+
         var textured = new DrawBuilder();
         textured.Build(new DrawCommandList(commands), 64, 64, false,
             _ => new ImageRenderBinding(1, 8, 8, new ImageAtlasRegion(0, 0, 8, 8)));
@@ -712,7 +741,9 @@ public sealed class RoundedRectangleTests
         var outer = new RoundedRectangle(new Rect(origin, origin, 20, 20), new CornerRadius(1));
         var ancestor = horizontal
             ? clipAtStart ? new Rect(2.8, 0, 29.2, 32) : new Rect(0, 0, 2.2, 32)
-            : clipAtStart ? new Rect(0, 2.8, 32, 29.2) : new Rect(0, 0, 32, 2.2);
+            : clipAtStart
+                ? new Rect(0, 2.8, 32, 29.2)
+                : new Rect(0, 0, 32, 2.2);
         var commands = new List<DrawCommand>();
         var context = new DrawingContext(commands);
         using (context.PushClip(ancestor))
@@ -726,7 +757,7 @@ public sealed class RoundedRectangleTests
         var vertexIndex = Assert.Single(Enumerable.Range(0, builder.VertexCount / 4)
             .Select(index => index * 4)
             .Where(index => x + 0.5 >= builder.Vertices[index].X && x + 0.5 < builder.Vertices[index + 2].X &&
-                y + 0.5 >= builder.Vertices[index].Y && y + 0.5 < builder.Vertices[index + 2].Y));
+                            y + 0.5 >= builder.Vertices[index].Y && y + 0.5 < builder.Vertices[index + 2].Y));
         Assert.Equal(1f, SubmittedAlphaAt(builder, x, y));
         AssertClipContainsShape(builder, new RoundedRectangle(ancestor, CornerRadius.Zero), vertexIndex: vertexIndex);
         for (var i = vertexIndex; i < vertexIndex + 4; i++)
@@ -738,11 +769,12 @@ public sealed class RoundedRectangleTests
             Assert.Equal((clipAtStart ? 0.5f : 2.5f) / 8, horizontal ? vertex.ClampMinU : vertex.ClampMinV);
             Assert.Equal((clipAtStart ? 1.5f : 5.5f) / 8, horizontal ? vertex.ClampMaxU : vertex.ClampMaxV);
         }
+
         Assert.Equal(0, builder.CellCoverageEvaluations);
         Assert.Single(builder.Batches.ToArray());
     }
 
-    private static DrawCommand[] Record(Node node, double size)
+    private static DrawCommand[] Record(UIElement node, double size)
     {
         node.Measure(new Size(size, size));
         node.Arrange(new Rect(0, 0, size, size));
@@ -777,10 +809,12 @@ public sealed class RoundedRectangleTests
     public void ReusedBuilderDoesNotRetainPreviousImageClip()
     {
         var image = Image.FromRgba(new byte[64], 4, 4);
-        var commands = new DrawCommandList([Clip(new Rect(0, 0, 20, 20), 6),
+        var commands = new DrawCommandList([
+            Clip(new Rect(0, 0, 20, 20), 6),
             new DrawImageCommand(new Rect(0, 0, 8, 20), image, image.FullSourceRect, ImageSamplingMode.Linear),
             new DrawImageCommand(new Rect(8, 0, 12, 20), image, image.FullSourceRect, ImageSamplingMode.Linear),
-            PopCommand.Instance]);
+            PopCommand.Instance
+        ]);
         var builder = new DrawBuilder();
         ImageResolver resolver = _ => new ImageRenderBinding(1, 4, 4, new ImageAtlasRegion(0, 0, 4, 4));
         builder.Build(commands, 64, 64, false, resolver);
@@ -809,8 +843,10 @@ public sealed class RoundedRectangleTests
         Assert.Equal(new Scissor(0, 0, 64, 64), batch.Scissor);
         Assert.Equal((uint)builder.IndexCount, batch.IndexCount);
         Assert.Equal(12, builder.VertexCount);
-        AssertClipContainsShape(builder, new RoundedRectangle(new Rect(16, 16, 16, 16), new CornerRadius(8)), vertexIndex: 4);
-        AssertClipContainsShape(builder, new RoundedRectangle(new Rect(36, 16, 16, 16), new CornerRadius(8)), vertexIndex: 8);
+        AssertClipContainsShape(builder, new RoundedRectangle(new Rect(16, 16, 16, 16), new CornerRadius(8)),
+            vertexIndex: 4);
+        AssertClipContainsShape(builder, new RoundedRectangle(new Rect(36, 16, 16, 16), new CornerRadius(8)),
+            vertexIndex: 8);
         Assert.Equal(0, builder.CellCoverageEvaluations);
         Assert.Equal(0f, SubmittedAlphaAt(builder, 4, 4));
         Assert.Equal(1f, SubmittedAlphaAt(builder, 24, 24));
@@ -838,10 +874,11 @@ public sealed class RoundedRectangleTests
         var image = Image.FromRgba(new byte[64], 4, 4);
         var builder = new DrawBuilder();
         builder.Build(new DrawCommandList([
-            Clip(new Rect(0, 0, 32, 32), 8),
-            new PushClipCommand(new Rect(12, 12, 4, 4)),
-            new DrawImageCommand(new Rect(0, 0, 32, 32), image, image.FullSourceRect, ImageSamplingMode.Linear),
-            PopCommand.Instance, PopCommand.Instance]), 64, 64, false,
+                Clip(new Rect(0, 0, 32, 32), 8),
+                new PushClipCommand(new Rect(12, 12, 4, 4)),
+                new DrawImageCommand(new Rect(0, 0, 32, 32), image, image.FullSourceRect, ImageSamplingMode.Linear),
+                PopCommand.Instance, PopCommand.Instance
+            ]), 64, 64, false,
             _ => new ImageRenderBinding(1, 4, 4, new ImageAtlasRegion(0, 0, 4, 4)));
         Assert.Equal(4, builder.VertexCount);
         Assert.Equal(12f, builder.Vertices[0].X);
@@ -954,7 +991,8 @@ public sealed class RoundedRectangleTests
         Assert.Equal(12, builder.VertexCount);
         Assert.Equal(18u, Assert.Single(builder.Batches.ToArray()).IndexCount);
         AssertClipContainsShape(builder, new RoundedRectangle(new Rect(0, 0, 8, 8), CornerRadius.Zero));
-        AssertClipContainsShape(builder, new RoundedRectangle(new Rect(12, 0, 8, 8), new CornerRadius(4)), vertexIndex: 4);
+        AssertClipContainsShape(builder, new RoundedRectangle(new Rect(12, 0, 8, 8), new CornerRadius(4)),
+            vertexIndex: 4);
         Assert.Equal(0u, builder.Vertices[8].DrawDataIndex);
         Assert.Equal(MaterialKind.Solid, builder.Vertices[0].MaterialKind);
         Assert.Equal(MaterialKind.ImageLinear, builder.Vertices[4].MaterialKind);
@@ -967,8 +1005,10 @@ public sealed class RoundedRectangleTests
     [Fact]
     public void RectangularClipKeepsCpuGeometryCoverageAndSharesTheAnalyticBatch()
     {
-        var mesh = new TriangleMesh([new Point(0, 0), new Point(4, 0),
-            new Point(4, 4), new Point(0, 4)], [0u, 1u, 2u, 0u, 2u, 3u]);
+        var mesh = new TriangleMesh([
+            new Point(0, 0), new Point(4, 0),
+            new Point(4, 4), new Point(0, 4)
+        ], [0u, 1u, 2u, 0u, 2u, 3u]);
         var builder = Build(new PushClipCommand(new Rect(0.25, 0.25, 1.5, 1.5)),
             new FillRectangleCommand(new Rect(0, 0, 4, 4), new Color(255, 0, 0)),
             new DrawGeometryCommand(mesh, new Color(0, 255, 0)), PopCommand.Instance,
@@ -999,6 +1039,7 @@ public sealed class RoundedRectangleTests
             if (x + 0.5 >= first.X && x + 0.5 < last.X && y + 0.5 >= first.Y && y + 0.5 < last.Y)
                 result += first.A;
         }
+
         return result;
     }
 
@@ -1022,7 +1063,8 @@ public sealed class RoundedRectangleTests
         var radiusY = new Vector4((float)shape.TopLeft.Y, (float)shape.TopRight.Y,
             (float)shape.BottomRight.Y, (float)shape.BottomLeft.Y);
         Assert.Contains(GetClips(builder, vertexIndex), clip => clip.Bounds == bounds && clip.RadiusX == radiusX &&
-            clip.RadiusY == radiusY && clip.Exclude == (exclude ? 1u : 0u));
+                                                                clip.RadiusY == radiusY &&
+                                                                clip.Exclude == (exclude ? 1u : 0u));
     }
 
     private static IEnumerable<GpuClipData> GetClips(DrawBuilder builder, int vertexIndex = 0)
@@ -1038,6 +1080,6 @@ public sealed class RoundedRectangleTests
 
     private sealed class TestRegion : Region
     {
-        internal void Add(Node node) => Children.Add(node);
+        internal void Add(UIElement node) => Children.Add(node);
     }
 }

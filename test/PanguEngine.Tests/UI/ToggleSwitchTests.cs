@@ -76,7 +76,7 @@ public sealed class ToggleSwitchTests
             var point = control.LocalToScreen(new Point(
                 thumb.LayoutBounds.X + thumb.LayoutBounds.Width / 2,
                 thumb.LayoutBounds.Y + thumb.LayoutBounds.Height / 2));
-            Node? source = null;
+            UIElement? source = null;
             var changes = 0;
             control.PointerClicked += (_, args) => source = args.Source;
             using var subscription = control.Subscribe(ToggleSwitch.IsOnProperty, (_, _) => changes++);
@@ -572,7 +572,7 @@ public sealed class ToggleSwitchTests
 
             Assert.True(on.X > off.X);
             Assert.InRange(Math.Abs(on.X + on.Width -
-                (control.ContentBounds.X + control.ContentBounds.Width)), 0, tolerance);
+                                    (control.ContentBounds.X + control.ContentBounds.Width)), 0, tolerance);
             AssertCentered(control.ContentBounds, on, tolerance);
         }
         finally
@@ -622,11 +622,13 @@ public sealed class ToggleSwitchTests
         var (manager, screen, _) = OpenScene(control);
         try
         {
-            screen.SetStyleSheets([StyleSheet.Parse("""
-                ToggleSwitch { width: 60px; padding: 4px; background-color: #112233; }
-                ToggleSwitch:checked { background-color: #445566; }
-                ToggleSwitch .toggle-switch-thumb { padding: 5px; background-color: #778899; }
-                """)]);
+            screen.SetStyleSheets([
+                StyleSheet.Parse("""
+                                 ToggleSwitch { width: 60px; padding: 4px; background-color: #112233; }
+                                 ToggleSwitch:checked { background-color: #445566; }
+                                 ToggleSwitch .toggle-switch-thumb { padding: 5px; background-color: #778899; }
+                                 """)
+            ]);
             manager.UpdateFrame(new Size(120, 80), 0);
             Assert.Equal(60, control.LayoutBounds.Width);
             Assert.Equal(new SolidColorBrush(17, 34, 51), control.Background);
@@ -736,8 +738,7 @@ public sealed class ToggleSwitchTests
     }
 
     private static Panel FindThumb(ToggleSwitch control) =>
-        Assert.IsType<Panel>(control.ReadOnlyChildren.Single(
-            node => node.Classes.Contains("toggle-switch-thumb")));
+        Assert.IsType<Panel>(control.ReadOnlyChildren.Single(node => node.Classes.Contains("toggle-switch-thumb")));
 
     private static void AssertCentered(Rect content, Rect thumb, double tolerance) =>
         Assert.InRange(Math.Abs(content.Y + content.Height / 2 - thumb.Y - thumb.Height / 2), 0, tolerance);

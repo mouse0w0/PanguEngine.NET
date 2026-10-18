@@ -1,8 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
 using PanguEngine.UI;
+using PropertyChangedEventArgs = PanguEngine.ComponentModel.PropertyChangedEventArgs;
 using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.ComponentModel;
@@ -519,7 +519,7 @@ public sealed class BindingTests
         return (new WeakReference<TestNode>(target), source);
     }
 
-    private class TestNode : Node
+    private class TestNode : UIElement
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<TestNode, int>(nameof(Value), 10);
@@ -553,7 +553,7 @@ public sealed class BindingTests
     {
         internal bool ThrowNotifications { get; set; }
 
-        protected override void OnPropertyChanged(PanguEngine.ComponentModel.PropertyChangedEventArgs eventArgs)
+        protected override void OnPropertyChanged(PropertyChangedEventArgs eventArgs)
         {
             base.OnPropertyChanged(eventArgs);
             if (ThrowNotifications)
@@ -561,7 +561,7 @@ public sealed class BindingTests
         }
     }
 
-    private sealed class ForeignNode : Node
+    private sealed class ForeignNode : UIElement
     {
     }
 

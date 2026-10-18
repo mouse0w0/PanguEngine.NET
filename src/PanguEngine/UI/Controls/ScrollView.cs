@@ -6,11 +6,11 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>
-/// Presents a single content node inside a clipped scrollable viewport with optional scroll bars.
+/// Presents a single content element inside a clipped scrollable viewport with optional scroll bars.
 /// </summary>
 /// <remarks>
 /// The scroll bars occupy layout space instead of overlaying the content. Replacing or clearing
-/// <see cref="Content"/> is performed through the validated parent tree operations, and a content node
+/// <see cref="Content"/> is performed through the validated parent tree operations, and a content element
 /// moved to another parent by caller code clears this scroll view's content reference through the
 /// observable viewport child collection. <see cref="Offset"/> is normalized to the resolved per-axis
 /// range before it is committed, so property writes, scroll methods, bindings, and user input share one
@@ -21,8 +21,8 @@ public sealed partial class ScrollView : Control
     /// <summary>
     /// Identifies the <see cref="Content"/> property.
     /// </summary>
-    public static readonly Property<Node?> ContentProperty =
-        Property.Register<ScrollView, Node?>(
+    public static readonly Property<UIElement?> ContentProperty =
+        Property.Register<ScrollView, UIElement?>(
             nameof(Content),
             onChanged: static (view, _, newValue) => view.OnContentChanged(newValue));
 
@@ -171,13 +171,13 @@ public sealed partial class ScrollView : Control
     }
 
     /// <summary>
-    /// Gets or sets the single business content node, or null for no content.
+    /// Gets or sets the single business content element, or null for no content.
     /// </summary>
     /// <remarks>
-    /// Assigning a node moves it from its current parent. Moving the current content node to another
+    /// Assigning an element moves it from its current parent. Moving the current content element to another
     /// parent by caller code clears this property.
     /// </remarks>
-    public Node? Content
+    public UIElement? Content
     {
         get => GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
@@ -301,10 +301,10 @@ public sealed partial class ScrollView : Control
     }
 
     /// <summary>
-    /// Clears the content reference when the content node leaves the internal viewport.
+    /// Clears the content reference when the content element leaves the internal viewport.
     /// </summary>
-    /// <param name="content">The content node that left.</param>
-    internal void OnViewportContentRemoved(Node content)
+    /// <param name="content">The content element that left.</param>
+    internal void OnViewportContentRemoved(UIElement content)
     {
         if (_isUpdatingContent)
             return;
@@ -315,7 +315,7 @@ public sealed partial class ScrollView : Control
         Content = null;
     }
 
-    private void OnContentChanged(Node? newContent)
+    private void OnContentChanged(UIElement? newContent)
     {
         _isUpdatingContent = true;
         try

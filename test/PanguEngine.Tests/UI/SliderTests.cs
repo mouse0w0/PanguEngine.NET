@@ -42,7 +42,8 @@ public sealed class SliderTests
         var slider = new Slider<int>(new ListSliderValueModel<int>(items));
         var changes = new List<bool>();
         var values = new List<int>();
-        using var valueSubscription = slider.Subscribe(Slider<int>.ValueProperty, (_, change) => values.Add(change.NewValue));
+        using var valueSubscription =
+            slider.Subscribe(Slider<int>.ValueProperty, (_, change) => values.Add(change.NewValue));
         using var availabilitySubscription = slider.Subscribe(Slider<int>.HasValueProperty, (_, change) =>
         {
             Assert.Equal(change.NewValue, slider.HasValue);
@@ -90,7 +91,8 @@ public sealed class SliderTests
     public void TwoWayBindingPreservesNumericAssignmentPolicies()
     {
         var source = new Slider<int>(new NumericSliderValueModel<int>()) { Value = 15 };
-        var target = new Slider<int>(new NumericSliderValueModel<int> { Step = 2, AssignmentPolicy = SliderValueAssignmentPolicy.Snap });
+        var target = new Slider<int>(new NumericSliderValueModel<int>
+            { Step = 2, AssignmentPolicy = SliderValueAssignmentPolicy.Snap });
         target.BindTwoWay(Slider<int>.ValueProperty, source, Slider<int>.ValueProperty);
         Assert.Equal(16, target.Value);
         Assert.Equal(16, source.Value);
@@ -151,7 +153,10 @@ public sealed class SliderTests
             Assert.Equal(0, change.StartValue);
             Assert.Equal(target.Value, change.EndValue);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -174,7 +179,10 @@ public sealed class SliderTests
             Assert.Equal(10, change.StartValue);
             Assert.Equal(11, change.EndValue);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -230,7 +238,8 @@ public sealed class SliderTests
         var changes = new List<(int OldValue, int NewValue)>();
         using var valueSubscription = slider.Subscribe(Slider<int>.ValueProperty,
             (_, change) => changes.Add((change.OldValue, change.NewValue)));
-        using var modelSubscription = slider.Subscribe(Slider<int>.ValueModelProperty, (_, _) => slider.Value = assignedValue);
+        using var modelSubscription =
+            slider.Subscribe(Slider<int>.ValueModelProperty, (_, _) => slider.Value = assignedValue);
 
         slider.ValueModel = new NumericSliderValueModel<int> { Minimum = 10, Maximum = 20 };
 
@@ -307,7 +316,10 @@ public sealed class SliderTests
             Assert.Equal(0, change.StartValue);
             Assert.Equal(100, change.EndValue);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -329,7 +341,10 @@ public sealed class SliderTests
             Assert.Equal(60, slider.Value);
             manager.ProcessPointerReleased(new Point(press.X + 20, press.Y), MouseButton.Left, KeyModifiers.None);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -347,7 +362,10 @@ public sealed class SliderTests
             Assert.Equal(50, slider.Value);
             Assert.Equal(0, count);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -366,7 +384,10 @@ public sealed class SliderTests
             Assert.Equal(20, slider.Value);
             Assert.Equal(0, count);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Theory]
@@ -390,16 +411,23 @@ public sealed class SliderTests
                 case "disabled": slider.IsEnabled = false; break;
                 case "hidden": slider.Visibility = Visibility.Hidden; break;
                 case "orientation": slider.Orientation = Orientation.Vertical; break;
-                case "geometry": slider.Width = 220; manager.UpdateFrame(new Size(320, 320), 0); break;
+                case "geometry":
+                    slider.Width = 220;
+                    manager.UpdateFrame(new Size(320, 320), 0);
+                    break;
                 case "model": model.Maximum = 80; break;
             }
+
             var retained = slider.Value;
             manager.ProcessPointerMoved(new Point(180, 16));
             manager.ProcessPointerReleased(new Point(180, 16), MouseButton.Left, KeyModifiers.None);
             Assert.Equal(retained, slider.Value);
             Assert.Equal(0, count);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -423,13 +451,17 @@ public sealed class SliderTests
             Assert.False(manager.ProcessPointerPressed(new Point(100, 16), MouseButton.Left, KeyModifiers.None));
             Assert.False(manager.ProcessKeyDown(Key.End, KeyModifiers.None));
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
     public void KeyboardAdjustmentsAndRepeatsEachCommitWhileWheelRemainsUnhandled()
     {
-        var slider = new Slider<double>(new NumericSliderValueModel<double> { Minimum = 2, Maximum = 10, Step = 2, LargeChange = 1 }) { Value = 2.5 };
+        var slider = new Slider<double>(new NumericSliderValueModel<double>
+            { Minimum = 2, Maximum = 10, Step = 2, LargeChange = 1 }) { Value = 2.5 };
         var committed = new List<SliderValueCommittedEventArgs<double>>();
         slider.ValueCommitted += (_, change) => committed.Add(change);
         var (manager, _) = Open(slider);
@@ -453,7 +485,10 @@ public sealed class SliderTests
             manager.ProcessKeyDown(Key.End, KeyModifiers.None);
             Assert.Equal(5, committed.Count);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Theory]
@@ -484,7 +519,10 @@ public sealed class SliderTests
             else
                 Assert.Empty(committed);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -503,7 +541,10 @@ public sealed class SliderTests
             manager.ProcessKeyDown(Key.Down, KeyModifiers.None);
             Assert.Equal(0, slider.Value);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Theory]
@@ -541,7 +582,10 @@ public sealed class SliderTests
             Assert.False(slider.IsFocused);
             Assert.Empty(committed);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -555,16 +599,23 @@ public sealed class SliderTests
         var (manager, screen) = Open(slider, 240, 80);
         try
         {
-            var labels = slider.Children.OfType<Text>().Where(label => label.Visibility == Visibility.Visible).ToArray();
+            var labels = slider.Children.OfType<Text>().Where(label => label.Visibility == Visibility.Visible)
+                .ToArray();
             Assert.Contains(labels, label => label.Content == "choice 5");
             var ordered = labels.OrderBy(label => label.LayoutBounds.X).ToArray();
             for (var index = 1; index < ordered.Length; index++)
-                Assert.True(ordered[index - 1].LayoutBounds.X + ordered[index - 1].LayoutBounds.Width <= ordered[index].LayoutBounds.X);
-            Assert.DoesNotContain(slider.Children, node => node.Classes.Contains("slider-tick") && node.Visibility == Visibility.Visible);
+                Assert.True(ordered[index - 1].LayoutBounds.X + ordered[index - 1].LayoutBounds.Width <=
+                            ordered[index].LayoutBounds.X);
+            Assert.DoesNotContain(slider.Children,
+                node => node.Classes.Contains("slider-tick") && node.Visibility == Visibility.Visible);
             foreach (var label in labels)
-                Assert.NotSame(label, screen.HitTest(slider.LocalToScreen(new Point(label.LayoutBounds.X, label.LayoutBounds.Y))));
+                Assert.NotSame(label,
+                    screen.HitTest(slider.LocalToScreen(new Point(label.LayoutBounds.X, label.LayoutBounds.Y))));
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -592,7 +643,10 @@ public sealed class SliderTests
             Assert.Equal("changed", slider.Value);
             Assert.Equal(1, values);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -622,7 +676,10 @@ public sealed class SliderTests
             manager.UpdateFrame(new Size(100, 80), 0);
             Assert.True(slider.IsArrangeValid);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -640,7 +697,8 @@ public sealed class SliderTests
             manager.UpdateFrame(new Size(320, 320), 0);
             slider.Value = 1;
             manager.UpdateFrame(new Size(320, 320), 0);
-            Assert.Contains(slider.Children.OfType<Text>(), label => label.Content == "choice 1" && label.Visibility == Visibility.Visible);
+            Assert.Contains(slider.Children.OfType<Text>(),
+                label => label.Content == "choice 1" && label.Visibility == Visibility.Visible);
             slider.ShowTickLabels = false;
             manager.UpdateFrame(new Size(320, 320), 0);
             slider.ShowTickLabels = true;
@@ -648,7 +706,10 @@ public sealed class SliderTests
             Assert.True(slider.IsMeasureValid);
             Assert.True(slider.IsArrangeValid);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -674,13 +735,17 @@ public sealed class SliderTests
             Assert.Equal(50, slider.Value);
             Assert.Equal(0, count);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
     public void FailedAssignmentsAndFutureAssignmentPoliciesKeepTheActiveDrag()
     {
-        var model = new NumericSliderValueModel<int> { Step = 20, AssignmentPolicy = SliderValueAssignmentPolicy.Reject };
+        var model = new NumericSliderValueModel<int>
+            { Step = 20, AssignmentPolicy = SliderValueAssignmentPolicy.Reject };
         var slider = new Slider<int>(model);
         var count = 0;
         slider.ValueCommitted += (_, _) => count++;
@@ -695,7 +760,10 @@ public sealed class SliderTests
             Assert.Equal(100, slider.Value);
             Assert.Equal(1, count);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
     [Fact]
@@ -713,10 +781,14 @@ public sealed class SliderTests
             Assert.Equal(50, slider.Value);
             Assert.Equal(0, count);
         }
-        finally { manager.Close(); }
+        finally
+        {
+            manager.Close();
+        }
     }
 
-    private static (UiManager Manager, GameScreen Screen) Open<T>(Slider<T> slider, double width = 200, double height = 32)
+    private static (UiManager Manager, GameScreen Screen) Open<T>(Slider<T> slider, double width = 200,
+        double height = 32)
     {
         slider.Width = width;
         slider.Height = height;
@@ -730,7 +802,8 @@ public sealed class SliderTests
         return (manager, screen);
     }
 
-    private static Node Part<T>(Slider<T> slider, string role) => slider.Children.Single(node => node.Classes.Contains($"slider-{role}"));
+    private static UIElement Part<T>(Slider<T> slider, string role) =>
+        slider.Children.Single(node => node.Classes.Contains($"slider-{role}"));
 
     private sealed class CaseInsensitiveList(IEnumerable<string> items) : ObservableList<string>(items)
     {

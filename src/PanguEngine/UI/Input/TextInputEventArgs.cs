@@ -5,7 +5,7 @@ namespace PanguEngine.UI.Input;
 /// </summary>
 public sealed class TextInputEventArgs : InputEventArgs
 {
-    internal TextInputEventArgs(Node source, string text)
+    internal TextInputEventArgs(UIElement source, string text)
         : base(source)
     {
         Text = text;

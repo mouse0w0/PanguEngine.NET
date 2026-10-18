@@ -7,10 +7,10 @@ namespace PanguEngine.UI;
 public partial class Screen
 {
     private readonly List<HitPathEntry> _hoverPath = [];
-    private Node[] _focusWithinPath = [];
+    private UIElement[] _focusWithinPath = [];
 
-    private readonly Node?[] _pressedTargets =
-        new Node?[(int)MouseButton.Button12 - (int)MouseButton.Left + 1];
+    private readonly UIElement?[] _pressedTargets =
+        new UIElement?[(int)MouseButton.Button12 - (int)MouseButton.Left + 1];
 
     private Control[]? _leftPressedControls;
     private Point _pointerOutputPosition;
@@ -22,11 +22,11 @@ public partial class Screen
     internal sealed class InputStateCleanupSnapshot
     {
         internal InputStateCleanupSnapshot(
-            Node? focusedNode,
-            Node[] focusWithinPath,
+            UIElement? focusedNode,
+            UIElement[] focusWithinPath,
             Control[] pressedControls,
             HitPathEntry[] hoverPath,
-            Node[] exitedNodes,
+            UIElement[] exitedNodes,
             Point pointerPosition)
         {
             FocusedNode = focusedNode;
@@ -37,25 +37,25 @@ public partial class Screen
             PointerPosition = pointerPosition;
         }
 
-        internal Node? FocusedNode { get; }
-        internal Node[] FocusWithinPath { get; }
+        internal UIElement? FocusedNode { get; }
+        internal UIElement[] FocusWithinPath { get; }
         internal Control[] PressedControls { get; }
         internal HitPathEntry[] HoverPath { get; }
-        internal Node[] ExitedNodes { get; }
+        internal UIElement[] ExitedNodes { get; }
         internal Point PointerPosition { get; }
     }
 
     /// <summary>
-    /// Gets the node that currently owns keyboard focus.
+    /// Gets the element that currently owns keyboard focus.
     /// </summary>
-    public Node? FocusedNode { get; private set; }
+    public UIElement? FocusedNode { get; private set; }
 
     /// <summary>
-    /// Finds the frontmost deepest node at a point in screen logical coordinates.
+    /// Finds the frontmost deepest element at a point in screen logical coordinates.
     /// </summary>
     /// <param name="screenPoint">The point in screen logical coordinates.</param>
-    /// <returns>The deepest hit node, or null when the root subtree is not hit.</returns>
-    public Node? HitTest(Point screenPoint)
+    /// <returns>The deepest hit element, or null when the root subtree is not hit.</returns>
+    public UIElement? HitTest(Point screenPoint)
     {
         var path = BuildHitPath(screenPoint);
         return path.Count == 0 ? null : path[^1].Node;
@@ -73,7 +73,7 @@ public partial class Screen
         _ = ChangeFocus(null);
     }
 
-    internal bool TryFocus(Node node)
+    internal bool TryFocus(UIElement node)
     {
         if (!IsScreenActive())
             return false;
@@ -168,7 +168,7 @@ public partial class Screen
             if (!IsScreenActive())
                 return false;
 
-            Node? focusCandidate = null;
+            UIElement? focusCandidate = null;
             for (var pathIndex = path.Length - 1; pathIndex >= 0; pathIndex--)
             {
                 if (CanFocus(path[pathIndex].Node))
@@ -344,7 +344,7 @@ public partial class Screen
         return CommitInputStateCore(clearAll: false);
     }
 
-    internal void CommitAndNotifyInputStateAfterNodeUnavailable(Node node)
+    internal void CommitAndNotifyInputStateAfterNodeUnavailable(UIElement node)
     {
         if (!ReferenceEquals(node.Screen, this) ||
             (node.IsEnabled && node.Visibility == Visibility.Visible) ||
@@ -518,13 +518,13 @@ public partial class Screen
         return path;
     }
 
-    private List<HitPathEntry> BuildPathForNode(Node node, Point screenPoint)
+    private List<HitPathEntry> BuildPathForNode(UIElement node, Point screenPoint)
     {
         var root = Root;
         if (root is null || !ReferenceEquals(node.Screen, this))
             return [];
 
-        var nodes = new List<Node>();
+        var nodes = new List<UIElement>();
         for (var current = node; current is not null; current = current.Parent)
         {
             nodes.Add(current);
@@ -556,7 +556,7 @@ public partial class Screen
         Key key,
         KeyModifiers modifiers,
         bool isRepeat,
-        Action<Node, KeyEventArgs> raise)
+        Action<UIElement, KeyEventArgs> raise)
     {
         return ProcessFocusedInput(
             source => new KeyEventArgs(source, key, modifiers, isRepeat),
@@ -564,8 +564,8 @@ public partial class Screen
     }
 
     private bool ProcessFocusedInput<TEventArgs>(
-        Func<Node, TEventArgs> createEventArgs,
-        Action<Node, TEventArgs> raise)
+        Func<UIElement, TEventArgs> createEventArgs,
+        Action<UIElement, TEventArgs> raise)
         where TEventArgs : InputEventArgs
     {
         BeginInputRouting();
@@ -662,7 +662,7 @@ public partial class Screen
         return logicalPosition;
     }
 
-    private bool ChangeFocus(Node? next)
+    private bool ChangeFocus(UIElement? next)
     {
         BeginRuntimeOperation();
         try
@@ -714,9 +714,9 @@ public partial class Screen
         }
     }
 
-    private void UpdateFocusWithin(Node? focused)
+    private void UpdateFocusWithin(UIElement? focused)
     {
-        var nodes = new List<Node>();
+        var nodes = new List<UIElement>();
         for (var current = focused; current is not null; current = current.Parent)
             nodes.Add(current);
         nodes.Reverse();
@@ -742,7 +742,7 @@ public partial class Screen
         }
     }
 
-    private static void ClearFocusWithin(Node[] path, int startIndex)
+    private static void ClearFocusWithin(UIElement[] path, int startIndex)
     {
         for (var index = path.Length - 1; index >= startIndex; index--)
         {
@@ -757,7 +757,7 @@ public partial class Screen
         }
     }
 
-    private static void ClearFocusedState(Node node)
+    private static void ClearFocusedState(UIElement node)
     {
         if (node.Screen is { } screen && ReferenceEquals(screen.FocusedNode, node))
             return;
@@ -765,7 +765,7 @@ public partial class Screen
         node.SetFocused(false);
     }
 
-    private bool CanFocus(Node node)
+    private bool CanFocus(UIElement node)
     {
         if (!IsActive(node) ||
             !node.IsEnabled ||
@@ -786,7 +786,7 @@ public partial class Screen
         return ReferenceEquals(node, Root);
     }
 
-    private bool CanSetHovered(Node node) =>
+    private bool CanSetHovered(UIElement node) =>
         IsScreenActive() &&
         ReferenceEquals(node.Screen, this) &&
         ContainsNodeReference(_hoverPath, node) &&
@@ -872,7 +872,7 @@ public partial class Screen
         return false;
     }
 
-    private bool IsInputStateCurrent(Node node)
+    private bool IsInputStateCurrent(UIElement node)
     {
         if (!ReferenceEquals(node.Screen, this))
             return false;
@@ -890,7 +890,7 @@ public partial class Screen
 
     private static bool ContainsNodeReference(
         IReadOnlyList<HitPathEntry> path,
-        Node node)
+        UIElement node)
     {
         foreach (var entry in path)
         {
@@ -904,7 +904,7 @@ public partial class Screen
     private void Bubble<TEventArgs>(
         IReadOnlyList<HitPathEntry> path,
         TEventArgs eventArgs,
-        Action<Node, TEventArgs> raise)
+        Action<UIElement, TEventArgs> raise)
         where TEventArgs : InputEventArgs
     {
         for (var index = path.Count - 1; index >= 0; index--)
@@ -925,7 +925,7 @@ public partial class Screen
             return _ownerThreadId is not null && _isInteractionActive && !_isClosing;
     }
 
-    private bool IsActive(Node node) =>
+    private bool IsActive(UIElement node) =>
         IsScreenActive() && ReferenceEquals(node.Screen, this);
 
     private void BeginInputRouting()

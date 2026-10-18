@@ -2,11 +2,12 @@ using System.ComponentModel;
 using System.Runtime.ExceptionServices;
 using PanguEngine.ComponentModel;
 using PanguEngine.UI;
+using Container = PanguEngine.UI.Container;
 using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.UI;
 
-public sealed class NodeLayoutTests
+public sealed class UIElementLayoutTests
 {
     [Fact]
     public void DefaultLayoutPropertiesUseAutoZeroInfinityAndStretch()
@@ -573,7 +574,7 @@ public sealed class NodeLayoutTests
         var observedMeasureValid = true;
         node.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, Node.WidthProperty))
+            if (ReferenceEquals(args.Property, UIElement.WidthProperty))
                 observedMeasureValid = node.IsMeasureValid;
         };
         node.Width = 12;
@@ -586,10 +587,10 @@ public sealed class NodeLayoutTests
     [Fact]
     public void VisibilityPropertyExposesThreeStateMetadata()
     {
-        Assert.Equal(nameof(Node.Visibility), Node.VisibilityProperty.Name);
-        Assert.Equal(typeof(Node), Node.VisibilityProperty.OwnerType);
-        Assert.Equal(typeof(Node), Node.VisibilityProperty.TargetType);
-        Assert.Equal(Visibility.Visible, Node.VisibilityProperty.DefaultValue);
+        Assert.Equal(nameof(UIElement.Visibility), UIElement.VisibilityProperty.Name);
+        Assert.Equal(typeof(UIElement), UIElement.VisibilityProperty.OwnerType);
+        Assert.Equal(typeof(UIElement), UIElement.VisibilityProperty.TargetType);
+        Assert.Equal(Visibility.Visible, UIElement.VisibilityProperty.DefaultValue);
         Assert.Equal(
             [Visibility.Visible, Visibility.Hidden, Visibility.Collapsed],
             Enum.GetValues<Visibility>());
@@ -668,7 +669,7 @@ public sealed class NodeLayoutTests
         ValidateLayout(root);
         ValidateLayout(child);
         var source = new LayoutSource { Visibility = Visibility.Collapsed };
-        child.Bind(Node.VisibilityProperty, source, item => item.Visibility);
+        child.Bind(UIElement.VisibilityProperty, source, item => item.Visibility);
 
         Assert.Equal(Visibility.Collapsed, child.Visibility);
         Assert.False(child.IsMeasureValid);
@@ -688,7 +689,7 @@ public sealed class NodeLayoutTests
         ValidateLayout(root);
         ValidateLayout(child);
 
-        child.ClearValue(Node.VisibilityProperty);
+        child.ClearValue(UIElement.VisibilityProperty);
 
         Assert.Equal(Visibility.Visible, child.Visibility);
         Assert.False(child.IsMeasureValid);
@@ -697,7 +698,7 @@ public sealed class NodeLayoutTests
         ValidateLayout(root);
         ValidateLayout(child);
         var source = new LayoutSource { Visibility = Visibility.Hidden };
-        child.Bind(Node.VisibilityProperty, source, item => item.Visibility);
+        child.Bind(UIElement.VisibilityProperty, source, item => item.Visibility);
         Assert.Equal(Visibility.Hidden, child.Visibility);
         Assert.False(child.IsMeasureValid);
 
@@ -710,10 +711,10 @@ public sealed class NodeLayoutTests
 
         ValidateLayout(root);
         ValidateLayout(child);
-        child.Unbind(Node.VisibilityProperty);
+        child.Unbind(UIElement.VisibilityProperty);
         source.Visibility = Visibility.Visible;
 
-        Assert.False(child.IsBound(Node.VisibilityProperty));
+        Assert.False(child.IsBound(UIElement.VisibilityProperty));
         Assert.Equal(Visibility.Collapsed, child.Visibility);
         Assert.True(child.IsMeasureValid);
         Assert.True(child.IsArrangeValid);
@@ -732,12 +733,12 @@ public sealed class NodeLayoutTests
         var source = new LayoutSource { Visibility = Visibility.Collapsed };
         var bindingError = RunOnBackgroundThread(() =>
             Record.Exception(() =>
-                node.Bind(Node.VisibilityProperty, source, item => item.Visibility)));
+                node.Bind(UIElement.VisibilityProperty, source, item => item.Visibility)));
 
         Assert.IsType<InvalidOperationException>(setterError);
         Assert.IsType<InvalidOperationException>(bindingError);
         Assert.Equal(Visibility.Visible, node.Visibility);
-        Assert.False(node.IsBound(Node.VisibilityProperty));
+        Assert.False(node.IsBound(UIElement.VisibilityProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
         screen.Close();
@@ -749,13 +750,13 @@ public sealed class NodeLayoutTests
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
         ValidateLayout(node);
 
-        node.ClearValue(Node.WidthProperty);
+        node.ClearValue(UIElement.WidthProperty);
         Assert.False(node.IsMeasureValid);
         Assert.True(double.IsNaN(node.Width));
 
         ValidateLayout(node);
         var source = new LayoutSource { Width = 20 };
-        node.Bind(Node.WidthProperty, source, item => item.Width);
+        node.Bind(UIElement.WidthProperty, source, item => item.Width);
         Assert.False(node.IsMeasureValid);
         Assert.Equal(20, node.Width);
 
@@ -765,7 +766,7 @@ public sealed class NodeLayoutTests
         Assert.Equal(30, node.Width);
 
         ValidateLayout(node);
-        node.Unbind(Node.WidthProperty);
+        node.Unbind(UIElement.WidthProperty);
         Assert.True(node.IsMeasureValid);
         Assert.Equal(30, node.Width);
     }
@@ -823,28 +824,28 @@ public sealed class NodeLayoutTests
 
         var source = new LayoutSource { Width = 30 };
         var bindError = RunOnBackgroundThread(() =>
-            Record.Exception(() => node.Bind(Node.WidthProperty, source, item => item.Width)));
+            Record.Exception(() => node.Bind(UIElement.WidthProperty, source, item => item.Width)));
         Assert.IsType<InvalidOperationException>(bindError);
-        Assert.False(node.IsBound(Node.WidthProperty));
+        Assert.False(node.IsBound(UIElement.WidthProperty));
         Assert.Equal(10, node.Width);
 
         var twoWaySource = new LayoutSource { Width = node.Width };
-        node.BindTwoWay(Node.WidthProperty, twoWaySource, item => item.Width);
+        node.BindTwoWay(UIElement.WidthProperty, twoWaySource, item => item.Width);
         var equalSetError = RunOnBackgroundThread(() =>
-            Record.Exception(() => node.SetValue(Node.WidthProperty, node.Width)));
+            Record.Exception(() => node.SetValue(UIElement.WidthProperty, node.Width)));
         Assert.IsType<InvalidOperationException>(equalSetError);
 
         var clearError = RunOnBackgroundThread(() =>
-            Record.Exception(() => node.ClearValue(Node.WidthProperty)));
+            Record.Exception(() => node.ClearValue(UIElement.WidthProperty)));
         var unbindError = RunOnBackgroundThread(() =>
-            Record.Exception(() => node.Unbind(Node.WidthProperty)));
+            Record.Exception(() => node.Unbind(UIElement.WidthProperty)));
         var bindingWriteError = RunOnBackgroundThread(() =>
             Record.Exception(() => twoWaySource.Width = 20));
         Assert.IsType<InvalidOperationException>(clearError);
         Assert.IsType<InvalidOperationException>(unbindError);
         Assert.IsType<InvalidOperationException>(bindingWriteError);
         Assert.Equal(10, node.Width);
-        Assert.True(node.IsBound(Node.WidthProperty));
+        Assert.True(node.IsBound(UIElement.WidthProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
         screen.Close();
@@ -879,19 +880,19 @@ public sealed class NodeLayoutTests
         };
 
         var actual = Record.Exception(() =>
-            node.Bind(Node.WidthProperty, source, item => item.Width));
+            node.Bind(UIElement.WidthProperty, source, item => item.Width));
         release.Set();
         background?.Join();
 
         Assert.IsType<InvalidOperationException>(actual);
         Assert.Equal(10, node.Width);
-        Assert.False(node.IsBound(Node.WidthProperty));
+        Assert.False(node.IsBound(UIElement.WidthProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
         Assert.Same(screen, node.Screen);
     }
 
-    private static void ValidateLayout(Node node)
+    private static void ValidateLayout(UIElement node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
@@ -921,7 +922,7 @@ public sealed class NodeLayoutTests
         return result;
     }
 
-    private sealed class TestNode : Node
+    private sealed class TestNode : UIElement
     {
         internal static readonly Property<int> RenderOnlyProperty =
             Property.Register<TestNode, int>(
@@ -965,9 +966,9 @@ public sealed class NodeLayoutTests
         }
     }
 
-    private sealed class TestParent : Parent
+    private sealed class TestParent : Container
     {
-        internal void Add(Node child) =>
+        internal void Add(UIElement child) =>
             Children.Add(child);
     }
 

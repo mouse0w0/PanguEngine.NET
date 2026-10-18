@@ -90,10 +90,10 @@ public sealed class CssVariableUpdateTests
         var screen = new Screen(root);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               .theme { --n: 4px; }
-                               #large { --n: 8px; }
-                               Panel { padding: var(--n, 0); }
-                               """)
+                             .theme { --n: 4px; }
+                             #large { --n: 8px; }
+                             Panel { padding: var(--n, 0); }
+                             """)
         ]);
         root.Classes.Add("theme");
         screen.Root!.UpdateStyles();
@@ -118,10 +118,10 @@ public sealed class CssVariableUpdateTests
         var screen = new Screen(root);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               #root { --alpha: 0.8; }
-                               #root:hover { --alpha: 0.4; }
-                               Panel { opacity: var(--alpha); }
-                               """)
+                             #root { --alpha: 0.8; }
+                             #root:hover { --alpha: 0.4; }
+                             Panel { opacity: var(--alpha); }
+                             """)
         ]);
         screen.Root!.UpdateStyles();
         Assert.Equal(0.8, child.Opacity);
@@ -148,10 +148,10 @@ public sealed class CssVariableUpdateTests
         var screen = new Screen(root);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               #first { --n: 4px; }
-                               #second { --n: 8px; }
-                               Panel { padding: var(--n, 0); }
-                               """)
+                             #first { --n: 4px; }
+                             #second { --n: 8px; }
+                             Panel { padding: var(--n, 0); }
+                             """)
         ]);
         screen.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), leaf.Padding);
@@ -198,16 +198,16 @@ public sealed class CssVariableUpdateTests
         var screen = new Screen(root);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               .theme { --alpha: 0.4; }
-                               .theme.same { --alpha: 0.4; }
-                               Panel { opacity: var(--alpha, 1); }
-                               """)
+                             .theme { --alpha: 0.4; }
+                             .theme.same { --alpha: 0.4; }
+                             Panel { opacity: var(--alpha, 1); }
+                             """)
         ]);
         var notifications = 0;
         double? observed = null;
         first.PropertyChanged += (_, args) =>
         {
-            if (!ReferenceEquals(args.Property, Node.OpacityProperty))
+            if (!ReferenceEquals(args.Property, UIElement.OpacityProperty))
                 return;
             notifications++;
             observed = second.Opacity;
@@ -234,8 +234,8 @@ public sealed class CssVariableUpdateTests
         screen.Root!.UpdateStyles();
         Assert.Equal(0.9, root.Opacity);
         Assert.Equal(0.4, child.Opacity);
-        Assert.True(Assert.Single(root.GetStyleValueSources(Node.OpacityProperty)).IsMaskedByLocalValue);
-        root.ClearValue(Node.OpacityProperty);
+        Assert.True(Assert.Single(root.GetStyleValueSources(UIElement.OpacityProperty)).IsMaskedByLocalValue);
+        root.ClearValue(UIElement.OpacityProperty);
         Assert.Equal(0.4, root.Opacity);
     }
 
@@ -247,14 +247,14 @@ public sealed class CssVariableUpdateTests
         root.Children.Add(child);
         var resolver = new StyleResolver([], [
             StyleSheet.Parse("""
-                               #root { --alpha: 0.4; opacity: 0.2; }
-                               Panel { opacity: var(--alpha, 1); }
-                               """)
+                             #root { --alpha: 0.4; opacity: 0.2; }
+                             Panel { opacity: var(--alpha, 1); }
+                             """)
         ]);
         var notifications = 0;
         root.PropertyChanged += (_, _) => notifications++;
         var snapshot = resolver.Resolve(child);
-        Assert.Equal(0.4, snapshot.GetValue(Node.OpacityProperty));
+        Assert.Equal(0.4, snapshot.GetValue(UIElement.OpacityProperty));
         Assert.Equal(1d, root.Opacity);
         Assert.Equal(0, notifications);
     }
@@ -270,14 +270,14 @@ public sealed class CssVariableUpdateTests
         var screen = new Screen(root);
         screen.SetStyleSheets([
             StyleSheet.Parse("""
-                               :root { --alpha: 0.4; }
-                               :root.changed { --alpha: 0.7; }
-                               Panel { opacity: var(--alpha, 1); }
-                               """)
+                             :root { --alpha: 0.4; }
+                             :root.changed { --alpha: 0.7; }
+                             Panel { opacity: var(--alpha, 1); }
+                             """)
         ]);
         first.PropertyChanged += (_, args) =>
         {
-            if (args.Property == Node.OpacityProperty)
+            if (args.Property == UIElement.OpacityProperty)
                 root.Classes.Add("changed");
         };
 
