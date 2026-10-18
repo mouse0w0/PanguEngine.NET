@@ -1,8 +1,9 @@
 using System.Diagnostics;
 using PanguEngine.Client.Huds;
-using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Input;
 using PanguEngine.Registries;
+using PanguEngine.UI;
+using PanguEngine.UI.Drawing;
 
 namespace PanguEngine.Client.UI;
 

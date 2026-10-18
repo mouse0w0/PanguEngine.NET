@@ -1,6 +1,7 @@
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Styling;
 using PanguEngine.ComponentModel;
+using PanguEngine.UI;
+using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.ComponentModel;
 

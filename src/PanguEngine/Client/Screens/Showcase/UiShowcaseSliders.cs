@@ -1,6 +1,7 @@
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
 using PanguEngine.Collections;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Client.Screens.Showcase;
 

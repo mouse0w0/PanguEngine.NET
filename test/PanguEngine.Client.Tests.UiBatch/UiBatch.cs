@@ -1,14 +1,15 @@
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
-using PanguEngine.Client.UI.Drawing;
-using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Desktop;
 using PanguEngine.Desktop.Sdl;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
+using PanguEngine.UI.Drawing;
+using PanguEngine.UI.Rendering;
 using PanguEngine.Windowing;
-using VectorPath = PanguEngine.Client.UI.Controls.Path;
+using VectorPath = PanguEngine.UI.Controls.Path;
 
 namespace PanguEngine.Client.Tests.UiBatch;
 

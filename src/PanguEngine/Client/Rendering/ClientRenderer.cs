@@ -2,11 +2,12 @@ using PanguEngine.Client.Game;
 using PanguEngine.Client.Rendering.World;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Drawing;
-using PanguEngine.Client.UI.Rendering;
 using PanguEngine.Client.World;
 using PanguEngine.Graphics;
 using PanguEngine.Graphics.Text;
+using PanguEngine.UI;
+using PanguEngine.UI.Drawing;
+using PanguEngine.UI.Rendering;
 using PanguEngine.World.Interaction;
 
 namespace PanguEngine.Client.Rendering;

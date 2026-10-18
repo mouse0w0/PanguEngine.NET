@@ -1,7 +1,8 @@
 using System.ComponentModel;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Styling;
 using PanguEngine.ComponentModel;
+using PanguEngine.UI;
+using PanguEngine.UI.Styling;
 using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.ComponentModel;

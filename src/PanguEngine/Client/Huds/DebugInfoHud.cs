@@ -1,6 +1,7 @@
 using System.Globalization;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
 using PanguEngine.World.Chunking;
 
 namespace PanguEngine.Client.Huds;

@@ -1,8 +1,9 @@
 using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
-using PanguEngine.Client.UI.Drawing;
 using PanguEngine.Registries;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
+using PanguEngine.UI.Drawing;
 
 namespace PanguEngine.Tests.Client.Huds;
 

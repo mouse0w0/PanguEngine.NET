@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
+using PanguEngine.UI;
 using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.ComponentModel;

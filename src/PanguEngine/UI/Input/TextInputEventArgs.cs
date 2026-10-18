@@ -1,0 +1,18 @@
+namespace PanguEngine.UI.Input;
+
+/// <summary>
+/// Provides data for a routed UI text input event.
+/// </summary>
+public sealed class TextInputEventArgs : InputEventArgs
+{
+    internal TextInputEventArgs(Node source, string text)
+        : base(source)
+    {
+        Text = text;
+    }
+
+    /// <summary>
+    /// Gets the committed text associated with the event.
+    /// </summary>
+    public string Text { get; }
+}

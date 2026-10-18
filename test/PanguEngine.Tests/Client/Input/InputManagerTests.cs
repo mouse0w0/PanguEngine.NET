@@ -3,15 +3,15 @@ using PanguEngine.Client.Huds;
 using PanguEngine.Client.Input;
 using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
-using PanguEngine.Client.UI.Input;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.Tests.Windowing;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
 using PanguEngine.Windowing;
 using Silk.NET.Maths;
 using KeyEventArgs = PanguEngine.Windowing.KeyEventArgs;
-using UiKeyEventArgs = PanguEngine.Client.UI.Input.KeyEventArgs;
+using UiKeyEventArgs = PanguEngine.UI.Input.KeyEventArgs;
 
 namespace PanguEngine.Tests.Client.Input;
 

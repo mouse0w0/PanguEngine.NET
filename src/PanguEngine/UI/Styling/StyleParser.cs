@@ -1,0 +1,536 @@
+using System.Text;
+
+namespace PanguEngine.UI.Styling;
+
+/// <summary>
+/// Compiles the minimum CSS grammar into an immutable <see cref="StyleSheet"/> using a strict one-pass scan.
+/// </summary>
+internal static class StyleParser
+{
+    public static StyleSheet Parse(string text, string? sourceName)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return new Parser(text, sourceName).ParseStylesheet();
+    }
+
+    public static StyleSheet Parse(Stream stream, string? sourceName)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        string text;
+        try
+        {
+            var bytes = ReadAllBytes(stream);
+            var encoding = new UTF8Encoding(false, throwOnInvalidBytes: true);
+            text = encoding.GetString(StripBom(bytes));
+        }
+        catch (DecoderFallbackException ex)
+        {
+            throw new StyleParseException(StyleParseError.InvalidEncoding, sourceName, 1, 1, 0, ex);
+        }
+
+        return new Parser(text, sourceName).ParseStylesheet();
+    }
+
+    private static byte[] ReadAllBytes(Stream stream)
+    {
+        using var memory = new MemoryStream();
+        stream.CopyTo(memory);
+        return memory.ToArray();
+    }
+
+    private static byte[] StripBom(byte[] bytes)
+    {
+        if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
+            return bytes.AsSpan(3).ToArray();
+        return bytes;
+    }
+
+    private readonly struct Mark(int line, int column, int pos)
+    {
+        public readonly int Line = line;
+        public readonly int Column = column;
+        public readonly int Pos = pos;
+    }
+
+    private sealed class Parser(string text, string? sourceName)
+    {
+        private int _pos;
+        private int _line = 1;
+        private int _col = 1;
+
+        public StyleSheet ParseStylesheet()
+        {
+            SkipTrivia();
+            var rules = new List<StyleRule>();
+            while (_pos < text.Length)
+            {
+                if (!IsIdentifierStart(Peek()) && Peek() is not ('*' or '.' or '#' or ':'))
+                    throw Error(StyleParseError.TrailingToken, GetMark(), 1);
+                rules.Add(ParseRule());
+                SkipTrivia();
+            }
+
+            return new StyleSheet(rules, sourceName);
+        }
+
+        private StyleRule ParseRule()
+        {
+            var selectorStart = GetMark();
+            var selectors = new List<StyleSelector>
+            {
+                ParseSelectorChain(out var selectorEnd)
+            };
+
+            while (text[_pos] == ',')
+            {
+                Advance();
+                SkipTrivia();
+                selectors.Add(ParseSelectorChain(out selectorEnd));
+            }
+
+            var selectorLength = selectorEnd.Pos - selectorStart.Pos;
+            var sourceLocation = new StyleSourceLocation(sourceName, selectorStart.Line, selectorStart.Column, selectorLength);
+
+            Advance();
+            var declarations = new List<StyleRule.CssDeclaration>();
+            while (true)
+            {
+                SkipTrivia();
+                if (_pos >= text.Length)
+                    throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+                if (text[_pos] == '}')
+                {
+                    Advance();
+                    break;
+                }
+
+                declarations.Add(ParseDeclaration());
+            }
+
+            return StyleRule.FromCss(selectors, declarations, sourceLocation);
+        }
+
+        private StyleSelector ParseSelectorChain(out Mark selectorEnd)
+        {
+            var segments = new List<StyleSelectorSegment>();
+            var combinators = new List<StyleCombinator>();
+            selectorEnd = ParseCompoundSegment(segments);
+
+            while (true)
+            {
+                var sawWhitespace = SkipTrivia();
+                if (_pos >= text.Length)
+                    throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+
+                var c = text[_pos];
+                if (c is '{' or ',')
+                    break;
+
+                var explicitCombinator = c switch
+                {
+                    '>' => StyleCombinator.Child,
+                    '+' => StyleCombinator.AdjacentSibling,
+                    '~' => StyleCombinator.SubsequentSibling,
+                    _ => (StyleCombinator?)null
+                };
+
+                if (explicitCombinator is { } combinator)
+                {
+                    Advance();
+                    SkipTrivia();
+                    selectorEnd = ParseCompoundSegment(segments);
+                    combinators.Add(combinator);
+                    continue;
+                }
+
+                if (!sawWhitespace || (!IsIdentifierStart(c) && c is not ('*' or '.' or '#' or ':')))
+                    throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+
+                selectorEnd = ParseCompoundSegment(segments);
+                combinators.Add(StyleCombinator.Descendant);
+            }
+
+            return StyleSelector.Create(segments, combinators);
+        }
+
+        private Mark ParseCompoundSegment(List<StyleSelectorSegment> segments)
+        {
+            var start = GetMark();
+            var typeName = "*";
+            var hasType = false;
+            if (_pos < text.Length && text[_pos] == '*')
+            {
+                Advance();
+                hasType = true;
+            }
+            else if (_pos < text.Length && IsIdentifierStart(text[_pos]))
+            {
+                typeName = ReadIdentifier();
+                hasType = true;
+            }
+
+            var classes = new List<string>();
+            string? id = null;
+            var pseudoClasses = new List<PseudoClass>();
+            var nthConditions = new List<StyleNthCondition>();
+            var end = GetMark();
+
+            while (true)
+            {
+                SkipComments();
+                if (_pos >= text.Length)
+                    break;
+
+                var c = text[_pos];
+                if (c == '.')
+                {
+                    Advance();
+                    classes.Add(ReadIdentifier());
+                }
+                else if (c == '#')
+                {
+                    Advance();
+                    var idStart = GetMark();
+                    var idValue = ReadIdentifier();
+                    if (id is not null)
+                        throw Error(StyleParseError.DuplicateId, idStart, idValue.Length);
+                    id = idValue;
+                }
+                else if (c == ':')
+                {
+                    Advance();
+                    var pseudoStart = GetMark();
+                    var name = ReadIdentifier().ToLowerInvariant();
+                    if (name is "nth-child" or "nth-last-child")
+                    {
+                        if (_pos >= text.Length || text[_pos] != '(')
+                            throw Error(StyleParseError.InvalidSyntax, pseudoStart, name.Length);
+                        Advance();
+                        nthConditions.Add(new StyleNthCondition(name == "nth-last-child", ParseNthExpression()));
+                    }
+                    else
+                    {
+                        if (_pos < text.Length && text[_pos] == '(')
+                            throw Error(StyleParseError.InvalidSyntax, pseudoStart, name.Length);
+                        pseudoClasses.Add(PseudoClass.Get(name));
+                    }
+                }
+                else
+                {
+                    break;
+                }
+
+                end = GetMark();
+            }
+
+            if (!hasType && classes.Count == 0 && id is null && pseudoClasses.Count == 0 && nthConditions.Count == 0)
+                throw Error(StyleParseError.InvalidSyntax, start, 1);
+
+            segments.Add(StyleSelectorSegment.Create(null, typeName, classes, id, pseudoClasses, nthConditions));
+            return end;
+        }
+
+        private NthExpression ParseNthExpression()
+        {
+            SkipTrivia();
+            var start = GetMark();
+            if (_pos < text.Length && text[_pos] is 'o' or 'O' or 'e' or 'E')
+            {
+                var keyword = ReadIdentifier().ToLowerInvariant();
+                var expression = keyword switch
+                {
+                    "odd" => new NthExpression(2, 1),
+                    "even" => new NthExpression(2, 0),
+                    _ => throw Error(StyleParseError.InvalidSyntax, start, keyword.Length)
+                };
+                return FinishNthExpression(expression);
+            }
+
+            var negative = false;
+            var separatedPlus = false;
+            if (_pos < text.Length && text[_pos] is '+' or '-')
+            {
+                negative = text[_pos] == '-';
+                Advance();
+                if (!negative)
+                {
+                    var beforeComments = _pos;
+                    SkipComments();
+                    separatedPlus = _pos != beforeComments;
+                }
+            }
+
+            int coefficient;
+            if (_pos < text.Length && text[_pos] is 'n' or 'N')
+                coefficient = negative ? -1 : 1;
+            else
+            {
+                if (separatedPlus)
+                    throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+                coefficient = ReadNthInteger(negative);
+                if (_pos >= text.Length || text[_pos] is not ('n' or 'N'))
+                    return FinishNthExpression(new NthExpression(0, coefficient));
+            }
+
+            Advance();
+            SkipTrivia();
+            if (_pos < text.Length && text[_pos] == ')')
+                return FinishNthExpression(new NthExpression(coefficient, 0));
+            if (_pos >= text.Length || text[_pos] is not ('+' or '-'))
+                throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+            negative = text[_pos] == '-';
+            Advance();
+            SkipTrivia();
+            var offset = ReadNthInteger(negative);
+            return FinishNthExpression(new NthExpression(coefficient, offset));
+        }
+
+        private int ReadNthInteger(bool negative)
+        {
+            var start = GetMark();
+            if (_pos >= text.Length || !char.IsAsciiDigit(text[_pos]))
+                throw Error(StyleParseError.InvalidSyntax, start, 1);
+            var limit = negative ? 2147483648L : int.MaxValue;
+            long magnitude = 0;
+            while (_pos < text.Length && char.IsAsciiDigit(text[_pos]))
+            {
+                var digit = text[_pos] - '0';
+                if (magnitude > (limit - digit) / 10)
+                    throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+                magnitude = magnitude * 10 + digit;
+                Advance();
+            }
+            return (int)(negative ? -magnitude : magnitude);
+        }
+
+        private NthExpression FinishNthExpression(NthExpression expression)
+        {
+            SkipTrivia();
+            if (_pos >= text.Length || text[_pos] != ')')
+                throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+            Advance();
+            return expression;
+        }
+
+        private StyleRule.CssDeclaration ParseDeclaration()
+        {
+            var propertyStart = GetMark();
+            var propertyName = ReadIdentifier();
+            if (propertyName == "--")
+                throw Error(StyleParseError.InvalidSyntax, propertyStart, propertyName.Length);
+            SkipTrivia();
+            if (_pos >= text.Length || text[_pos] != ':')
+                throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
+            Advance();
+
+            var rawValue = ReadValue(out var valueStart, out var valueLength);
+            var valueLocation = new StyleSourceLocation(sourceName, valueStart.Line, valueStart.Column, valueLength);
+            var expression = CssValue.Parse(rawValue, valueLocation);
+            if (expression.Text.Length == 0 && !propertyName.StartsWith("--", StringComparison.Ordinal))
+                throw Error(StyleParseError.InvalidSyntax, valueStart, 0);
+
+            if (_pos >= text.Length || text[_pos] != ';')
+                throw Error(StyleParseError.MissingSemicolon, GetMark(), 1);
+            Advance();
+
+            return new StyleRule.CssDeclaration(
+                propertyName,
+                expression,
+                new StyleSourceLocation(sourceName, propertyStart.Line, propertyStart.Column, propertyName.Length),
+                valueLocation);
+        }
+
+        private string ReadValue(out Mark start, out int sourceLength)
+        {
+            SkipTrivia();
+            start = GetMark();
+            var startPosition = _pos;
+            var sourceEndPosition = startPosition;
+            var depth = 0;
+            char quote = '\0';
+            while (_pos < text.Length)
+            {
+                var c = text[_pos];
+                if (quote != '\0')
+                {
+                    Advance();
+                    if (c == '\\' && _pos < text.Length)
+                        Advance();
+                    else if (c == quote)
+                        quote = '\0';
+                    sourceEndPosition = _pos;
+                    continue;
+                }
+                if (c is '\'' or '"')
+                {
+                    quote = c;
+                    Advance();
+                    sourceEndPosition = _pos;
+                    continue;
+                }
+                if (c is '}' or '{' || (c == ';' && depth == 0))
+                    break;
+
+                if (c == '/' && _pos + 1 < text.Length && text[_pos + 1] == '*')
+                {
+                    var commentStart = GetMark();
+                    Advance();
+                    Advance();
+                    var closed = false;
+                    while (_pos < text.Length)
+                    {
+                        if (text[_pos] == '*' && _pos + 1 < text.Length && text[_pos + 1] == '/')
+                        {
+                            Advance();
+                            Advance();
+                            closed = true;
+                            break;
+                        }
+
+                        Advance();
+                    }
+
+                    if (!closed)
+                        throw Error(StyleParseError.UnterminatedComment, commentStart, 2);
+                    sourceEndPosition = _pos;
+                    continue;
+                }
+
+                if (c == '(')
+                    depth++;
+                else if (c == ')')
+                    depth--;
+                Advance();
+                if (!IsAsciiWhitespace(c))
+                    sourceEndPosition = _pos;
+            }
+
+            sourceLength = sourceEndPosition - startPosition;
+            return text[startPosition..sourceEndPosition];
+        }
+
+        private string ReadIdentifier()
+        {
+            var start = GetMark();
+            if (_pos >= text.Length || !IsIdentifierStart(text[_pos]))
+                throw Error(StyleParseError.InvalidSyntax, start, 1);
+
+            var builder = new StringBuilder();
+            while (_pos < text.Length && IsIdentifierPart(text[_pos]))
+            {
+                builder.Append(text[_pos]);
+                Advance();
+            }
+
+            return builder.ToString();
+        }
+
+        private void SkipComments()
+        {
+            while (_pos + 1 < text.Length && text[_pos] == '/' && text[_pos + 1] == '*')
+            {
+                var start = GetMark();
+                Advance();
+                Advance();
+                var closed = false;
+                while (_pos < text.Length)
+                {
+                    if (text[_pos] == '*' && _pos + 1 < text.Length && text[_pos + 1] == '/')
+                    {
+                        Advance();
+                        Advance();
+                        closed = true;
+                        break;
+                    }
+
+                    Advance();
+                }
+
+                if (!closed)
+                    throw Error(StyleParseError.UnterminatedComment, start, 2);
+            }
+        }
+
+        private bool SkipTrivia()
+        {
+            var sawWhitespace = false;
+            while (_pos < text.Length)
+            {
+                var c = text[_pos];
+                if (IsAsciiWhitespace(c))
+                {
+                    sawWhitespace = true;
+                    Advance();
+                    continue;
+                }
+
+                if (c == '/' && _pos + 1 < text.Length && text[_pos + 1] == '*')
+                {
+                    var start = GetMark();
+                    Advance();
+                    Advance();
+                    var closed = false;
+                    while (_pos < text.Length)
+                    {
+                        if (text[_pos] == '*' && _pos + 1 < text.Length && text[_pos + 1] == '/')
+                        {
+                            Advance();
+                            Advance();
+                            closed = true;
+                            break;
+                        }
+
+                        Advance();
+                    }
+
+                    if (!closed)
+                        throw Error(StyleParseError.UnterminatedComment, start, 2);
+                    continue;
+                }
+
+                break;
+            }
+
+            return sawWhitespace;
+        }
+
+        private void Advance()
+        {
+            var c = text[_pos];
+            _pos++;
+            if (c == '\n')
+            {
+                _line++;
+                _col = 1;
+            }
+            else if (c == '\r')
+            {
+                if (_pos < text.Length && text[_pos] == '\n')
+                    _pos++;
+                _line++;
+                _col = 1;
+            }
+            else
+            {
+                _col++;
+            }
+        }
+
+        private char Peek() => text[_pos];
+
+        private Mark GetMark() => new(_line, _col, _pos);
+
+        private StyleParseException Error(StyleParseError error, Mark mark, int length, Exception? inner = null)
+            => new(error, sourceName, mark.Line, mark.Column, length, inner);
+
+        private static bool IsAsciiWhitespace(char c) =>
+            c is ' ' or '\t' or '\n' or '\r' or '\f' or '\v';
+
+        private static bool IsIdentifierStart(char c) =>
+            char.IsAsciiLetter(c) || c == '_' || c == '-';
+
+        private static bool IsIdentifierPart(char c) =>
+            char.IsAsciiLetterOrDigit(c) || c == '_' || c == '-';
+    }
+}

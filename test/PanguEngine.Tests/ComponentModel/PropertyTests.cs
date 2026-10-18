@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using PanguEngine.Client.UI;
 using PanguEngine.ComponentModel;
+using PanguEngine.UI;
 
 namespace PanguEngine.Tests.ComponentModel;
 

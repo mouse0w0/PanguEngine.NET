@@ -1,0 +1,635 @@
+using PanguEngine.ComponentModel;
+
+namespace PanguEngine.UI;
+
+public abstract partial class Node
+{
+    private bool _isHitTestLayoutValid;
+
+    /// <summary>
+    /// Identifies the <see cref="Width"/> property.
+    /// </summary>
+    public static readonly Property<double> WidthProperty =
+        Property.Register<Node, double>(
+            nameof(Width),
+            double.NaN,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsRequestedDimensionValid,
+            validationMessage: "Width must be Auto or a finite non-negative value.");
+
+    /// <summary>
+    /// Identifies the <see cref="Height"/> property.
+    /// </summary>
+    public static readonly Property<double> HeightProperty =
+        Property.Register<Node, double>(
+            nameof(Height),
+            double.NaN,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsRequestedDimensionValid,
+            validationMessage: "Height must be Auto or a finite non-negative value.");
+
+    /// <summary>
+    /// Identifies the <see cref="MinWidth"/> property.
+    /// </summary>
+    public static readonly Property<double> MinWidthProperty =
+        Property.Register<Node, double>(
+            nameof(MinWidth),
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "MinWidth must be a finite non-negative value.");
+
+    /// <summary>
+    /// Identifies the <see cref="MinHeight"/> property.
+    /// </summary>
+    public static readonly Property<double> MinHeightProperty =
+        Property.Register<Node, double>(
+            nameof(MinHeight),
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsFiniteNonNegative,
+            validationMessage: "MinHeight must be a finite non-negative value.");
+
+    /// <summary>
+    /// Identifies the <see cref="MaxWidth"/> property.
+    /// </summary>
+    public static readonly Property<double> MaxWidthProperty =
+        Property.Register<Node, double>(
+            nameof(MaxWidth),
+            double.PositiveInfinity,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsMaximumDimensionValid,
+            validationMessage: "MaxWidth must be non-negative or positive infinity.");
+
+    /// <summary>
+    /// Identifies the <see cref="MaxHeight"/> property.
+    /// </summary>
+    public static readonly Property<double> MaxHeightProperty =
+        Property.Register<Node, double>(
+            nameof(MaxHeight),
+            double.PositiveInfinity,
+            onChanged: static (node, _, _) => node.InvalidateMeasure(),
+            validate: IsMaximumDimensionValid,
+            validationMessage: "MaxHeight must be non-negative or positive infinity.");
+
+    /// <summary>
+    /// Identifies the <see cref="Margin"/> property.
+    /// </summary>
+    public static readonly Property<Thickness> MarginProperty =
+        Property.Register<Node, Thickness>(
+            nameof(Margin),
+            Thickness.Zero,
+            onChanged: static (node, _, _) => node.InvalidateMeasure());
+
+    /// <summary>
+    /// Identifies the <see cref="HorizontalAlignment"/> property.
+    /// </summary>
+    public static readonly Property<HorizontalAlignment> HorizontalAlignmentProperty =
+        Property.Register<Node, HorizontalAlignment>(
+            nameof(HorizontalAlignment),
+            HorizontalAlignment.Stretch,
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: static value => value is HorizontalAlignment.Left or HorizontalAlignment.Center or HorizontalAlignment.Right or HorizontalAlignment.Stretch,
+            validationMessage: "HorizontalAlignment has an undefined value.");
+
+    /// <summary>
+    /// Identifies the <see cref="VerticalAlignment"/> property.
+    /// </summary>
+    public static readonly Property<VerticalAlignment> VerticalAlignmentProperty =
+        Property.Register<Node, VerticalAlignment>(
+            nameof(VerticalAlignment),
+            VerticalAlignment.Stretch,
+            onChanged: static (node, _, _) => node.InvalidateArrange(),
+            validate: static value => value is VerticalAlignment.Top or VerticalAlignment.Center or VerticalAlignment.Bottom or VerticalAlignment.Stretch,
+            validationMessage: "VerticalAlignment has an undefined value.");
+
+    /// <summary>
+    /// Identifies the <see cref="Visibility"/> property.
+    /// </summary>
+    public static readonly Property<Visibility> VisibilityProperty =
+        Property.Register<Node, Visibility>(
+            nameof(Visibility),
+            Visibility.Visible,
+            onChanged: static (node, _, newValue) =>
+            {
+                node.InvalidateMeasure();
+                if (newValue != Visibility.Visible)
+                    node.Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
+            });
+
+    private Size _lastMeasureConstraint;
+    private Size _desiredContentSize;
+    private Rect _lastArrangeRect;
+    private int _measurePassDepth;
+    private int _arrangePassDepth;
+    private ulong _measureInvalidationVersion;
+    private ulong _arrangeInvalidationVersion;
+
+    /// <summary>
+    /// Gets or sets the requested width, or NaN for automatic sizing.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is neither NaN nor finite and non-negative.</exception>
+    public double Width
+    {
+        get => GetValue(WidthProperty);
+        set => SetValue(WidthProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the requested height, or NaN for automatic sizing.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is neither NaN nor finite and non-negative.</exception>
+    public double Height
+    {
+        get => GetValue(HeightProperty);
+        set => SetValue(HeightProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the minimum width.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
+    public double MinWidth
+    {
+        get => GetValue(MinWidthProperty);
+        set => SetValue(MinWidthProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the minimum height.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is not finite and non-negative.</exception>
+    public double MinHeight
+    {
+        get => GetValue(MinHeightProperty);
+        set => SetValue(MinHeightProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the maximum width.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is NaN or negative.</exception>
+    public double MaxWidth
+    {
+        get => GetValue(MaxWidthProperty);
+        set => SetValue(MaxWidthProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the maximum height.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is NaN or negative.</exception>
+    public double MaxHeight
+    {
+        get => GetValue(MaxHeightProperty);
+        set => SetValue(MaxHeightProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets the non-negative spacing outside the layout bounds.
+    /// </summary>
+    public Thickness Margin
+    {
+        get => GetValue(MarginProperty);
+        set => SetValue(MarginProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets horizontal positioning within the allocated slot.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is undefined.</exception>
+    public HorizontalAlignment HorizontalAlignment
+    {
+        get => GetValue(HorizontalAlignmentProperty);
+        set => SetValue(HorizontalAlignmentProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets vertical positioning within the allocated slot.
+    /// </summary>
+    /// <exception cref="ArgumentException">Thrown when the value is undefined.</exception>
+    public VerticalAlignment VerticalAlignment
+    {
+        get => GetValue(VerticalAlignmentProperty);
+        set => SetValue(VerticalAlignmentProperty, value);
+    }
+
+    /// <summary>
+    /// Gets or sets how this node participates in layout, drawing, and hit testing.
+    /// </summary>
+    /// <remarks>
+    /// Hiding or collapsing this node immediately clears focus, hover, and pressed states
+    /// for this node and its descendants. Showing it again does not restore focus or pressed states.
+    /// </remarks>
+    public Visibility Visibility
+    {
+        get => GetValue(VisibilityProperty);
+        set => SetValue(VisibilityProperty, value);
+    }
+
+    /// <summary>
+    /// Gets the measured size, including margin.
+    /// </summary>
+    public Size DesiredSize { get; private set; }
+
+    /// <summary>
+    /// Gets the arranged boundary in parent coordinates, excluding margin.
+    /// </summary>
+    /// <remarks>
+    /// A root node uses the coordinate system supplied by its arrange caller.
+    /// </remarks>
+    public Rect LayoutBounds { get; private set; }
+
+    /// <summary>
+    /// Gets whether measurement is valid for the last constraint.
+    /// </summary>
+    public bool IsMeasureValid { get; private set; }
+
+    /// <summary>
+    /// Gets whether arrangement is valid for the last layout rectangle.
+    /// </summary>
+    public bool IsArrangeValid { get; private set; }
+
+    /// <summary>
+    /// Measures this node within an available size.
+    /// </summary>
+    /// <param name="availableSize">The available size, which may contain positive infinity.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when layout mutation is prohibited, or when measurement produces an invalid result.
+    /// </exception>
+    public void Measure(Size availableSize)
+    {
+        VerifyLayoutMutationAccess();
+        VerifyNotUpdatingStyles();
+        var screen = Screen;
+        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
+        var scale = screen?.Scale ?? 1;
+        if (IsMeasureValid && _lastMeasureConstraint == availableSize)
+            return;
+
+        InvalidateMeasureState();
+
+        if (Visibility == Visibility.Collapsed)
+        {
+            _lastMeasureConstraint = availableSize;
+            _desiredContentSize = Size.Zero;
+            DesiredSize = Size.Zero;
+            IsMeasureValid = true;
+            return;
+        }
+
+        var margin = Margin;
+        if (useLayoutRounding)
+            margin = LayoutHelper.RoundLayoutThickness(margin, scale);
+        var width = Width;
+        var height = Height;
+        var minWidth = MinWidth;
+        var minHeight = MinHeight;
+        var effectiveMaxWidth = Math.Max(minWidth, MaxWidth);
+        var effectiveMaxHeight = Math.Max(minHeight, MaxHeight);
+        var coreConstraint = new Size(
+            GetMeasureConstraint(
+                availableSize.Width,
+                margin.Left,
+                margin.Right,
+                width,
+                effectiveMaxWidth),
+            GetMeasureConstraint(
+                availableSize.Height,
+                margin.Top,
+                margin.Bottom,
+                height,
+                effectiveMaxHeight));
+        var invalidationVersion = _measureInvalidationVersion;
+        Size coreDesiredSize;
+        _measurePassDepth++;
+        try
+        {
+            coreDesiredSize = MeasureCore(coreConstraint);
+        }
+        finally
+        {
+            _measurePassDepth--;
+        }
+
+        VerifyCoreSize(coreDesiredSize, "Measurement returned an invalid desired size.");
+        if (_measureInvalidationVersion != invalidationVersion)
+            return;
+
+        var desiredContentSize = new Size(
+            ResolveDesiredDimension(coreDesiredSize.Width, width, minWidth, effectiveMaxWidth),
+            ResolveDesiredDimension(coreDesiredSize.Height, height, minHeight, effectiveMaxHeight));
+        var layoutDesiredContentSize = useLayoutRounding
+            ? LayoutHelper.RoundLayoutSizeUp(desiredContentSize, scale)
+            : desiredContentSize;
+        var desiredSize = new Size(
+            AddMargin(layoutDesiredContentSize.Width, margin.Left, margin.Right),
+            AddMargin(layoutDesiredContentSize.Height, margin.Top, margin.Bottom));
+
+        _lastMeasureConstraint = availableSize;
+        _desiredContentSize = desiredContentSize;
+        DesiredSize = desiredSize;
+        IsMeasureValid = true;
+    }
+
+    /// <summary>
+    /// Arranges this node within a final layout rectangle.
+    /// </summary>
+    /// <param name="finalRect">The final slot in parent or caller coordinates.</param>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when layout mutation is prohibited, measurement is invalid, or arrangement produces an invalid result.
+    /// </exception>
+    public void Arrange(Rect finalRect)
+    {
+        VerifyLayoutMutationAccess();
+        VerifyNotUpdatingStyles();
+        var screen = Screen;
+        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
+        var scale = screen?.Scale ?? 1;
+        if (!IsMeasureValid)
+            throw new InvalidOperationException("A UI node must have a valid measure before it can be arranged.");
+        if (IsArrangeValid && _lastArrangeRect == finalRect)
+            return;
+
+        InvalidateArrangeState();
+
+        if (Visibility == Visibility.Collapsed)
+        {
+            _lastArrangeRect = finalRect;
+            LayoutBounds = Rect.Zero;
+            IsArrangeValid = true;
+            _isHitTestLayoutValid = true;
+            return;
+        }
+
+        var margin = Margin;
+        if (useLayoutRounding)
+            margin = LayoutHelper.RoundLayoutThickness(margin, scale);
+        var width = Width;
+        var height = Height;
+        var minWidth = MinWidth;
+        var minHeight = MinHeight;
+        var effectiveMaxWidth = Math.Max(minWidth, MaxWidth);
+        var effectiveMaxHeight = Math.Max(minHeight, MaxHeight);
+        var slotWidth = SubtractMargin(finalRect.Width, margin.Left, margin.Right);
+        var slotHeight = SubtractMargin(finalRect.Height, margin.Top, margin.Bottom);
+        var actualWidth = ResolveArrangeDimension(
+            slotWidth,
+            _desiredContentSize.Width,
+            width,
+            minWidth,
+            effectiveMaxWidth,
+            HorizontalAlignment == HorizontalAlignment.Stretch);
+        var actualHeight = ResolveArrangeDimension(
+            slotHeight,
+            _desiredContentSize.Height,
+            height,
+            minHeight,
+            effectiveMaxHeight,
+            VerticalAlignment == VerticalAlignment.Stretch);
+        var actualSize = new Size(actualWidth, actualHeight);
+        if (useLayoutRounding)
+            actualSize = LayoutHelper.RoundLayoutSizeUp(actualSize, scale);
+        var horizontalRemaining = slotWidth - actualSize.Width;
+        var verticalRemaining = slotHeight - actualSize.Height;
+        var x = finalRect.X + margin.Left + GetHorizontalOffset(horizontalRemaining);
+        var y = finalRect.Y + margin.Top + GetVerticalOffset(verticalRemaining);
+        if (!double.IsFinite(x) || !double.IsFinite(y))
+            throw new InvalidOperationException("Arrangement produced a non-finite layout origin.");
+
+        if (useLayoutRounding)
+        {
+            var origin = LayoutHelper.RoundLayoutPoint(new Point(x, y), scale);
+            x = origin.X;
+            y = origin.Y;
+        }
+
+        var layoutBounds = new Rect(x, y, actualSize);
+        var invalidationVersion = _arrangeInvalidationVersion;
+        _arrangePassDepth++;
+        try
+        {
+            ArrangeCore(actualSize);
+        }
+        finally
+        {
+            _arrangePassDepth--;
+        }
+
+        if (_arrangeInvalidationVersion != invalidationVersion)
+            return;
+
+        _lastArrangeRect = finalRect;
+        LayoutBounds = layoutBounds;
+        IsArrangeValid = true;
+        _isHitTestLayoutValid = true;
+    }
+
+    /// <summary>
+    /// Invalidates measurement and arrangement for this node and its ancestors.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the open screen is accessed from another thread.
+    /// </exception>
+    public void InvalidateMeasure()
+    {
+        VerifyLayoutMutationAccess();
+        InvalidateMeasureCore();
+    }
+
+    /// <summary>
+    /// Invalidates arrangement for this node and its ancestors.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the open screen is accessed from another thread.
+    /// </exception>
+    public void InvalidateArrange()
+    {
+        VerifyLayoutMutationAccess();
+        InvalidateArrangeCore();
+    }
+
+    /// <summary>
+    /// Measures the content of this node.
+    /// </summary>
+    /// <param name="availableSize">The content size available after framework constraints.</param>
+    /// <returns>The finite non-negative desired content size, excluding margin.</returns>
+    protected virtual Size MeasureCore(Size availableSize) =>
+        Size.Zero;
+
+    /// <summary>
+    /// Arranges the content of this node within its final size.
+    /// </summary>
+    /// <param name="finalSize">The finite non-negative content size, excluding margin.</param>
+    protected virtual void ArrangeCore(Size finalSize)
+    {
+    }
+
+    private void VerifyLayoutMutationAccess() =>
+        Screen?.VerifyTreeMutationAccess();
+
+    private void VerifyNotUpdatingStyles()
+    {
+        if (IsUpdatingStyles)
+            throw new InvalidOperationException("Layout cannot run while styles are being updated.");
+    }
+
+    /// <inheritdoc />
+    protected override void VerifyMutationAccess() =>
+        VerifyLayoutMutationAccess();
+
+    private void InvalidateMeasureCore()
+    {
+        for (var node = this; node is not null; node = node.Parent)
+            node.InvalidateMeasureState();
+    }
+
+    internal void InvalidateMeasureSubtree()
+    {
+        InvalidateMeasureState();
+        if (this is not Parent parent)
+            return;
+
+        foreach (var child in parent.ReadOnlyChildren)
+            child.InvalidateMeasureSubtree();
+    }
+
+    private void InvalidateArrangeCore()
+    {
+        for (var node = this; node is not null; node = node.Parent)
+            node.InvalidateArrangeState();
+    }
+
+    private void InvalidateMeasureState()
+    {
+        IsMeasureValid = false;
+        IsArrangeValid = false;
+        _isHitTestLayoutValid = false;
+        if (_measurePassDepth != 0)
+            _measureInvalidationVersion++;
+        if (_arrangePassDepth != 0)
+            _arrangeInvalidationVersion++;
+    }
+
+    private void InvalidateArrangeState()
+    {
+        IsArrangeValid = false;
+        _isHitTestLayoutValid = false;
+        if (_arrangePassDepth != 0)
+            _arrangeInvalidationVersion++;
+    }
+
+    internal bool CanPreserveHitTestLayoutAfterChildOrderChange()
+    {
+        for (var node = this; node is not null; node = node.Parent)
+        {
+            if (!node._isHitTestLayoutValid)
+                return false;
+        }
+
+        return true;
+    }
+
+    internal void RestoreHitTestLayoutAfterChildOrderChange()
+    {
+        for (var node = this; node is not null; node = node.Parent)
+            node._isHitTestLayoutValid = true;
+    }
+
+    private double GetHorizontalOffset(double remaining) =>
+        HorizontalAlignment switch
+        {
+            HorizontalAlignment.Left => 0,
+            HorizontalAlignment.Center => remaining / 2,
+            HorizontalAlignment.Right => remaining,
+            HorizontalAlignment.Stretch => remaining == 0 ? 0 : remaining / 2,
+            _ => throw new InvalidOperationException("HorizontalAlignment has an undefined value.")
+        };
+
+    private double GetVerticalOffset(double remaining) =>
+        VerticalAlignment switch
+        {
+            VerticalAlignment.Top => 0,
+            VerticalAlignment.Center => remaining / 2,
+            VerticalAlignment.Bottom => remaining,
+            VerticalAlignment.Stretch => remaining == 0 ? 0 : remaining / 2,
+            _ => throw new InvalidOperationException("VerticalAlignment has an undefined value.")
+        };
+
+    private static double GetMeasureConstraint(
+        double available,
+        double leadingMargin,
+        double trailingMargin,
+        double requested,
+        double effectiveMax)
+    {
+        var constraint = Math.Min(
+            SubtractMargin(available, leadingMargin, trailingMargin),
+            effectiveMax);
+        return double.IsNaN(requested) ? constraint : Math.Min(constraint, requested);
+    }
+
+    private static double ResolveDesiredDimension(
+        double coreDesired,
+        double requested,
+        double minimum,
+        double effectiveMax) =>
+        Math.Clamp(double.IsNaN(requested) ? coreDesired : requested, minimum, effectiveMax);
+
+    private static double ResolveArrangeDimension(
+        double slot,
+        double desired,
+        double requested,
+        double minimum,
+        double effectiveMax,
+        bool stretches) =>
+        double.IsNaN(requested)
+            ? stretches ? Math.Clamp(slot, minimum, effectiveMax) : desired
+            : Math.Clamp(requested, minimum, effectiveMax);
+
+    private static double SubtractMargin(
+        double available,
+        double leadingMargin,
+        double trailingMargin)
+    {
+        if (double.IsPositiveInfinity(available))
+            return double.PositiveInfinity;
+
+        var margin = leadingMargin + trailingMargin;
+        return double.IsPositiveInfinity(margin) ? 0 : Math.Max(0, available - margin);
+    }
+
+    private static double AddMargin(
+        double content,
+        double leadingMargin,
+        double trailingMargin)
+    {
+        var result = content + leadingMargin + trailingMargin;
+        if (!double.IsFinite(result))
+            throw new InvalidOperationException("Measurement produced a non-finite desired size.");
+
+        return result;
+    }
+
+    private static void VerifyCoreSize(Size size, string message)
+    {
+        if (!double.IsFinite(size.Width) || !double.IsFinite(size.Height))
+            throw new InvalidOperationException(message);
+    }
+
+    private static bool IsRequestedDimensionValid(double value) =>
+        double.IsNaN(value) || IsFiniteNonNegative(value);
+
+    /// <summary>Determines whether a numeric value is finite and non-negative.</summary>
+    private protected static bool IsFiniteNonNegative(double value) =>
+        double.IsFinite(value) && value >= 0;
+
+    /// <summary>Determines whether a numeric value is finite and positive.</summary>
+    private protected static bool IsFinitePositive(double value) =>
+        double.IsFinite(value) && value > 0;
+
+    private static bool IsMaximumDimensionValid(double value) => value >= 0;
+
+    partial void OnTreeStructureInvalidated()
+    {
+        InvalidateMeasureState();
+    }
+}

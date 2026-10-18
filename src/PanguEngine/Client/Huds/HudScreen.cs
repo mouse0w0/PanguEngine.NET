@@ -1,7 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
 using PanguEngine.Registries;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Client.Huds;
 

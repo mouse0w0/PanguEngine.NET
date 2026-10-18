@@ -1,6 +1,7 @@
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
-using PanguEngine.Client.UI.Drawing;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
+using PanguEngine.UI.Drawing;
 
 namespace PanguEngine.Client.Screens;
 

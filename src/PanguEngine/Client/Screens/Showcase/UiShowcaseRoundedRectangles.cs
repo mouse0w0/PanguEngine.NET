@@ -1,7 +1,8 @@
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Controls;
-using PanguEngine.Client.UI.Drawing;
-using Rectangle = PanguEngine.Client.UI.Controls.Rectangle;
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
+using PanguEngine.UI.Drawing;
+using Rectangle = PanguEngine.UI.Controls.Rectangle;
 
 namespace PanguEngine.Client.Screens.Showcase;
 

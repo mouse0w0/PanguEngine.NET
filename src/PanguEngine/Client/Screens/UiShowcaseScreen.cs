@@ -1,7 +1,8 @@
 using System.Globalization;
 using PanguEngine.Client.Screens.Showcase;
 using PanguEngine.Client.UI;
-using PanguEngine.Client.UI.Styling;
+using PanguEngine.UI;
+using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Client.Screens;
 

@@ -15,6 +15,7 @@ using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.Threading;
+using PanguEngine.UI;
 using PanguEngine.Windowing;
 using SDL;
 using Silk.NET.Maths;
