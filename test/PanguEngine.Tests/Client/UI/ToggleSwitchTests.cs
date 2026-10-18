@@ -23,7 +23,7 @@ public sealed class ToggleSwitchTests
 
         Assert.Equal([true, false], changes);
         Assert.False(control.IsOn);
-        Assert.False(control.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.False(control.HasPseudoClass(PseudoClass.Checked));
     }
 
     [Fact]
@@ -34,7 +34,7 @@ public sealed class ToggleSwitchTests
         using var subscription = control.Subscribe(ToggleSwitch.IsOnProperty, (_, args) =>
         {
             Assert.Equal(args.NewValue, control.IsOn);
-            Assert.True(control.HasPseudoClass(UiPseudoClass.Checked));
+            Assert.True(control.HasPseudoClass(PseudoClass.Checked));
             throw error;
         });
 
@@ -42,7 +42,7 @@ public sealed class ToggleSwitchTests
 
         Assert.Same(error, actual);
         Assert.True(control.IsOn);
-        Assert.True(control.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.True(control.HasPseudoClass(PseudoClass.Checked));
     }
 
     [Fact]
@@ -61,7 +61,7 @@ public sealed class ToggleSwitchTests
 
         Assert.False(source.IsOn);
         Assert.False(target.IsOn);
-        Assert.False(target.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.False(target.HasPseudoClass(PseudoClass.Checked));
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public sealed class ToggleSwitchTests
             var point = control.LocalToScreen(new Point(
                 thumb.LayoutBounds.X + thumb.LayoutBounds.Width / 2,
                 thumb.LayoutBounds.Y + thumb.LayoutBounds.Height / 2));
-            UiNode? source = null;
+            Node? source = null;
             var changes = 0;
             control.PointerClicked += (_, args) => source = args.Source;
             using var subscription = control.Subscribe(ToggleSwitch.IsOnProperty, (_, _) => changes++);
@@ -262,13 +262,13 @@ public sealed class ToggleSwitchTests
             manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
             manager.ProcessKeyDown(Key.Space, KeyModifiers.None, true);
             Assert.False(control.IsOn);
-            Assert.True(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.True(control.HasPseudoClass(PseudoClass.Pressed));
             Assert.False(control.IsPressed);
 
             manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
             Assert.True(control.IsOn);
-            Assert.False(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.False(control.HasPseudoClass(PseudoClass.Pressed));
             manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
             Assert.True(control.IsOn);
         }
@@ -297,7 +297,7 @@ public sealed class ToggleSwitchTests
             manager.ProcessKeyUp(key, KeyModifiers.None);
 
             Assert.Equal(state, control.IsOn);
-            Assert.False(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.False(control.HasPseudoClass(PseudoClass.Pressed));
         }
         finally
         {
@@ -322,7 +322,7 @@ public sealed class ToggleSwitchTests
             Assert.True(control.Focus());
             manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
             MakeUnavailable(reason, manager, root, control);
-            Assert.False(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.False(control.HasPseudoClass(PseudoClass.Pressed));
             control.IsEnabled = true;
             control.Visibility = Visibility.Visible;
             root.IsEnabled = true;
@@ -372,7 +372,7 @@ public sealed class ToggleSwitchTests
                 manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
             Assert.False(control.IsOn);
-            Assert.False(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.False(control.HasPseudoClass(PseudoClass.Pressed));
         }
         finally
         {
@@ -394,7 +394,7 @@ public sealed class ToggleSwitchTests
             manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
             Assert.False(control.IsOn);
-            Assert.False(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.False(control.HasPseudoClass(PseudoClass.Pressed));
         }
         finally
         {
@@ -422,7 +422,7 @@ public sealed class ToggleSwitchTests
             manager.ProcessKeyUp(key, KeyModifiers.None);
 
             Assert.True(control.IsOn);
-            Assert.False(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.False(control.HasPseudoClass(PseudoClass.Pressed));
         }
         finally
         {
@@ -451,7 +451,7 @@ public sealed class ToggleSwitchTests
 
             Assert.True(control.IsOn);
             Assert.True(source.IsOn);
-            Assert.False(control.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.False(control.HasPseudoClass(PseudoClass.Pressed));
             manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
             Assert.True(control.IsOn);
         }
@@ -621,7 +621,7 @@ public sealed class ToggleSwitchTests
         var (manager, screen, _) = OpenScene(control);
         try
         {
-            screen.SetStyleSheets([UiStyleSheet.Parse("""
+            screen.SetStyleSheets([StyleSheet.Parse("""
                 ToggleSwitch { width: 60px; padding: 4px; background-color: #112233; }
                 ToggleSwitch:checked { background-color: #445566; }
                 ToggleSwitch .toggle-switch-thumb { padding: 5px; background-color: #778899; }
@@ -643,7 +643,7 @@ public sealed class ToggleSwitchTests
             Assert.Same(local, control.Background);
             control.ClearValue(Region.BackgroundProperty);
             Assert.Equal(new SolidColorBrush(17, 34, 51), control.Background);
-            Assert.Null(UiCssRegistry.FindProperty(typeof(ToggleSwitch), "is-on"));
+            Assert.Null(CssRegistry.FindProperty(typeof(ToggleSwitch), "is-on"));
         }
         finally
         {

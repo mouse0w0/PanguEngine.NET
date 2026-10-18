@@ -102,9 +102,9 @@ public sealed class GameScreenTests
     {
         var events = new List<string>();
         var root = new TickingPanel(events);
-        UiScreen screen = gameScreen
+        Screen screen = gameScreen
             ? new RecordingGameScreen(root) { FrameAction = _ => throw new InvalidOperationException("game update") }
-            : new UiScreen(root);
+            : new Screen(root);
         var ticker = root.AddTicker(time =>
         {
             Assert.Equal(TimeSpan.FromSeconds(10), time);
@@ -237,7 +237,7 @@ public sealed class GameScreenTests
             Assert.Throws<InvalidOperationException>(() => screen.UpdateFrame(0));
             Assert.Throws<InvalidOperationException>(() => screen.PrepareFrame(new Size(10, 10)));
             Assert.Throws<InvalidOperationException>(() => screen.CreateDrawCommandList());
-            Assert.Throws<InvalidOperationException>(() => new UiDrawCommandList().Append(screen));
+            Assert.Throws<InvalidOperationException>(() => new DrawCommandList().Append(screen));
         }
 
         screen.FixedAction = Check;
@@ -471,7 +471,7 @@ public sealed class GameScreenTests
         }
     }
 
-    private sealed class RecordingGameScreen(UiNode? root = null) : GameScreen(root)
+    private sealed class RecordingGameScreen(Node? root = null) : GameScreen(root)
     {
         internal Action? FixedAction { get; set; }
         internal Action<double>? FrameAction { get; set; }
@@ -482,7 +482,7 @@ public sealed class GameScreenTests
 
     private sealed class TickingPanel(List<string> events) : Panel
     {
-        internal UiTicker AddTicker(Action<TimeSpan> onTick) => CreateTicker(onTick);
+        internal Ticker AddTicker(Action<TimeSpan> onTick) => CreateTicker(onTick);
 
         protected override Size MeasureContent(Size availableSize)
         {

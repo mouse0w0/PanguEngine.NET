@@ -57,11 +57,11 @@ public sealed class UniformGrid : Panel
 
     static UniformGrid()
     {
-        UiCssRegistry.RegisterElement<UniformGrid>("UniformGrid");
-        UiCssRegistry.RegisterProperty<UniformGrid, int>("rows", RowsProperty, UiCssValueConverters.ParseInteger);
-        UiCssRegistry.RegisterProperty<UniformGrid, int>("columns", ColumnsProperty, UiCssValueConverters.ParseInteger);
-        UiCssRegistry.RegisterProperty<UniformGrid, double>("row-spacing", RowSpacingProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<UniformGrid, double>("column-spacing", ColumnSpacingProperty, UiCssValueConverters.ParseLength);
+        CssRegistry.RegisterElement<UniformGrid>("UniformGrid");
+        CssRegistry.RegisterProperty<UniformGrid, int>("rows", RowsProperty, CssValueConverters.ParseInteger);
+        CssRegistry.RegisterProperty<UniformGrid, int>("columns", ColumnsProperty, CssValueConverters.ParseInteger);
+        CssRegistry.RegisterProperty<UniformGrid, double>("row-spacing", RowSpacingProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<UniformGrid, double>("column-spacing", ColumnSpacingProperty, CssValueConverters.ParseLength);
     }
 
     /// <summary>
@@ -203,8 +203,8 @@ public sealed class UniformGrid : Panel
         if (screen?.UseLayoutRounding ?? true)
         {
             var scale = screen?.Scale ?? 1;
-            rowSpacing = UiLayoutHelper.RoundLayoutValue(rowSpacing, scale);
-            columnSpacing = UiLayoutHelper.RoundLayoutValue(columnSpacing, scale);
+            rowSpacing = LayoutHelper.RoundLayoutValue(rowSpacing, scale);
+            columnSpacing = LayoutHelper.RoundLayoutValue(columnSpacing, scale);
         }
 
         return (rowSpacing, columnSpacing);
@@ -229,8 +229,8 @@ public sealed class UniformGrid : Panel
         var end = origin + (index + 1d) * cellExtent;
         if (useLayoutRounding)
         {
-            start = UiLayoutHelper.RoundLayoutValue(start, scale);
-            end = UiLayoutHelper.RoundLayoutValue(end, scale);
+            start = LayoutHelper.RoundLayoutValue(start, scale);
+            end = LayoutHelper.RoundLayoutValue(end, scale);
         }
 
         return (start + index * spacing, end - start);

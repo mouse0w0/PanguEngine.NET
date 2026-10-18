@@ -137,23 +137,23 @@ public sealed partial class ScrollBar : Control
 
     static ScrollBar()
     {
-        UiCssRegistry.RegisterElement<ScrollBar>("ScrollBar");
-        UiCssRegistry.RegisterProperty<ScrollBar, Orientation>(
+        CssRegistry.RegisterElement<ScrollBar>("ScrollBar");
+        CssRegistry.RegisterProperty<ScrollBar, Orientation>(
             "orientation",
             OrientationProperty,
-            UiCssValueConverters.ParseOrientation);
-        UiCssRegistry.RegisterProperty<ScrollBar, bool>(
+            CssValueConverters.ParseOrientation);
+        CssRegistry.RegisterProperty<ScrollBar, bool>(
             "show-arrows",
             ShowArrowsProperty,
-            UiCssValueConverters.ParseBool);
-        UiCssRegistry.RegisterProperty<ScrollBar, double>(
+            CssValueConverters.ParseBool);
+        CssRegistry.RegisterProperty<ScrollBar, double>(
             "bar-thickness",
             BarThicknessProperty,
-            UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<ScrollBar, double>(
+            CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<ScrollBar, double>(
             "minimum-thumb-length",
             MinimumThumbLengthProperty,
-            UiCssValueConverters.ParseLength);
+            CssValueConverters.ParseLength);
     }
 
     private readonly ScrollBarPart _track;
@@ -485,8 +485,8 @@ public sealed partial class ScrollBar : Control
     private void SynchronizeOrientationPseudoClass()
     {
         var horizontal = Orientation == Orientation.Horizontal;
-        SetPseudoClass(UiPseudoClass.Horizontal, horizontal);
-        SetPseudoClass(UiPseudoClass.Vertical, !horizontal);
+        SetPseudoClass(PseudoClass.Horizontal, horizontal);
+        SetPseudoClass(PseudoClass.Vertical, !horizontal);
     }
 
     private void UpdatePartVisibility()
@@ -534,9 +534,9 @@ public sealed partial class ScrollBar : Control
         var useLayoutRounding = Screen?.UseLayoutRounding ?? true;
         var scale = Screen?.Scale ?? 1;
         if (useLayoutRounding)
-            main = UiLayoutHelper.RoundLayoutValueUp(main, scale);
+            main = LayoutHelper.RoundLayoutValueUp(main, scale);
         var showArrows = ShowArrows;
-        var thickness = useLayoutRounding ? UiLayoutHelper.RoundLayoutValueUp(BarThickness, scale) : BarThickness;
+        var thickness = useLayoutRounding ? LayoutHelper.RoundLayoutValueUp(BarThickness, scale) : BarThickness;
         var maximumArrowLength = useLayoutRounding
             ? Math.Floor(Math.Round(main * scale) / 2) / scale
             : main / 2;
@@ -565,7 +565,7 @@ public sealed partial class ScrollBar : Control
         }
 
         if (useLayoutRounding)
-            thumbLength = Math.Min(trackLength, UiLayoutHelper.RoundLayoutValueUp(thumbLength, scale));
+            thumbLength = Math.Min(trackLength, LayoutHelper.RoundLayoutValueUp(thumbLength, scale));
 
         var travel = trackLength - thumbLength;
         var thumbOffset = 0d;
@@ -574,7 +574,7 @@ public sealed partial class ScrollBar : Control
             var fraction = Math.Clamp((Value - Minimum) / range, 0, 1);
             thumbOffset = fraction * travel;
             if (useLayoutRounding)
-                thumbOffset = Math.Clamp(UiLayoutHelper.RoundLayoutValue(thumbOffset, scale), 0, travel);
+                thumbOffset = Math.Clamp(LayoutHelper.RoundLayoutValue(thumbOffset, scale), 0, travel);
         }
 
         return new BarPlan(arrowLength, trackLength, thumbLength, thumbOffset);
@@ -584,7 +584,7 @@ public sealed partial class ScrollBar : Control
     {
         var thickness = BarThickness;
         if (Screen?.UseLayoutRounding ?? true)
-            thickness = UiLayoutHelper.RoundLayoutValueUp(thickness, Screen?.Scale ?? 1);
+            thickness = LayoutHelper.RoundLayoutValueUp(thickness, Screen?.Scale ?? 1);
         return Math.Min(thickness, Math.Max(0, cross));
     }
 

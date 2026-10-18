@@ -71,18 +71,18 @@ public sealed partial class TabView : Control
 
     static TabView()
     {
-        UiCssRegistry.RegisterElement<TabView>("TabView");
-        UiCssRegistry.RegisterProperty<TabView, double>(
-            "min-tab-width", MinTabWidthProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<TabView, double>(
-            "max-tab-width", MaxTabWidthProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<TabView, double>(
-            "vertical-tab-strip-width", VerticalTabStripWidthProperty, UiCssValueConverters.ParseLength);
+        CssRegistry.RegisterElement<TabView>("TabView");
+        CssRegistry.RegisterProperty<TabView, double>(
+            "min-tab-width", MinTabWidthProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<TabView, double>(
+            "max-tab-width", MaxTabWidthProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<TabView, double>(
+            "vertical-tab-strip-width", VerticalTabStripWidthProperty, CssValueConverters.ParseLength);
     }
 
     private readonly TabStripPanel _strip;
     private readonly TabContentArea _contentArea;
-    private readonly UiTicker _dragTicker;
+    private readonly Ticker _dragTicker;
     private int _collectionMutationDepth;
     private int _selectionUpdateDepth;
     private bool _collectionNotificationPending;
@@ -172,7 +172,7 @@ public sealed partial class TabView : Control
     /// <summary>
     /// Determines whether a node is an internal layout part owned by a tab view.
     /// </summary>
-    internal static bool IsInternalPartNode(UiNode node) =>
+    internal static bool IsInternalPartNode(Node node) =>
         node.Parent is TabView ||
         node is TabStripPanel or TabStripViewport or TabScrollButton or TabContentArea or TabContentHost or TabHeaderHost or TabCloseButton;
 

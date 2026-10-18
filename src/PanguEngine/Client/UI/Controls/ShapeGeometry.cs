@@ -11,11 +11,11 @@ internal sealed class ShapeGeometry
     /// Gets a geometry with no fill or stroke area.
     /// </summary>
     internal static ShapeGeometry Empty { get; } =
-        new(UiTriangleMesh.Empty, UiTriangleMesh.Empty, Rect.Zero);
+        new(TriangleMesh.Empty, TriangleMesh.Empty, Rect.Zero);
 
     internal ShapeGeometry(
-        UiTriangleMesh fillMesh,
-        UiTriangleMesh strokeMesh,
+        TriangleMesh fillMesh,
+        TriangleMesh strokeMesh,
         Rect naturalBounds)
     {
         FillMesh = fillMesh;
@@ -26,12 +26,12 @@ internal sealed class ShapeGeometry
     /// <summary>
     /// Gets the fill mesh in local drawing coordinates.
     /// </summary>
-    internal UiTriangleMesh FillMesh { get; }
+    internal TriangleMesh FillMesh { get; }
 
     /// <summary>
     /// Gets the stroke mesh in local drawing coordinates.
     /// </summary>
-    internal UiTriangleMesh StrokeMesh { get; }
+    internal TriangleMesh StrokeMesh { get; }
 
     /// <summary>
     /// Gets the natural drawing bounds with the top-left corner at the local origin.

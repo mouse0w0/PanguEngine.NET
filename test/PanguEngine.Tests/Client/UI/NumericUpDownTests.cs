@@ -115,7 +115,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void ValidInputUpdatesValueWithoutRewritingUserText()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<decimal>(new() { Value = 10 });
         scene.Edit("001.00");
         Assert.Equal(1m, scene.Node.Value);
@@ -133,7 +133,7 @@ public sealed class NumericUpDownTests
     [InlineData("2147483648")]
     public void InvalidInputRemainsUntilConfirmation(string input)
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit(input);
         Assert.Equal(10, scene.Node.Value);
@@ -149,7 +149,7 @@ public sealed class NumericUpDownTests
     [InlineData("1e999")]
     public void NonFiniteParsedTextDoesNotBecomeAValue(string input)
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<double>(new() { Value = 10 });
         scene.Edit(input);
         scene.Key(Key.Enter);
@@ -160,7 +160,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void ConfirmationClampsParsableOutOfRangeText()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit("150");
         Assert.Equal(10, scene.Node.Value);
@@ -175,7 +175,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void EscapeRestoresLatestAcceptedValue()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit("20");
         scene.Edit("-");
@@ -187,7 +187,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void ExternalWritesPreserveEditingTextAndInvalidConfirmationUsesLatestValue()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit("-");
         scene.Node.Value = 25;
@@ -208,7 +208,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void UntouchedRoundedTextNeverOverwritesFullPrecisionOrExternalValue()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<decimal>(new() { FormatString = "F2", Value = 1.234m });
         scene.Node.Focus();
         Assert.Equal("1.23", scene.Editor.Text);
@@ -233,7 +233,7 @@ public sealed class NumericUpDownTests
             var second = new NumericUpDown<decimal>();
             Assert.Equal("de-DE", ((CultureInfo)first.FormatProvider).Name);
             Assert.Equal("en-US", ((CultureInfo)second.FormatProvider).Name);
-            using var context = new UiTextTestContext();
+            using var context = new TextTestContext();
             using var scene = new Scene<decimal>(first, useInvariantProvider: false);
             scene.Edit("1,26");
             Assert.Equal(1.26m, first.Value);
@@ -262,7 +262,7 @@ public sealed class NumericUpDownTests
                 FormatProvider = CultureInfo.GetCultureInfo("fr-FR")
             };
             node.Bind(NumericUpDown.FormatProviderProperty, source, NumericUpDown.FormatProviderProperty);
-            using var context = new UiTextTestContext();
+            using var context = new TextTestContext();
             using var scene = new Scene<decimal>(node, useInvariantProvider: false);
             Assert.Equal("1,25", scene.Editor.Text);
 
@@ -282,7 +282,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void SteppingConfirmsTextBeforeApplyingTheRequestedDirection()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new());
         scene.Edit("150");
         scene.Key(Key.Down);
@@ -293,7 +293,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void UnsignedStepsSaturateWithoutNegatingIncrementOrWrapping()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<uint>(new() { Maximum = uint.MaxValue, Value = uint.MaxValue - 1, Increment = 10 });
         scene.Node.Focus();
         scene.Key(Key.Up);
@@ -306,7 +306,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void DecimalAndArbitraryPrecisionIntegerStepsKeepTheirTypePrecision()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var decimalScene = new Scene<decimal>(new() { Value = 1.000000000000000000000000001m, Increment = 0.000000000000000000000000001m });
         decimalScene.Node.Focus();
         decimalScene.Key(Key.Up);
@@ -321,7 +321,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void FloatingOverflowSaturatesToTheFiniteBoundary()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<double>(new() { Minimum = -double.MaxValue, Maximum = double.MaxValue, Value = double.MaxValue / 2, Increment = double.MaxValue });
         scene.Node.Focus();
         scene.Key(Key.Up);
@@ -334,7 +334,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void ReadOnlyDiscardsUnacceptedTextAndStillAllowsSelectionAndExternalUpdates()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit("150");
         scene.Node.IsReadOnly = true;
@@ -354,7 +354,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void FocusAndPointerStepsKeepTheTextEditorAsTheOnlyActualFocus()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         Assert.True(scene.Node.Focus());
         Assert.False(scene.Node.IsFocused);
@@ -362,15 +362,15 @@ public sealed class NumericUpDownTests
         Assert.True(scene.Editor.IsFocusWithin);
         Assert.True(scene.Node.IsFocusWithin);
         Assert.True(scene.Root.IsFocusWithin);
-        Assert.True(scene.Editor.HasPseudoClass(UiPseudoClass.FocusWithin));
-        Assert.True(scene.Node.HasPseudoClass(UiPseudoClass.FocusWithin));
-        Assert.True(scene.Root.HasPseudoClass(UiPseudoClass.FocusWithin));
+        Assert.True(scene.Editor.HasPseudoClass(PseudoClass.FocusWithin));
+        Assert.True(scene.Node.HasPseudoClass(PseudoClass.FocusWithin));
+        Assert.True(scene.Root.HasPseudoClass(PseudoClass.FocusWithin));
         var point = scene.PartCenter("increase");
         scene.Press(point);
         Assert.Equal(11, scene.Node.Value);
         Assert.Same(scene.Editor, scene.Screen.FocusedNode);
         Assert.True(scene.Node.IsFocusWithin);
-        Assert.True(scene.Node.HasPseudoClass(UiPseudoClass.FocusWithin));
+        Assert.True(scene.Node.HasPseudoClass(PseudoClass.FocusWithin));
         scene.Release(point);
         Assert.Equal(11, scene.Node.Value);
         scene.Edit("150");
@@ -379,15 +379,15 @@ public sealed class NumericUpDownTests
         Assert.False(scene.Editor.IsFocusWithin);
         Assert.False(scene.Node.IsFocusWithin);
         Assert.True(scene.Root.IsFocusWithin);
-        Assert.False(scene.Editor.HasPseudoClass(UiPseudoClass.FocusWithin));
-        Assert.False(scene.Node.HasPseudoClass(UiPseudoClass.FocusWithin));
-        Assert.True(scene.Root.HasPseudoClass(UiPseudoClass.FocusWithin));
+        Assert.False(scene.Editor.HasPseudoClass(PseudoClass.FocusWithin));
+        Assert.False(scene.Node.HasPseudoClass(PseudoClass.FocusWithin));
+        Assert.True(scene.Root.HasPseudoClass(PseudoClass.FocusWithin));
     }
 
     [Fact]
     public void PointerCanDecreaseOutOfRangeTextEvenWhenTheOldValueIsAtMinimum()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new());
         scene.Edit("150");
         Assert.Equal(0, scene.Node.Value);
@@ -405,13 +405,13 @@ public sealed class NumericUpDownTests
     [InlineData(true)]
     public void MovingAndRefocusingDuringRangeCleanupKeepsTheNewEditingSession(bool remove)
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         var otherRoot = new Canvas();
         var otherScreen = new GameScreen(otherRoot);
         var otherManager = new UiManager();
         var transferred = false;
-        using var subscription = scene.Editor.Subscribe(UiNode.IsFocusWithinProperty, (_, args) =>
+        using var subscription = scene.Editor.Subscribe(Node.IsFocusWithinProperty, (_, args) =>
         {
             if (args.NewValue || transferred)
                 return;
@@ -453,7 +453,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void LongPressRepeatsAfterDelayAndResetsDelayWhenPointerReturns()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         var point = scene.PartCenter("increase");
         scene.Press(point);
@@ -480,7 +480,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void LayoutMovementPausesLongPressAndReturningWaitsForTheFullDelay()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Press(scene.PartCenter("increase"));
         scene.Frame(0);
@@ -502,7 +502,7 @@ public sealed class NumericUpDownTests
     [InlineData(KeyModifiers.Control)]
     public void EnterAndEscapeWorkWithModifiers(KeyModifiers modifiers)
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit("150");
         scene.Key(Key.Enter, modifiers);
@@ -517,7 +517,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void ClickingInsideTheFocusedEditorPreservesFractionalWheelInput()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Node.Focus();
         var point = scene.Editor.LocalToScreen(new Point(10, 10));
@@ -531,7 +531,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void EqualBoundariesStopLongPressAndRejectFurtherSteps()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Press(scene.PartCenter("increase"));
         scene.Frame(0);
@@ -547,7 +547,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void ChangingProviderDuringEditingPreservesTextAndUsesTheNewParser()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<decimal>(new() { Value = 10 });
         scene.Edit("-");
         scene.Node.FormatProvider = CultureInfo.GetCultureInfo("de-DE");
@@ -561,7 +561,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void DisabledNumericControlCannotReceiveFocusOrPointerSteps()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10, IsEnabled = false });
         Assert.False(scene.Node.Focus());
         scene.Press(scene.PartCenter("increase"));
@@ -581,7 +581,7 @@ public sealed class NumericUpDownTests
     [InlineData("close")]
     public void LifecycleChangesCancelLongPressWithoutResuming(string change)
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Press(scene.PartCenter("increase"));
         scene.Frame(0);
@@ -603,7 +603,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void PrecisionLimitedLongPressStopsWithoutRepeatedNotifications()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<double>(new() { Maximum = 1e30, Value = 1e20, Increment = 1 });
         var changes = 0;
         scene.Node.PropertyChanged += (_, args) =>
@@ -622,7 +622,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void WheelAccumulatesWholeUnitsOnlyWhileFocusedAndConsumesBoundaryInput()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         var point = scene.Editor.LocalToScreen(new Point(10, 10));
         Assert.False(scene.Manager.ProcessPointerWheel(point, 0, 1));
@@ -650,7 +650,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void ModifiedArrowKeysDoNotStepAndZeroIncrementLeavesEditingTextAlone()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit("150");
         scene.Key(Key.Up, KeyModifiers.Control);
@@ -664,7 +664,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void UndoAndRedoTextUseTheSameLiveValueRules()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Edit("20");
         scene.Key(Key.Z, KeyModifiers.Control);
@@ -681,8 +681,8 @@ public sealed class NumericUpDownTests
         var root = new StackPanel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse("NumericUpDown .numeric-up-down-editor { font-size: 23px; }")]);
+        var screen = new Screen(root);
+        screen.SetStyleSheets([StyleSheet.Parse("NumericUpDown .numeric-up-down-editor { font-size: 23px; }")]);
         root.UpdateStyles();
         Assert.Equal(23, first.ReadOnlyChildren.OfType<TextBox>().Single().FontSize);
         Assert.Equal(23, second.ReadOnlyChildren.OfType<TextBox>().Single().FontSize);
@@ -691,7 +691,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void CustomReferenceNumberSupportsEditingAndTypedArithmetic()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<NumericUpDownTestNumber>(new()
         {
             Value = new(1.000000000000000000000000001m),
@@ -707,7 +707,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void NaNFromCustomArithmeticIsRejected()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<NumericUpDownTestNumber>(new() { Value = new(10) { ProduceNaN = true } });
         scene.Node.Focus();
         Assert.Throws<InvalidOperationException>(() => scene.Key(Key.Up));
@@ -717,7 +717,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void CustomParsingOverflowIsPropagatedRatherThanTreatedAsInvalidText()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<NumericUpDownTestNumber>(new());
         try
         {
@@ -733,7 +733,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void FormattingOverflowOutsideArithmeticIsNotSaturated()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<NumericUpDownTestNumber>(new() { Value = new(10) });
         scene.Node.Focus();
         scene.Node.FormatString = "throw";
@@ -751,7 +751,7 @@ public sealed class NumericUpDownTests
     [Fact]
     public void NotificationOverflowOutsideArithmeticIsNotSaturated()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Node.Focus();
         var failure = new OverflowException("notification");

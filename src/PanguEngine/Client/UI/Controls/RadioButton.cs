@@ -29,14 +29,14 @@ public abstract class RadioButton : Control
 
     static RadioButton()
     {
-        UiCssRegistry.RegisterElement<RadioButton>("RadioButton");
-        UiCssRegistry.RegisterProperty<RadioButton, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
+        CssRegistry.RegisterElement<RadioButton>("RadioButton");
+        CssRegistry.RegisterProperty<RadioButton, double>("spacing", SpacingProperty, CssValueConverters.ParseLength);
     }
 
     private readonly RadioButtonIndicator _indicator;
     private readonly RadioButtonContentHost _contentHost;
     private object? _content;
-    private UiNode? _contentNode;
+    private Node? _contentNode;
     private bool _isChecked;
     private bool _changingContent;
     private bool _enterKeyDown;
@@ -72,7 +72,7 @@ public abstract class RadioButton : Control
             _changingContent = true;
             try
             {
-                if (value is UiNode node)
+                if (value is Node node)
                     ValidateContentAssignment(node);
                 SetField(ContentProperty, ref _content, value);
             }
@@ -137,7 +137,7 @@ public abstract class RadioButton : Control
     protected override bool IsPressedPseudoClassActive => IsPressed || _spaceKeyDown;
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left && HasInputQualification())
@@ -145,7 +145,7 @@ public abstract class RadioButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left && HasInputQualification())
@@ -153,7 +153,7 @@ public abstract class RadioButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerClicked(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerClicked(eventArgs);
         if (eventArgs.Handled || eventArgs.Button != MouseButton.Left || !HasInputQualification())
@@ -163,7 +163,7 @@ public abstract class RadioButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         var focusVersion = _focusVersion;
         var eligible = IsFocused && Focusable && HasInputQualification();
@@ -204,7 +204,7 @@ public abstract class RadioButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyUp(UiKeyEventArgs eventArgs)
+    protected override void OnKeyUp(KeyEventArgs eventArgs)
     {
         var focusVersion = _focusVersion;
         var activateSpace = _spaceKeyDown;
@@ -224,7 +224,7 @@ public abstract class RadioButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnLostFocus(UiFocusChangedEventArgs eventArgs)
+    protected override void OnLostFocus(FocusChangedEventArgs eventArgs)
     {
         _focusVersion++;
         _enterKeyDown = false;
@@ -234,7 +234,7 @@ public abstract class RadioButton : Control
 
     internal void VerifyGroupAccess() => VerifyMutationAccess();
     internal void CommitChecked(bool value) => _isChecked = value;
-    internal void RefreshCheckedPseudoClass() => SetPseudoClass(UiPseudoClass.Checked, IsChecked);
+    internal void RefreshCheckedPseudoClass() => SetPseudoClass(PseudoClass.Checked, IsChecked);
     internal void PublishCheckedChanged(bool oldValue, bool newValue) =>
         RaisePropertyChanged(IsCheckedProperty, oldValue, newValue);
 
@@ -255,7 +255,7 @@ public abstract class RadioButton : Control
         InvalidateMeasure();
     }
 
-    private void NotifyContentDetached(UiNode node)
+    private void NotifyContentDetached(Node node)
     {
         if (!ReferenceEquals(node, _contentNode))
             return;
@@ -271,10 +271,10 @@ public abstract class RadioButton : Control
         }
     }
 
-    private void ValidateContentAssignment(UiNode value)
+    private void ValidateContentAssignment(Node value)
     {
         value.Screen?.VerifyTreeMutationAccess();
-        for (UiNode? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
+        for (Node? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
         {
             if (ReferenceEquals(ancestor, value))
                 throw new InvalidOperationException("Radio button content cannot create a parent cycle.");
@@ -288,11 +288,11 @@ public abstract class RadioButton : Control
             throw new InvalidOperationException("A UI screen root must be cleared before it can be radio button content.");
     }
 
-    private static UiNode? CreateContentNode(object? content)
+    private static Node? CreateContentNode(object? content)
     {
         if (content is null)
             return null;
-        if (content is UiNode node)
+        if (content is Node node)
             return node;
         var text = new Text
         {
@@ -308,7 +308,7 @@ public abstract class RadioButton : Control
     {
         var screen = Screen;
         return screen?.UseLayoutRounding ?? true
-            ? UiLayoutHelper.RoundLayoutValue(Spacing, screen?.Scale ?? 1)
+            ? LayoutHelper.RoundLayoutValue(Spacing, screen?.Scale ?? 1)
             : Spacing;
     }
 
@@ -318,7 +318,7 @@ public abstract class RadioButton : Control
         var screen = Screen;
         if (screen is null || !screen.IsOpen())
             return false;
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (Node? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;
@@ -501,7 +501,7 @@ internal sealed class RadioButtonIndicator : Control
 
 internal sealed class RadioButtonContentHost : Control
 {
-    internal RadioButtonContentHost(Action<UiNode> notifyDetached)
+    internal RadioButtonContentHost(Action<Node> notifyDetached)
     {
         Classes.Add("radio-button-content");
         Children.Changed += (_, change) =>
@@ -514,7 +514,7 @@ internal sealed class RadioButtonContentHost : Control
         };
     }
 
-    internal void SetContent(UiNode? content)
+    internal void SetContent(Node? content)
     {
         if (Children.Count > 0 && !ReferenceEquals(Children[0], content))
             Children.Remove(Children[0]);

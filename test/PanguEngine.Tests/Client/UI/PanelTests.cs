@@ -60,15 +60,15 @@ public sealed class PanelTests
 
         Assert.Same(mutable, panel.Children);
         Assert.Same(readOnly, ((Parent)panel).ReadOnlyChildren);
-        Assert.Equal(new UiNode[] { second, first }, mutable);
-        Assert.Equal(new UiNode[] { second, first }, readOnly);
+        Assert.Equal(new Node[] { second, first }, mutable);
+        Assert.Equal(new Node[] { second, first }, readOnly);
         Assert.False(mutable.IsReadOnly);
         Assert.True(mutable.Contains(first));
         Assert.Equal(0, mutable.IndexOf(second));
         Assert.False(mutable.Contains(null));
         Assert.Equal(-1, mutable.IndexOf(null));
 
-        var copy = new UiNode[3];
+        var copy = new Node[3];
         mutable.CopyTo(copy, 1);
         Assert.Null(copy[0]);
         Assert.Same(second, copy[1]);
@@ -89,7 +89,7 @@ public sealed class PanelTests
         Assert.True(panel.Children.Remove(first));
         panel.Children.RemoveAt(1);
 
-        Assert.Equal(new UiNode[] { second }, panel.Children);
+        Assert.Equal(new Node[] { second }, panel.Children);
         Assert.Null(first.Parent);
         Assert.Null(third.Parent);
         Assert.False(panel.Children.Remove(first));
@@ -118,10 +118,10 @@ public sealed class PanelTests
         Assert.Throws<ArgumentOutOfRangeException>(() => panel.Children.Move(0, 1));
         Assert.Throws<ArgumentNullException>(() => panel.Children.CopyTo(null!, 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => panel.Children.CopyTo([], -1));
-        Assert.Throws<ArgumentOutOfRangeException>(() => panel.Children.CopyTo(new UiNode[1], 2));
+        Assert.Throws<ArgumentOutOfRangeException>(() => panel.Children.CopyTo(new Node[1], 2));
         Assert.Throws<ArgumentException>(() => panel.Children.CopyTo([], 0));
 
-        Assert.Equal(new UiNode[] { child }, panel.Children);
+        Assert.Equal(new Node[] { child }, panel.Children);
         Assert.Same(panel, child.Parent);
     }
 
@@ -138,7 +138,7 @@ public sealed class PanelTests
         target.Children.Insert(0, incoming);
 
         Assert.Empty(oldParent.Children);
-        Assert.Equal(new UiNode[] { incoming, sibling }, target.Children);
+        Assert.Equal(new Node[] { incoming, sibling }, target.Children);
         Assert.Same(target, incoming.Parent);
     }
 
@@ -153,7 +153,7 @@ public sealed class PanelTests
 
         Assert.Throws<InvalidOperationException>(() => panel.Children.Insert(0, second));
 
-        Assert.Equal(new UiNode[] { first, second }, panel.Children);
+        Assert.Equal(new Node[] { first, second }, panel.Children);
     }
 
     [Fact]
@@ -163,7 +163,7 @@ public sealed class PanelTests
         var nested = new TestPanel();
         root.Children.Add(nested);
         var activeRoot = new TestNode();
-        var activeScreen = new UiScreen(activeRoot);
+        var activeScreen = new Screen(activeRoot);
         activeScreen.Open();
 
         Assert.Throws<InvalidOperationException>(() => nested.Children.Add(nested));
@@ -171,7 +171,7 @@ public sealed class PanelTests
         Assert.Throws<InvalidOperationException>(() => nested.Children.Add(activeRoot));
 
         Assert.Empty(nested.Children);
-        Assert.Equal(new UiNode[] { nested }, root.Children);
+        Assert.Equal(new Node[] { nested }, root.Children);
         Assert.Same(root, nested.Parent);
         Assert.Null(activeRoot.Parent);
         Assert.Same(activeScreen, activeRoot.Screen);
@@ -191,7 +191,7 @@ public sealed class PanelTests
         target.Children[0] = incoming;
 
         Assert.Empty(oldParent.Children);
-        Assert.Equal(new UiNode[] { incoming }, target.Children);
+        Assert.Equal(new Node[] { incoming }, target.Children);
         Assert.Same(target, incoming.Parent);
         Assert.Null(outgoing.Parent);
     }
@@ -208,13 +208,13 @@ public sealed class PanelTests
         target.Children.Add(outgoing);
         root.Children.Add(oldParent);
         root.Children.Add(target);
-        var screen = new UiScreen(root);
+        var screen = new Screen(root);
         screen.Open();
 
         target.Children[0] = incoming;
 
         Assert.Empty(oldParent.Children);
-        Assert.Equal(new UiNode[] { incoming }, target.Children);
+        Assert.Equal(new Node[] { incoming }, target.Children);
         Assert.Same(target, incoming.Parent);
         Assert.Same(screen, incoming.Screen);
         Assert.Null(outgoing.Parent);
@@ -230,12 +230,12 @@ public sealed class PanelTests
         var incoming = new TestNode();
         outgoing.Children.Add(incoming);
         target.Children.Add(outgoing);
-        var screen = new UiScreen(target);
+        var screen = new Screen(target);
         screen.Open();
 
         target.Children[0] = incoming;
 
-        Assert.Equal(new UiNode[] { incoming }, target.Children);
+        Assert.Equal(new Node[] { incoming }, target.Children);
         Assert.Same(target, incoming.Parent);
         Assert.Same(screen, incoming.Screen);
         Assert.Empty(outgoing.Children);
@@ -253,15 +253,15 @@ public sealed class PanelTests
         var outgoing = new TestNode();
         oldRoot.Children.Add(incoming);
         target.Children.Add(outgoing);
-        var oldScreen = new UiScreen(oldRoot);
-        var newScreen = new UiScreen(target);
+        var oldScreen = new Screen(oldRoot);
+        var newScreen = new Screen(target);
         oldScreen.Open();
         newScreen.Open();
 
         target.Children[0] = incoming;
 
         Assert.Empty(oldRoot.Children);
-        Assert.Equal(new UiNode[] { incoming }, target.Children);
+        Assert.Equal(new Node[] { incoming }, target.Children);
         Assert.Same(target, incoming.Parent);
         Assert.Same(newScreen, incoming.Screen);
         Assert.Null(outgoing.Parent);
@@ -281,7 +281,7 @@ public sealed class PanelTests
 
         Assert.Throws<InvalidOperationException>(() => panel.Children[0] = second);
 
-        Assert.Equal(new UiNode[] { first, second }, panel.Children);
+        Assert.Equal(new Node[] { first, second }, panel.Children);
         Assert.Same(panel, first.Parent);
         Assert.Same(panel, second.Parent);
     }
@@ -295,13 +295,13 @@ public sealed class PanelTests
         root.Children.Add(nested);
         nested.Children.Add(outgoing);
         var activeRoot = new TestNode();
-        var activeScreen = new UiScreen(activeRoot);
+        var activeScreen = new Screen(activeRoot);
         activeScreen.Open();
 
         Assert.Throws<InvalidOperationException>(() => nested.Children[0] = root);
         Assert.Throws<InvalidOperationException>(() => nested.Children[0] = activeRoot);
 
-        Assert.Equal(new UiNode[] { outgoing }, nested.Children);
+        Assert.Equal(new Node[] { outgoing }, nested.Children);
         Assert.Same(nested, outgoing.Parent);
         Assert.Null(activeRoot.Parent);
         Assert.Same(activeScreen, activeRoot.Screen);
@@ -314,7 +314,7 @@ public sealed class PanelTests
         var panel = new TestPanel();
         var child = new TestNode();
         panel.Children.Add(child);
-        var screen = new UiScreen(panel);
+        var screen = new Screen(panel);
         ValidateLayout(panel);
         screen.Open();
         var enumerator = panel.Children.GetEnumerator();
@@ -341,20 +341,20 @@ public sealed class PanelTests
         panel.Children.Add(first);
         panel.Children.Add(middle);
         panel.Children.Add(last);
-        var screen = new UiScreen(panel);
+        var screen = new Screen(panel);
         ValidateLayout(panel);
         screen.Open();
 
         panel.Children.Move(0, 2);
 
-        Assert.Equal(new UiNode[] { middle, last, first }, panel.Children);
+        Assert.Equal(new Node[] { middle, last, first }, panel.Children);
         Assert.Same(panel, first.Parent);
         Assert.Same(screen, first.Screen);
         Assert.False(panel.IsMeasureValid);
         Assert.False(panel.IsArrangeValid);
 
         panel.Children.Move(2, 0);
-        Assert.Equal(new UiNode[] { first, middle, last }, panel.Children);
+        Assert.Equal(new Node[] { first, middle, last }, panel.Children);
         screen.Close();
     }
 
@@ -363,7 +363,7 @@ public sealed class PanelTests
     {
         var panel = new TestPanel();
         panel.Children.Add(new TestNode());
-        var screen = new UiScreen(panel);
+        var screen = new Screen(panel);
         ValidateLayout(panel);
         screen.Open();
         var enumerator = panel.Children.GetEnumerator();
@@ -383,7 +383,7 @@ public sealed class PanelTests
     public void MissingRemoveAndEmptyClearAreNoOpsOnWrongThread()
     {
         var panel = new TestPanel();
-        var screen = new UiScreen(panel);
+        var screen = new Screen(panel);
         ValidateLayout(panel);
         screen.Open();
         var enumerator = panel.Children.GetEnumerator();
@@ -409,7 +409,7 @@ public sealed class PanelTests
         var second = new TestNode();
         panel.Children.Add(first);
         panel.Children.Add(second);
-        var screen = new UiScreen(panel);
+        var screen = new Screen(panel);
         screen.Open();
 
         var result = RunOnBackgroundThread(() =>
@@ -424,7 +424,7 @@ public sealed class PanelTests
         Assert.IsType<InvalidOperationException>(result.Remove);
         Assert.IsType<InvalidOperationException>(result.Move);
         Assert.IsType<InvalidOperationException>(result.Clear);
-        Assert.Equal(new UiNode[] { first, second }, panel.Children);
+        Assert.Equal(new Node[] { first, second }, panel.Children);
         screen.Close();
     }
 
@@ -475,7 +475,7 @@ public sealed class PanelTests
         Assert.False(enumerator.MoveNext());
     }
 
-    private static void AssertEnumeratorInvalidated(Action<UiNodeList> change)
+    private static void AssertEnumeratorInvalidated(Action<NodeList> change)
     {
         var panel = CreateTwoChildPanel();
         var enumerator = panel.Children.GetEnumerator();
@@ -494,7 +494,7 @@ public sealed class PanelTests
         return panel;
     }
 
-    private static void ValidateLayout(UiNode node)
+    private static void ValidateLayout(Node node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
@@ -504,7 +504,7 @@ public sealed class PanelTests
     {
     }
 
-    private sealed class TestNode : UiNode
+    private sealed class TestNode : Node
     {
     }
 

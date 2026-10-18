@@ -238,11 +238,11 @@ public sealed class TabViewInputTests
         manager.ProcessPointerMoved(end);
         manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(items[0].IsDragging);
-        Assert.True(items[0].HasPseudoClass(UiPseudoClass.Dragging));
+        Assert.True(items[0].HasPseudoClass(PseudoClass.Dragging));
         manager.ProcessPointerReleased(end, MouseButton.Left, KeyModifiers.None);
 
         Assert.False(items[0].IsDragging);
-        Assert.False(items[0].HasPseudoClass(UiPseudoClass.Dragging));
+        Assert.False(items[0].HasPseudoClass(PseudoClass.Dragging));
         Assert.Same(items[1], view.Items[0]);
         Assert.Same(items[2], view.Items[1]);
         Assert.Same(items[0], view.Items[2]);

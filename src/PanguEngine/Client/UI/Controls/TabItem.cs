@@ -47,13 +47,13 @@ public sealed class TabItem : Control
 
     static TabItem()
     {
-        UiCssRegistry.RegisterElement<TabItem>("TabItem");
+        CssRegistry.RegisterElement<TabItem>("TabItem");
     }
 
     private readonly TabContentHost _contentHost;
     private readonly TabHeaderHost _headerHost;
-    private UiNode? _header;
-    private UiNode? _content;
+    private Node? _header;
+    private Node? _content;
     private TabCloseButton? _closeButton;
 
     /// <summary>Initializes a focusable tab item with a stable internal content host.</summary>
@@ -73,7 +73,7 @@ public sealed class TabItem : Control
     /// another child of this item. Moving the header node out of this item through the tree API
     /// clears this slot.
     /// </remarks>
-    public UiNode? Header
+    public Node? Header
     {
         get => _header;
         set
@@ -93,7 +93,7 @@ public sealed class TabItem : Control
     /// of this item or its owning view. Moving the content node out of the host through the tree API
     /// clears this slot.
     /// </remarks>
-    public UiNode? Content
+    public Node? Content
     {
         get => _content;
         set
@@ -141,13 +141,13 @@ public sealed class TabItem : Control
 
     internal void NotifyCloseRequested() => OwnerView?.RequestClose(this);
 
-    internal void NotifyContentDetached(UiNode child)
+    internal void NotifyContentDetached(Node child)
     {
         if (ReferenceEquals(_content, child))
             _content = null;
     }
 
-    internal void NotifyHeaderDetached(UiNode child)
+    internal void NotifyHeaderDetached(Node child)
     {
         if (ReferenceEquals(_header, child))
             _header = null;
@@ -192,7 +192,7 @@ public sealed class TabItem : Control
         _headerHost.Arrange(new Rect(contentBounds.X, contentBounds.Y, headerWidth, contentBounds.Height));
     }
 
-    private void ValidateHeaderAssignment(UiNode? value)
+    private void ValidateHeaderAssignment(Node? value)
     {
         Screen?.VerifyTreeMutationAccess();
         if (value is null)
@@ -209,7 +209,7 @@ public sealed class TabItem : Control
         if (TabView.IsInternalPartNode(value))
             throw new InvalidOperationException("A tab view internal node cannot be used as a header.");
 
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (Node? node = this; node is not null; node = node.Parent)
         {
             if (ReferenceEquals(node, value))
                 throw new InvalidOperationException("Adding the node would create a parent cycle.");
@@ -219,7 +219,7 @@ public sealed class TabItem : Control
             throw new InvalidOperationException("The node is already a child of this tab item.");
     }
 
-    private void ValidateContentAssignment(UiNode? value)
+    private void ValidateContentAssignment(Node? value)
     {
         Screen?.VerifyTreeMutationAccess();
         if (value is null)
@@ -236,7 +236,7 @@ public sealed class TabItem : Control
         if (TabView.IsInternalPartNode(value))
             throw new InvalidOperationException("A tab view internal node cannot be used as content.");
 
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (Node? node = this; node is not null; node = node.Parent)
         {
             if (ReferenceEquals(node, value))
                 throw new InvalidOperationException("Adding the node would create a parent cycle.");
@@ -261,7 +261,7 @@ public sealed class TabItem : Control
         _closeButton = null;
     }
 
-    private void RefreshSelectedPseudoClass() => SetPseudoClass(UiPseudoClass.Selected, IsSelected);
+    private void RefreshSelectedPseudoClass() => SetPseudoClass(PseudoClass.Selected, IsSelected);
 
-    private void RefreshDraggingPseudoClass() => SetPseudoClass(UiPseudoClass.Dragging, IsDragging);
+    private void RefreshDraggingPseudoClass() => SetPseudoClass(PseudoClass.Dragging, IsDragging);
 }

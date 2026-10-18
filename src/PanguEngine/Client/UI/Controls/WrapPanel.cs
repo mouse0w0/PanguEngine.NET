@@ -42,19 +42,19 @@ public sealed class WrapPanel : Panel
 
     static WrapPanel()
     {
-        UiCssRegistry.RegisterElement<WrapPanel>("WrapPanel");
-        UiCssRegistry.RegisterProperty<WrapPanel, Orientation>(
+        CssRegistry.RegisterElement<WrapPanel>("WrapPanel");
+        CssRegistry.RegisterProperty<WrapPanel, Orientation>(
             "orientation",
             OrientationProperty,
-            UiCssValueConverters.ParseOrientation);
-        UiCssRegistry.RegisterProperty<WrapPanel, double>(
+            CssValueConverters.ParseOrientation);
+        CssRegistry.RegisterProperty<WrapPanel, double>(
             "item-spacing",
             ItemSpacingProperty,
-            UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<WrapPanel, double>(
+            CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<WrapPanel, double>(
             "line-spacing",
             LineSpacingProperty,
-            UiCssValueConverters.ParseLength);
+            CssValueConverters.ParseLength);
     }
 
     /// <summary>
@@ -218,8 +218,8 @@ public sealed class WrapPanel : Panel
         if (screen?.UseLayoutRounding ?? true)
         {
             var scale = screen?.Scale ?? 1;
-            itemSpacing = UiLayoutHelper.RoundLayoutValue(itemSpacing, scale);
-            lineSpacing = UiLayoutHelper.RoundLayoutValue(lineSpacing, scale);
+            itemSpacing = LayoutHelper.RoundLayoutValue(itemSpacing, scale);
+            lineSpacing = LayoutHelper.RoundLayoutValue(lineSpacing, scale);
         }
 
         return (orientation, itemSpacing, lineSpacing);

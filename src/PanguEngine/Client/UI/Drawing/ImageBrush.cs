@@ -15,7 +15,7 @@ public sealed class ImageBrush : Brush, IEquatable<ImageBrush>
     /// <param name="samplingMode">The image interpolation mode.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="source"/> is null.</exception>
     public ImageBrush(
-        UiImage source,
+        Image source,
         ImageStretch stretch = ImageStretch.Fill,
         ImageSamplingMode samplingMode = ImageSamplingMode.Linear)
     {
@@ -38,7 +38,7 @@ public sealed class ImageBrush : Brush, IEquatable<ImageBrush>
     /// Thrown when <paramref name="sourceRect"/> is outside the image.
     /// </exception>
     public ImageBrush(
-        UiImage source,
+        Image source,
         Rect sourceRect,
         ImageStretch stretch = ImageStretch.Fill,
         ImageSamplingMode samplingMode = ImageSamplingMode.Linear)
@@ -60,7 +60,7 @@ public sealed class ImageBrush : Brush, IEquatable<ImageBrush>
     /// <summary>
     /// Gets the shared image source.
     /// </summary>
-    public UiImage Source { get; }
+    public Image Source { get; }
 
     /// <summary>
     /// Gets the source region in image pixel coordinates.

@@ -126,8 +126,8 @@ public sealed class TabViewLayoutTests
         var (view, strip, _, _) = CreateView(6, placement);
         var viewport = strip.Viewport;
         var buttons = ScrollButtons(strip);
-        var screen = new UiScreen(view);
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        var screen = new Screen(view);
+        screen.SetStyleSheets([StyleSheet.Parse(
             ".tab-scroll-button { width: 24; height: 24; } " +
             ".tab-scroll-button:disabled { width: 32; height: 32; }")]);
         var smallSize = view.IsHorizontalPlacement ? new Size(200, 100) : new Size(400, 100);

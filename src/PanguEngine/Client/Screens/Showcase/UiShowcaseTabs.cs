@@ -88,7 +88,7 @@ internal static class UiShowcaseTabs
         return text;
     }
 
-    private static StackPanel CreateStack(string cssClass, params UiNode[] children)
+    private static StackPanel CreateStack(string cssClass, params Node[] children)
     {
         var stack = new StackPanel();
         stack.Classes.Add(cssClass);

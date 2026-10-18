@@ -106,7 +106,7 @@ public sealed class PropertyCallbackTests
     {
         var error = new InvalidOperationException("internal");
         var node = new CallbackNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         node.Trace.Clear();
         node.Changed = (_, _) =>
         {
@@ -117,10 +117,10 @@ public sealed class PropertyCallbackTests
         node.PropertyChanged += (_, args) => notified.Add(args.Property);
 
         screen.SetStyleSheets([
-            new UiStyleSheet([
-                new UiStyleRule(UiStyleSelector.For<CallbackNode>(), [
-                    UiStyleSetter.Create(CallbackNode.ValueProperty, 7),
-                    UiStyleSetter.Create(CallbackNode.OtherProperty, 8)
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<CallbackNode>(), [
+                    StyleSetter.Create(CallbackNode.ValueProperty, 7),
+                    StyleSetter.Create(CallbackNode.OtherProperty, 8)
                 ])
             ])
         ]);
@@ -140,11 +140,11 @@ public sealed class PropertyCallbackTests
     public void ClassRecomputeAndClearLocalValueInvokeCallbacks()
     {
         var node = new CallbackNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([
-            new UiStyleSheet([
-                new UiStyleRule(UiStyleSelector.For<CallbackNode>(classes: ["active"]), [
-                    UiStyleSetter.Create(CallbackNode.ValueProperty, 7)
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<CallbackNode>(classes: ["active"]), [
+                    StyleSetter.Create(CallbackNode.ValueProperty, 7)
                 ])
             ])
         ]);
@@ -160,7 +160,7 @@ public sealed class PropertyCallbackTests
         Assert.Equal([(0, 7), (7, 9), (9, 7), (7, 0)], node.Changes);
     }
 
-    private class CallbackNode : UiNode
+    private class CallbackNode : Node
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<CallbackNode, int>("Value", onChanged: static (node, oldValue, newValue) =>

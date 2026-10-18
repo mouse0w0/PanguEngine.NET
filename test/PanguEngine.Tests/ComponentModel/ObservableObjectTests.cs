@@ -278,17 +278,17 @@ public sealed class ObservableObjectTests
         var replacement = new EqualValue(7);
         var node = new ReferenceNode();
         var property = useReferenceComparer ? ReferenceNode.ReferenceValueProperty : ReferenceNode.ValueProperty;
-        var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<ReferenceNode>(), [UiStyleSetter.Create(property, original)])
+        var screen = new Screen(node);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, original)])
         ])]);
         screen.Root!.UpdateStyles();
         var changes = new List<(EqualValue? OldValue, EqualValue? NewValue)>();
         using var subscription = node.Subscribe(property,
             (_, change) => changes.Add((change.OldValue, change.NewValue)));
 
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<ReferenceNode>(), [UiStyleSetter.Create(property, replacement)])
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, replacement)])
         ])]);
         screen.Root.UpdateStyles();
 
@@ -421,9 +421,9 @@ public sealed class ObservableObjectTests
     {
         var source = new Model { Value = 7 };
         var node = new ValueNode();
-        var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<ValueNode>(), [UiStyleSetter.Create(ValueNode.ValueProperty, 20)])
+        var screen = new Screen(node);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 20)])
         ])]);
         screen.Root!.UpdateStyles();
         var changes = new List<(int Old, int New)>();
@@ -446,9 +446,9 @@ public sealed class ObservableObjectTests
     public void EqualAssignmentMasksStyleUntilClearedWithoutNotifying(bool bind)
     {
         var node = new ValueNode();
-        var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<ValueNode>(), [UiStyleSetter.Create(ValueNode.ValueProperty, 7)])
+        var screen = new Screen(node);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 7)])
         ])]);
         screen.Root!.UpdateStyles();
         var changes = new List<(int OldValue, int NewValue)>();
@@ -461,8 +461,8 @@ public sealed class ObservableObjectTests
             node.SetValue(ValueNode.ValueProperty, 7);
 
         Assert.True(Assert.Single(node.GetStyleValueSources(ValueNode.ValueProperty)).IsMaskedByLocalValue);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<ValueNode>(), [UiStyleSetter.Create(ValueNode.ValueProperty, 9)])
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 9)])
         ])]);
         screen.Root.UpdateStyles();
         Assert.Equal(7, node.GetValue(ValueNode.ValueProperty));
@@ -529,7 +529,7 @@ public sealed class ObservableObjectTests
         internal void ClearReadOnlyText() => ClearValue(ReadOnlyTextKey);
     }
 
-    private sealed class ReferenceNode : UiNode
+    private sealed class ReferenceNode : Node
     {
         internal static readonly Property<EqualValue?> ValueProperty = Property.Register<ReferenceNode, EqualValue?>("Value",
             comparer: EqualityComparer<EqualValue?>.Default);
@@ -606,7 +606,7 @@ public sealed class ObservableObjectTests
         }
     }
 
-    private sealed class ValueNode : UiNode
+    private sealed class ValueNode : Node
     {
         internal static readonly Property<int> ValueProperty = Property.Register<ValueNode, int>("Value");
     }

@@ -70,8 +70,8 @@ internal static class UiShowcaseStyles
             }
             else
             {
-                overridden.ClearValue(UiNode.FontSizeProperty);
-                overridden.ClearValue(UiNode.ColorProperty);
+                overridden.ClearValue(Node.FontSizeProperty);
+                overridden.ClearValue(Node.ColorProperty);
             }
             overrideButton.Text = enabled ? "清除局部覆盖" : "恢复局部覆盖";
         }
@@ -179,7 +179,7 @@ internal static class UiShowcaseStyles
                     UiShowcaseWidgets.Sample("纵向拉伸", tall))));
     }
 
-    private static UiImage CreateFrameImage()
+    private static Image CreateFrameImage()
     {
         const int size = 16;
         var pixels = new byte[size * size * 4];
@@ -201,6 +201,6 @@ internal static class UiShowcaseStyles
             pixels[offset + 2] = color.B;
             pixels[offset + 3] = color.A;
         }
-        return UiImage.FromRgba(pixels, size, size);
+        return Image.FromRgba(pixels, size, size);
     }
 }

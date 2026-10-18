@@ -136,7 +136,7 @@ internal sealed class UiShowcaseShell : Region
     protected override Size MeasureContent(Size availableSize)
     {
         var width = availableSize.Width;
-        foreach (var node in new UiNode[] { _header, _feedback, _warning, _scaleRow, _scaleValue, _returnButton })
+        foreach (var node in new Node[] { _header, _feedback, _warning, _scaleRow, _scaleValue, _returnButton })
             node.Measure(new Size(width, double.PositiveInfinity));
         var footerHeight = _isCompact
             ? _returnButton.DesiredSize.Height + Gap + _scaleRow.DesiredSize.Height
@@ -201,7 +201,7 @@ internal sealed class UiShowcaseShell : Region
         ArrangeNode(_pageTabs, left, middleTop, width, Math.Max(0, middleBottom - middleTop));
     }
 
-    private static void ArrangeNode(UiNode node, double x, double y, double width, double height) =>
+    private static void ArrangeNode(Node node, double x, double y, double width, double height) =>
         node.Arrange(new Rect(x, y, Math.Max(0, width), Math.Max(0, height)));
 
     private static Text CreateClassedText(string text, string cssClass)

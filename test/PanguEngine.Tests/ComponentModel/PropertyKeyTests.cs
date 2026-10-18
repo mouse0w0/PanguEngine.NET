@@ -12,21 +12,21 @@ public sealed class PropertyKeyTests
     public void ReadOnlyDefaultsAndOwnerWritesDoNotResolveStyles()
     {
         var node = new ReadOnlyNode();
-        var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<ReadOnlyNode>(), [UiStyleSetter.Create(UiNode.OpacityProperty, 0.5d)])
+        var screen = new Screen(node);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<ReadOnlyNode>(), [StyleSetter.Create(Node.OpacityProperty, 0.5d)])
         ])]);
 
         Assert.Equal(5, node.Value);
         Assert.Equal(1d, node.Opacity);
-        Assert.Empty(node.GetStyleValueSources(UiNode.OpacityProperty));
+        Assert.Empty(node.GetStyleValueSources(Node.OpacityProperty));
 
         node.SetValueFromOwner(9);
         node.ClearValueFromOwner();
 
         Assert.Equal(5, node.Value);
         Assert.Equal(1d, node.Opacity);
-        Assert.Empty(node.GetStyleValueSources(UiNode.OpacityProperty));
+        Assert.Empty(node.GetStyleValueSources(Node.OpacityProperty));
         node.UpdateStyles();
         Assert.Equal(0.5d, node.Opacity);
     }
@@ -107,7 +107,7 @@ public sealed class PropertyKeyTests
     public void KeyWritesOnOpenScreenRejectWrongThreadBeforeMutation()
     {
         var node = new ReadOnlyNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.Open();
         Exception? setError = null;
         Exception? clearError = null;
@@ -292,7 +292,7 @@ public sealed class PropertyKeyTests
         Assert.Equal("Property 'Value' is read-only.", error.Message);
     }
 
-    private class ReadOnlyNode : UiNode
+    private class ReadOnlyNode : Node
     {
         private static readonly PropertyKey<int> ValuePropertyKey =
             Property.RegisterReadOnly<ReadOnlyNode, int>(
@@ -311,7 +311,7 @@ public sealed class PropertyKeyTests
             ClearValue(propertyKey);
     }
 
-    private sealed class WritableNode : UiNode
+    private sealed class WritableNode : Node
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<WritableNode, int>(nameof(Value));
@@ -332,23 +332,23 @@ public sealed class PropertyKeyTests
         }
     }
 
-    private sealed class ForeignReadOnlyNode : UiNode
+    private sealed class ForeignReadOnlyNode : Node
     {
         internal static readonly PropertyKey<int> ValuePropertyKey =
             Property.RegisterReadOnly<ForeignReadOnlyNode, int>("Value");
     }
 
-    private sealed class ForeignNode : UiNode
+    private sealed class ForeignNode : Node
     {
     }
 
-    private sealed class AttachedOwner : UiNode
+    private sealed class AttachedOwner : Node
     {
         internal static readonly Property<int> ValueProperty =
             Property.RegisterAttached<AttachedOwner, AttachedTarget, int>("Value");
     }
 
-    private sealed class AttachedTarget : UiNode
+    private sealed class AttachedTarget : Node
     {
     }
 

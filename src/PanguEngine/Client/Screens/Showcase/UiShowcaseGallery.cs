@@ -11,7 +11,7 @@ namespace PanguEngine.Client.Screens.Showcase;
 internal sealed class UiShowcaseGallery(double minimumColumnWidth = 360, int maximumColumns = 2) : Panel
 {
     private const double Gap = 16;
-    private UiNode[] _items = [];
+    private Node[] _items = [];
     private double[] _rowHeights = [];
     private int _columns = 1;
 

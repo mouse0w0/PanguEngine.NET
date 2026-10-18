@@ -8,7 +8,7 @@ public sealed partial class ScrollBar
     private const int InitialRepeatDelayMilliseconds = 400;
     private const int RepeatIntervalMilliseconds = 50;
 
-    private readonly UiTicker _repeatTicker;
+    private readonly Ticker _repeatTicker;
     private InteractionKind _interaction;
     private double _thumbDragStartPointer;
     private double _thumbDragStartValue;
@@ -22,7 +22,7 @@ public sealed partial class ScrollBar
     private TimeSpan _nextRepeatDelay;
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button != MouseButton.Left ||
@@ -62,7 +62,7 @@ public sealed partial class ScrollBar
     }
 
     /// <inheritdoc />
-    protected override void OnPointerMoved(UiPointerEventArgs eventArgs)
+    protected override void OnPointerMoved(PointerEventArgs eventArgs)
     {
         base.OnPointerMoved(eventArgs);
         if (_interaction == InteractionKind.None)
@@ -85,7 +85,7 @@ public sealed partial class ScrollBar
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -98,7 +98,7 @@ public sealed partial class ScrollBar
     }
 
     /// <inheritdoc />
-    protected override void OnPointerCanceled(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerCanceled(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerCanceled(eventArgs);
         if (eventArgs.Button != MouseButton.Left || _interaction == InteractionKind.None)
@@ -109,7 +109,7 @@ public sealed partial class ScrollBar
     }
 
     /// <inheritdoc />
-    protected override void OnPointerWheel(UiPointerWheelEventArgs eventArgs)
+    protected override void OnPointerWheel(PointerWheelEventArgs eventArgs)
     {
         base.OnPointerWheel(eventArgs);
         if (!IsWheelScrollingEnabled || !IsEnabled || eventArgs.Handled)
@@ -129,7 +129,7 @@ public sealed partial class ScrollBar
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
         if (!IsFocused ||
@@ -364,7 +364,7 @@ public sealed partial class ScrollBar
         Value += delta;
     }
 
-    private double GetWheelDelta(UiPointerWheelEventArgs eventArgs)
+    private double GetWheelDelta(PointerWheelEventArgs eventArgs)
     {
         if (Orientation != Orientation.Horizontal)
             return eventArgs.DeltaY;

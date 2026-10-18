@@ -8,16 +8,16 @@ namespace PanguEngine.Tests.Client.UI;
 public sealed class PropertyInheritanceTests
 {
     private static readonly Property<double> NumberProperty =
-        Property.RegisterAttached<PropertyOwner, UiNode, double>("Number", 7, inherits: true);
+        Property.RegisterAttached<PropertyOwner, Node, double>("Number", 7, inherits: true);
 
     private static readonly Property<string?> LabelProperty =
-        Property.RegisterAttached<PropertyOwner, UiNode, string?>("Label", "default", inherits: true);
+        Property.RegisterAttached<PropertyOwner, Node, string?>("Label", "default", inherits: true);
 
     private static readonly Property<double> PlainProperty =
-        Property.RegisterAttached<PropertyOwner, UiNode, double>("Plain", 7);
+        Property.RegisterAttached<PropertyOwner, Node, double>("Plain", 7);
 
     private static readonly Property<double> OtherNumberProperty =
-        Property.RegisterAttached<OtherOwner, UiNode, double>("Number", 3, inherits: true);
+        Property.RegisterAttached<OtherOwner, Node, double>("Number", 3, inherits: true);
 
     [Fact]
     public void MultiplePropertyTypesInheritAndUnmarkedPropertiesDoNot()
@@ -104,10 +104,10 @@ public sealed class PropertyInheritanceTests
         var child = new Text();
         middle.Children.Add(child);
         first.Children.Add(middle);
-        var screen = new UiScreen(root);
+        var screen = new Screen(root);
         if (useStyle)
         {
-            screen.SetStyleSheets([UiStyleSheet.Parse("#moving { inherited-number: 14; }")]);
+            screen.SetStyleSheets([StyleSheet.Parse("#moving { inherited-number: 14; }")]);
             root.UpdateStyles();
         }
         else
@@ -173,7 +173,7 @@ public sealed class PropertyInheritanceTests
         var child = new Text();
         middle.Children.Add(child);
         root.Children.Add(middle);
-        var property = Property.RegisterAttached<LateOwner, UiNode, int>("Late", 7, inherits: true);
+        var property = Property.RegisterAttached<LateOwner, Node, int>("Late", 7, inherits: true);
         var changes = new List<(int Old, int New)>();
         using var subscription = child.Subscribe(property,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
@@ -246,9 +246,9 @@ public sealed class PropertyInheritanceTests
         var root = new InheritedPanel { StyleId = "root" };
         var child = new InheritedPanel();
         root.Children.Add(child);
-        var screen = new UiScreen(root);
+        var screen = new Screen(root);
         screen.SetStyleSheets([
-            UiStyleSheet.Parse("#root { inherited-number: 20; inherited-label: parent; }")
+            StyleSheet.Parse("#root { inherited-number: 20; inherited-label: parent; }")
         ]);
         var changedProperties = new List<Property>();
         child.PropertyChanged += (_, args) =>
@@ -281,19 +281,19 @@ public sealed class PropertyInheritanceTests
         var leaf = new Text();
         child.Children.Add(leaf);
         root.Children.Add(child);
-        var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        var screen = new Screen(root);
+        screen.SetStyleSheets([StyleSheet.Parse(
             "#root { inherited-number: 20; } #child { inherited-number: 14; }")]);
         root.UpdateStyles();
         Assert.Equal(14d, leaf.GetValue(NumberProperty));
         child.SetValue(NumberProperty, 40);
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        screen.SetStyleSheets([StyleSheet.Parse(
             "#root { inherited-number: 30; } #child { inherited-number: 15; }")]);
         root.UpdateStyles();
         Assert.Equal(40d, leaf.GetValue(NumberProperty));
         child.ClearValue(NumberProperty);
         Assert.Equal(15d, leaf.GetValue(NumberProperty));
-        screen.SetStyleSheets([UiStyleSheet.Parse("#root { inherited-number: 30; }")]);
+        screen.SetStyleSheets([StyleSheet.Parse("#root { inherited-number: 30; }")]);
         root.UpdateStyles();
         Assert.Equal(30d, leaf.GetValue(NumberProperty));
     }
@@ -306,8 +306,8 @@ public sealed class PropertyInheritanceTests
         var child = new ScopedPanel();
         bridge.Children.Add(child);
         root.Children.Add(bridge);
-        var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse("#root { scoped-value: 28; }")]);
+        var screen = new Screen(root);
+        screen.SetStyleSheets([StyleSheet.Parse("#root { scoped-value: 28; }")]);
         var changes = new List<(int Old, int New)>();
         using var subscription = child.Subscribe(ScopedPanel.ValueProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
@@ -385,13 +385,13 @@ public sealed class PropertyInheritanceTests
         var first = new Panel();
         var second = new Panel();
         parent.Children.AddRange([first, second]);
-        using var firstSubscription = first.Subscribe(UiNode.FontSizeProperty, (_, _) =>
+        using var firstSubscription = first.Subscribe(Node.FontSizeProperty, (_, _) =>
         {
             parent.FontSize = 30;
             Assert.Equal(30d, second.FontSize);
         });
         var changes = new List<(double Old, double New)>();
-        using var secondSubscription = second.Subscribe(UiNode.FontSizeProperty,
+        using var secondSubscription = second.Subscribe(Node.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         parent.Children.RemoveRange(0, 2);
@@ -550,10 +550,10 @@ public sealed class PropertyInheritanceTests
         root.SetValue(LabelProperty, "parent");
         var child = new InheritedPanel();
         root.Children.Add(child);
-        var screen = new UiScreen(root);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<InheritedPanel>(),
-                [UiStyleSetter.Create(LabelProperty, (string?)null)])
+        var screen = new Screen(root);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<InheritedPanel>(),
+                [StyleSetter.Create(LabelProperty, (string?)null)])
         ])]);
         root.UpdateStyles();
         Assert.Null(child.GetValue(LabelProperty));
@@ -579,10 +579,10 @@ public sealed class PropertyInheritanceTests
         var child = new InheritedPanel();
         root.Children.Add(child);
         Assert.Null(child.GetValue(LabelProperty));
-        var screen = new UiScreen(root);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<InheritedPanel>(),
-                [UiStyleSetter.Create(LabelProperty, (string?)"styled")])
+        var screen = new Screen(root);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<InheritedPanel>(),
+                [StyleSetter.Create(LabelProperty, (string?)"styled")])
         ])]);
         root.UpdateStyles();
         Assert.Equal("styled", child.GetValue(LabelProperty));
@@ -604,13 +604,13 @@ public sealed class PropertyInheritanceTests
     [InlineData(true)]
     public void UnbindAfterRejectedInitializationDoesNotMaterializeFallback(bool useStyle)
     {
-        var property = Property.RegisterAttached<LateOwner, UiNode, int>(
+        var property = Property.RegisterAttached<LateOwner, Node, int>(
             Guid.NewGuid().ToString(), 7, validate: static value => value >= 0, inherits: true);
         var root = new Panel();
         root.SetValue(property, 20);
         var child = new InheritedPanel();
         root.Children.Add(child);
-        var screen = new UiScreen(root);
+        var screen = new Screen(root);
         if (useStyle)
         {
             screen.SetStyleSheets([CreateStyle(25)]);
@@ -632,8 +632,8 @@ public sealed class PropertyInheritanceTests
         }
         Assert.Equal(useStyle ? 35 : 30, child.GetValue(property));
 
-        UiStyleSheet CreateStyle(int value) => new([
-            new UiStyleRule(UiStyleSelector.For<InheritedPanel>(), [UiStyleSetter.Create(property, value)])
+        StyleSheet CreateStyle(int value) => new([
+            new StyleRule(StyleSelector.For<InheritedPanel>(), [StyleSetter.Create(property, value)])
         ]);
     }
 
@@ -763,10 +763,10 @@ public sealed class PropertyInheritanceTests
         var first = new Panel();
         var second = new Panel();
         parent.Children.AddRange([first, second]);
-        using var firstSubscription = first.Subscribe(UiNode.FontSizeProperty,
+        using var firstSubscription = first.Subscribe(Node.FontSizeProperty,
             (_, _) => otherParent.Children.Add(second));
         var changes = new List<(double Old, double New)>();
-        using var secondSubscription = second.Subscribe(UiNode.FontSizeProperty,
+        using var secondSubscription = second.Subscribe(Node.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
         parent.FontSize = 30;
@@ -840,10 +840,10 @@ public sealed class PropertyInheritanceTests
     {
         static InheritedPanel()
         {
-            UiCssRegistry.RegisterElement<InheritedPanel>("InheritedPanel");
-            UiCssRegistry.RegisterProperty<InheritedPanel, double>(
-                "inherited-number", NumberProperty, UiCssValueConverters.ParseNumber);
-            UiCssRegistry.RegisterProperty<InheritedPanel, string?>(
+            CssRegistry.RegisterElement<InheritedPanel>("InheritedPanel");
+            CssRegistry.RegisterProperty<InheritedPanel, double>(
+                "inherited-number", NumberProperty, CssValueConverters.ParseNumber);
+            CssRegistry.RegisterProperty<InheritedPanel, string?>(
                 "inherited-label", LabelProperty, static value => value);
         }
     }
@@ -855,9 +855,9 @@ public sealed class PropertyInheritanceTests
 
         static ScopedPanel()
         {
-            UiCssRegistry.RegisterElement<ScopedPanel>("ScopedPanel");
-            UiCssRegistry.RegisterProperty<ScopedPanel, int>(
-                "scoped-value", ValueProperty, static value => (int)UiCssValueConverters.ParseNumber(value));
+            CssRegistry.RegisterElement<ScopedPanel>("ScopedPanel");
+            CssRegistry.RegisterProperty<ScopedPanel, int>(
+                "scoped-value", ValueProperty, static value => (int)CssValueConverters.ParseNumber(value));
         }
     }
 

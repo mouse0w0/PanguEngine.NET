@@ -10,6 +10,8 @@ using PanguEngine.Registries;
 using PanguEngine.Tests.Windowing;
 using PanguEngine.Windowing;
 using Silk.NET.Maths;
+using KeyEventArgs = PanguEngine.Windowing.KeyEventArgs;
+using UiKeyEventArgs = PanguEngine.Client.UI.Input.KeyEventArgs;
 
 namespace PanguEngine.Tests.Client.Input;
 
@@ -1121,7 +1123,7 @@ public sealed class InputManagerTests
         manager.UpdateFrame(size ?? new Size(100, 100), 0);
     }
 
-    private sealed class TestNode : UiNode
+    private sealed class TestNode : Node
     {
     }
 

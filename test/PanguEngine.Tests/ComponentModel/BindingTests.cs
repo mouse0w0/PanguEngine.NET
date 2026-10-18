@@ -518,7 +518,7 @@ public sealed class BindingTests
         return (new WeakReference<TestNode>(target), source);
     }
 
-    private class TestNode : UiNode
+    private class TestNode : Node
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<TestNode, int>(nameof(Value), 10);
@@ -560,7 +560,7 @@ public sealed class BindingTests
         }
     }
 
-    private sealed class ForeignNode : UiNode
+    private sealed class ForeignNode : Node
     {
     }
 

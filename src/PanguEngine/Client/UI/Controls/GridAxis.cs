@@ -49,7 +49,7 @@ internal sealed class GridAxis
             var precedingSpacing = Finite(_spacing * index);
             _starts[index] = Finite(boundary + precedingSpacing);
             cumulative = Finite(cumulative + _sizes[index]);
-            boundary = round ? UiLayoutHelper.RoundLayoutValue(cumulative, scale) : cumulative;
+            boundary = round ? LayoutHelper.RoundLayoutValue(cumulative, scale) : cumulative;
             _ends[index] = Finite(boundary + precedingSpacing);
         }
     }

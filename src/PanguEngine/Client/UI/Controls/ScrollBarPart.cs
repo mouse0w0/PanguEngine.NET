@@ -35,7 +35,7 @@ internal sealed class ScrollBarPart : Control
 
     static ScrollBarPart()
     {
-        UiCssRegistry.RegisterElement<ScrollBarPart>("ScrollBarPart");
+        CssRegistry.RegisterElement<ScrollBarPart>("ScrollBarPart");
     }
 
     internal ScrollBarPart(ScrollBarPartKind kind)

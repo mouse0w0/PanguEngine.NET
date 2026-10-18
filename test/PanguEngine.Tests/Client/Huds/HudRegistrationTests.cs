@@ -48,7 +48,7 @@ public sealed class HudRegistrationTests
             Assert.Throws<InvalidOperationException>(manager.Destroy);
             Assert.Throws<InvalidOperationException>(manager.Update);
             Assert.Throws<InvalidOperationException>(() => manager.UpdateFrame(new Size(10, 10), 0));
-            Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
+            Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new DrawCommandList()));
             return new RecordingHud();
         }));
         definitions.Freeze();
@@ -441,7 +441,7 @@ public sealed class HudRegistrationTests
     private static Panel HudRoot(UiManager manager) =>
         Assert.IsType<Panel>(manager.Hud.Screen.Root);
 
-    private sealed class RecordingHud(UiNode? root = null, List<string>? events = null, string name = "hud")
+    private sealed class RecordingHud(Node? root = null, List<string>? events = null, string name = "hud")
         : Hud(root ?? new Panel())
     {
         internal string Name { get; } = name;

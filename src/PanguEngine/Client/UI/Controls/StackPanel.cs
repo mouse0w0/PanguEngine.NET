@@ -30,12 +30,12 @@ public sealed class StackPanel : Panel
 
     static StackPanel()
     {
-        UiCssRegistry.RegisterElement<StackPanel>("StackPanel");
-        UiCssRegistry.RegisterProperty<StackPanel, Orientation>(
+        CssRegistry.RegisterElement<StackPanel>("StackPanel");
+        CssRegistry.RegisterProperty<StackPanel, Orientation>(
             "orientation",
             OrientationProperty,
-            UiCssValueConverters.ParseOrientation);
-        UiCssRegistry.RegisterProperty<StackPanel, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
+            CssValueConverters.ParseOrientation);
+        CssRegistry.RegisterProperty<StackPanel, double>("spacing", SpacingProperty, CssValueConverters.ParseLength);
     }
 
     /// <summary>
@@ -133,7 +133,7 @@ public sealed class StackPanel : Panel
 
         var screen = Screen;
         if (screen?.UseLayoutRounding ?? true)
-            spacing = UiLayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1);
+            spacing = LayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1);
 
         return (orientation, spacing);
     }

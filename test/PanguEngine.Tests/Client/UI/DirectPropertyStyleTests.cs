@@ -15,12 +15,12 @@ public sealed class DirectPropertyStyleTests
     public void StyleRulesRejectDirectProperties(bool wildcard, bool readOnly)
     {
         var selector = wildcard
-            ? Assert.Single(UiStyleSheet.Parse("* { }").Rules).Selectors[0]
-            : UiStyleSelector.For<DirectNode>();
+            ? Assert.Single(StyleSheet.Parse("* { }").Rules).Selectors[0]
+            : StyleSelector.For<DirectNode>();
         Property<int> property = readOnly ? DirectNode.ReadOnlyProperty : DirectNode.ValueProperty;
 
         Assert.Throws<ArgumentException>(() =>
-            new UiStyleRule(selector, [UiStyleSetter.Create(property, 3)]));
+            new StyleRule(selector, [StyleSetter.Create(property, 3)]));
     }
 
     [Theory]
@@ -31,17 +31,17 @@ public sealed class DirectPropertyStyleTests
         Property<int> property = readOnly ? DirectNode.ReadOnlyProperty : DirectNode.ValueProperty;
 
         Assert.Throws<ArgumentException>(() =>
-            UiCssRegistry.RegisterProperty<DirectNode, int>("direct-value", property, int.Parse));
+            CssRegistry.RegisterProperty<DirectNode, int>("direct-value", property, int.Parse));
     }
 
     [Fact]
     public void CssConverterCannotIntroduceDirectSetter()
     {
-        UiCssRegistry.RegisterProperty<ConverterNode>("direct-value",
-            text => [UiStyleSetter.Create(DirectNode.ValueProperty, int.Parse(text))]);
-        var rule = Assert.Single(UiStyleSheet.Parse("* { direct-value: 3; }").Rules);
+        CssRegistry.RegisterProperty<ConverterNode>("direct-value",
+            text => [StyleSetter.Create(DirectNode.ValueProperty, int.Parse(text))]);
+        var rule = Assert.Single(StyleSheet.Parse("* { direct-value: 3; }").Rules);
 
-        var error = Assert.Throws<UiStyleParseException>(() => rule.Bind(typeof(ConverterNode)));
+        var error = Assert.Throws<StyleParseException>(() => rule.Bind(typeof(ConverterNode)));
 
         Assert.IsType<ArgumentException>(error.InnerException);
     }
@@ -53,7 +53,7 @@ public sealed class DirectPropertyStyleTests
 
         Assert.Empty(node.GetStyleValueSources(DirectNode.ValueProperty));
         Assert.Empty(node.GetStyleValueSources(DirectNode.ReadOnlyProperty));
-        UiCssRegistry.RegisterElement<SourceQueryNode>("DirectSourceQuery");
+        CssRegistry.RegisterElement<SourceQueryNode>("DirectSourceQuery");
         Assert.Equal(7, node.GetValue(DirectNode.ValueProperty));
     }
 
@@ -61,7 +61,7 @@ public sealed class DirectPropertyStyleTests
     public void DirectSetterHonorsDrawingWriteRestriction()
     {
         var node = new DirectNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         Exception? error = null;
         node.DrawAction = () => error = Record.Exception(() => node.Value = 9);
         screen.Open();
@@ -74,7 +74,7 @@ public sealed class DirectPropertyStyleTests
         screen.Close();
     }
 
-    private class DirectNode : UiNode
+    private class DirectNode : Node
     {
         internal static readonly DirectProperty<DirectNode, int> ValueProperty =
             Property.RegisterDirect<DirectNode, int>(nameof(Value), o => o.Value, (o, v) => o.Value = v);
@@ -91,7 +91,7 @@ public sealed class DirectPropertyStyleTests
         }
 
         protected override Size MeasureCore(Size availableSize) => availableSize;
-        protected override void DrawCore(UiDrawingContext context) => DrawAction?.Invoke();
+        protected override void DrawCore(DrawingContext context) => DrawAction?.Invoke();
     }
 
     private sealed class ConverterNode : DirectNode

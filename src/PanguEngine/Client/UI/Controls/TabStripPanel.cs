@@ -134,7 +134,7 @@ internal sealed class TabStripPanel : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerWheel(UiPointerWheelEventArgs eventArgs)
+    protected override void OnPointerWheel(PointerWheelEventArgs eventArgs)
     {
         base.OnPointerWheel(eventArgs);
         if (eventArgs.Handled || !_viewport.HasOverflow)

@@ -160,17 +160,17 @@ public sealed class UiResourceManagerTests
     [Fact]
     public void SmallImagesAreMaterializedOncePerManagerAndShareAtlasPage()
     {
-        var firstDevice = new UiTestGraphicsDevice();
-        var secondDevice = new UiTestGraphicsDevice();
+        var firstDevice = new GraphicsTestDevice();
+        var secondDevice = new GraphicsTestDevice();
         var firstManager = CreateManager(firstDevice);
         var secondManager = CreateManager(secondDevice);
         var firstImage = CreateImage();
         var secondImage = CreateImage();
 
-        var first = Assert.IsType<UiImageRenderBinding>(firstManager.ResolveImageBinding(Command(firstImage)));
-        var firstAgain = Assert.IsType<UiImageRenderBinding>(firstManager.ResolveImageBinding(Command(firstImage)));
-        var sharedPage = Assert.IsType<UiImageRenderBinding>(firstManager.ResolveImageBinding(Command(secondImage)));
-        var secondManagerBinding = Assert.IsType<UiImageRenderBinding>(
+        var first = Assert.IsType<ImageRenderBinding>(firstManager.ResolveImageBinding(Command(firstImage)));
+        var firstAgain = Assert.IsType<ImageRenderBinding>(firstManager.ResolveImageBinding(Command(firstImage)));
+        var sharedPage = Assert.IsType<ImageRenderBinding>(firstManager.ResolveImageBinding(Command(secondImage)));
+        var secondManagerBinding = Assert.IsType<ImageRenderBinding>(
             secondManager.ResolveImageBinding(Command(firstImage)));
 
         Assert.Equal(first, firstAgain);
@@ -186,10 +186,10 @@ public sealed class UiResourceManagerTests
     [Fact]
     public void PrepareFrameSynchronizesResourcesWithoutRequiringDrawGeometry()
     {
-        var device = new UiTestGraphicsDevice();
+        var device = new GraphicsTestDevice();
         var manager = CreateManager(device);
         var image = CreateImage();
-        _ = Assert.IsType<UiImageRenderBinding>(manager.ResolveImageBinding(Command(image)));
+        _ = Assert.IsType<ImageRenderBinding>(manager.ResolveImageBinding(Command(image)));
 
         manager.PrepareFrame(0);
 
@@ -202,14 +202,14 @@ public sealed class UiResourceManagerTests
     [Fact]
     public void OversizedImageUsesStandaloneTextureRegion()
     {
-        var device = new UiTestGraphicsDevice();
+        var device = new GraphicsTestDevice();
         var manager = CreateManager(device);
-        var image = UiImage.FromRgba(new byte[1025 * 4], 1025, 1);
+        var image = Image.FromRgba(new byte[1025 * 4], 1025, 1);
 
-        var binding = Assert.IsType<UiImageRenderBinding>(manager.ResolveImageBinding(Command(image)));
+        var binding = Assert.IsType<ImageRenderBinding>(manager.ResolveImageBinding(Command(image)));
 
         Assert.Equal((1025u, 1u), (binding.TextureWidth, binding.TextureHeight));
-        Assert.Equal(new UiImageAtlasRegion(0, 0, 1025, 1), binding.Region);
+        Assert.Equal(new ImageAtlasRegion(0, 0, 1025, 1), binding.Region);
         Assert.Single(device.Uploads.Where(upload => upload.Region is null).Skip(1));
         manager.Destroy();
     }
@@ -217,9 +217,9 @@ public sealed class UiResourceManagerTests
     [Fact]
     public void StandaloneViewDestructionFailureStopsBackingTextureAndOwnedResources()
     {
-        var device = new UiTestGraphicsDevice();
+        var device = new GraphicsTestDevice();
         var manager = CreateManager(device);
-        var image = UiImage.FromRgba(new byte[1025 * 4], 1025, 1);
+        var image = Image.FromRgba(new byte[1025 * 4], 1025, 1);
         Assert.NotNull(manager.ResolveImageBinding(Command(image)));
         var expected = new InvalidOperationException("standalone view destroy failed");
         device.TextureViews[1].DestroyException = expected;
@@ -237,7 +237,7 @@ public sealed class UiResourceManagerTests
     [Fact]
     public void SynchronousUploadFailureIsLoggedAndRetiredOnce()
     {
-        var device = new UiTestGraphicsDevice();
+        var device = new GraphicsTestDevice();
         var logger = new CapturingLogger();
         var manager = CreateManager(device, logger);
         var expected = new InvalidOperationException("upload failed");
@@ -257,10 +257,10 @@ public sealed class UiResourceManagerTests
     [Fact]
     public void ReadyImageUploadCanLaterFaultAndLogOnce()
     {
-        var device = new UiTestGraphicsDevice();
+        var device = new GraphicsTestDevice();
         var logger = new CapturingLogger();
         var manager = CreateManager(device, logger);
-        var upload = UiTestUploadHandle.Ready();
+        var upload = TestUploadHandle.Ready();
         device.UploadHandle = upload;
         var command = Command(CreateImage());
 
@@ -278,9 +278,9 @@ public sealed class UiResourceManagerTests
     [Fact]
     public void PendingImageUploadPublishesWhenItBecomesReady()
     {
-        var device = new UiTestGraphicsDevice();
+        var device = new GraphicsTestDevice();
         var manager = CreateManager(device);
-        var upload = new UiTestUploadHandle();
+        var upload = new TestUploadHandle();
         device.UploadHandle = upload;
         var image = CreateImage();
         var command = Command(image);
@@ -304,7 +304,7 @@ public sealed class UiResourceManagerTests
     public void ManagerWithoutFontManagerRejectsGlyphResolution()
     {
         using var fonts = new GlyphManagerContext();
-        var manager = CreateManager(new UiTestGraphicsDevice());
+        var manager = CreateManager(new GraphicsTestDevice());
 
         Assert.Throws<InvalidOperationException>(() =>
             manager.ResolveGlyphBinding(fonts.CreateKey("A", 16)));
@@ -316,10 +316,10 @@ public sealed class UiResourceManagerTests
     public void PendingGlyphPublishesThenObservesLateUploadFault()
     {
         using var fonts = new GlyphManagerContext();
-        var device = new UiTestGraphicsDevice();
+        var device = new GraphicsTestDevice();
         var logger = new CapturingLogger();
         var manager = CreateManager(device, fonts.FontManager, logger);
-        var upload = new UiTestUploadHandle();
+        var upload = new TestUploadHandle();
         device.UploadHandle = upload;
         var key = fonts.CreateKey("A", 16);
 
@@ -328,7 +328,7 @@ public sealed class UiResourceManagerTests
         Assert.Empty(device.DescriptorSets[0].Updates);
 
         upload.SetReady();
-        var ready = Assert.IsType<UiGlyphRenderBinding>(manager.ResolveGlyphBinding(key));
+        var ready = Assert.IsType<GlyphRenderBinding>(manager.ResolveGlyphBinding(key));
         Assert.Equal(0u, ready.TextureIndex);
         manager.SynchronizeAfterBuild(0);
 
@@ -346,39 +346,39 @@ public sealed class UiResourceManagerTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference<UiImageRegistration> CreateUnrootedRegistration(
+    private static WeakReference<ImageRegistration> CreateUnrootedRegistration(
         UiResourceManager manager,
         TestState state)
     {
         var registration = manager.RegisterImage(CreateImage(), state);
-        return new WeakReference<UiImageRegistration>(registration);
+        return new WeakReference<ImageRegistration>(registration);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static WeakReference<UiImage> RegisterUnrootedImage(
+    private static WeakReference<Image> RegisterUnrootedImage(
         UiResourceManager manager,
         TestState state)
     {
         var image = CreateImage();
         manager.RegisterImage(image, state);
-        return new WeakReference<UiImage>(image);
+        return new WeakReference<Image>(image);
     }
 
     private static UiResourceManager CreateManager(
-        UiTestGraphicsDevice device,
+        GraphicsTestDevice device,
         ILogger? logger = null) =>
-        new(device, new UiTestDescriptorSetLayout(default), 2, logger);
+        new(device, new TestDescriptorSetLayout(default), 2, logger);
 
     private static UiResourceManager CreateManager(
-        UiTestGraphicsDevice device,
+        GraphicsTestDevice device,
         FontManager fontManager,
         ILogger? logger = null) =>
-        new(device, fontManager, new UiTestDescriptorSetLayout(default), 2, logger);
+        new(device, fontManager, new TestDescriptorSetLayout(default), 2, logger);
 
-    private static UiImage CreateImage() =>
-        UiImage.FromRgba(new byte[] { 1, 2, 3, 4 }, 1, 1);
+    private static Image CreateImage() =>
+        Image.FromRgba(new byte[] { 1, 2, 3, 4 }, 1, 1);
 
-    private static UiDrawImageCommand Command(UiImage image) =>
+    private static DrawImageCommand Command(Image image) =>
         new(
             new Rect(0, 0, image.PixelWidth, image.PixelHeight),
             image,
@@ -398,7 +398,7 @@ public sealed class UiResourceManagerTests
         GC.KeepAlive(reference);
     }
 
-    private sealed class TestState(Exception? destroyException = null) : IUiGpuResourceState
+    private sealed class TestState(Exception? destroyException = null) : IGpuResourceState
     {
         internal int RetireCount { get; private set; }
         internal int DestroyCount { get; private set; }

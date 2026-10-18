@@ -12,7 +12,7 @@ namespace PanguEngine.Client.UI;
 /// Real child structure changes are rejected while the owning screen is generating drawing commands.
 /// Existing operations that would not change the child list remain no-ops outside a mutation.
 /// </remarks>
-public abstract class Parent : UiNode
+public abstract class Parent : Node
 {
     /// <summary>
     /// Identifies the <see cref="ClipToBounds"/> property.
@@ -23,7 +23,7 @@ public abstract class Parent : UiNode
 
     static Parent()
     {
-        UiCssRegistry.RegisterElement<Parent>("Parent");
+        CssRegistry.RegisterElement<Parent>("Parent");
     }
 
     /// <summary>
@@ -31,19 +31,19 @@ public abstract class Parent : UiNode
     /// </summary>
     protected Parent()
     {
-        Children = new UiNodeList(this);
+        Children = new NodeList(this);
         ReadOnlyChildren = Children.AsReadOnly();
     }
 
     /// <summary>
     /// Gets a stable read-only view of the direct children in drawing order.
     /// </summary>
-    public IReadOnlyObservableList<UiNode> ReadOnlyChildren { get; }
+    public IReadOnlyObservableList<Node> ReadOnlyChildren { get; }
 
     /// <summary>
     /// Gets the mutable collection of direct children for derived controls.
     /// </summary>
-    protected internal UiNodeList Children { get; }
+    protected internal NodeList Children { get; }
 
     /// <inheritdoc />
     protected override IReadOnlyList<StyledObject> InheritanceChildren => ReadOnlyChildren;
@@ -57,16 +57,16 @@ public abstract class Parent : UiNode
         set => SetValue(ClipToBoundsProperty, value);
     }
 
-    internal virtual UiDrawCommand CreateDescendantClip() =>
-        new UiPushClipCommand(new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height));
+    internal virtual DrawCommand CreateDescendantClip() =>
+        new PushClipCommand(new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height));
 
     internal virtual bool ContainsDescendantClip(Point point) =>
         point.X >= 0 && point.Y >= 0 && point.X < LayoutBounds.Width && point.Y < LayoutBounds.Height;
 
-    internal void MoveChildToFront(UiNode child) => Children.Move(GetChildIndex(child), Children.Count - 1);
-    internal void MoveChildToBack(UiNode child) => Children.Move(GetChildIndex(child), 0);
+    internal void MoveChildToFront(Node child) => Children.Move(GetChildIndex(child), Children.Count - 1);
+    internal void MoveChildToBack(Node child) => Children.Move(GetChildIndex(child), 0);
 
-    private int GetChildIndex(UiNode child)
+    private int GetChildIndex(Node child)
     {
         var index = Children.IndexOf(child);
         if (index < 0)

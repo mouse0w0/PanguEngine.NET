@@ -140,7 +140,7 @@ public sealed class StackPanelTests
     }
 
     [Fact]
-    public void ExplicitSizeMinMaxAndCrossAxisAlignmentFollowUiNodeRules()
+    public void ExplicitSizeMinMaxAndCrossAxisAlignmentFollowNodeRules()
     {
         var panel = new StackPanel();
         var explicitChild = new TestNode
@@ -298,7 +298,7 @@ public sealed class StackPanelTests
     public void ActiveStackPanelPropertiesRejectWrongThreadWithoutPartialState()
     {
         var panel = new StackPanel();
-        var screen = new UiScreen(panel);
+        var screen = new Screen(panel);
         ValidateLayout(panel);
         screen.Open();
 
@@ -319,7 +319,7 @@ public sealed class StackPanelTests
     public void VerticalMeasurementAndArrangementUseRoundedSpacingAndSharedBoundaries()
     {
         var panel = new StackPanel { Spacing = 0.6 };
-        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var screen = new Screen(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
         var second = new TestNode { CoreDesiredSize = new Size(10, 12) };
         panel.Children.Add(first);
@@ -347,7 +347,7 @@ public sealed class StackPanelTests
     public void HorizontalMeasurementAndArrangementUseRoundedSpacingAndSharedBoundaries()
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0.81 };
-        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var screen = new Screen(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(12, 10) };
         var second = new TestNode { CoreDesiredSize = new Size(12, 10) };
         panel.Children.Add(first);
@@ -374,7 +374,7 @@ public sealed class StackPanelTests
     public void DisabledLayoutRoundingPreservesRawSpacingAndFractions()
     {
         var panel = new StackPanel { Spacing = 0.6 };
-        var screen = new UiScreen(panel) { Scale = 1.25, UseLayoutRounding = false };
+        var screen = new Screen(panel) { Scale = 1.25, UseLayoutRounding = false };
         var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
         var second = new TestNode { CoreDesiredSize = new Size(10, 12) };
         panel.Children.Add(first);
@@ -403,7 +403,7 @@ public sealed class StackPanelTests
     public void CollapsedChildProducesNoSpacingGap()
     {
         var panel = new StackPanel { Spacing = 0.6 };
-        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var screen = new Screen(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
         var collapsed = new TestNode
         {
@@ -434,7 +434,7 @@ public sealed class StackPanelTests
     public void MultipleChildrenAccumulateRoundedDesiredSizesWithoutLastChildCompensation()
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0.81 };
-        var screen = new UiScreen(panel) { Scale = 1.25 };
+        var screen = new Screen(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(4, 12) };
         var second = new TestNode { CoreDesiredSize = new Size(4, 12) };
         var third = new TestNode { CoreDesiredSize = new Size(4, 12) };
@@ -466,7 +466,7 @@ public sealed class StackPanelTests
         Assert.Equal(1, secondGap * 1.25, 10);
     }
 
-    private static void ValidateLayout(UiNode node)
+    private static void ValidateLayout(Node node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
@@ -476,7 +476,7 @@ public sealed class StackPanelTests
     {
     }
 
-    private sealed class TestNode : UiNode
+    private sealed class TestNode : Node
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }

@@ -7,13 +7,13 @@ namespace PanguEngine.Client.UI.Controls;
 /// <summary>
 /// Displays a shared UI image using retained layout and drawing semantics.
 /// </summary>
-public sealed class ImageView : UiNode
+public sealed class ImageView : Node
 {
     /// <summary>
     /// Identifies the image source property.
     /// </summary>
-    public static readonly Property<UiImage?> SourceProperty =
-        Property.Register<ImageView, UiImage?>(
+    public static readonly Property<Image?> SourceProperty =
+        Property.Register<ImageView, Image?>(
             nameof(Source),
             defaultValue: null,
             onChanged: static (node, _, _) => node.InvalidateMeasure());
@@ -48,15 +48,15 @@ public sealed class ImageView : UiNode
 
     static ImageView()
     {
-        UiCssRegistry.RegisterElement<ImageView>("ImageView");
-        UiCssRegistry.RegisterProperty<ImageView, ImageStretch>(
+        CssRegistry.RegisterElement<ImageView>("ImageView");
+        CssRegistry.RegisterProperty<ImageView, ImageStretch>(
             "stretch",
             StretchProperty,
-            UiCssValueConverters.ParseImageStretch);
-        UiCssRegistry.RegisterProperty<ImageView, ImageSamplingMode>(
+            CssValueConverters.ParseImageStretch);
+        CssRegistry.RegisterProperty<ImageView, ImageSamplingMode>(
             "sampling-mode",
             SamplingModeProperty,
-            UiCssValueConverters.ParseImageSamplingMode);
+            CssValueConverters.ParseImageSamplingMode);
     }
 
     /// <summary>
@@ -69,7 +69,7 @@ public sealed class ImageView : UiNode
     /// <summary>
     /// Gets or sets the shared image source.
     /// </summary>
-    public UiImage? Source
+    public Image? Source
     {
         get => GetValue(SourceProperty);
         set => SetValue(SourceProperty, value);
@@ -125,7 +125,7 @@ public sealed class ImageView : UiNode
                     : availableSize.Height);
         }
 
-        var scale = UiImageLayout.GetScale(
+        var scale = ImageLayout.GetScale(
             availableSize,
             sourceRect.Width,
             sourceRect.Height,
@@ -134,7 +134,7 @@ public sealed class ImageView : UiNode
     }
 
     /// <inheritdoc />
-    protected override void DrawCore(UiDrawingContext context)
+    protected override void DrawCore(DrawingContext context)
     {
         var image = Source;
         if (image is null)
@@ -148,20 +148,20 @@ public sealed class ImageView : UiNode
         var screen = Screen;
         var useLayoutRounding = screen?.UseLayoutRounding ?? true;
         var scale = screen?.Scale ?? 1;
-        var destinationBounds = UiImageLayout.GetDestinationBounds(
+        var destinationBounds = ImageLayout.GetDestinationBounds(
             viewBounds,
             sourceRect.Width,
             sourceRect.Height,
             Stretch);
         if (useLayoutRounding && Stretch != ImageStretch.Fill)
-            destinationBounds = UiLayoutHelper.RoundLayoutRect(destinationBounds, scale);
+            destinationBounds = LayoutHelper.RoundLayoutRect(destinationBounds, scale);
         using (context.PushClip(viewBounds))
         {
             context.DrawImage(destinationBounds, image, sourceRect, SamplingMode);
         }
     }
 
-    private Rect ResolveSourceRect(UiImage image)
+    private Rect ResolveSourceRect(Image image)
     {
         var sourceRect = SourceRect ?? image.FullSourceRect;
         if (!image.ContainsSourceRect(sourceRect))

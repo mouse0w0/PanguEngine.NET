@@ -13,7 +13,7 @@ public sealed class TextTests
     [Fact]
     public void InheritedTypographyReflowsWhileInheritedColorReusesLayout()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var alias = context.RegisterAlias();
         var root = new Panel();
         var text = new Text { Content = "Hello" };
@@ -53,10 +53,10 @@ public sealed class TextTests
     [Fact]
     public void DetachedAndScreenOwnedTextUseSharedToolkitServices()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var detached = new Text { Content = "Detached" };
         var screenOwned = new Text { Content = "Screen owned" };
-        _ = new UiScreen(screenOwned);
+        _ = new Screen(screenOwned);
 
         detached.Measure(Size.Infinite);
         screenOwned.Measure(Size.Infinite);
@@ -71,9 +71,9 @@ public sealed class TextTests
         var text = new Text();
 
         AssertProperty(Text.ContentProperty, string.Empty);
-        Assert.Equal(typeof(UiNode), Text.FontFamilyProperty.OwnerType);
-        Assert.Equal(typeof(UiNode), Text.ColorProperty.OwnerType);
-        Assert.Equal(typeof(UiNode), Text.LineHeightProperty.OwnerType);
+        Assert.Equal(typeof(Node), Text.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(Node), Text.ColorProperty.OwnerType);
+        Assert.Equal(typeof(Node), Text.LineHeightProperty.OwnerType);
         Assert.Equal(new Color(255, 255, 255), Text.ColorProperty.DefaultValue);
         Assert.Equal(1d, Text.LineHeightProperty.DefaultValue);
         AssertProperty(Text.WrappingProperty, TextWrapping.NoWrap);
@@ -93,7 +93,7 @@ public sealed class TextTests
     [Fact]
     public void DefaultsUseCurrentDefaultFaceAndMeasureDrawShareLayout()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var text = new Text { Content = "Hello" };
         var screen = new GameScreen(text) { UseLayoutRounding = false };
         var manager = new UiManager();
@@ -113,7 +113,7 @@ public sealed class TextTests
     [Fact]
     public void EmptyContentMeasuresEmptyAndProducesNoCommand()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var text = new Text();
         var screen = new GameScreen(text);
         var manager = new UiManager();
@@ -129,7 +129,7 @@ public sealed class TextTests
     [Fact]
     public void WrapUsesAvailableWidthAndMissingFamilyUsesDefaultFace()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var text = new Text
         {
             Content = "A long line that must wrap",
@@ -153,7 +153,7 @@ public sealed class TextTests
     [Fact]
     public void ColorChangeKeepsLayoutInstance()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var text = new Text { Content = "Hello" };
         var screen = new GameScreen(text);
         var manager = new UiManager();
@@ -173,7 +173,7 @@ public sealed class TextTests
     [Fact]
     public void LayoutInputsAndAvailableWidthReplaceCachedLayout()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var text = new Text { Content = "Hello world" };
         var screen = new GameScreen(text);
         var manager = new UiManager();
@@ -211,7 +211,7 @@ public sealed class TextTests
     [Fact]
     public void RegisteredRequestedFontKeepsCachedLayoutUntilLayoutInputChanges()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var requestedFont = new Font("Testxx Han Sans CN");
         var text = new Text
         {
@@ -245,7 +245,7 @@ public sealed class TextTests
     [Fact]
     public void DefaultFontChangeKeepsCachedLayoutUntilLayoutInputChanges()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var text = new Text { Content = "Hello" };
         var screen = new GameScreen(text);
         var manager = new UiManager();
@@ -272,7 +272,7 @@ public sealed class TextTests
     [Fact]
     public void ScaleAndLayoutRoundingReflowReplaceLogicalLayout()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var text = new Text { Content = "Hello" };
         var screen = new GameScreen(text);
         var manager = new UiManager();
@@ -294,7 +294,7 @@ public sealed class TextTests
     [Fact]
     public void InheritedFontSizeInvalidatesMeasurementAndReplacesTextLayout()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var root = new Panel { FontSize = 18 };
         var text = new Text { Content = "Inherited size" };
         root.Children.Add(text);
@@ -316,8 +316,8 @@ public sealed class TextTests
         manager.Destroy();
     }
 
-    private static UiDrawTextCommand GetCommand(UiScreen screen) =>
-        Assert.Single(screen.CreateDrawCommandList().OfType<UiDrawTextCommand>());
+    private static DrawTextCommand GetCommand(Screen screen) =>
+        Assert.Single(screen.CreateDrawCommandList().OfType<DrawTextCommand>());
 
     private static void AssertProperty<T>(
         Property<T> property,

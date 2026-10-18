@@ -12,7 +12,7 @@ public sealed class DockPanel : Panel
     /// Identifies the attached dock direction property, whose default value is <see cref="Dock.Left"/>.
     /// </summary>
     public static readonly Property<Dock> DockProperty =
-        Property.RegisterAttached<DockPanel, UiNode, Dock>(
+        Property.RegisterAttached<DockPanel, Node, Dock>(
             "Dock",
             Dock.Left,
             onChanged: static (node, _, _) => node.InvalidateMeasure());
@@ -28,10 +28,10 @@ public sealed class DockPanel : Panel
 
     static DockPanel()
     {
-        UiCssRegistry.RegisterElement<DockPanel>("DockPanel");
-        UiCssRegistry.RegisterProperty<UiNode, Dock>("dock", DockProperty, UiCssValueConverters.ParseDock);
-        UiCssRegistry.RegisterProperty<DockPanel, bool>(
-            "last-child-fill", LastChildFillProperty, UiCssValueConverters.ParseBool);
+        CssRegistry.RegisterElement<DockPanel>("DockPanel");
+        CssRegistry.RegisterProperty<Node, Dock>("dock", DockProperty, CssValueConverters.ParseDock);
+        CssRegistry.RegisterProperty<DockPanel, bool>(
+            "last-child-fill", LastChildFillProperty, CssValueConverters.ParseBool);
     }
 
     /// <summary>
@@ -54,14 +54,14 @@ public sealed class DockPanel : Panel
     /// </summary>
     /// <param name="node">The node whose dock direction to read.</param>
     /// <returns>The effective dock direction.</returns>
-    public static Dock GetDock(UiNode node) => node.GetValue(DockProperty);
+    public static Dock GetDock(Node node) => node.GetValue(DockProperty);
 
     /// <summary>
     /// Sets the edge to which a child is docked within a DockPanel.
     /// </summary>
     /// <param name="node">The node whose dock direction to set.</param>
     /// <param name="value">The dock direction.</param>
-    public static void SetDock(UiNode node, Dock value) => node.SetValue(DockProperty, value);
+    public static void SetDock(Node node, Dock value) => node.SetValue(DockProperty, value);
 
     /// <inheritdoc />
     protected override Size MeasureContent(Size availableSize)

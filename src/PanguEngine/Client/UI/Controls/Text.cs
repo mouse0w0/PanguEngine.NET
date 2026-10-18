@@ -8,7 +8,7 @@ namespace PanguEngine.Client.UI.Controls;
 /// <summary>
 /// Displays an immutable layout of plain text.
 /// </summary>
-public sealed class Text : UiNode
+public sealed class Text : Node
 {
     /// <summary>
     /// Identifies the <see cref="Content"/> property.
@@ -41,15 +41,15 @@ public sealed class Text : UiNode
 
     static Text()
     {
-        UiCssRegistry.RegisterElement<Text>("Text");
-        UiCssRegistry.RegisterProperty<Text, TextWrapping>(
+        CssRegistry.RegisterElement<Text>("Text");
+        CssRegistry.RegisterProperty<Text, TextWrapping>(
             "wrapping",
             WrappingProperty,
-            UiCssValueConverters.ParseTextWrapping);
-        UiCssRegistry.RegisterProperty<Text, TextAlignment>(
+            CssValueConverters.ParseTextWrapping);
+        CssRegistry.RegisterProperty<Text, TextAlignment>(
             "text-alignment",
             AlignmentProperty,
-            UiCssValueConverters.ParseTextAlignment);
+            CssValueConverters.ParseTextAlignment);
     }
 
     private TextLayout? _layout;
@@ -106,6 +106,6 @@ public sealed class Text : UiNode
     }
 
     /// <inheritdoc />
-    protected override void DrawCore(UiDrawingContext context) =>
+    protected override void DrawCore(DrawingContext context) =>
         context.DrawText(Point.Zero, _layout!, FontSize, Color);
 }

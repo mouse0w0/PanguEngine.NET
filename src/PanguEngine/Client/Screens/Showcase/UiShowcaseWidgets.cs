@@ -16,7 +16,7 @@ internal static class UiShowcaseWidgets
         return button;
     }
 
-    internal static StackPanel Column(params UiNode[] children) => Stack(Orientation.Vertical, children);
+    internal static StackPanel Column(params Node[] children) => Stack(Orientation.Vertical, children);
 
     internal static Text Caption(string text)
     {
@@ -25,9 +25,9 @@ internal static class UiShowcaseWidgets
         return caption;
     }
 
-    internal static StackPanel Sample(string title, UiNode node) => Column(Caption(title), node);
+    internal static StackPanel Sample(string title, Node node) => Column(Caption(title), node);
 
-    internal static UiShowcaseGallery Samples(params UiNode[] children)
+    internal static UiShowcaseGallery Samples(params Node[] children)
     {
         var gallery = new UiShowcaseGallery(170, 3);
         foreach (var child in children)
@@ -35,7 +35,7 @@ internal static class UiShowcaseWidgets
         return gallery;
     }
 
-    internal static StackPanel Preview(params UiNode[] children)
+    internal static StackPanel Preview(params Node[] children)
     {
         var preview = Column(children);
         preview.Classes.Add("showcase-preview");
@@ -64,7 +64,7 @@ internal static class UiShowcaseWidgets
         return gallery;
     }
 
-    private static StackPanel Stack(Orientation orientation, UiNode[] children)
+    private static StackPanel Stack(Orientation orientation, Node[] children)
     {
         var panel = new StackPanel { Orientation = orientation, Spacing = 8 };
         foreach (var child in children)

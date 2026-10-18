@@ -11,7 +11,7 @@ namespace PanguEngine.Client.UI.Controls;
 /// Geometry meshes are rebuilt lazily only when the data, stroke parameters, arranged size, or screen scale
 /// change. Changing a brush color never rebuilds geometry.
 /// </remarks>
-public abstract partial class Shape : UiNode
+public abstract partial class Shape : Node
 {
     /// <summary>
     /// Identifies the <see cref="Fill"/> property.
@@ -155,7 +155,7 @@ public abstract partial class Shape : UiNode
     }
 
     /// <inheritdoc />
-    protected sealed override void DrawCore(UiDrawingContext context)
+    protected sealed override void DrawCore(DrawingContext context)
     {
         var fillColor = ((SolidColorBrush?)Fill)?.Color;
         var strokeColor = ((SolidColorBrush?)Stroke)?.Color;
@@ -180,10 +180,10 @@ public abstract partial class Shape : UiNode
     }
 
     /// <summary>Draws a specialized fill and returns whether the fill was handled.</summary>
-    private protected virtual bool DrawAnalyticFill(UiDrawingContext context, Color color) => false;
+    private protected virtual bool DrawAnalyticFill(DrawingContext context, Color color) => false;
 
     /// <summary>Draws a specialized fill and stroke and returns whether the shape was handled.</summary>
-    private protected virtual bool DrawAnalyticShape(UiDrawingContext context, Color? fill, Color? stroke) => false;
+    private protected virtual bool DrawAnalyticShape(DrawingContext context, Color? fill, Color? stroke) => false;
 
     /// <summary>
     /// Measures this shape's geometry for the available size.
@@ -269,16 +269,16 @@ public abstract partial class Shape : UiNode
         bool hasStroke,
         double strokeThickness)
     {
-        var fillMesh = UiShapeTessellator.Fill(contours, fillRule);
+        var fillMesh = ShapeTessellator.Fill(contours, fillRule);
         var strokeMesh = hasStroke && strokeThickness > 0
-            ? UiShapeTessellator.Stroke(
+            ? ShapeTessellator.Stroke(
                 contours,
                 strokeThickness,
                 StrokeLineCap,
                 StrokeLineJoin,
                 StrokeMiterLimit,
                 tolerance)
-            : UiTriangleMesh.Empty;
+            : TriangleMesh.Empty;
         var bounds = UnionBounds(sourceBounds, strokeMesh);
         var (scaleX, scaleY, translateX, translateY) =
             ComputeStretch(bounds, targetWidth, targetHeight, stretch);
@@ -333,7 +333,7 @@ public abstract partial class Shape : UiNode
         }
     }
 
-    private static Rect UnionBounds(Rect source, UiTriangleMesh strokeMesh)
+    private static Rect UnionBounds(Rect source, TriangleMesh strokeMesh)
     {
         if (strokeMesh.Vertices.Length == 0)
             return source;

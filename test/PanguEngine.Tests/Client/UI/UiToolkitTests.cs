@@ -20,7 +20,7 @@ public sealed class UiToolkitTests
     [Fact]
     public void InitializationBorrowsTheHostsServicesAndRejectsASecondBinding()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
 
         Assert.Same(context.FontManager, UiToolkit.FontManager);
         Assert.Same(context.LayoutEngine, UiToolkit.TextLayoutEngine);
@@ -37,7 +37,7 @@ public sealed class UiToolkitTests
     public void ShutdownKeepsSettingsAndBorrowedServicesAliveForRebinding()
     {
         using var logger = new RecordingLogger();
-        using var context = new UiTextTestContext(logger);
+        using var context = new TextTestContext(logger);
         UiToolkit.DefaultScale = 1.5;
         UiToolkit.WheelScrollLines = 5;
 
@@ -69,7 +69,7 @@ public sealed class UiToolkitTests
     [Fact]
     public void InvalidInitializationSettingsDoNotBindOrChangeExistingSettings()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         UiToolkit.Shutdown();
 
         Assert.Throws<ArgumentOutOfRangeException>(() => UiToolkit.Initialize(
@@ -90,14 +90,14 @@ public sealed class UiToolkitTests
         FontManager firstFonts;
         TextLayoutEngine firstLayout;
         MemoryClipboard firstClipboard;
-        using (var first = new UiTextTestContext(firstLogger))
+        using (var first = new TextTestContext(firstLogger))
         {
             firstFonts = UiToolkit.FontManager;
             firstLayout = UiToolkit.TextLayoutEngine;
             firstClipboard = first.Clipboard;
         }
 
-        using var second = new UiTextTestContext(secondLogger);
+        using var second = new TextTestContext(secondLogger);
 
         Assert.NotSame(firstFonts, UiToolkit.FontManager);
         Assert.NotSame(firstLayout, UiToolkit.TextLayoutEngine);
@@ -115,7 +115,7 @@ public sealed class UiToolkitTests
     [Fact]
     public void ShutdownFromAnotherThreadRejectsTheOperationAndPreservesTheBinding()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         Exception? error = null;
         var thread = new Thread(() => error = Record.Exception(UiToolkit.Shutdown));
 
@@ -132,7 +132,7 @@ public sealed class UiToolkitTests
     [InlineData(1)]
     public void SettingChangesFromAnotherThreadAreRejectedWithoutChangingState(int setting)
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         Exception? error = null;
         var thread = new Thread(() => error = Record.Exception(() =>
         {
@@ -157,7 +157,7 @@ public sealed class UiToolkitTests
     [InlineData(3)]
     public void MissingServicesAreRejectedBeforeBindingOrChangingSettings(int missingService)
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         UiToolkit.Shutdown();
 
         Assert.Throws<ArgumentNullException>(() => UiToolkit.Initialize(
@@ -198,7 +198,7 @@ public sealed class UiToolkitTests
     [Fact]
     public void PublicTextBoxClipboardOperationsUseTheToolkitWithoutAClientEngine()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var box = new TextBox { Text = "abcdef" };
         box.Select(1, 3);
 

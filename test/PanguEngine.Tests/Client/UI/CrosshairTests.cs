@@ -14,20 +14,20 @@ public sealed class CrosshairTests
         var root = new Panel { Color = new Color(10, 20, 30) };
         var crosshair = new Crosshair { OutlineThickness = 0, OutlineColor = new Color(0, 0, 0, 0) };
         root.Children.Add(crosshair);
-        var screen = new UiScreen(root) { UseLayoutRounding = false };
+        var screen = new Screen(root) { UseLayoutRounding = false };
         screen.SetBaseStyleSheets([]);
         screen.Open();
         screen.PrepareFrame(new Size(200, 100));
 
-        Assert.NotEmpty(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>());
-        Assert.All(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
+        Assert.NotEmpty(screen.CreateDrawCommandList().OfType<FillRectangleCommand>());
+        Assert.All(screen.CreateDrawCommandList().OfType<FillRectangleCommand>(),
             command => Assert.Equal(new Color(255, 255, 255), command.Color));
 
-        screen.SetStyleSheets([UiStyleSheet.Parse("Crosshair { color: #123456; }")]);
+        screen.SetStyleSheets([StyleSheet.Parse("Crosshair { color: #123456; }")]);
         screen.PrepareFrame(new Size(200, 100));
         root.Color = new Color(40, 50, 60);
 
-        Assert.All(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
+        Assert.All(screen.CreateDrawCommandList().OfType<FillRectangleCommand>(),
             command => Assert.Equal(new Color(0x12, 0x34, 0x56), command.Color));
         crosshair.Color = new Color(70, 80, 90);
         crosshair.ClearValue(Crosshair.ColorProperty);
@@ -37,7 +37,7 @@ public sealed class CrosshairTests
         screen.PrepareFrame(new Size(200, 100));
 
         Assert.Equal(new Color(255, 255, 255), crosshair.Color);
-        Assert.All(screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>(),
+        Assert.All(screen.CreateDrawCommandList().OfType<FillRectangleCommand>(),
             command => Assert.Equal(new Color(255, 255, 255), command.Color));
         screen.Close();
     }
@@ -75,7 +75,7 @@ public sealed class CrosshairTests
         };
         var screen = CreateScreen(crosshair);
 
-        var commands = screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().ToArray();
+        var commands = screen.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
 
         Assert.Equal(commandCount, commands.Length);
         Assert.Equal(commandCount / 2, commands.Count(command => command.Color == new Color(0, 0, 0)));
@@ -108,7 +108,7 @@ public sealed class CrosshairTests
         };
         var screen = CreateScreen(crosshair);
 
-        var commands = screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().ToArray();
+        var commands = screen.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
 
         Assert.Equal(10, commands.Length);
         Assert.Contains(commands, command => command.Bounds == new Rect(-3, -3, 6, 6));
@@ -141,7 +141,7 @@ public sealed class CrosshairTests
         var crosshair = new Crosshair { Thickness = 6 };
         var screen = CreateScreen(crosshair);
 
-        var commands = screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().ToArray();
+        var commands = screen.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
 
         Assert.Contains(commands, command =>
             command.Color == new Color(255, 255, 255) &&
@@ -162,7 +162,7 @@ public sealed class CrosshairTests
         var root = new Panel();
         var crosshair = new Crosshair();
         root.Children.Add(crosshair);
-        var screen = new UiScreen(root) { UseLayoutRounding = false, Scale = 2 };
+        var screen = new Screen(root) { UseLayoutRounding = false, Scale = 2 };
         screen.Open();
 
         screen.PrepareFrame(new Size(240, 160));
@@ -179,7 +179,7 @@ public sealed class CrosshairTests
         var root = new Panel();
         var crosshair = new Crosshair();
         root.Children.Add(crosshair);
-        var screen = new UiScreen(root) { UseLayoutRounding = false, Scale = 2 };
+        var screen = new Screen(root) { UseLayoutRounding = false, Scale = 2 };
         screen.Open();
 
         screen.PrepareFrame(new Size(240, 160));
@@ -187,7 +187,7 @@ public sealed class CrosshairTests
         Assert.Equal(12, crosshair.DesiredSize.Width);
         Assert.Equal(12, crosshair.DesiredSize.Height);
 
-        var commands = screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().ToArray();
+        var commands = screen.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
         Assert.Contains(commands, command =>
             command.Color == new Color(255, 255, 255) &&
             command.Bounds.Width == 8 &&
@@ -202,7 +202,7 @@ public sealed class CrosshairTests
         var root = new Panel();
         var crosshair = new Crosshair { UseUiScale = true };
         root.Children.Add(crosshair);
-        var screen = new UiScreen(root) { UseLayoutRounding = false, Scale = 2 };
+        var screen = new Screen(root) { UseLayoutRounding = false, Scale = 2 };
         screen.Open();
 
         screen.PrepareFrame(new Size(240, 160));
@@ -241,12 +241,12 @@ public sealed class CrosshairTests
     {
         var root = new Panel();
         root.Children.Add(new Crosshair { UseUiScale = useUiScale });
-        var screen = new UiScreen(root) { UseLayoutRounding = false, Scale = scale };
+        var screen = new Screen(root) { UseLayoutRounding = false, Scale = scale };
         screen.Open();
         try
         {
             screen.PrepareFrame(new Size(240, 160));
-            var builder = new UiDrawBuilder();
+            var builder = new DrawBuilder();
 
             builder.Build(screen.CreateDrawCommandList(), 240, 160, false);
 
@@ -302,11 +302,11 @@ public sealed class CrosshairTests
         }
     }
 
-    private static UiScreen CreateScreen(Crosshair crosshair)
+    private static Screen CreateScreen(Crosshair crosshair)
     {
         var root = new Panel();
         root.Children.Add(crosshair);
-        var screen = new UiScreen(root) { UseLayoutRounding = false };
+        var screen = new Screen(root) { UseLayoutRounding = false };
         screen.Open();
         screen.PrepareFrame(new Size(200, 100));
         return screen;

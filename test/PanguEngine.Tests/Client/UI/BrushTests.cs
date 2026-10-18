@@ -134,6 +134,6 @@ public sealed class BrushTests
             ImageSlice.Zero));
     }
 
-    private static UiImage Image(int width, int height) =>
-        UiImage.FromRgba(new byte[checked(width * height * 4)], width, height);
+    private static Image Image(int width, int height) =>
+        PanguEngine.Client.UI.Drawing.Image.FromRgba(new byte[checked(width * height * 4)], width, height);
 }

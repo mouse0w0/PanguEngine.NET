@@ -76,17 +76,17 @@ public sealed class TextBox : Control
 
     static TextBox()
     {
-        UiCssRegistry.RegisterElement<TextBox>("TextBox");
-        UiCssRegistry.RegisterProperty<TextBox, Color>(
-            "placeholder-color", PlaceholderColorProperty, UiCssValueConverters.ParseColor);
-        UiCssRegistry.RegisterProperty<TextBox, Color>(
-            "selection-background-color", SelectionBackgroundColorProperty, UiCssValueConverters.ParseColor);
-        UiCssRegistry.RegisterProperty<TextBox, Color>("caret-color", CaretColorProperty,
-            UiCssValueConverters.ParseColor);
+        CssRegistry.RegisterElement<TextBox>("TextBox");
+        CssRegistry.RegisterProperty<TextBox, Color>(
+            "placeholder-color", PlaceholderColorProperty, CssValueConverters.ParseColor);
+        CssRegistry.RegisterProperty<TextBox, Color>(
+            "selection-background-color", SelectionBackgroundColorProperty, CssValueConverters.ParseColor);
+        CssRegistry.RegisterProperty<TextBox, Color>("caret-color", CaretColorProperty,
+            CssValueConverters.ParseColor);
     }
 
-    private static readonly UiKeyBindings<TextBox> KeyBindings =
-        new UiKeyBindings<TextBox>()
+    private static readonly KeyBindings<TextBox> KeyBindings =
+        new KeyBindings<TextBox>()
             .AddBinding(
                 Key.Left,
                 static (textBox, _) => textBox.MoveByTextElement(-1, extend: false))
@@ -461,7 +461,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void DrawCore(UiDrawingContext context)
+    protected override void DrawCore(DrawingContext context)
     {
         base.DrawCore(context);
         var layout = _layout!;
@@ -506,7 +506,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnTextInput(UiTextInputEventArgs eventArgs)
+    protected override void OnTextInput(TextInputEventArgs eventArgs)
     {
         base.OnTextInput(eventArgs);
         if (!IsFocused)
@@ -526,7 +526,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
         if (IsFocused && KeyBindings.TryHandle(this, eventArgs, KeyAction.Press))
@@ -534,7 +534,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button != MouseButton.Left || !IsFocused)
@@ -551,7 +551,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerMoved(UiPointerEventArgs eventArgs)
+    protected override void OnPointerMoved(PointerEventArgs eventArgs)
     {
         base.OnPointerMoved(eventArgs);
         if (!_isDraggingSelection || !IsPressed)
@@ -572,7 +572,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button != MouseButton.Left || !_isDraggingSelection)
@@ -583,7 +583,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnGotFocus(UiFocusChangedEventArgs eventArgs)
+    protected override void OnGotFocus(FocusChangedEventArgs eventArgs)
     {
         ResetCaretPhase();
         EnsureCaretVisibleIfArranged();
@@ -591,7 +591,7 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnLostFocus(UiFocusChangedEventArgs eventArgs)
+    protected override void OnLostFocus(FocusChangedEventArgs eventArgs)
     {
         _isDraggingSelection = false;
         _editingState.EndEditGroup();
@@ -704,7 +704,7 @@ public sealed class TextBox : Control
     {
         var screen = Screen;
         return screen?.UseLayoutRounding ?? true
-            ? UiLayoutHelper.RoundLayoutValue(1, screen?.Scale ?? 1)
+            ? LayoutHelper.RoundLayoutValue(1, screen?.Scale ?? 1)
             : 1;
     }
 

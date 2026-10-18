@@ -74,7 +74,7 @@ public sealed class UiManagerTests
         var root = new TestNode();
         GameScreen? openingCurrent = null;
         GameScreen? openedCurrent = null;
-        var screen = new RecordingUiScreen(root);
+        var screen = new RecordingScreen(root);
         screen.Opening = () => openingCurrent = manager.CurrentScreen;
         screen.Opened = () => openedCurrent = manager.CurrentScreen;
 
@@ -93,7 +93,7 @@ public sealed class UiManagerTests
         var root = new TestNode();
         GameScreen? closingCurrent = null;
         GameScreen? closedCurrent = null;
-        var screen = new RecordingUiScreen(root);
+        var screen = new RecordingScreen(root);
         screen.Closing = () => closingCurrent = manager.CurrentScreen;
         screen.Closed = () => closedCurrent = manager.CurrentScreen;
         manager.Open(screen);
@@ -113,8 +113,8 @@ public sealed class UiManagerTests
         var oldRoot = new TestNode();
         var newRoot = new TestNode();
         var events = new List<string>();
-        var oldScreen = new RecordingUiScreen(oldRoot);
-        var newScreen = new RecordingUiScreen(newRoot);
+        var oldScreen = new RecordingScreen(oldRoot);
+        var newScreen = new RecordingScreen(newRoot);
         oldScreen.Closing = () => Record("old-closing");
         oldScreen.Closed = () => Record("old-closed");
         newScreen.Opening = () => Record("new-opening");
@@ -140,7 +140,7 @@ public sealed class UiManagerTests
         var manager = new UiManager();
         var openedCalls = 0;
         var closingCalls = 0;
-        var screen = new RecordingUiScreen(new TestNode());
+        var screen = new RecordingScreen(new TestNode());
         screen.Opened = () => openedCalls++;
         screen.Closing = () => closingCalls++;
 
@@ -157,7 +157,7 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var openedCalls = 0;
-        var screen = new RecordingUiScreen(new TestNode());
+        var screen = new RecordingScreen(new TestNode());
         screen.Opened = () => openedCalls++;
 
         manager.Open(screen);
@@ -169,7 +169,7 @@ public sealed class UiManagerTests
     }
 
     [Fact]
-    public void OpenRejectsAlreadyOpenUiScreenWithoutReplacingCurrentScreen()
+    public void OpenRejectsAlreadyOpenScreenWithoutReplacingCurrentScreen()
     {
         var manager = new UiManager();
         var current = new GameScreen(new TestNode());
@@ -209,7 +209,7 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var errors = new List<Exception?>();
-        var screen = new RecordingUiScreen(new TestNode());
+        var screen = new RecordingScreen(new TestNode());
         screen.Opening = Capture;
         screen.Opened = Capture;
         screen.Closing = Capture;
@@ -236,9 +236,9 @@ public sealed class UiManagerTests
     public void LifecycleCallbackQueuesScreenRequests(string hook)
     {
         var manager = new UiManager();
-        var first = new RecordingUiScreen(new TestNode());
-        var second = new RecordingUiScreen(new TestNode());
-        var third = new RecordingUiScreen(new TestNode());
+        var first = new RecordingScreen(new TestNode());
+        var second = new RecordingScreen(new TestNode());
+        var third = new RecordingScreen(new TestNode());
         var notifications = new List<(GameScreen? Old, GameScreen? New)>();
         manager.CurrentScreenChanged += (oldScreen, newScreen) => notifications.Add((oldScreen, newScreen));
         GameScreen? currentDuringCallback = null;
@@ -303,7 +303,7 @@ public sealed class UiManagerTests
             {
                 queued = true;
                 Assert.Throws<InvalidOperationException>(manager.Update);
-                Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
+                Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new DrawCommandList()));
                 Assert.Throws<InvalidOperationException>(manager.Destroy);
                 manager.Open(second);
                 manager.Open(third);
@@ -333,7 +333,7 @@ public sealed class UiManagerTests
     public void NotificationCanCloseAndReopenSameScreen()
     {
         var manager = new UiManager();
-        var screen = new RecordingUiScreen(new TestNode());
+        var screen = new RecordingScreen(new TestNode());
         var openedCalls = 0;
         var closedCalls = 0;
         screen.Opened = () => openedCalls++;
@@ -363,10 +363,10 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var expected = new InvalidOperationException("opening");
-        var second = new RecordingUiScreen(new TestNode());
+        var second = new RecordingScreen(new TestNode());
         var secondOpened = 0;
         second.Opened = () => secondOpened++;
-        var first = new RecordingUiScreen(new TestNode())
+        var first = new RecordingScreen(new TestNode())
         {
             Opening = () =>
             {
@@ -390,8 +390,8 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var expected = new InvalidOperationException("changed");
-        var first = new RecordingUiScreen(new TestNode());
-        var second = new RecordingUiScreen(new TestNode());
+        var first = new RecordingScreen(new TestNode());
+        var second = new RecordingScreen(new TestNode());
         var secondOpened = 0;
         second.Opened = () => secondOpened++;
         var queued = false;
@@ -420,12 +420,12 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var owner = new UiManager();
-        var first = new RecordingUiScreen(new TestNode());
+        var first = new RecordingScreen(new TestNode());
         var middle = new GameScreen(new TestNode());
         var closingCalls = 0;
         first.Closing = () => closingCalls++;
         var occupied = new GameScreen(new TestNode());
-        var tail = new RecordingUiScreen(new TestNode());
+        var tail = new RecordingScreen(new TestNode());
         var tailOpened = 0;
         tail.Opened = () => tailOpened++;
         owner.Open(occupied);
@@ -465,12 +465,12 @@ public sealed class UiManagerTests
         var closeError = new InvalidOperationException("close");
         var notifyError = new InvalidOperationException("notify");
         var failedChangeNotified = false;
-        var oldScreen = new RecordingUiScreen(new TestNode())
+        var oldScreen = new RecordingScreen(new TestNode())
         {
             Closing = () => throw closeError
         };
-        var next = new RecordingUiScreen(new TestNode());
-        var tail = new RecordingUiScreen(new TestNode());
+        var next = new RecordingScreen(new TestNode());
+        var tail = new RecordingScreen(new TestNode());
         var openedCalls = 0;
         next.Opened = () => openedCalls++;
         tail.Opened = () => openedCalls++;
@@ -503,7 +503,7 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var errors = new List<Exception?>();
-        var screen = new RecordingUiScreen(new TestNode());
+        var screen = new RecordingScreen(new TestNode());
         screen.Closing = Capture;
         screen.Closed = Capture;
         manager.Open(screen);
@@ -725,12 +725,12 @@ public sealed class UiManagerTests
         var dispatcher = new EngineDispatcher(queue);
         var manager = new UiManager();
         var events = new List<string>();
-        var oldScreen = new RecordingUiScreen(new TestNode
+        var oldScreen = new RecordingScreen(new TestNode
         {
             CoreDesiredSize = new Size(10, 10),
             DrawAction = DrawRectangle
         });
-        var replacement = new RecordingUiScreen(new TestNode
+        var replacement = new RecordingScreen(new TestNode
         {
             CoreDesiredSize = new Size(10, 10),
             MeasureAction = () => events.Add("layout"),
@@ -761,9 +761,9 @@ public sealed class UiManagerTests
         Assert.False(replacement.IsOpen());
         Assert.Empty(events);
         Assert.False(replacement.Root!.IsMeasureValid);
-        var commands = new UiDrawCommandList();
+        var commands = new DrawCommandList();
         manager.AppendDrawCommands(commands);
-        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        Assert.Single(commands.OfType<FillRectangleCommand>());
 
         queue.RunPending();
         Assert.True(change.IsCompletedSuccessfully);
@@ -776,7 +776,7 @@ public sealed class UiManagerTests
         Assert.True(replacement.Root!.IsArrangeValid);
         commands.Clear();
         manager.AppendDrawCommands(commands);
-        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        Assert.Single(commands.OfType<FillRectangleCommand>());
         manager.Destroy();
         queue.Destroy();
         await change;
@@ -874,7 +874,7 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var expected = new InvalidOperationException("closing");
-        var oldScreen = new RecordingUiScreen(new TestNode())
+        var oldScreen = new RecordingScreen(new TestNode())
         {
             Closing = () => throw expected
         };
@@ -896,7 +896,7 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var expected = new InvalidOperationException("closing");
-        var screen = new RecordingUiScreen(new TestNode())
+        var screen = new RecordingScreen(new TestNode())
         {
             Closing = () => throw expected
         };
@@ -988,9 +988,9 @@ public sealed class UiManagerTests
         Assert.IsType<InvalidOperationException>(updateError);
         Assert.Same(screen, manager.CurrentScreen);
         Assert.False(change.IsCompleted);
-        var commands = new UiDrawCommandList();
+        var commands = new DrawCommandList();
         manager.AppendDrawCommands(commands);
-        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        Assert.Single(commands.OfType<FillRectangleCommand>());
 
         queue.RunPending();
         Assert.True(change.IsCompletedSuccessfully);
@@ -998,7 +998,7 @@ public sealed class UiManagerTests
         manager.UpdateFrame(new Size(100, 100), 0);
         commands.Clear();
         manager.AppendDrawCommands(commands);
-        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        Assert.Single(commands.OfType<FillRectangleCommand>());
         manager.Destroy();
         queue.Destroy();
         await change;
@@ -1036,7 +1036,7 @@ public sealed class UiManagerTests
         definitions.Freeze();
         manager.InitializeHud(definitions);
         manager.Hud.Post(() => events.Add("hud-post"));
-        var screen = new RecordingUiScreen(new TestNode { MeasureAction = () => events.Add("screen-layout") })
+        var screen = new RecordingScreen(new TestNode { MeasureAction = () => events.Add("screen-layout") })
         {
             FixedAction = () => events.Add("screen-fixed"),
             FrameAction = alpha =>
@@ -1070,7 +1070,7 @@ public sealed class UiManagerTests
         var events = new List<string>();
         var manager = new UiManager();
         var hud = new RecordingHud(new TestNode());
-        var screen = new RecordingUiScreen(new TestNode
+        var screen = new RecordingScreen(new TestNode
         {
             CoreDesiredSize = new Size(10, 10),
             MeasureAction = () => events.Add("layout"),
@@ -1104,9 +1104,9 @@ public sealed class UiManagerTests
         Assert.Null(manager.CurrentScreen);
         Assert.False(change.IsCompleted);
         Assert.False(screen.Root!.IsMeasureValid);
-        var commands = new UiDrawCommandList();
+        var commands = new DrawCommandList();
         manager.AppendDrawCommands(commands);
-        Assert.Empty(commands.OfType<UiFillRectangleCommand>());
+        Assert.Empty(commands.OfType<FillRectangleCommand>());
 
         queue.RunPending();
         Assert.True(change.IsCompletedSuccessfully);
@@ -1116,7 +1116,7 @@ public sealed class UiManagerTests
         Assert.True(screen.Root!.IsArrangeValid);
         commands.Clear();
         manager.AppendDrawCommands(commands);
-        Assert.Single(commands.OfType<UiFillRectangleCommand>());
+        Assert.Single(commands.OfType<FillRectangleCommand>());
         manager.Destroy();
         queue.Destroy();
         await change;
@@ -1129,7 +1129,7 @@ public sealed class UiManagerTests
         var dispatcher = new EngineDispatcher(queue);
         var manager = new UiManager();
         Task change = Task.CompletedTask;
-        var screen = new RecordingUiScreen(new TestNode())
+        var screen = new RecordingScreen(new TestNode())
         {
             FrameAction = _ => change = dispatcher.InvokeAsync(manager.Close)
         };
@@ -1156,12 +1156,12 @@ public sealed class UiManagerTests
         var dispatcher = new EngineDispatcher(queue);
         var manager = new UiManager();
         var failure = new InvalidOperationException("opening failed");
-        var replacement = new RecordingUiScreen
+        var replacement = new RecordingScreen
         {
             Opening = () => throw failure
         };
         Task change = Task.CompletedTask;
-        var screen = new RecordingUiScreen
+        var screen = new RecordingScreen
         {
             FrameAction = _ => change = dispatcher.InvokeAsync(() => manager.Open(replacement))
         };
@@ -1212,7 +1212,7 @@ public sealed class UiManagerTests
         definitions.Register(ResourceKey.Create("test", "later"), new HudDefinition(() => laterHud));
         definitions.Freeze();
         var root = new TestNode { MeasureAction = () => events.Add("screen-layout") };
-        var screen = new RecordingUiScreen(root)
+        var screen = new RecordingScreen(root)
         {
             FixedAction = () => events.Add("screen-fixed"),
             FrameAction = _ => events.Add("screen-frame")
@@ -1269,7 +1269,7 @@ public sealed class UiManagerTests
     {
         var manager = new UiManager();
         var failure = new InvalidOperationException("update failed");
-        var screen = new RecordingUiScreen(new TestNode())
+        var screen = new RecordingScreen(new TestNode())
         {
             FixedAction = () => throw failure,
             FrameAction = _ => throw failure
@@ -1297,7 +1297,7 @@ public sealed class UiManagerTests
             Assert.Throws<InvalidOperationException>(manager.Update);
             Assert.Throws<InvalidOperationException>(manager.Destroy);
             Assert.Throws<InvalidOperationException>(() => manager.UpdateFrame(new Size(10, 10), 0));
-            Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
+            Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(new DrawCommandList()));
         });
 
         manager.UpdateFrame(new Size(10, 10), 0);
@@ -1322,7 +1322,7 @@ public sealed class UiManagerTests
             Assert.Throws<InvalidOperationException>(manager.Destroy);
         }
 
-        var screen = new RecordingUiScreen(root)
+        var screen = new RecordingScreen(root)
         {
             FixedAction = Check,
             FrameAction = _ => Check()
@@ -1341,11 +1341,11 @@ public sealed class UiManagerTests
         Assert.Equal(!fixedUpdate, root.IsMeasureValid);
         manager.Destroy();
         Assert.Throws<ObjectDisposedException>(manager.Update);
-        Assert.Throws<ObjectDisposedException>(() => manager.AppendDrawCommands(new UiDrawCommandList()));
+        Assert.Throws<ObjectDisposedException>(() => manager.AppendDrawCommands(new DrawCommandList()));
         manager.Destroy();
     }
 
-    private static void DrawRectangle(UiDrawingContext context) =>
+    private static void DrawRectangle(DrawingContext context) =>
         context.FillRectangle(new Rect(0, 0, 10, 10), new Color(255, 255, 255));
 
     private static void CaptureNestedOperationErrors(
@@ -1358,7 +1358,7 @@ public sealed class UiManagerTests
         errors.Add(Record.Exception(() => manager.UpdateFrame(new Size(10, 10), 0)));
     }
 
-    private static ResourceKey InitializeHud(UiManager manager, UiNode root)
+    private static ResourceKey InitializeHud(UiManager manager, Node root)
     {
         var key = ResourceKey.Create("test", "hud");
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
@@ -1392,18 +1392,18 @@ public sealed class UiManagerTests
         return result;
     }
 
-    private sealed class TestNode : UiNode
+    private sealed class TestNode : Node
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }
         internal Size LastArrangeSize { get; private set; }
         internal Action? MeasureAction { get; set; }
         internal Action? ArrangeAction { get; set; }
-        internal Action<UiDrawingContext>? DrawAction { get; set; }
+        internal Action<DrawingContext>? DrawAction { get; set; }
         internal int MeasureCalls { get; private set; }
         internal int ArrangeCalls { get; private set; }
 
-        internal UiTicker AddTicker(Action<TimeSpan> onTick) => CreateTicker(onTick);
+        internal Ticker AddTicker(Action<TimeSpan> onTick) => CreateTicker(onTick);
 
         protected override Size MeasureCore(Size availableSize)
         {
@@ -1420,10 +1420,10 @@ public sealed class UiManagerTests
             ArrangeAction?.Invoke();
         }
 
-        protected override void DrawCore(UiDrawingContext context) => DrawAction?.Invoke(context);
+        protected override void DrawCore(DrawingContext context) => DrawAction?.Invoke(context);
     }
 
-    private sealed class RecordingHud(UiNode root) : Hud(root)
+    private sealed class RecordingHud(Node root) : Hud(root)
     {
         internal Action? FixedAction { get; init; }
         internal Action<double>? FrameAction { get; set; }
@@ -1432,7 +1432,7 @@ public sealed class UiManagerTests
         protected override void OnFrameUpdate(double alpha) => FrameAction?.Invoke(alpha);
     }
 
-    private sealed class RecordingUiScreen(UiNode? root = null) : GameScreen(root)
+    private sealed class RecordingScreen(Node? root = null) : GameScreen(root)
     {
         internal Action? Opening { get; set; }
         internal Action? Opened { get; set; }

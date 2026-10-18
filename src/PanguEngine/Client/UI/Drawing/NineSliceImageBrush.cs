@@ -18,7 +18,7 @@ public sealed class NineSliceImageBrush : Brush, IEquatable<NineSliceImageBrush>
     /// Thrown when the slice does not leave a positive center source region.
     /// </exception>
     public NineSliceImageBrush(
-        UiImage source,
+        Image source,
         ImageSlice slice,
         ImageSamplingMode samplingMode = ImageSamplingMode.Linear)
     {
@@ -43,7 +43,7 @@ public sealed class NineSliceImageBrush : Brush, IEquatable<NineSliceImageBrush>
     /// Thrown when the source region is outside the image or the slice does not leave a positive center region.
     /// </exception>
     public NineSliceImageBrush(
-        UiImage source,
+        Image source,
         Rect sourceRect,
         ImageSlice slice,
         ImageSamplingMode samplingMode = ImageSamplingMode.Linear)
@@ -66,7 +66,7 @@ public sealed class NineSliceImageBrush : Brush, IEquatable<NineSliceImageBrush>
     /// <summary>
     /// Gets the shared image source.
     /// </summary>
-    public UiImage Source { get; }
+    public Image Source { get; }
 
     /// <summary>
     /// Gets the source region in image pixel coordinates.

@@ -258,7 +258,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.6),
             ContentDesiredSize = Size.Zero
         };
-        _ = new UiScreen(region) { Scale = 1.25 };
+        _ = new Screen(region) { Scale = 1.25 };
 
         region.Measure(new Size(100, 100));
 
@@ -277,7 +277,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.6),
             ContentDesiredSize = Size.Zero
         };
-        _ = new UiScreen(region) { Scale = 1.25 };
+        _ = new Screen(region) { Scale = 1.25 };
         region.Measure(new Size(100, 100));
 
         region.Arrange(new Rect(10, 20, 100, 120));
@@ -299,7 +299,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.4),
             ContentDesiredSize = Size.Zero
         };
-        var screen = new UiScreen(region) { Scale = 1.25, UseLayoutRounding = false };
+        var screen = new Screen(region) { Scale = 1.25, UseLayoutRounding = false };
         region.Measure(new Size(100, 100));
 
         region.Arrange(new Rect(0, 0, 100, 100));
@@ -324,7 +324,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.6),
             ContentDesiredSize = Size.Zero
         };
-        var screen = new UiScreen(region) { Scale = 1.25 };
+        var screen = new Screen(region) { Scale = 1.25 };
         region.Measure(new Size(100, 100));
         region.Arrange(new Rect(10, 20, 100, 120));
         screen.Scale = 2;
@@ -350,7 +350,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.4),
             ContentDesiredSize = Size.Zero
         };
-        _ = new UiScreen(region) { Scale = 1.25 };
+        _ = new Screen(region) { Scale = 1.25 };
         region.Measure(new Size(100, 100));
         region.Arrange(new Rect(0, 0, 100, 100));
         Assert.NotEqual(Rect.Zero, region.ContentBounds);
@@ -489,7 +489,7 @@ public sealed class RegionTests
     [Fact]
     public void ImageBrushChangesDoNotInvalidateLayout()
     {
-        var image = UiImage.FromRgba(new byte[64], 4, 4);
+        var image = Image.FromRgba(new byte[64], 4, 4);
         var region = new TestRegion();
         ValidateLayout(region);
 
@@ -652,7 +652,7 @@ public sealed class RegionTests
         var original = new SolidColorBrush(10, 20, 30);
         var changed = new SolidColorBrush(40, 50, 60);
         region.Background = original;
-        var screen = new UiScreen(region);
+        var screen = new Screen(region);
         ValidateLayout(region);
         screen.Open();
 
@@ -709,7 +709,7 @@ public sealed class RegionTests
             BorderBrush = originalBrush,
             BorderThickness = new Thickness(1)
         };
-        var screen = new UiScreen(region);
+        var screen = new Screen(region);
         ValidateLayout(region);
         screen.Open();
 
@@ -727,7 +727,7 @@ public sealed class RegionTests
         screen.Close();
     }
 
-    private static void ValidateLayout(UiNode node)
+    private static void ValidateLayout(Node node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
@@ -757,7 +757,7 @@ public sealed class RegionTests
 
     private sealed class TestRegion : Region
     {
-        internal void Add(UiNode child) => Children.Add(child);
+        internal void Add(Node child) => Children.Add(child);
     }
 
     private sealed class HookRegion : Region
@@ -788,7 +788,7 @@ public sealed class RegionTests
         }
     }
 
-    private sealed class TestNode : UiNode
+    private sealed class TestNode : Node
     {
         internal Size CoreDesiredSize { get; set; }
         internal Size LastMeasureConstraint { get; private set; }

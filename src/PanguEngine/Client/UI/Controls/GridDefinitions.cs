@@ -45,8 +45,8 @@ public sealed class GridDefinitions : IReadOnlyList<GridDefinition>, IEquatable<
 
             var star = part.EndsWith('*');
             var number = star
-                ? part.Length == 1 ? 1 : UiCssValueConverters.ParseNumber(part[..^1])
-                : UiCssValueConverters.ParseLength(part);
+                ? part.Length == 1 ? 1 : CssValueConverters.ParseNumber(part[..^1])
+                : CssValueConverters.ParseLength(part);
             if (number < 0)
                 throw new FormatException("Grid lengths and weights cannot be negative.");
             definitions[index] = new GridLength(number, star ? GridUnitType.Star : GridUnitType.Pixel);

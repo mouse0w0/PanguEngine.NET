@@ -14,7 +14,7 @@ namespace PanguEngine.Client.UI.Controls;
 /// </remarks>
 internal sealed class ScrollViewport : Parent
 {
-    private UiNode? _content;
+    private Node? _content;
 
     internal ScrollViewport()
     {
@@ -41,7 +41,7 @@ internal sealed class ScrollViewport : Parent
     /// Replaces the content node, moving nodes through the validated parent operations.
     /// </summary>
     /// <param name="content">The new content node, or null to clear the content.</param>
-    internal void SetContent(UiNode? content)
+    internal void SetContent(Node? content)
     {
         if (ReferenceEquals(_content, content))
             return;
@@ -78,7 +78,7 @@ internal sealed class ScrollViewport : Parent
         content.Arrange(new Rect(-Offset.X, -Offset.Y, slotWidth, slotHeight));
     }
 
-    private void OnChildrenChanged(object? sender, ListChangedEventArgs<UiNode> change)
+    private void OnChildrenChanged(object? sender, ListChangedEventArgs<Node> change)
     {
         foreach (var child in change.OldItems)
         {

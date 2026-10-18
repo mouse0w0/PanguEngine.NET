@@ -208,7 +208,7 @@ public sealed class RadioButtonTests
         var newNode = new Panel();
         var button = new RadioButton<string> { Content = oldNode };
         var notifications = 0;
-        using var subscription = oldNode.Subscribe(UiNode.ParentProperty, (_, change) =>
+        using var subscription = oldNode.Subscribe(Node.ParentProperty, (_, change) =>
         {
             if (change.NewValue is null)
             {
@@ -259,7 +259,7 @@ public sealed class RadioButtonTests
     [Fact]
     public void TextContentMeasuresWithToolkitAndSelectionDoesNotChangeSize()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var group = new RadioGroup<string>();
         var button = new RadioButton<string> { Group = group, Value = "a", Content = "Option" };
         button.GetStyleRoot().UpdateStyles();
@@ -320,7 +320,7 @@ public sealed class RadioButtonTests
         {
             Content = content, Spacing = 1.1, Padding = Thickness.Zero, BorderThickness = Thickness.Zero
         };
-        _ = new UiScreen(button) { Scale = 1.5, UseLayoutRounding = rounding };
+        _ = new Screen(button) { Scale = 1.5, UseLayoutRounding = rounding };
         button.GetStyleRoot().UpdateStyles();
         button.Measure(new Size(100, 30));
         button.Arrange(new Rect(0, 0, 100, 30));
@@ -384,8 +384,8 @@ public sealed class RadioButtonTests
         var root = new StackPanel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new UiScreen(root);
-        screen.SetStyleSheets([UiStyleSheet.Parse("RadioButton { spacing: 5px; } RadioButton:checked { background-color: #010203; }")]);
+        var screen = new Screen(root);
+        screen.SetStyleSheets([StyleSheet.Parse("RadioButton { spacing: 5px; } RadioButton:checked { background-color: #010203; }")]);
         firstGroup.Select(first);
         secondGroup.Select(second);
         root.UpdateStyles();
@@ -466,7 +466,7 @@ public sealed class RadioButtonTests
     {
         var (manager, screen, _, group, buttons) = OpenScene();
         Assert.True(buttons[0].Focus());
-        void LoseAndReturnFocus(object? sender, PanguEngine.Client.UI.Input.UiKeyEventArgs args)
+        void LoseAndReturnFocus(object? sender, PanguEngine.Client.UI.Input.KeyEventArgs args)
         {
             if (args.Key == key)
             {
@@ -481,7 +481,7 @@ public sealed class RadioButtonTests
         manager.ProcessKeyDown(key, KeyModifiers.None);
         manager.ProcessKeyUp(key, KeyModifiers.None);
         Assert.Null(group.SelectedButton);
-        Assert.False(buttons[0].HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.False(buttons[0].HasPseudoClass(PseudoClass.Pressed));
         manager.Close();
     }
 
@@ -492,9 +492,9 @@ public sealed class RadioButtonTests
         Assert.True(buttons[0].Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
         Assert.False(buttons[0].IsPressed);
-        Assert.True(buttons[0].HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.True(buttons[0].HasPseudoClass(PseudoClass.Pressed));
         screen.ClearFocus();
-        Assert.False(buttons[0].HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.False(buttons[0].HasPseudoClass(PseudoClass.Pressed));
         manager.Close();
     }
 
@@ -550,7 +550,7 @@ public sealed class RadioButtonTests
     {
         var (manager, _, root, group, buttons) = OpenScene();
         root.Children.Remove(buttons[1]);
-        _ = new UiScreen(buttons[1]);
+        _ = new Screen(buttons[1]);
         buttons[2].Visibility = Visibility.Hidden;
         Assert.True(buttons[0].Focus());
         manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
@@ -615,14 +615,14 @@ public sealed class RadioButtonTests
         manager.ProcessPointerReleased(point, MouseButton.Left, KeyModifiers.None);
     }
 
-    private static Point ToScreen(UiNode node, Point local)
+    private static Point ToScreen(Node node, Point local)
     {
-        for (UiNode? current = node; current is not null; current = current.Parent)
+        for (Node? current = node; current is not null; current = current.Parent)
             local = new Point(local.X + current.LayoutBounds.X, local.Y + current.LayoutBounds.Y);
         return local;
     }
 
-    private static IEnumerable<UiNode> Descendants(Parent parent)
+    private static IEnumerable<Node> Descendants(Parent parent)
     {
         foreach (var child in parent.ReadOnlyChildren)
         {

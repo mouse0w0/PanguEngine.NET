@@ -20,7 +20,7 @@ public sealed class ToggleSwitch : Control
             static (control, value) => control.IsOn = value,
             onChanged: static (control, _, _) =>
             {
-                control.SetPseudoClass(UiPseudoClass.Checked, control.IsOn);
+                control.SetPseudoClass(PseudoClass.Checked, control.IsOn);
                 control.InvalidateArrange();
             });
 
@@ -30,7 +30,7 @@ public sealed class ToggleSwitch : Control
 
     static ToggleSwitch()
     {
-        UiCssRegistry.RegisterElement<ToggleSwitch>("ToggleSwitch");
+        CssRegistry.RegisterElement<ToggleSwitch>("ToggleSwitch");
     }
 
     /// <summary>
@@ -74,7 +74,7 @@ public sealed class ToggleSwitch : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button == MouseButton.Left)
@@ -82,7 +82,7 @@ public sealed class ToggleSwitch : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button == MouseButton.Left)
@@ -90,7 +90,7 @@ public sealed class ToggleSwitch : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerClicked(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
         var screen = Screen;
         base.OnPointerClicked(eventArgs);
@@ -103,7 +103,7 @@ public sealed class ToggleSwitch : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
         if (eventArgs.Handled || !IsEnabled || !IsFocused)
@@ -128,7 +128,7 @@ public sealed class ToggleSwitch : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyUp(UiKeyEventArgs eventArgs)
+    protected override void OnKeyUp(KeyEventArgs eventArgs)
     {
         var activate = eventArgs.Key == Key.Space && _spaceKeyDown;
         if (eventArgs.Key == Key.Space)
@@ -149,7 +149,7 @@ public sealed class ToggleSwitch : Control
     }
 
     /// <inheritdoc />
-    protected override void OnLostFocus(UiFocusChangedEventArgs eventArgs)
+    protected override void OnLostFocus(FocusChangedEventArgs eventArgs)
     {
         _enterKeyDown = false;
         SetSpaceKeyDown(false);
@@ -159,12 +159,12 @@ public sealed class ToggleSwitch : Control
     /// <inheritdoc />
     protected override bool IsPressedPseudoClassActive => IsPressed || _spaceKeyDown;
 
-    private bool CanReceivePointerInput(UiScreen? screen)
+    private bool CanReceivePointerInput(Screen? screen)
     {
         if (screen is null || !ReferenceEquals(Screen, screen) || !screen.IsOpen())
             return false;
 
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (Node? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;

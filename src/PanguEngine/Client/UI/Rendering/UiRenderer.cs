@@ -10,7 +10,7 @@ internal sealed class UiRenderer
 {
     private readonly GraphicsDevice _device;
     private readonly bool _convertSrgbToLinear;
-    private readonly UiDrawBuilder _builder = new();
+    private readonly DrawBuilder _builder = new();
     private readonly FrameResources[] _frameResources;
     private readonly UiResourceManager _resourceManager;
     private readonly GraphicsPipeline _pipeline;
@@ -42,7 +42,7 @@ internal sealed class UiRenderer
                 0,
                 DescriptorType.SampledImage,
                 ShaderStageFlags.Fragment,
-                UiTextureTable.SlotCount),
+                TextureTable.SlotCount),
             new DescriptorSetLayoutBinding(1, DescriptorType.Sampler, ShaderStageFlags.Fragment),
             new DescriptorSetLayoutBinding(2, DescriptorType.Sampler, ShaderStageFlags.Fragment)
         ]));
@@ -76,7 +76,7 @@ internal sealed class UiRenderer
         _resourceManager.PrepareFrame(frame.FrameSlot);
     }
 
-    internal void Draw(Frame frame, UiDrawCommandList commands)
+    internal void Draw(Frame frame, DrawCommandList commands)
     {
         ObjectDisposedException.ThrowIf(_destroyed, this);
         ArgumentNullException.ThrowIfNull(frame);
@@ -113,7 +113,7 @@ internal sealed class UiRenderer
         commandList.SetViewport(0, 0, frame.Width, frame.Height);
         commandList.SetVertexBuffer(0, vertexBuffer);
         commandList.SetIndexBuffer(indexBuffer, IndexFormat.UInt32);
-        var projection = new UiProjection(2f / frame.Width, 2f / frame.Height);
+        var projection = new Projection(2f / frame.Width, 2f / frame.Height);
         commandList.SetPushConstants(ShaderStageFlags.Vertex, 0, projection);
         foreach (var batch in _builder.Batches)
         {
@@ -174,11 +174,11 @@ internal sealed class UiRenderer
             pipeline = device.CreateGraphicsPipeline(new GraphicsPipelineDescription
             {
                 Shaders = [vertexShader, fragmentShader],
-                VertexInput = UiVertex.VertexInput,
+                VertexInput = Vertex.VertexInput,
                 ColorAttachmentFormats = [colorFormat],
                 DescriptorSetLayouts = [descriptorSetLayout, drawDataLayout],
                 PushConstantRanges =
-                    [new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, UiProjection.SizeInBytes)],
+                    [new PushConstantRangeDescription(ShaderStageFlags.Vertex, 0, Projection.SizeInBytes)],
                 Rasterizer = new RasterizerDescription { CullMode = CullMode.None },
                 ColorBlend = new ColorBlendDescription { AlphaBlend = true },
                 DepthStencil =
@@ -203,9 +203,9 @@ internal sealed class UiRenderer
     {
         if (frame.VertexCapacity < requiredVertexCount)
         {
-            var capacity = UiDrawBuilder.GrowCapacity(frame.VertexCapacity, requiredVertexCount);
+            var capacity = DrawBuilder.GrowCapacity(frame.VertexCapacity, requiredVertexCount);
             var vertexBuffer = _device.CreateBuffer(new BufferDescription(
-                checked((ulong)capacity * UiVertex.SizeInBytes),
+                checked((ulong)capacity * Vertex.SizeInBytes),
                 BufferUsage.Vertex,
                 MemoryUsage.CpuToGpu));
             var previous = frame.VertexBuffer;
@@ -216,7 +216,7 @@ internal sealed class UiRenderer
 
         if (frame.IndexCapacity < requiredIndexCount)
         {
-            var capacity = UiDrawBuilder.GrowCapacity(frame.IndexCapacity, requiredIndexCount);
+            var capacity = DrawBuilder.GrowCapacity(frame.IndexCapacity, requiredIndexCount);
             var indexBuffer = _device.CreateBuffer(new BufferDescription(
                 checked((ulong)capacity * sizeof(uint)),
                 BufferUsage.Index,
@@ -240,16 +240,16 @@ internal sealed class UiRenderer
         var previousDescriptorSet = frame.DrawDataDescriptorSet;
         if (growDrawData)
         {
-            frame.DrawDataCapacity = UiDrawBuilder.GrowCapacity(frame.DrawDataCapacity, drawCount);
+            frame.DrawDataCapacity = DrawBuilder.GrowCapacity(frame.DrawDataCapacity, drawCount);
             frame.DrawDataBuffer = _device.CreateBuffer(new BufferDescription(
-                checked((ulong)frame.DrawDataCapacity * UiGpuDrawData.SizeInBytes),
+                checked((ulong)frame.DrawDataCapacity * GpuDrawData.SizeInBytes),
                 BufferUsage.Storage, MemoryUsage.CpuToGpu));
         }
         if (growClipData)
         {
-            frame.ClipDataCapacity = UiDrawBuilder.GrowCapacity(frame.ClipDataCapacity, clipCount);
+            frame.ClipDataCapacity = DrawBuilder.GrowCapacity(frame.ClipDataCapacity, clipCount);
             frame.ClipDataBuffer = _device.CreateBuffer(new BufferDescription(
-                checked((ulong)frame.ClipDataCapacity * UiGpuClipData.SizeInBytes),
+                checked((ulong)frame.ClipDataCapacity * GpuClipData.SizeInBytes),
                 BufferUsage.Storage, MemoryUsage.CpuToGpu));
         }
         var drawBuffer = frame.DrawDataBuffer!;
@@ -268,7 +268,7 @@ internal sealed class UiRenderer
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private readonly struct UiProjection(float clipScaleX, float clipScaleY)
+    private readonly struct Projection(float clipScaleX, float clipScaleY)
     {
         internal const uint SizeInBytes = 8;
         private readonly float _clipScaleX = clipScaleX;

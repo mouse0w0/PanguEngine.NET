@@ -5,13 +5,13 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Represents a UI screen with client game policies and update callbacks.
 /// </summary>
-public class GameScreen : UiScreen
+public class GameScreen : Screen
 {
     /// <summary>
     /// Initializes a game screen with an optional root node.
     /// </summary>
     /// <param name="root">The initial root node, or null to create an empty screen.</param>
-    public GameScreen(UiNode? root = null) : base(root)
+    public GameScreen(Node? root = null) : base(root)
     {
     }
 

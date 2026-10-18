@@ -7,25 +7,25 @@ public abstract partial class Shape
 {
     static Shape()
     {
-        UiCssRegistry.RegisterElement<Shape>("Shape");
-        UiCssRegistry.RegisterProperty<Shape, Brush?>("fill", FillProperty, UiCssValueConverters.ParseBrush);
-        UiCssRegistry.RegisterProperty<Shape, Brush?>("stroke", StrokeProperty, UiCssValueConverters.ParseBrush);
-        UiCssRegistry.RegisterProperty<Shape, double>(
+        CssRegistry.RegisterElement<Shape>("Shape");
+        CssRegistry.RegisterProperty<Shape, Brush?>("fill", FillProperty, CssValueConverters.ParseBrush);
+        CssRegistry.RegisterProperty<Shape, Brush?>("stroke", StrokeProperty, CssValueConverters.ParseBrush);
+        CssRegistry.RegisterProperty<Shape, double>(
             "stroke-width",
             StrokeThicknessProperty,
-            UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Shape, StrokeLineCap>(
+            CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Shape, StrokeLineCap>(
             "stroke-linecap",
             StrokeLineCapProperty,
             ParseStrokeLineCap);
-        UiCssRegistry.RegisterProperty<Shape, StrokeLineJoin>(
+        CssRegistry.RegisterProperty<Shape, StrokeLineJoin>(
             "stroke-linejoin",
             StrokeLineJoinProperty,
             ParseStrokeLineJoin);
-        UiCssRegistry.RegisterProperty<Shape, double>(
+        CssRegistry.RegisterProperty<Shape, double>(
             "stroke-miterlimit",
             StrokeMiterLimitProperty,
-            UiCssValueConverters.ParseNumber);
+            CssValueConverters.ParseNumber);
     }
 
     private static StrokeLineCap ParseStrokeLineCap(string value) =>

@@ -39,7 +39,7 @@ internal static class UiShowcaseRoundedRectangles
                 UiShowcaseWidgets.Sample("透明背景 · 半透明边框", translucent)));
     }
 
-    private static UiShowcaseExample CreateBrushesExample(UiImage image)
+    private static UiShowcaseExample CreateBrushesExample(Image image)
     {
         var imageBackground = Surface(new CornerRadius(28));
         imageBackground.Background = new ImageBrush(image, ImageStretch.UniformToFill);
@@ -88,7 +88,7 @@ internal static class UiShowcaseRoundedRectangles
                 radiusValue, change));
     }
 
-    private static UiShowcaseExample CreateClipExample(UiImage image, Action<string> report)
+    private static UiShowcaseExample CreateClipExample(Image image, Action<string> report)
     {
         var clicks = 0;
         var feedback = UiShowcaseWidgets.Caption("角块点击次数：0");
@@ -137,7 +137,7 @@ internal static class UiShowcaseRoundedRectangles
         StrokeThickness = 4
     };
 
-    private static Canvas ClipSurface(bool clip, UiImage image, Action click)
+    private static Canvas ClipSurface(bool clip, Image image, Action click)
     {
         var host = new Canvas
         {
@@ -168,7 +168,7 @@ internal static class UiShowcaseRoundedRectangles
         return host;
     }
 
-    private static UiImage CreatePatternImage()
+    private static Image CreatePatternImage()
     {
         const int size = 48;
         var pixels = new byte[size * size * 4];
@@ -181,6 +181,6 @@ internal static class UiShowcaseRoundedRectangles
             pixels[offset + 2] = (byte)((x / 8 + y / 8) % 2 == 0 ? 220 : 90);
             pixels[offset + 3] = 255;
         }
-        return UiImage.FromRgba(pixels, size, size);
+        return Image.FromRgba(pixels, size, size);
     }
 }

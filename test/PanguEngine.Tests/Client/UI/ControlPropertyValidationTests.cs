@@ -26,8 +26,8 @@ public sealed class ControlPropertyValidationTests
     [Fact]
     public void ExistingEnumConstraintsRejectUndefinedValuesAtThePropertyBoundary()
     {
-        AssertRejected(new Panel(), UiNode.HorizontalAlignmentProperty, (HorizontalAlignment)123);
-        AssertRejected(new Panel(), UiNode.VerticalAlignmentProperty, (VerticalAlignment)123);
+        AssertRejected(new Panel(), Node.HorizontalAlignmentProperty, (HorizontalAlignment)123);
+        AssertRejected(new Panel(), Node.VerticalAlignmentProperty, (VerticalAlignment)123);
         AssertRejected(new ImageView(), ImageView.StretchProperty, (ImageStretch)123);
         AssertRejected(new Path(), Path.StretchProperty, (PathStretch)123);
     }
@@ -36,16 +36,16 @@ public sealed class ControlPropertyValidationTests
     public void TextInputsRejectNullBeforePublishingOrSynchronizingChildren()
     {
         AssertRejected(new Text(), Text.ContentProperty, null!);
-        AssertRejected(new Panel(), UiNode.FontFamilyProperty, null!);
-        AssertRejected(new Text(), UiNode.FontFamilyProperty, null!);
+        AssertRejected(new Panel(), Node.FontFamilyProperty, null!);
+        AssertRejected(new Text(), Node.FontFamilyProperty, null!);
         AssertRejected(new Button(), Button.TextProperty, null!);
-        AssertRejected(new Button(), UiNode.FontFamilyProperty, null!);
+        AssertRejected(new Button(), Node.FontFamilyProperty, null!);
         AssertRejected(new TextBox(), TextBox.TextProperty, null!);
         AssertRejected(new TextBox(), TextBox.PlaceholderProperty, null!);
-        AssertRejected(new TextBox(), UiNode.FontFamilyProperty, null!);
+        AssertRejected(new TextBox(), Node.FontFamilyProperty, null!);
     }
 
-    private static void AssertRejected<T>(UiNode node, Property<T> property, T value)
+    private static void AssertRejected<T>(Node node, Property<T> property, T value)
     {
         var previous = node.GetValue(property);
         var notifications = 0;
@@ -55,7 +55,7 @@ public sealed class ControlPropertyValidationTests
         Assert.Equal(0, notifications);
     }
 
-    private static IEnumerable<(Func<UiNode> Create, Property<double> Property, double Valid, double[] Invalid)> NumericCases()
+    private static IEnumerable<(Func<Node> Create, Property<double> Property, double Valid, double[] Invalid)> NumericCases()
     {
         double[] nonNegative = [-1, double.NaN, double.PositiveInfinity, double.NegativeInfinity];
         double[] positive = [0, -1, double.NaN, double.PositiveInfinity, double.NegativeInfinity];
@@ -67,8 +67,8 @@ public sealed class ControlPropertyValidationTests
         yield return (() => new Rectangle(), Shape.StrokeMiterLimitProperty, 1, [0.5, double.NaN, double.PositiveInfinity, double.NegativeInfinity]);
         yield return (() => new Text(), Text.FontSizeProperty, 12, positive);
         yield return (() => new Text(), Text.LineHeightProperty, 1, positive);
-        yield return (() => new Panel(), UiNode.LineHeightProperty, 1, positive);
-        yield return (() => new TextBox(), UiNode.LineHeightProperty, 1, positive);
+        yield return (() => new Panel(), Node.LineHeightProperty, 1, positive);
+        yield return (() => new TextBox(), Node.LineHeightProperty, 1, positive);
         yield return (() => new TextBox(), TextBox.FontSizeProperty, 12, positive);
         yield return (() => new ScrollBar(), ScrollBar.LargeChangeProperty, 0, nonNegative);
         yield return (() => new ScrollBar(), ScrollBar.MinimumThumbLengthProperty, 0, nonNegative);

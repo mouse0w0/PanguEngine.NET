@@ -30,8 +30,8 @@ public class Button : Control
     /// <summary>
     /// Identifies the <see cref="Icon"/> property.
     /// </summary>
-    public static readonly Property<UiImage?> IconProperty =
-        Property.Register<Button, UiImage?>(
+    public static readonly Property<Image?> IconProperty =
+        Property.Register<Button, Image?>(
             nameof(Icon),
             defaultValue: null,
             onChanged: static (node, _, _) =>
@@ -69,9 +69,9 @@ public class Button : Control
 
     static Button()
     {
-        UiCssRegistry.RegisterElement<Button>("Button");
-        UiCssRegistry.RegisterProperty<Button, double>("icon-size", IconSizeProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Button, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
+        CssRegistry.RegisterElement<Button>("Button");
+        CssRegistry.RegisterProperty<Button, double>("icon-size", IconSizeProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Button, double>("spacing", SpacingProperty, CssValueConverters.ParseLength);
     }
 
     private ImageView? _imageNode;
@@ -100,7 +100,7 @@ public class Button : Control
     /// <summary>
     /// Gets or sets the shared image displayed before the button text.
     /// </summary>
-    public UiImage? Icon
+    public Image? Icon
     {
         get => GetValue(IconProperty);
         set => SetValue(IconProperty, value);
@@ -198,7 +198,7 @@ public class Button : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button == MouseButton.Left)
@@ -206,7 +206,7 @@ public class Button : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button == MouseButton.Left)
@@ -214,7 +214,7 @@ public class Button : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerClicked(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
         var activate = eventArgs.Button == MouseButton.Left && IsEnabled;
         base.OnPointerClicked(eventArgs);
@@ -227,7 +227,7 @@ public class Button : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         switch (eventArgs.Key)
         {
@@ -253,7 +253,7 @@ public class Button : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyUp(UiKeyEventArgs eventArgs)
+    protected override void OnKeyUp(KeyEventArgs eventArgs)
     {
         switch (eventArgs.Key)
         {
@@ -279,7 +279,7 @@ public class Button : Control
     }
 
     /// <inheritdoc />
-    protected override void OnLostFocus(UiFocusChangedEventArgs eventArgs)
+    protected override void OnLostFocus(FocusChangedEventArgs eventArgs)
     {
         _enterKeyDown = false;
         SetSpaceKeyDown(false);
@@ -361,7 +361,7 @@ public class Button : Control
 
         var screen = Screen;
         if (screen?.UseLayoutRounding ?? true)
-            spacing = UiLayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1);
+            spacing = LayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1);
         return spacing;
     }
 
@@ -373,7 +373,7 @@ public class Button : Control
         RefreshPressedPseudoClass();
     }
 
-    private static void ArrangeCentered(UiNode child, Rect contentBounds)
+    private static void ArrangeCentered(Node child, Rect contentBounds)
     {
         var desiredSize = child.DesiredSize;
         child.Arrange(new Rect(

@@ -323,7 +323,7 @@ public sealed partial class TabView
         }
     }
 
-    private void ValidateSlotNode(UiNode? node)
+    private void ValidateSlotNode(Node? node)
     {
         if (node is null)
             return;
@@ -335,9 +335,9 @@ public sealed partial class TabView
             throw new InvalidOperationException("A tab slot node cannot contain the tab view.");
     }
 
-    private bool IsAncestorOfView(UiNode node)
+    private bool IsAncestorOfView(Node node)
     {
-        for (UiNode? current = this; current is not null; current = current.Parent)
+        for (Node? current = this; current is not null; current = current.Parent)
         {
             if (ReferenceEquals(current, node))
                 return true;

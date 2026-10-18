@@ -45,7 +45,7 @@ public sealed class ScrollViewTests
     public void DefaultBaseStyleSheetStylesScrollViewChrome()
     {
         var view = new ScrollView();
-        var screen = new UiScreen(view);
+        var screen = new Screen(view);
 
         screen.Root!.UpdateStyles();
 
@@ -54,7 +54,7 @@ public sealed class ScrollViewTests
         Assert.NotNull(view.Background);
         Assert.Contains(
             view.GetStyleValueSources(Region.BorderThicknessProperty),
-            source => source.Origin == UiStyleOrigin.Base);
+            source => source.Origin == StyleOrigin.Base);
     }
 
     [Fact]
@@ -945,7 +945,7 @@ public sealed class ScrollViewTests
     [Fact]
     public void HandledTextBoxKeyDoesNotScrollTheView()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var textBox = new TextBox { Width = 400, Height = 100, Text = "abc" };
         var view = new ScrollView
         {
@@ -1014,7 +1014,7 @@ public sealed class ScrollViewTests
         var (manager, screen, _) = OpenScene(view, new Size(200, 200));
         screen.Scale = scale;
         screen.UseLayoutRounding = useLayoutRounding;
-        screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { bar-thickness: 16.5px; }")]);
+        screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { bar-thickness: 16.5px; }")]);
         manager.UpdateFrame(new Size(200 * scale, 200 * scale), 0);
         try
         {
@@ -1040,7 +1040,7 @@ public sealed class ScrollViewTests
         }
     }
 
-    private static bool IsSelfOrDescendant(UiNode? node, UiNode ancestor)
+    private static bool IsSelfOrDescendant(Node? node, Node ancestor)
     {
         for (var current = node; current is not null; current = current.Parent)
         {
@@ -1063,17 +1063,17 @@ public sealed class ScrollViewTests
         return (manager, screen, view);
     }
 
-    private sealed class TestNode : UiNode
+    private sealed class TestNode : Node
     {
     }
 
     private sealed class ContentSource : INotifyPropertyChanged
     {
-        private UiNode? _child;
+        private Node? _child;
 
         public event PropertyChangedEventHandler? PropertyChanged;
 
-        public UiNode? Child
+        public Node? Child
         {
             get => _child;
             set

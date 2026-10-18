@@ -96,19 +96,19 @@ public sealed class HudScreenTests
             }) { Scale = 0.5 };
             manager.Open(screen);
             manager.UpdateFrame(new Size(200, 100), 0);
-            var commands = new UiDrawCommandList();
-            var builder = new UiDrawBuilder();
+            var commands = new DrawCommandList();
+            var builder = new DrawBuilder();
 
             manager.AppendDrawCommands(commands);
             builder.Build(commands, 200, 100, false);
 
             Assert.Equal(2, builder.RectangleCount);
-            Assert.Equal(new UiVertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
-            Assert.Equal(new UiVertex(10, 10, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
-            Assert.Equal(new UiVertex(0.5f, 1, 0, 1, 0, 1), builder.Vertices[4]);
-            Assert.Equal(new UiVertex(2.5f, 4, 0, 1, 0, 1), builder.Vertices[6]);
+            Assert.Equal(new Vertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
+            Assert.Equal(new Vertex(10, 10, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[2]);
+            Assert.Equal(new Vertex(0.5f, 1, 0, 1, 0, 1), builder.Vertices[4]);
+            Assert.Equal(new Vertex(2.5f, 4, 0, 1, 0, 1), builder.Vertices[6]);
             Assert.Equal(
-                [new UiBatch(new UiScissor(0, 0, 200, 100), 0, 12)],
+                [new Batch(new Scissor(0, 0, 200, 100), 0, 12)],
                 builder.Batches.ToArray());
             var data = builder.DrawData[(int)builder.Vertices[0].DrawDataIndex];
             Assert.Equal(new System.Numerics.Vector4(0, 0, 10, 10), builder.ClipData[(int)data.ClipIndex].Bounds);
@@ -118,9 +118,9 @@ public sealed class HudScreenTests
             manager.AppendDrawCommands(commands);
             builder.Build(commands, 200, 100, false);
 
-            Assert.Single(commands.OfType<UiFillRectangleCommand>());
+            Assert.Single(commands.OfType<FillRectangleCommand>());
             Assert.Equal(1, builder.RectangleCount);
-            Assert.Equal(new UiVertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
+            Assert.Equal(new Vertex(2, 4, 1, 0, 0, 0.25f, drawDataIndex: builder.Vertices[0].DrawDataIndex), builder.Vertices[0]);
         }
         finally
         {
@@ -145,14 +145,14 @@ public sealed class HudScreenTests
                 DrawAction = _ => throw expected
             }));
             manager.UpdateFrame(new Size(200, 100), 0);
-            var commands = new UiDrawCommandList();
+            var commands = new DrawCommandList();
 
             Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => manager.AppendDrawCommands(commands)));
             Assert.Empty(commands);
 
             manager.Close();
             manager.AppendDrawCommands(commands);
-            var builder = new UiDrawBuilder();
+            var builder = new DrawBuilder();
             builder.Build(commands, 200, 100, false);
 
             Assert.Equal(1, builder.RectangleCount);
@@ -171,7 +171,7 @@ public sealed class HudScreenTests
         var manager = new UiManager();
         try
         {
-            var commands = new UiDrawCommandList();
+            var commands = new DrawCommandList();
             var errors = new List<Exception?>();
             var postedActionExecuted = false;
             var node = new DrawingNode
@@ -202,7 +202,7 @@ public sealed class HudScreenTests
 
             Assert.Equal(5, errors.Count);
             Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
-            Assert.Single(commands.OfType<UiFillRectangleCommand>());
+            Assert.Single(commands.OfType<FillRectangleCommand>());
             Assert.False(postedActionExecuted);
 
             manager.UpdateFrame(new Size(200, 100), 0);
@@ -215,7 +215,7 @@ public sealed class HudScreenTests
         }
     }
 
-    private static void InitializeHud(UiManager manager, UiNode root)
+    private static void InitializeHud(UiManager manager, Node root)
     {
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
         definitions.Register(ResourceKey.Create("test", "hud"), new HudDefinition(() => new TestHud(root)));
@@ -223,18 +223,18 @@ public sealed class HudScreenTests
         manager.InitializeHud(definitions);
     }
 
-    private sealed class TestHud(UiNode root) : Hud(root)
+    private sealed class TestHud(Node root) : Hud(root)
     {
     }
 
-    private sealed class DrawingNode : UiNode
+    private sealed class DrawingNode : Node
     {
-        public Action<UiDrawingContext>? DrawAction { get; init; }
+        public Action<DrawingContext>? DrawAction { get; init; }
 
-        protected override void DrawCore(UiDrawingContext context) => DrawAction?.Invoke(context);
+        protected override void DrawCore(DrawingContext context) => DrawAction?.Invoke(context);
     }
 
-    private sealed class FocusableTestNode : UiNode
+    private sealed class FocusableTestNode : Node
     {
         public FocusableTestNode()
         {

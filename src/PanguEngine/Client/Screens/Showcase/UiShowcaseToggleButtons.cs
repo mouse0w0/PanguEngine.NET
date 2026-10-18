@@ -39,7 +39,7 @@ internal static class UiShowcaseToggleButtons
             report(model.IsGridVisible ? "从外部开启网格显示" : "从外部关闭网格显示");
         });
 
-        var icon = UiImage.FromRgba(
+        var icon = Image.FromRgba(
         [
             84, 169, 255, 255, 48, 54, 62, 255,
             48, 54, 62, 255, 84, 169, 255, 255

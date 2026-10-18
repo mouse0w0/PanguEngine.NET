@@ -74,8 +74,8 @@ public sealed partial class ScrollView
         if (Screen?.UseLayoutRounding ?? true)
         {
             var scale = Screen?.Scale ?? 1;
-            horizontalThickness = UiLayoutHelper.RoundLayoutValueUp(horizontalThickness, scale);
-            verticalThickness = UiLayoutHelper.RoundLayoutValueUp(verticalThickness, scale);
+            horizontalThickness = LayoutHelper.RoundLayoutValueUp(horizontalThickness, scale);
+            verticalThickness = LayoutHelper.RoundLayoutValueUp(verticalThickness, scale);
         }
         var showHorizontal = HorizontalScrollBarVisibility == ScrollBarVisibility.Visible;
         var showVertical = VerticalScrollBarVisibility == ScrollBarVisibility.Visible;

@@ -200,7 +200,7 @@ public sealed class UiManager
         }
     }
 
-    internal void AppendDrawCommands(UiDrawCommandList commands)
+    internal void AppendDrawCommands(DrawCommandList commands)
     {
         VerifyAccess();
         VerifyLifecycleOperation();

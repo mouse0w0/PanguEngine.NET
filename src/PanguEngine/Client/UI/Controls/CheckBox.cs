@@ -41,12 +41,12 @@ public sealed class CheckBox : Control
     private bool _spaceKeyDown;
     private int _focusVersion;
 
-    private UiNode? ContentNode => _contentPanel.Children.Count == 0 ? null : _contentPanel.Children[0];
+    private Node? ContentNode => _contentPanel.Children.Count == 0 ? null : _contentPanel.Children[0];
 
     static CheckBox()
     {
-        UiCssRegistry.RegisterElement<CheckBox>("CheckBox");
-        UiCssRegistry.RegisterProperty<CheckBox, double>("spacing", SpacingProperty, UiCssValueConverters.ParseLength);
+        CssRegistry.RegisterElement<CheckBox>("CheckBox");
+        CssRegistry.RegisterProperty<CheckBox, double>("spacing", SpacingProperty, CssValueConverters.ParseLength);
     }
 
     /// <summary>Initializes a focusable check box with an empty label.</summary>
@@ -91,9 +91,9 @@ public sealed class CheckBox : Control
         get => _content;
         set
         {
-            if (value is UiNode node)
+            if (value is Node node)
             {
-                for (UiNode? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
+                for (Node? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
                     if (ReferenceEquals(node, ancestor))
                         throw new ArgumentException("Content cannot be this check box or an ancestor.", nameof(value));
                 if (ReferenceEquals(node, _box) || ReferenceEquals(node, _mark) || ReferenceEquals(node, _contentPanel))
@@ -140,7 +140,7 @@ public sealed class CheckBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button == MouseButton.Left)
@@ -148,7 +148,7 @@ public sealed class CheckBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button == MouseButton.Left)
@@ -156,7 +156,7 @@ public sealed class CheckBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerClicked(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
         var screen = Screen;
         base.OnPointerClicked(eventArgs);
@@ -168,7 +168,7 @@ public sealed class CheckBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         if (eventArgs.Key != Key.Space)
         {
@@ -182,7 +182,7 @@ public sealed class CheckBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyUp(UiKeyEventArgs eventArgs)
+    protected override void OnKeyUp(KeyEventArgs eventArgs)
     {
         if (eventArgs.Key != Key.Space)
         {
@@ -200,7 +200,7 @@ public sealed class CheckBox : Control
     }
 
     /// <inheritdoc />
-    protected override void OnLostFocus(UiFocusChangedEventArgs eventArgs)
+    protected override void OnLostFocus(FocusChangedEventArgs eventArgs)
     {
         _focusVersion++;
         SetSpaceKeyDown(false);
@@ -212,7 +212,7 @@ public sealed class CheckBox : Control
 
     private void SynchronizeContent(object? value)
     {
-        UiNode? node = value as UiNode;
+        Node? node = value as Node;
         if (node is null && value is not null)
         {
             var text = value is string content ? content : value.ToString();
@@ -226,7 +226,7 @@ public sealed class CheckBox : Control
             SetContentNode(node, value);
     }
 
-    private void SetContentNode(UiNode? node, object? expectedValue)
+    private void SetContentNode(Node? node, object? expectedValue)
     {
         if (ReferenceEquals(ContentNode, node))
             return;
@@ -247,7 +247,7 @@ public sealed class CheckBox : Control
         _contentPanel.Children.Add(node);
     }
 
-    private void OnContentChildrenChanged(object? sender, ListChangedEventArgs<UiNode> change)
+    private void OnContentChildrenChanged(object? sender, ListChangedEventArgs<Node> change)
     {
         foreach (var node in change.OldItems)
             if (!ReferenceEquals(node.Parent, _contentPanel) && ReferenceEquals(Content, node))
@@ -257,8 +257,8 @@ public sealed class CheckBox : Control
     private void SynchronizeCheckState()
     {
         var state = IsChecked;
-        SetPseudoClass(UiPseudoClass.Checked, state == true);
-        SetPseudoClass(UiPseudoClass.Indeterminate, state is null);
+        SetPseudoClass(PseudoClass.Checked, state == true);
+        SetPseudoClass(PseudoClass.Indeterminate, state is null);
     }
 
     private double GetLayoutSpacing()
@@ -268,7 +268,7 @@ public sealed class CheckBox : Control
         var spacing = Spacing;
         var screen = Screen;
         return screen?.UseLayoutRounding ?? true
-            ? UiLayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1)
+            ? LayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1)
             : spacing;
     }
 
@@ -291,11 +291,11 @@ public sealed class CheckBox : Control
         Click?.Invoke(this, EventArgs.Empty);
     }
 
-    private bool CanActivate(UiScreen? screen)
+    private bool CanActivate(Screen? screen)
     {
         if (screen is null || !screen.IsOpen() || !ReferenceEquals(Screen, screen))
             return false;
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (Node? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;

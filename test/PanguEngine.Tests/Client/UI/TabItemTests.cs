@@ -125,17 +125,17 @@ public sealed class TabItemTests
         view.Items.Add(first);
         view.Items.Add(second);
 
-        Assert.True(first.HasPseudoClass(UiPseudoClass.Selected));
-        Assert.False(second.HasPseudoClass(UiPseudoClass.Selected));
+        Assert.True(first.HasPseudoClass(PseudoClass.Selected));
+        Assert.False(second.HasPseudoClass(PseudoClass.Selected));
 
         view.Selection.SelectedItem = second;
 
-        Assert.False(first.HasPseudoClass(UiPseudoClass.Selected));
-        Assert.True(second.HasPseudoClass(UiPseudoClass.Selected));
+        Assert.False(first.HasPseudoClass(PseudoClass.Selected));
+        Assert.True(second.HasPseudoClass(PseudoClass.Selected));
 
         view.Selection.SelectedItem = null;
 
-        Assert.False(second.HasPseudoClass(UiPseudoClass.Selected));
+        Assert.False(second.HasPseudoClass(PseudoClass.Selected));
     }
 
     [Fact]

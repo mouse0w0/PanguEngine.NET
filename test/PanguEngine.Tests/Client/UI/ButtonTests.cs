@@ -25,12 +25,12 @@ public sealed class ButtonTests
         AssertProperty(
             Button.TextProperty,
             string.Empty);
-        Assert.Equal(typeof(UiNode), Button.FontFamilyProperty.OwnerType);
-        Assert.Equal(typeof(UiNode), Button.ColorProperty.OwnerType);
+        Assert.Equal(typeof(Node), Button.FontFamilyProperty.OwnerType);
+        Assert.Equal(typeof(Node), Button.ColorProperty.OwnerType);
         Assert.Equal(new Color(242, 244, 247), button.Color);
         AssertProperty(
             Button.IconProperty,
-            (UiImage?)null);
+            (Image?)null);
         AssertProperty(
             Button.IconSizeProperty,
             16d);
@@ -58,7 +58,7 @@ public sealed class ButtonTests
         Assert.Null(typeof(Button).GetProperty(
             nameof(Parent.Children),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
-        Assert.IsAssignableFrom<IReadOnlyList<UiNode>>(button.ReadOnlyChildren);
+        Assert.IsAssignableFrom<IReadOnlyList<Node>>(button.ReadOnlyChildren);
     }
 
     [Fact]
@@ -189,7 +189,7 @@ public sealed class ButtonTests
     public void IconAndTextAreCenteredWithRoundedSpacing()
     {
         const double scale = 1.25;
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var button = new Button
         {
             Icon = CreateImage(20, 10),
@@ -197,7 +197,7 @@ public sealed class ButtonTests
             Text = "Play",
             Spacing = 5.3
         };
-        _ = new UiScreen(button) { Scale = scale };
+        _ = new Screen(button) { Scale = scale };
         button.GetStyleRoot().UpdateStyles();
 
         button.Measure(new Size(200, 80));
@@ -304,10 +304,10 @@ public sealed class ButtonTests
         manager.UpdateFrame(new Size(120, 80), 0);
 
         var normalCommands = screen.CreateDrawCommandList();
-        var normal = normalCommands.OfType<UiFillRectangleCommand>().ToArray();
+        var normal = normalCommands.OfType<FillRectangleCommand>().ToArray();
         Assert.Equal(5, normal.Length);
         Assert.Equal(new Color(48, 54, 62), normal[0].Color);
-        Assert.DoesNotContain(normalCommands, command => command is UiPushClipCommand);
+        Assert.DoesNotContain(normalCommands, command => command is PushClipCommand);
 
         manager.ProcessPointerMoved(new Point(20, 20));
         var hovered = GetFills(screen);
@@ -315,7 +315,7 @@ public sealed class ButtonTests
         Assert.Equal(new Color(67, 73, 80), hovered[0].Color);
         Assert.Equal(new Rect(1, 1, 78, 30), hovered[0].Bounds);
 
-        var builder = new UiDrawBuilder();
+        var builder = new DrawBuilder();
         builder.Build(screen.CreateDrawCommandList(), 120, 80, false);
         Assert.Equal(11f, builder.Vertices[0].X);
         Assert.Equal(11f, builder.Vertices[0].Y);
@@ -427,29 +427,29 @@ public sealed class ButtonTests
     public void StyleDrivenContentRemovalLeavesDetachedChildStylesPending()
     {
         var button = new Button();
-        var screen = new UiScreen(button);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(
-                UiStyleSelector.For<Button>(),
-                [UiStyleSetter.Create(Button.TextProperty, "Old")]),
-            new UiStyleRule(
-                UiStyleSelector.For<Text>(),
-                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.4)])
+        var screen = new Screen(button);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(
+                StyleSelector.For<Button>(),
+                [StyleSetter.Create(Button.TextProperty, "Old")]),
+            new StyleRule(
+                StyleSelector.For<Text>(),
+                [StyleSetter.Create(Node.OpacityProperty, 0.4)])
         ])]);
         screen.Root!.UpdateStyles();
         var oldText = Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
         screen.Root!.UpdateStyles();
         var opacityNotifications = 0;
         oldText.PropertyChanged += (_, e) =>
-            opacityNotifications += ReferenceEquals(e.Property, UiNode.OpacityProperty) ? 1 : 0;
+            opacityNotifications += ReferenceEquals(e.Property, Node.OpacityProperty) ? 1 : 0;
 
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(
-                UiStyleSelector.For<Button>(),
-                [UiStyleSetter.Create(Button.TextProperty, string.Empty)]),
-            new UiStyleRule(
-                UiStyleSelector.For<Text>(),
-                [UiStyleSetter.Create(UiNode.OpacityProperty, 0.8)])
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(
+                StyleSelector.For<Button>(),
+                [StyleSetter.Create(Button.TextProperty, string.Empty)]),
+            new StyleRule(
+                StyleSelector.For<Text>(),
+                [StyleSetter.Create(Node.OpacityProperty, 0.8)])
         ])]);
         screen.Root!.UpdateStyles();
 
@@ -523,7 +523,7 @@ public sealed class ButtonTests
         Assert.Equal(new Color(139, 148, 160), text.Color);
         button.Color = new Color(240, 230, 220);
         Assert.Equal(new Color(240, 230, 220), text.Color);
-        button.ClearValue(UiNode.ColorProperty);
+        button.ClearValue(Node.ColorProperty);
         Assert.Equal(new Color(139, 148, 160), text.Color);
     }
 
@@ -564,7 +564,7 @@ public sealed class ButtonTests
     [Fact]
     public void ImageKeepsItsViewClipWhileTextInheritsTheOuterClip()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var root = new Canvas();
         var button = Place(
             root,
@@ -579,13 +579,13 @@ public sealed class ButtonTests
         manager.UpdateFrame(new Size(140, 80), 0);
 
         var commands = screen.CreateDrawCommandList();
-        var imageCommand = Assert.Single(commands.OfType<UiDrawImageCommand>());
-        var textCommand = Assert.Single(commands.OfType<UiDrawTextCommand>());
+        var imageCommand = Assert.Single(commands.OfType<DrawImageCommand>());
+        var textCommand = Assert.Single(commands.OfType<DrawTextCommand>());
         var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
 
         Assert.Equal(
             new Rect(0, 0, image.LayoutBounds.Width, image.LayoutBounds.Height),
-            Assert.Single(commands.OfType<UiPushClipCommand>()).Clip);
+            Assert.Single(commands.OfType<PushClipCommand>()).Clip);
         var ordered = commands.ToArray();
         Assert.True(Array.IndexOf(ordered, imageCommand) < Array.IndexOf(ordered, textCommand));
         manager.Close();
@@ -594,7 +594,7 @@ public sealed class ButtonTests
     [Fact]
     public void InternalContentHitTargetsTheButtonAndClicksOnce()
     {
-        using var context = new UiTextTestContext();
+        using var context = new TextTestContext();
         var root = new Canvas();
         var button = Place(
             root,
@@ -605,7 +605,7 @@ public sealed class ButtonTests
             40);
         var manager = new UiManager();
         var screen = new GameScreen(root);
-        UiNode? source = null;
+        Node? source = null;
         var clicks = 0;
         button.PointerClicked += (_, eventArgs) => source = eventArgs.Source;
         button.Click += (_, _) => clicks++;
@@ -985,12 +985,12 @@ public sealed class ButtonTests
         var enterError = new InvalidOperationException("enter");
         var spaceError = new InvalidOperationException("space");
         var clicks = 0;
-        EventHandler<UiKeyEventArgs> enterHandler = (_, eventArgs) =>
+        EventHandler<KeyEventArgs> enterHandler = (_, eventArgs) =>
         {
             if (eventArgs.Key == Key.Enter)
                 throw enterError;
         };
-        EventHandler<UiKeyEventArgs> spaceHandler = (_, eventArgs) =>
+        EventHandler<KeyEventArgs> spaceHandler = (_, eventArgs) =>
         {
             if (eventArgs.Key == Key.Space)
                 throw spaceError;
@@ -1133,7 +1133,7 @@ public sealed class ButtonTests
         double y,
         double width,
         double height)
-        where T : UiNode
+        where T : Node
     {
         child.Width = width;
         child.Height = height;
@@ -1149,17 +1149,17 @@ public sealed class ButtonTests
         manager.ProcessPointerReleased(point, button, KeyModifiers.None);
     }
 
-    private static IReadOnlyList<UiFillRectangleCommand> GetFills(UiScreen screen)
+    private static IReadOnlyList<FillRectangleCommand> GetFills(Screen screen)
     {
         screen.Root!.UpdateStyles();
-        return screen.CreateDrawCommandList().OfType<UiFillRectangleCommand>().ToArray();
+        return screen.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
     }
 
-    private static UiStyleValueSource? StyleSource(UiNode node, Property property) =>
+    private static StyleValueSource? StyleSource(Node node, Property property) =>
         node.GetStyleValueSources(property).SingleOrDefault();
 
-    private static UiImage CreateImage(int width, int height) =>
-        UiImage.FromRgba(new byte[checked(width * height * 4)], width, height);
+    private static Image CreateImage(int width, int height) =>
+        Image.FromRgba(new byte[checked(width * height * 4)], width, height);
 
     private static void AssertCenteredWithinHalfPhysicalPixel(
         double expected,

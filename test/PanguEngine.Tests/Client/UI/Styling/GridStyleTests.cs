@@ -13,8 +13,8 @@ public sealed class GridStyleTests
         var child = new Panel();
         child.Classes.Add("field");
         grid.Children.Add(child);
-        var screen = new UiScreen(grid);
-        screen.SetStyleSheets([UiStyleSheet.Parse("""
+        var screen = new Screen(grid);
+        screen.SetStyleSheets([StyleSheet.Parse("""
             Grid { column-definitions: 20px, *, 2*; row-definitions: Auto, *; column-spacing: 5px; row-spacing: 4px; }
             .field { grid-column: 1; grid-row: 1; grid-column-span: 2; }
             """)]);
@@ -33,14 +33,14 @@ public sealed class GridStyleTests
         var grid = new Grid();
         var child = new Panel();
         grid.Children.Add(child);
-        var screen = new UiScreen(grid);
-        screen.SetStyleSheets([UiStyleSheet.Parse("Grid { column-definitions: 20, *; }")]);
+        var screen = new Screen(grid);
+        screen.SetStyleSheets([StyleSheet.Parse("Grid { column-definitions: 20, *; }")]);
         grid.UpdateStyles();
         grid.Measure(new Size(100, 20));
         grid.Arrange(new Rect(0, 0, 100, 20));
 
         child.Classes.Add("second");
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        screen.SetStyleSheets([StyleSheet.Parse(
             "Grid { column-definitions: 30, *; } .second { grid-column: 1; }")]);
         grid.UpdateStyles();
         Assert.False(grid.IsMeasureValid);
@@ -63,8 +63,8 @@ public sealed class GridStyleTests
         var grid = new Grid();
         var child = new Panel();
         grid.Children.Add(child);
-        var screen = new UiScreen(grid);
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        var screen = new Screen(grid);
+        screen.SetStyleSheets([StyleSheet.Parse(
             "Grid { column-definitions: 20, *; } .second { grid-column: 1; }")]);
         grid.UpdateStyles();
         grid.Measure(new Size(100, 20));
@@ -91,9 +91,9 @@ public sealed class GridStyleTests
     public void InvalidCssReportsInvalidValue(string declaration)
     {
         var grid = new Grid();
-        var screen = new UiScreen(grid);
-        screen.SetStyleSheets([UiStyleSheet.Parse($"Grid {{ {declaration} }}")]);
-        var error = Assert.Throws<UiStyleParseException>(grid.UpdateStyles);
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        var screen = new Screen(grid);
+        screen.SetStyleSheets([StyleSheet.Parse($"Grid {{ {declaration} }}")]);
+        var error = Assert.Throws<StyleParseException>(grid.UpdateStyles);
+        Assert.Equal(StyleParseError.InvalidValue, error.Error);
     }
 }

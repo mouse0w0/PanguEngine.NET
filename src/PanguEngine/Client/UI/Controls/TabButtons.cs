@@ -47,7 +47,7 @@ internal sealed class TabCloseButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button != MouseButton.Left || !IsEnabled)
@@ -56,7 +56,7 @@ internal sealed class TabCloseButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -65,7 +65,7 @@ internal sealed class TabCloseButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerClicked(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerClicked(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -132,7 +132,7 @@ internal sealed class TabScrollButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button != MouseButton.Left || !IsEnabled)
@@ -141,7 +141,7 @@ internal sealed class TabScrollButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -150,7 +150,7 @@ internal sealed class TabScrollButton : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerClicked(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerClicked(eventArgs);
         if (eventArgs.Button != MouseButton.Left)

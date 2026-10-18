@@ -6,7 +6,7 @@ namespace PanguEngine.Client.UI.Controls;
 public sealed partial class TabView
 {
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -26,7 +26,7 @@ public sealed partial class TabView
     }
 
     /// <inheritdoc />
-    protected override void OnPointerMoved(UiPointerEventArgs eventArgs)
+    protected override void OnPointerMoved(PointerEventArgs eventArgs)
     {
         base.OnPointerMoved(eventArgs);
         if (_isDragging)
@@ -55,7 +55,7 @@ public sealed partial class TabView
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -71,7 +71,7 @@ public sealed partial class TabView
         _candidateItem = null;
     }
 
-    protected override void OnPointerCanceled(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerCanceled(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerCanceled(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -89,7 +89,7 @@ public sealed partial class TabView
     }
 
     /// <inheritdoc />
-    protected override void OnPointerClicked(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerClicked(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -114,7 +114,7 @@ public sealed partial class TabView
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
         if (eventArgs.Handled)
@@ -273,7 +273,7 @@ public sealed partial class TabView
             : null;
     }
 
-    private TabItem? FindTabItem(UiNode? source)
+    private TabItem? FindTabItem(Node? source)
     {
         for (var node = source; node is not null; node = node.Parent)
         {
@@ -286,7 +286,7 @@ public sealed partial class TabView
         return null;
     }
 
-    private static bool IsInteractiveChild(UiNode? source, TabItem tab)
+    private static bool IsInteractiveChild(Node? source, TabItem tab)
     {
         for (var node = source; node is not null && !ReferenceEquals(node, tab); node = node.Parent)
         {

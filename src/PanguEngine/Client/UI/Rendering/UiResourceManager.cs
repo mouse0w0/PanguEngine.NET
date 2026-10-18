@@ -8,17 +8,17 @@ using PanguEngine.Graphics.Text;
 
 namespace PanguEngine.Client.UI.Rendering;
 
-internal interface IUiGpuResourceState
+internal interface IGpuResourceState
 {
     void Retire();
     void Destroy();
 }
 
-internal sealed class UiImageRegistration
+internal sealed class ImageRegistration
 {
     private readonly UiResourceManager _manager;
 
-    internal UiImageRegistration(UiResourceManager manager, ulong id)
+    internal ImageRegistration(UiResourceManager manager, ulong id)
     {
         _manager = manager;
         Id = id;
@@ -26,7 +26,7 @@ internal sealed class UiImageRegistration
 
     internal ulong Id { get; }
 
-    ~UiImageRegistration()
+    ~ImageRegistration()
     {
         _manager.EnqueueFinalized(Id);
     }
@@ -48,11 +48,11 @@ internal sealed class UiResourceManager
     private readonly FontManager? _fontManager;
     private readonly ILogger _logger;
     private readonly Thread _ownerThread = Thread.CurrentThread;
-    private readonly Dictionary<ulong, IUiGpuResourceState> _states = [];
-    private readonly ConditionalWeakTable<UiImage, UiImageRegistration> _imageRegistrations = new();
+    private readonly Dictionary<ulong, IGpuResourceState> _states = [];
+    private readonly ConditionalWeakTable<Image, ImageRegistration> _imageRegistrations = new();
     private readonly ConcurrentQueue<ulong> _finalizedIds = new();
-    private readonly UiTextureTable? _textureTable;
-    private readonly UiImageAtlas? _imageAtlas;
+    private readonly TextureTable? _textureTable;
+    private readonly ImageAtlas? _imageAtlas;
     private GlyphAtlas? _glyphAtlas;
     private ulong _nextId;
     private int _accepting = 1;
@@ -95,8 +95,8 @@ internal sealed class UiResourceManager
         _device = device;
         _fontManager = fontManager;
         _logger = logger ?? NullLogger.Instance;
-        _textureTable = new UiTextureTable(device, descriptorSetLayout, frameSlotCount);
-        _imageAtlas = new UiImageAtlas(device, _textureTable);
+        _textureTable = new TextureTable(device, descriptorSetLayout, frameSlotCount);
+        _imageAtlas = new ImageAtlas(device, _textureTable);
     }
 
     private static FontManager VerifyFontManager(FontManager fontManager)
@@ -106,7 +106,7 @@ internal sealed class UiResourceManager
         return fontManager;
     }
 
-    internal UiImageRegistration RegisterImage(UiImage image, IUiGpuResourceState state)
+    internal ImageRegistration RegisterImage(Image image, IGpuResourceState state)
     {
         VerifyOwnerThread();
         ObjectDisposedException.ThrowIf(_destroyed, this);
@@ -116,7 +116,7 @@ internal sealed class UiResourceManager
             throw new InvalidOperationException("The UI image is already registered with this resource manager.");
 
         var id = checked(++_nextId);
-        var registration = new UiImageRegistration(this, id);
+        var registration = new ImageRegistration(this, id);
         _states.Add(id, state);
         try
         {
@@ -144,7 +144,7 @@ internal sealed class UiResourceManager
         }
     }
 
-    internal UiImageRenderBinding? ResolveImageBinding(UiDrawImageCommand command)
+    internal ImageRenderBinding? ResolveImageBinding(DrawImageCommand command)
     {
         VerifyOwnerThread();
         ObjectDisposedException.ThrowIf(_destroyed, this);
@@ -167,7 +167,7 @@ internal sealed class UiResourceManager
         return state.Binding;
     }
 
-    internal UiGlyphRenderBinding? ResolveGlyphBinding(GlyphRasterKey key)
+    internal GlyphRenderBinding? ResolveGlyphBinding(GlyphRasterKey key)
     {
         VerifyOwnerThread();
         ObjectDisposedException.ThrowIf(_destroyed, this);
@@ -186,7 +186,7 @@ internal sealed class UiResourceManager
 
         var page = entry.Page!;
         _textureTable!.Publish(page.TextureIndex);
-        return new UiGlyphRenderBinding(
+        return new GlyphRenderBinding(
             page.TextureIndex,
             page.Width,
             page.Height,
@@ -252,7 +252,7 @@ internal sealed class UiResourceManager
         }
     }
 
-    private IUiImageGpuResourceState? ResolveImageState(UiImage image)
+    private IImageGpuResourceState? ResolveImageState(Image image)
     {
         var device = _device ?? throw new InvalidOperationException(
             "The UI resource manager has no graphics device.");
@@ -260,7 +260,7 @@ internal sealed class UiResourceManager
         if (_imageRegistrations.TryGetValue(image, out var registration))
         {
             if (!_states.TryGetValue(registration.Id, out var existingState) ||
-                existingState is not IUiImageGpuResourceState imageState)
+                existingState is not IImageGpuResourceState imageState)
             {
                 throw new InvalidOperationException("The UI image registration has no live GPU state.");
             }
@@ -268,7 +268,7 @@ internal sealed class UiResourceManager
             return imageState;
         }
 
-        IUiImageGpuResourceState? state;
+        IImageGpuResourceState? state;
         if (image.PixelWidth <= 1024 && image.PixelHeight <= 1024)
         {
             var entry = _imageAtlas!.TryCreate(image);
@@ -297,8 +297,8 @@ internal sealed class UiResourceManager
 
     private static StandaloneImageState? TryCreateStandaloneImage(
         GraphicsDevice device,
-        UiTextureTable textureTable,
-        UiImage image)
+        TextureTable textureTable,
+        Image image)
     {
         if (!textureTable.HasFreeSlot)
             return null;
@@ -384,26 +384,26 @@ internal sealed class UiResourceManager
     }
 }
 
-internal interface IUiImageGpuResourceState : IUiGpuResourceState
+internal interface IImageGpuResourceState : IGpuResourceState
 {
     ulong ResourceId { get; set; }
     bool IsUploadReady { get; }
-    UiImageRenderBinding Binding { get; }
+    ImageRenderBinding Binding { get; }
     void Publish();
     bool TryObserveUploadFailure(out Exception? failure, out bool firstObservation);
 }
 
 internal sealed class AtlasImageState(
-    UiImageAtlas atlas,
-    UiTextureTable textureTable,
-    UiImageAtlasEntry entry) : IUiImageGpuResourceState
+    ImageAtlas atlas,
+    TextureTable textureTable,
+    ImageAtlasEntry entry) : IImageGpuResourceState
 {
     private bool _retired;
 
     public ulong ResourceId { get; set; }
     public bool IsUploadReady => entry.IsUploadReady;
 
-    public UiImageRenderBinding Binding => new(
+    public ImageRenderBinding Binding => new(
         entry.Page.TextureSlot.Index,
         entry.Page.Texture.Width,
         entry.Page.Texture.Height,
@@ -427,12 +427,12 @@ internal sealed class AtlasImageState(
     }
 }
 
-internal sealed class StandaloneImageState : IUiImageGpuResourceState
+internal sealed class StandaloneImageState : IImageGpuResourceState
 {
-    private readonly UiTextureTable _textureTable;
+    private readonly TextureTable _textureTable;
     private readonly Texture _texture;
     private readonly TextureView _view;
-    private readonly UiTextureSlot _slot;
+    private readonly TextureSlot _slot;
     private readonly UploadHandle? _upload;
     private Exception? _uploadFailure;
     private bool _failureObserved;
@@ -440,10 +440,10 @@ internal sealed class StandaloneImageState : IUiImageGpuResourceState
     private bool _destroyed;
 
     internal StandaloneImageState(
-        UiTextureTable textureTable,
+        TextureTable textureTable,
         Texture texture,
         TextureView view,
-        UiTextureSlot slot,
+        TextureSlot slot,
         UploadHandle? upload,
         Exception? uploadFailure)
     {
@@ -458,11 +458,11 @@ internal sealed class StandaloneImageState : IUiImageGpuResourceState
     public ulong ResourceId { get; set; }
     public bool IsUploadReady => _uploadFailure is null && _upload?.IsReady == true;
 
-    public UiImageRenderBinding Binding => new(
+    public ImageRenderBinding Binding => new(
         _slot.Index,
         _texture.Width,
         _texture.Height,
-        new UiImageAtlasRegion(0, 0, _texture.Width, _texture.Height));
+        new ImageAtlasRegion(0, 0, _texture.Width, _texture.Height));
 
     public bool TryObserveUploadFailure(out Exception? failure, out bool firstObservation)
     {

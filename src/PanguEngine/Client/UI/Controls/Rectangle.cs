@@ -38,9 +38,9 @@ public sealed class Rectangle : Shape
 
     static Rectangle()
     {
-        UiCssRegistry.RegisterElement<Rectangle>("Rectangle");
-        UiCssRegistry.RegisterProperty<Rectangle, double>("radius-x", RadiusXProperty, ParseRadius);
-        UiCssRegistry.RegisterProperty<Rectangle, double>("radius-y", RadiusYProperty, ParseRadius);
+        CssRegistry.RegisterElement<Rectangle>("Rectangle");
+        CssRegistry.RegisterProperty<Rectangle, double>("radius-x", RadiusXProperty, ParseRadius);
+        CssRegistry.RegisterProperty<Rectangle, double>("radius-y", RadiusYProperty, ParseRadius);
     }
 
     /// <summary>
@@ -52,7 +52,7 @@ public sealed class Rectangle : Shape
 
     private static double ParseRadius(string value)
     {
-        var radius = UiCssValueConverters.ParseLength(value);
+        var radius = CssValueConverters.ParseLength(value);
         if (radius < 0)
             throw new FormatException("Rectangle radii must be non-negative.");
         return radius;
@@ -70,20 +70,20 @@ public sealed class Rectangle : Shape
     private protected override Point GetGeometryRadii() => new(RadiusX, RadiusY);
 
     /// <inheritdoc />
-    private protected override bool DrawAnalyticFill(UiDrawingContext context, Color color)
+    private protected override bool DrawAnalyticFill(DrawingContext context, Color color)
     {
         var width = IsArrangeValid ? LayoutBounds.Width : 0;
         var height = IsArrangeValid ? LayoutBounds.Height : 0;
         var thickness = Stroke is not null ? Math.Min(StrokeThickness, Math.Min(width, height)) : 0;
         var bounds = new Rect(thickness / 2, thickness / 2, width - thickness, height - thickness);
         var radius = new Point(RadiusX, RadiusY);
-        context.FillRoundedRectangle(new UiRoundedClipGeometry(
-            new UiRoundedRectangle(bounds, radius, radius, radius, radius)), new SolidColorBrush(color));
+        context.FillRoundedRectangle(new RoundedClipGeometry(
+            new RoundedRectangle(bounds, radius, radius, radius, radius)), new SolidColorBrush(color));
         return true;
     }
 
     /// <inheritdoc />
-    private protected override bool DrawAnalyticShape(UiDrawingContext context, Color? fill, Color? stroke)
+    private protected override bool DrawAnalyticShape(DrawingContext context, Color? fill, Color? stroke)
     {
         if (stroke is null)
             return false;
@@ -106,7 +106,7 @@ public sealed class Rectangle : Shape
             StrokeLineJoin.Bevel => StrokeLineJoin.Bevel,
             _ => StrokeMiterLimit >= Math.Sqrt(2) ? StrokeLineJoin.Miter : StrokeLineJoin.Bevel
         };
-        context.DrawRoundedShape(new UiRoundedRectangle(bounds, radius, radius, radius, radius),
+        context.DrawRoundedShape(new RoundedRectangle(bounds, radius, radius, radius, radius),
             thickness, fill ?? default, stroke.Value, join);
         return true;
     }
@@ -133,7 +133,7 @@ public sealed class Rectangle : Shape
         if (key.RadiusX > 0 && key.RadiusY > 0 && geometryWidth > 0 && geometryHeight > 0)
         {
             var radius = new Point(key.RadiusX, key.RadiusY);
-            points = new UiRoundedRectangle(new Rect(inset, inset, geometryWidth, geometryHeight),
+            points = new RoundedRectangle(new Rect(inset, inset, geometryWidth, geometryHeight),
                 radius, radius, radius, radius).GetContour(key.Scale);
         }
         var contours = new[] { new FlattenedContour(points, true) };

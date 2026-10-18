@@ -38,15 +38,15 @@ public abstract class Slider : Control
 
     static Slider()
     {
-        UiCssRegistry.RegisterElement<Slider>("Slider");
-        UiCssRegistry.RegisterProperty<Slider, Orientation>("orientation", OrientationProperty, UiCssValueConverters.ParseOrientation);
-        UiCssRegistry.RegisterProperty<Slider, bool>("show-ticks", ShowTicksProperty, UiCssValueConverters.ParseBool);
-        UiCssRegistry.RegisterProperty<Slider, bool>("show-tick-labels", ShowTickLabelsProperty, UiCssValueConverters.ParseBool);
-        UiCssRegistry.RegisterProperty<Slider, double>("track-thickness", TrackThicknessProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Slider, double>("thumb-length", ThumbLengthProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Slider, double>("thumb-thickness", ThumbThicknessProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Slider, double>("tick-length", TickLengthProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Slider, double>("tick-label-spacing", TickLabelSpacingProperty, UiCssValueConverters.ParseLength);
+        CssRegistry.RegisterElement<Slider>("Slider");
+        CssRegistry.RegisterProperty<Slider, Orientation>("orientation", OrientationProperty, CssValueConverters.ParseOrientation);
+        CssRegistry.RegisterProperty<Slider, bool>("show-ticks", ShowTicksProperty, CssValueConverters.ParseBool);
+        CssRegistry.RegisterProperty<Slider, bool>("show-tick-labels", ShowTickLabelsProperty, CssValueConverters.ParseBool);
+        CssRegistry.RegisterProperty<Slider, double>("track-thickness", TrackThicknessProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, double>("thumb-length", ThumbLengthProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, double>("thumb-thickness", ThumbThicknessProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, double>("tick-length", TickLengthProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Slider, double>("tick-label-spacing", TickLabelSpacingProperty, CssValueConverters.ParseLength);
     }
 
     /// <summary>Gets or sets the slider axis. Vertical values increase upwards.</summary>
@@ -78,9 +78,9 @@ public abstract class Slider : Control
 
     protected void SynchronizePseudoClasses(bool hasValue)
     {
-        SetPseudoClass(UiPseudoClass.Horizontal, Orientation == Orientation.Horizontal);
-        SetPseudoClass(UiPseudoClass.Vertical, Orientation == Orientation.Vertical);
-        SetPseudoClass(UiPseudoClass.NoValue, !hasValue);
+        SetPseudoClass(PseudoClass.Horizontal, Orientation == Orientation.Horizontal);
+        SetPseudoClass(PseudoClass.Vertical, Orientation == Orientation.Vertical);
+        SetPseudoClass(PseudoClass.NoValue, !hasValue);
     }
 
     private static Property<double> RegisterLength(string name, double defaultValue) => Property.Register<Slider, double>(
@@ -91,7 +91,7 @@ public abstract class Slider : Control
     /// <summary>Provides a styled slider region with an optional hit target.</summary>
     protected sealed class SliderPart : Control
     {
-        static SliderPart() => UiCssRegistry.RegisterElement<SliderPart>("SliderPart");
+        static SliderPart() => CssRegistry.RegisterElement<SliderPart>("SliderPart");
 
         internal SliderPart(string role, bool hitTestVisible)
         {
@@ -346,7 +346,7 @@ public sealed class Slider<T> : Slider
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Handled || eventArgs.Button != MouseButton.Left || !CanInteract())
@@ -367,7 +367,7 @@ public sealed class Slider<T> : Slider
     }
 
     /// <inheritdoc />
-    protected override void OnPointerMoved(UiPointerEventArgs eventArgs)
+    protected override void OnPointerMoved(PointerEventArgs eventArgs)
     {
         base.OnPointerMoved(eventArgs);
         if (!_isDragging)
@@ -382,7 +382,7 @@ public sealed class Slider<T> : Slider
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button != MouseButton.Left || !_isDragging)
@@ -409,7 +409,7 @@ public sealed class Slider<T> : Slider
     }
 
     /// <inheritdoc />
-    protected override void OnPointerCanceled(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerCanceled(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerCanceled(eventArgs);
         if (eventArgs.Button != MouseButton.Left || !_isDragging)
@@ -419,7 +419,7 @@ public sealed class Slider<T> : Slider
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
         if (eventArgs.Handled || !IsFocused || !CanInteract() || eventArgs.Modifiers != KeyModifiers.None)
@@ -453,7 +453,7 @@ public sealed class Slider<T> : Slider
     {
         if (!HasValue || Screen is not { } screen || !screen.IsOpen())
             return false;
-        for (UiNode? node = this; node is not null; node = node.Parent)
+        for (Node? node = this; node is not null; node = node.Parent)
             if (!node.IsEnabled || !node.IsHitTestVisible || node.Visibility != Visibility.Visible)
                 return false;
         return true;

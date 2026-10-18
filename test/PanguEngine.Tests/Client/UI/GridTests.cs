@@ -266,7 +266,7 @@ public sealed class GridTests
     public void RoundedStarCellsMeetAtSharedBoundaries(double scale)
     {
         var grid = new Grid { ColumnDefinitions = new(GridLength.Star, GridLength.Star, GridLength.Star) };
-        _ = new UiScreen(grid) { Scale = scale };
+        _ = new Screen(grid) { Scale = scale };
         var nodes = AddColumns(grid, 0, 0, 0);
         Layout(grid, 100, 10);
         Assert.Equal(nodes[0].LayoutBounds.X + nodes[0].LayoutBounds.Width, nodes[1].LayoutBounds.X, 8);
@@ -314,7 +314,7 @@ public sealed class GridTests
     public void SpanningCellsUseTheSameRoundedBoundaryAsAdjacentCells()
     {
         var grid = new Grid { ColumnDefinitions = new(0.1, 0.2, 0.3, 1) };
-        _ = new UiScreen(grid) { Scale = 7.5 };
+        _ = new Screen(grid) { Scale = 7.5 };
         var spanning = new ProbeNode(_ => Size.Zero);
         var adjacent = new ProbeNode(_ => Size.Zero);
         Grid.SetColumn(spanning, 1);
@@ -330,7 +330,7 @@ public sealed class GridTests
     public void FractionalScaleDoesNotExpandAlreadyAlignedCellWidths()
     {
         var grid = new Grid { ColumnDefinitions = new(0.9, 50, 1) };
-        _ = new UiScreen(grid) { Scale = 1.1 };
+        _ = new Screen(grid) { Scale = 1.1 };
         var nodes = AddColumns(grid, 0, 0, 0);
         Layout(grid, 60, 10);
         Assert.Equal(nodes[1].LayoutBounds.X + nodes[1].LayoutBounds.Width, nodes[2].LayoutBounds.X, 8);
@@ -347,7 +347,7 @@ public sealed class GridTests
             ColumnDefinitions = new(new GridLength(1e-100, GridUnitType.Star),
                 new GridLength(1e300, GridUnitType.Star))
         };
-        _ = new UiScreen(grid) { UseLayoutRounding = false };
+        _ = new Screen(grid) { UseLayoutRounding = false };
         var nodes = AddColumns(grid, 0, 0);
         if (spanningContent)
         {
@@ -369,7 +369,7 @@ public sealed class GridTests
     public void DisabledRoundingKeepsFractionalWidthsAndSpacing()
     {
         var grid = new Grid { ColumnDefinitions = new(GridLength.Star, GridLength.Star), ColumnSpacing = 0.25 };
-        _ = new UiScreen(grid) { UseLayoutRounding = false };
+        _ = new Screen(grid) { UseLayoutRounding = false };
         var nodes = AddColumns(grid, 0, 0);
         Layout(grid, 10, 10);
         Assert.Equal(4.875, nodes[0].LayoutBounds.Width);
@@ -403,7 +403,7 @@ public sealed class GridTests
     public void NonRepresentableTrackTotalFailsMeasurement()
     {
         var grid = new Grid { ColumnDefinitions = new(double.MaxValue, double.MaxValue) };
-        _ = new UiScreen(grid) { UseLayoutRounding = false };
+        _ = new Screen(grid) { UseLayoutRounding = false };
         Assert.Throws<InvalidOperationException>(() => grid.Measure(Size.Infinite));
         Assert.False(grid.IsMeasureValid);
     }
@@ -438,7 +438,7 @@ public sealed class GridTests
         grid.Arrange(new Rect(0, 0, width, height));
     }
 
-    private sealed class ProbeNode(Func<Size, Size> measure) : UiNode
+    private sealed class ProbeNode(Func<Size, Size> measure) : Node
     {
         public Size Constraint { get; private set; }
 

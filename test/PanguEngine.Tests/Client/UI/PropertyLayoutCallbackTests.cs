@@ -14,7 +14,7 @@ public sealed class PropertyLayoutCallbackTests
         root.Children.Add(child);
         Layout(root);
         var notified = false;
-        using var subscription = child.Subscribe(UiNode.WidthProperty, (_, _) =>
+        using var subscription = child.Subscribe(Node.WidthProperty, (_, _) =>
         {
             Assert.False(child.IsMeasureValid);
             Assert.False(root.IsMeasureValid);
@@ -60,11 +60,11 @@ public sealed class PropertyLayoutCallbackTests
     public void StyledLayoutValueInvokesTheSameInvalidationCallback()
     {
         var node = new TestNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         Layout(node);
 
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<TestNode>(), [UiStyleSetter.Create(UiNode.WidthProperty, 25d)])
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<TestNode>(), [StyleSetter.Create(Node.WidthProperty, 25d)])
         ])]);
 
         Assert.True(double.IsNaN(node.Width));
@@ -77,11 +77,11 @@ public sealed class PropertyLayoutCallbackTests
         Assert.False(node.IsArrangeValid);
     }
 
-    private static void Layout(UiNode node)
+    private static void Layout(Node node)
     {
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
     }
 
-    private sealed class TestNode : UiNode;
+    private sealed class TestNode : Node;
 }

@@ -19,7 +19,7 @@ internal sealed class TabHeaderHost : Control
         };
     }
 
-    internal void SetHeader(UiNode? header)
+    internal void SetHeader(Node? header)
     {
         if (Children.Count > 0)
             Children.Remove(Children[0]);
@@ -49,9 +49,9 @@ internal sealed class TabContentHost : Control
         };
     }
 
-    internal UiNode? Content => Children.Count == 0 ? null : Children[0];
+    internal Node? Content => Children.Count == 0 ? null : Children[0];
 
-    internal void SetContent(UiNode? content)
+    internal void SetContent(Node? content)
     {
         for (var index = Children.Count - 1; index >= 0; index--)
         {

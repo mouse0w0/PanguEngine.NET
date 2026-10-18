@@ -21,7 +21,7 @@ public sealed class ControlTests
         Assert.Null(typeof(Control).GetProperty(
             nameof(Parent.Children),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
-        Assert.IsAssignableFrom<IReadOnlyList<UiNode>>(control.ReadOnlyChildren);
+        Assert.IsAssignableFrom<IReadOnlyList<Node>>(control.ReadOnlyChildren);
 
         control.Add(first);
         control.Add(second);
@@ -51,22 +51,22 @@ public sealed class ControlTests
             defaultValue: false,
             isReadOnly: true);
         Assert.Null(typeof(Control).GetField(
-            nameof(UiNode.IsEnabledProperty),
+            nameof(Node.IsEnabledProperty),
             BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetField(
-            nameof(UiNode.IsHoveredProperty),
+            nameof(Node.IsHoveredProperty),
             BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetField(
-            nameof(UiNode.IsFocusedProperty),
+            nameof(Node.IsFocusedProperty),
             BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetProperty(
-            nameof(UiNode.IsEnabled),
+            nameof(Node.IsEnabled),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetProperty(
-            nameof(UiNode.IsHovered),
+            nameof(Node.IsHovered),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
         Assert.Null(typeof(Control).GetProperty(
-            nameof(UiNode.IsFocused),
+            nameof(Node.IsFocused),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
         Assert.False(control.IsPressed);
@@ -282,7 +282,7 @@ public sealed class ControlTests
         child.PointerClicked += (_, _) => childClicks++;
         var enabledNotifications = 0;
         using var subscription = control.Subscribe(
-            UiNode.IsEnabledProperty,
+            Node.IsEnabledProperty,
             (_, args) =>
             {
                 if (args.NewValue)
@@ -393,7 +393,7 @@ public sealed class ControlTests
         var lostError = new InvalidOperationException("lost");
         var exitError = new InvalidOperationException("exit");
         var events = new List<string>();
-        _ = inner.Subscribe(UiNode.IsFocusedProperty, (_, args) =>
+        _ = inner.Subscribe(Node.IsFocusedProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw focusedError;
@@ -408,12 +408,12 @@ public sealed class ControlTests
             if (!args.NewValue)
                 throw outerPressedError;
         });
-        _ = inner.Subscribe(UiNode.IsHoveredProperty, (_, args) =>
+        _ = inner.Subscribe(Node.IsHoveredProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw innerHoveredError;
         });
-        _ = outer.Subscribe(UiNode.IsHoveredProperty, (_, args) =>
+        _ = outer.Subscribe(Node.IsHoveredProperty, (_, args) =>
         {
             if (!args.NewValue)
                 throw outerHoveredError;
@@ -467,7 +467,7 @@ public sealed class ControlTests
         });
         control.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, UiNode.IsEnabledProperty))
+            if (ReferenceEquals(args.Property, Node.IsEnabledProperty))
                 throw enabledError;
         };
         manager.Open(screen);
@@ -495,9 +495,9 @@ public sealed class ControlTests
         var manager = new UiManager();
         var screen = new GameScreen(root);
         screen.SetStyleSheets([
-            new UiStyleSheet([
-                new UiStyleRule(UiStyleSelector.For<TestControl>(pseudoClasses: [UiPseudoClass.Disabled]), [
-                    UiStyleSetter.Create(UiNode.OpacityProperty, 0.5)
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<TestControl>(pseudoClasses: [PseudoClass.Disabled]), [
+                    StyleSetter.Create(Node.OpacityProperty, 0.5)
                 ])
             ])
         ]);
@@ -512,9 +512,9 @@ public sealed class ControlTests
         });
         control.PropertyChanged += (_, args) =>
         {
-            if (ReferenceEquals(args.Property, UiNode.IsEnabledProperty))
+            if (ReferenceEquals(args.Property, Node.IsEnabledProperty))
                 enabledNotifications++;
-            if (ReferenceEquals(args.Property, UiNode.OpacityProperty))
+            if (ReferenceEquals(args.Property, Node.OpacityProperty))
             {
                 opacityNotifications++;
                 throw internalError;
@@ -532,7 +532,7 @@ public sealed class ControlTests
         Assert.Equal(0, enabledNotifications);
         Assert.Equal(0, opacityNotifications);
         Assert.False(control.IsEnabled);
-        Assert.True(control.HasPseudoClass(UiPseudoClass.Disabled));
+        Assert.True(control.HasPseudoClass(PseudoClass.Disabled));
         Assert.Equal(1, control.Opacity);
         manager.Close();
     }
@@ -626,7 +626,7 @@ public sealed class ControlTests
     }
 
     private static T Place<T>(Canvas parent, T child, double x, double y, double width, double height)
-        where T : UiNode
+        where T : Node
     {
         child.Width = width;
         child.Height = height;
@@ -638,12 +638,12 @@ public sealed class ControlTests
 
     private sealed class TestControl : Control
     {
-        internal void Add(UiNode child) => Children.Add(child);
-        internal bool Remove(UiNode child) => Children.Remove(child);
+        internal void Add(Node child) => Children.Add(child);
+        internal bool Remove(Node child) => Children.Remove(child);
         internal void Clear() => Children.Clear();
     }
 
-    private sealed class TestNode : UiNode
+    private sealed class TestNode : Node
     {
     }
 }

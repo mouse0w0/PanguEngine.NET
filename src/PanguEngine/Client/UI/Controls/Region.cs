@@ -47,9 +47,9 @@ public abstract class Region : Parent
     private Rect _committedDecorationBounds;
     private Rect _committedBorderInnerBounds;
     private Rect _committedContentBounds;
-    private UiRoundedClipGeometry? _roundedBackground;
-    private UiRoundedClipGeometry? _roundedBorder;
-    private UiRoundedClipGeometry? _roundedDescendantClip;
+    private RoundedClipGeometry? _roundedBackground;
+    private RoundedClipGeometry? _roundedBorder;
+    private RoundedClipGeometry? _roundedDescendantClip;
 
     /// <summary>Identifies the <see cref="CornerRadius"/> property.</summary>
     public static readonly Property<CornerRadius> CornerRadiusProperty =
@@ -66,43 +66,43 @@ public abstract class Region : Parent
 
     static Region()
     {
-        UiCssRegistry.RegisterElement<Region>("Region");
-        UiCssRegistry.RegisterProperty<Region, CornerRadius>("border-radius", CornerRadiusProperty,
-            UiCssValueConverters.ParseCornerRadius);
-        UiCssRegistry.RegisterProperty<Region, Thickness>("padding", PaddingProperty,
-            UiCssValueConverters.ParseThickness);
-        UiCssRegistry.RegisterProperty<Region>("padding-top", value =>
+        CssRegistry.RegisterElement<Region>("Region");
+        CssRegistry.RegisterProperty<Region, CornerRadius>("border-radius", CornerRadiusProperty,
+            CssValueConverters.ParseCornerRadius);
+        CssRegistry.RegisterProperty<Region, Thickness>("padding", PaddingProperty,
+            CssValueConverters.ParseThickness);
+        CssRegistry.RegisterProperty<Region>("padding-top", value =>
             new[]
             {
-                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Top, UiCssValueConverters.ParseLength(value))
+                StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Top, CssValueConverters.ParseLength(value))
             });
-        UiCssRegistry.RegisterProperty<Region>("padding-right", value =>
+        CssRegistry.RegisterProperty<Region>("padding-right", value =>
             new[]
             {
-                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Right, UiCssValueConverters.ParseLength(value))
+                StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Right, CssValueConverters.ParseLength(value))
             });
-        UiCssRegistry.RegisterProperty<Region>("padding-bottom", value =>
+        CssRegistry.RegisterProperty<Region>("padding-bottom", value =>
             new[]
             {
-                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Bottom, UiCssValueConverters.ParseLength(value))
+                StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Bottom, CssValueConverters.ParseLength(value))
             });
-        UiCssRegistry.RegisterProperty<Region>("padding-left", value =>
+        CssRegistry.RegisterProperty<Region>("padding-left", value =>
             new[]
             {
-                UiStyleSetter.CreateEdge(PaddingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(value))
+                StyleSetter.CreateEdge(PaddingProperty, StyleEdge.Left, CssValueConverters.ParseLength(value))
             });
-        UiCssRegistry.RegisterProperty<Region, Brush?>("background", BackgroundProperty,
-            UiCssValueConverters.ParseBrush);
-        UiCssRegistry.RegisterProperty<Region, Brush?>(
+        CssRegistry.RegisterProperty<Region, Brush?>("background", BackgroundProperty,
+            CssValueConverters.ParseBrush);
+        CssRegistry.RegisterProperty<Region, Brush?>(
             "background-color",
             BackgroundProperty,
-            UiCssValueConverters.ParseBrush);
-        UiCssRegistry.RegisterProperty<Region, Brush?>("border-color", BorderBrushProperty,
-            UiCssValueConverters.ParseBrush);
-        UiCssRegistry.RegisterProperty<Region, Thickness>(
+            CssValueConverters.ParseBrush);
+        CssRegistry.RegisterProperty<Region, Brush?>("border-color", BorderBrushProperty,
+            CssValueConverters.ParseBrush);
+        CssRegistry.RegisterProperty<Region, Thickness>(
             "border-thickness",
             BorderThicknessProperty,
-            UiCssValueConverters.ParseThickness);
+            CssValueConverters.ParseThickness);
     }
 
     /// <summary>
@@ -199,8 +199,8 @@ public abstract class Region : Parent
         var padding = Padding;
         if (useLayoutRounding)
         {
-            borderThickness = UiLayoutHelper.RoundLayoutThickness(borderThickness, scale);
-            padding = UiLayoutHelper.RoundLayoutThickness(padding, scale);
+            borderThickness = LayoutHelper.RoundLayoutThickness(borderThickness, scale);
+            padding = LayoutHelper.RoundLayoutThickness(padding, scale);
         }
 
         var innerAvailableSize = SubtractThickness(availableSize, borderThickness);
@@ -220,8 +220,8 @@ public abstract class Region : Parent
         var padding = Padding;
         if (useLayoutRounding)
         {
-            borderThickness = UiLayoutHelper.RoundLayoutThickness(borderThickness, scale);
-            padding = UiLayoutHelper.RoundLayoutThickness(padding, scale);
+            borderThickness = LayoutHelper.RoundLayoutThickness(borderThickness, scale);
+            padding = LayoutHelper.RoundLayoutThickness(padding, scale);
         }
 
         var decorationBounds = new Rect(0, 0, finalSize);
@@ -234,7 +234,7 @@ public abstract class Region : Parent
     }
 
     /// <inheritdoc />
-    protected override void DrawCore(UiDrawingContext context)
+    protected override void DrawCore(DrawingContext context)
     {
         var decorationBounds = _committedDecorationBounds;
         var borderInnerBounds = _committedBorderInnerBounds;
@@ -268,26 +268,26 @@ public abstract class Region : Parent
             borderBrush);
     }
 
-    internal override UiDrawCommand CreateDescendantClip()
+    internal override DrawCommand CreateDescendantClip()
     {
         if (CornerRadius == CornerRadius.Zero)
             return base.CreateDescendantClip();
         EnsureRoundedGeometry();
-        return new UiPushRoundedClipCommand(_roundedDescendantClip!);
+        return new PushRoundedClipCommand(_roundedDescendantClip!);
     }
 
     internal override bool ContainsDescendantClip(Point point) =>
-        new UiRoundedRectangle(new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height), CornerRadius).Contains(point);
+        new RoundedRectangle(new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height), CornerRadius).Contains(point);
 
     private void EnsureRoundedGeometry()
     {
-        var outer = new UiRoundedRectangle(_committedDecorationBounds, CornerRadius);
+        var outer = new RoundedRectangle(_committedDecorationBounds, CornerRadius);
         var inner = outer.Deflate(_committedBorderInnerBounds);
         if (_roundedBorder is { } cached && cached.Outer == outer && cached.Inner == inner)
             return;
-        _roundedBackground = new UiRoundedClipGeometry(inner, constraint: outer);
-        _roundedBorder = new UiRoundedClipGeometry(outer, inner);
-        _roundedDescendantClip = new UiRoundedClipGeometry(outer);
+        _roundedBackground = new RoundedClipGeometry(inner, constraint: outer);
+        _roundedBorder = new RoundedClipGeometry(outer, inner);
+        _roundedDescendantClip = new RoundedClipGeometry(outer);
     }
 
     private static Rect DeflateBounds(Rect bounds, Thickness thickness) =>

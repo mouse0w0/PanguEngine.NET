@@ -21,8 +21,8 @@ public sealed partial class ScrollView : Control
     /// <summary>
     /// Identifies the <see cref="Content"/> property.
     /// </summary>
-    public static readonly Property<UiNode?> ContentProperty =
-        Property.Register<ScrollView, UiNode?>(
+    public static readonly Property<Node?> ContentProperty =
+        Property.Register<ScrollView, Node?>(
             nameof(Content),
             onChanged: static (view, _, newValue) => view.OnContentChanged(newValue));
 
@@ -125,19 +125,19 @@ public sealed partial class ScrollView : Control
 
     static ScrollView()
     {
-        UiCssRegistry.RegisterElement<ScrollView>("ScrollView");
-        UiCssRegistry.RegisterProperty<ScrollView, ScrollBarVisibility>(
+        CssRegistry.RegisterElement<ScrollView>("ScrollView");
+        CssRegistry.RegisterProperty<ScrollView, ScrollBarVisibility>(
             "horizontal-scroll-bar-visibility",
             HorizontalScrollBarVisibilityProperty,
             ParseScrollBarVisibility);
-        UiCssRegistry.RegisterProperty<ScrollView, ScrollBarVisibility>(
+        CssRegistry.RegisterProperty<ScrollView, ScrollBarVisibility>(
             "vertical-scroll-bar-visibility",
             VerticalScrollBarVisibilityProperty,
             ParseScrollBarVisibility);
-        UiCssRegistry.RegisterProperty<ScrollView, bool>(
+        CssRegistry.RegisterProperty<ScrollView, bool>(
             "show-arrows",
             ShowArrowsProperty,
-            UiCssValueConverters.ParseBool);
+            CssValueConverters.ParseBool);
     }
 
     /// <summary>
@@ -177,7 +177,7 @@ public sealed partial class ScrollView : Control
     /// Assigning a node moves it from its current parent. Moving the current content node to another
     /// parent by caller code clears this property.
     /// </remarks>
-    public UiNode? Content
+    public Node? Content
     {
         get => GetValue(ContentProperty);
         set => SetValue(ContentProperty, value);
@@ -304,7 +304,7 @@ public sealed partial class ScrollView : Control
     /// Clears the content reference when the content node leaves the internal viewport.
     /// </summary>
     /// <param name="content">The content node that left.</param>
-    internal void OnViewportContentRemoved(UiNode content)
+    internal void OnViewportContentRemoved(Node content)
     {
         if (_isUpdatingContent)
             return;
@@ -315,7 +315,7 @@ public sealed partial class ScrollView : Control
         Content = null;
     }
 
-    private void OnContentChanged(UiNode? newContent)
+    private void OnContentChanged(Node? newContent)
     {
         _isUpdatingContent = true;
         try
@@ -422,7 +422,7 @@ public sealed partial class ScrollView : Control
     }
 
     /// <inheritdoc />
-    protected override void OnPointerWheel(UiPointerWheelEventArgs eventArgs)
+    protected override void OnPointerWheel(PointerWheelEventArgs eventArgs)
     {
         base.OnPointerWheel(eventArgs);
         if (eventArgs.Handled)
@@ -431,7 +431,7 @@ public sealed partial class ScrollView : Control
         HandleWheel(eventArgs);
     }
 
-    private void HandleWheel(UiPointerWheelEventArgs eventArgs)
+    private void HandleWheel(PointerWheelEventArgs eventArgs)
     {
         var lines = UiToolkit.WheelScrollLines;
         if (lines == 0)
@@ -463,7 +463,7 @@ public sealed partial class ScrollView : Control
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
         if (eventArgs.Handled || eventArgs.Modifiers != KeyModifiers.None)
@@ -472,7 +472,7 @@ public sealed partial class ScrollView : Control
         HandleNavigationKey(eventArgs.Key, eventArgs);
     }
 
-    private void HandleNavigationKey(Key key, UiKeyEventArgs eventArgs)
+    private void HandleNavigationKey(Key key, KeyEventArgs eventArgs)
     {
         var step = SmallChange;
         switch (key)

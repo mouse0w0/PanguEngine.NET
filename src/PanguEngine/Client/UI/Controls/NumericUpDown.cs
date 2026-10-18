@@ -25,7 +25,7 @@ public abstract class NumericUpDown : Control
         Property.Register<NumericUpDown, bool>(nameof(IsReadOnly),
             onChanged: static (node, _, _) => node.OnReadOnlyChanged());
 
-    static NumericUpDown() => UiCssRegistry.RegisterElement<NumericUpDown>("NumericUpDown");
+    static NumericUpDown() => CssRegistry.RegisterElement<NumericUpDown>("NumericUpDown");
 
     /// <summary>Initializes shared numeric control settings.</summary>
     protected NumericUpDown()
@@ -113,7 +113,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     private bool _editing;
     private bool _writingDisplay;
     private bool _userModified;
-    private readonly UiTicker _repeatTicker;
+    private readonly Ticker _repeatTicker;
     private NumericUpDownPart? _pressedPart;
     private bool _hasRepeatBaseline;
     private TimeSpan _lastRepeatTime;
@@ -211,7 +211,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected internal override UiNode GetFocusTarget() => _editor;
+    protected internal override Node GetFocusTarget() => _editor;
 
     private void OnValueChanged()
     {
@@ -263,7 +263,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
         CancelRepeat();
         _wheelRemainder = 0;
         _editor.IsReadOnly = IsReadOnly;
-        SetPseudoClass(UiPseudoClass.ReadOnly, IsReadOnly);
+        SetPseudoClass(PseudoClass.ReadOnly, IsReadOnly);
         _editing = false;
         ShowValue();
         _editing = _editor.IsFocused && !IsReadOnly;
@@ -292,12 +292,12 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
         UpdatePartStates();
     }
 
-    private void OnEditorGotFocus(object? sender, UiFocusChangedEventArgs eventArgs)
+    private void OnEditorGotFocus(object? sender, FocusChangedEventArgs eventArgs)
     {
         _editing = !IsReadOnly;
     }
 
-    private void OnEditorLostFocus(object? sender, UiFocusChangedEventArgs eventArgs)
+    private void OnEditorLostFocus(object? sender, FocusChangedEventArgs eventArgs)
     {
         if (ReferenceEquals(_editor.Screen?.FocusedNode, _editor))
             return;
@@ -370,7 +370,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected override void OnKeyDown(UiKeyEventArgs eventArgs)
+    protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
         base.OnKeyDown(eventArgs);
         if (eventArgs.Handled || !_editor.IsFocused || IsReadOnly)
@@ -399,7 +399,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected override void OnPointerWheel(UiPointerWheelEventArgs eventArgs)
+    protected override void OnPointerWheel(PointerWheelEventArgs eventArgs)
     {
         base.OnPointerWheel(eventArgs);
         if (eventArgs.Handled || !_editor.IsFocused || !CanStep || eventArgs.DeltaY == 0)
@@ -420,7 +420,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected override void OnPointerPressed(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerPressed(eventArgs);
         if (eventArgs.Handled || eventArgs.Button != MouseButton.Left || !CanStep ||
@@ -439,7 +439,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected override void OnPointerMoved(UiPointerEventArgs eventArgs)
+    protected override void OnPointerMoved(PointerEventArgs eventArgs)
     {
         base.OnPointerMoved(eventArgs);
         if (_pressedPart is null)
@@ -448,7 +448,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected override void OnPointerReleased(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerReleased(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
@@ -459,7 +459,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     }
 
     /// <inheritdoc />
-    protected override void OnPointerCanceled(UiPointerButtonEventArgs eventArgs)
+    protected override void OnPointerCanceled(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerCanceled(eventArgs);
         if (eventArgs.Button == MouseButton.Left)
@@ -552,7 +552,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     {
         private readonly Path _arrow = new() { IsHitTestVisible = false };
 
-        static NumericUpDownPart() => UiCssRegistry.RegisterElement<NumericUpDownPart>("NumericUpDownPart");
+        static NumericUpDownPart() => CssRegistry.RegisterElement<NumericUpDownPart>("NumericUpDownPart");
 
         /// <summary>Initializes a numeric step target.</summary>
         /// <param name="isIncrease">Whether this target increases the value.</param>

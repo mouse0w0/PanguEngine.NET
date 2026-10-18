@@ -27,12 +27,12 @@ internal sealed class UiBatchScene : IClientTestScene
     private UiBatchNode _root = null!;
     private GameScreen _screen = null!;
     private Clipboard _clipboard = null!;
-    private UiImage _firstImage = null!;
-    private UiImage _secondImage = null!;
-    private UiImage _thirdImage = null!;
-    private UiImage _fourthImage = null!;
-    private UiImage _nineSliceImage = null!;
-    private UiImage _oversizedImage = null!;
+    private Image _firstImage = null!;
+    private Image _secondImage = null!;
+    private Image _thirdImage = null!;
+    private Image _fourthImage = null!;
+    private Image _nineSliceImage = null!;
+    private Image _oversizedImage = null!;
     private bool _buttonStatesInitialized;
     private uint _completedFrames;
 
@@ -145,7 +145,7 @@ internal sealed class UiBatchScene : IClientTestScene
         _completedFrames++;
     }
 
-    private static UiImage CreateCheckerImage(int width, int height, Color first, Color second)
+    private static Image CreateCheckerImage(int width, int height, Color first, Color second)
     {
         var pixels = new byte[checked(width * height * 4)];
         for (var y = 0; y < height; y++)
@@ -162,10 +162,10 @@ internal sealed class UiBatchScene : IClientTestScene
             }
         }
 
-        return UiImage.FromRgba(pixels, width, height);
+        return Image.FromRgba(pixels, width, height);
     }
 
-    private static ImageView CreateImageView(UiImage source, ImageStretch stretch)
+    private static ImageView CreateImageView(Image source, ImageStretch stretch)
     {
         var imageView = new ImageView
         {
@@ -176,7 +176,7 @@ internal sealed class UiBatchScene : IClientTestScene
         return imageView;
     }
 
-    private static UiImage CreateNineSliceImage()
+    private static Image CreateNineSliceImage()
     {
         const int size = 24;
         var colors = new Color[]
@@ -207,18 +207,18 @@ internal sealed class UiBatchScene : IClientTestScene
             }
         }
 
-        return UiImage.FromRgba(pixels, size, size);
+        return Image.FromRgba(pixels, size, size);
     }
 
     private sealed class UiBatchNode : Panel
     {
         private const double DesignWidth = 640;
         private const double DesignHeight = 900;
-        private readonly UiImage _firstImage;
-        private readonly UiImage _secondImage;
-        private readonly UiImage _thirdImage;
-        private readonly UiImage _fourthImage;
-        private readonly UiImage _oversizedImage;
+        private readonly Image _firstImage;
+        private readonly Image _secondImage;
+        private readonly Image _thirdImage;
+        private readonly Image _fourthImage;
+        private readonly Image _oversizedImage;
         private readonly ImageView[] _imageViews;
         private readonly Text[] _textNodes;
         private readonly TextClipPanel _textClipPanel;
@@ -228,12 +228,12 @@ internal sealed class UiBatchScene : IClientTestScene
         private readonly Shape[] _shapes;
 
         internal UiBatchNode(
-            UiImage firstImage,
-            UiImage secondImage,
-            UiImage thirdImage,
-            UiImage fourthImage,
-            UiImage nineSliceImage,
-            UiImage oversizedImage)
+            Image firstImage,
+            Image secondImage,
+            Image thirdImage,
+            Image fourthImage,
+            Image nineSliceImage,
+            Image oversizedImage)
         {
             _firstImage = firstImage;
             _secondImage = secondImage;
@@ -414,7 +414,7 @@ internal sealed class UiBatchScene : IClientTestScene
                 _shapes[index].Arrange(Scale(new Rect(40 + index * 94, 660, 70, 42), layoutScale, offsetX, offsetY));
         }
 
-        protected override void DrawCore(UiDrawingContext context)
+        protected override void DrawCore(DrawingContext context)
         {
             var layoutScale = Math.Min(LayoutBounds.Width / DesignWidth, LayoutBounds.Height / DesignHeight);
             var offsetX = (LayoutBounds.Width - DesignWidth * layoutScale) / 2;
@@ -487,9 +487,9 @@ internal sealed class UiBatchScene : IClientTestScene
         {
         }
 
-        private sealed class DecorationContentNode : UiNode
+        private sealed class DecorationContentNode : Node
         {
-            protected override void DrawCore(UiDrawingContext context) =>
+            protected override void DrawCore(DrawingContext context) =>
                 context.FillRectangle(
                     new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height),
                     new Color(245, 245, 245, 210));
@@ -507,7 +507,7 @@ internal sealed class UiBatchScene : IClientTestScene
             private readonly Button _pressedButton;
             private readonly Button _focusedButton;
 
-            internal ButtonPanel(UiImage image)
+            internal ButtonPanel(Image image)
             {
                 var buttons = new Button[]
                 {

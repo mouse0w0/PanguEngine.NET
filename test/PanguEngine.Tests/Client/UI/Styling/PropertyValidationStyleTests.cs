@@ -15,7 +15,7 @@ public sealed class PropertyValidationStyleTests
         var node = new StyleNode();
         if (masked)
             node.Value = 40;
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         var original = CreateSheet(20);
         screen.SetStyleSheets([original]);
         node.UpdateStyles();
@@ -47,15 +47,15 @@ public sealed class PropertyValidationStyleTests
         var panel = new Panel();
         panel.Children.Add(first);
         panel.Children.Add(second);
-        var screen = new UiScreen(panel);
+        var screen = new Screen(panel);
         screen.SetStyleSheets([CreateSheet(20)]);
         panel.UpdateStyles();
         var notifications = 0;
         using var subscription = first.Subscribe(StyleNode.ValueProperty, (_, _) => notifications++);
-        var candidate = new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<StyleNode>(), [UiStyleSetter.Create(StyleNode.ValueProperty, 30)]),
-            new UiStyleRule(UiStyleSelector.For<StyleNode>(classes: ["invalid"]),
-                [UiStyleSetter.Create(StyleNode.ValueProperty, -1)])
+        var candidate = new StyleSheet([
+            new StyleRule(StyleSelector.For<StyleNode>(), [StyleSetter.Create(StyleNode.ValueProperty, 30)]),
+            new StyleRule(StyleSelector.For<StyleNode>(classes: ["invalid"]),
+                [StyleSetter.Create(StyleNode.ValueProperty, -1)])
         ]);
 
         screen.SetStyleSheets([candidate]);
@@ -74,7 +74,7 @@ public sealed class PropertyValidationStyleTests
     public void ReadingDoesNotResolvePendingInvalidStyles()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([CreateSheet(-1)]);
         Assert.Equal(0, node.Value);
 
@@ -91,17 +91,17 @@ public sealed class PropertyValidationStyleTests
     public void NullableStyleValuesArePassedToTheValidator()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<StyleNode>(),
-                [UiStyleSetter.Create<string?>(StyleNode.OptionalProperty, "invalid")])
+        var screen = new Screen(node);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<StyleNode>(),
+                [StyleSetter.Create<string?>(StyleNode.OptionalProperty, "invalid")])
         ])]);
         Assert.Throws<ArgumentException>(node.UpdateStyles);
         Assert.Equal("initial", node.GetValue(StyleNode.OptionalProperty));
 
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<StyleNode>(),
-                [UiStyleSetter.Create<string?>(StyleNode.OptionalProperty, null)])
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<StyleNode>(),
+                [StyleSetter.Create<string?>(StyleNode.OptionalProperty, null)])
         ])]);
         node.UpdateStyles();
 
@@ -112,7 +112,7 @@ public sealed class PropertyValidationStyleTests
     public void NullableValueTypeStylesValidateBothBoxingForms()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([CreateNullableSheet(null)]);
         node.UpdateStyles();
         Assert.Null(node.GetValue(StyleNode.NullableValueProperty));
@@ -130,7 +130,7 @@ public sealed class PropertyValidationStyleTests
     public void ComponentWinnersAreCombinedBeforeValidation()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([CreateSpacingSheet(4, 4)]);
         node.UpdateStyles();
         Assert.Equal(new Thickness(4, 0, 4, 0), node.GetValue(StyleNode.SpacingProperty));
@@ -153,17 +153,17 @@ public sealed class PropertyValidationStyleTests
         var node = new StyleNode();
         if (masked)
             node.Value = 40;
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([CreateSheet(20)]);
         node.UpdateStyles();
         var notifications = 0;
         using var subscription = node.Subscribe(StyleNode.ValueProperty, (_, _) => notifications++);
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        screen.SetStyleSheets([StyleSheet.Parse(
             "PropertyValidationStyleNode {\n    validated-value: -1;\n}", sourceName)]);
 
-        var error = Assert.Throws<UiStyleParseException>(node.UpdateStyles);
+        var error = Assert.Throws<StyleParseException>(node.UpdateStyles);
 
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        Assert.Equal(StyleParseError.InvalidValue, error.Error);
         Assert.Equal(sourceName, error.SourceName);
         Assert.Equal(2, error.Line);
         Assert.Equal(5, error.Column);
@@ -188,10 +188,10 @@ public sealed class PropertyValidationStyleTests
     public void InvalidCssLoserIsNotValidated()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([
-            UiStyleSheet.Parse("PropertyValidationStyleNode { validated-value: -1; }", "loser.css"),
-            UiStyleSheet.Parse("PropertyValidationStyleNode { validated-value: 20; }", "winner.css")
+            StyleSheet.Parse("PropertyValidationStyleNode { validated-value: -1; }", "loser.css"),
+            StyleSheet.Parse("PropertyValidationStyleNode { validated-value: 20; }", "winner.css")
         ]);
 
         node.UpdateStyles();
@@ -204,11 +204,11 @@ public sealed class PropertyValidationStyleTests
     public void RejectedVariableValueReportsTheConsumingDeclaration()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        var screen = new Screen(node);
+        screen.SetStyleSheets([StyleSheet.Parse(
             "PropertyValidationStyleNode {\n    --candidate: -1;\n    validated-value: var(--candidate);\n}", "variables.css")]);
 
-        var error = Assert.Throws<UiStyleParseException>(node.UpdateStyles);
+        var error = Assert.Throws<StyleParseException>(node.UpdateStyles);
 
         Assert.Equal("variables.css", error.SourceName);
         Assert.Equal(3, error.Line);
@@ -221,15 +221,15 @@ public sealed class PropertyValidationStyleTests
     public void RejectedCombinedValueReportsAllWinningDeclarations()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([CreateSpacingSheet(4, 4)]);
         node.UpdateStyles();
         screen.SetStyleSheets([
-            UiStyleSheet.Parse("PropertyValidationStyleNode {\n    validated-spacing-left: 4;\n}", "left.css"),
-            UiStyleSheet.Parse("PropertyValidationStyleNode {\n    validated-spacing-right: 5;\n}", "right.css")
+            StyleSheet.Parse("PropertyValidationStyleNode {\n    validated-spacing-left: 4;\n}", "left.css"),
+            StyleSheet.Parse("PropertyValidationStyleNode {\n    validated-spacing-right: 5;\n}", "right.css")
         ]);
 
-        var error = Assert.Throws<UiStyleParseException>(node.UpdateStyles);
+        var error = Assert.Throws<StyleParseException>(node.UpdateStyles);
 
         Assert.Equal("right.css", error.SourceName);
         Assert.Equal(2, error.Line);
@@ -246,10 +246,10 @@ public sealed class PropertyValidationStyleTests
     public void CssValidatorExceptionsPropagateWithoutWrappingAndUpdatesRecover(int value)
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([CreateSheet(20)]);
         node.UpdateStyles();
-        screen.SetStyleSheets([UiStyleSheet.Parse(
+        screen.SetStyleSheets([StyleSheet.Parse(
             $"PropertyValidationStyleNode {{ validated-value: {value}; }}", "validator.css")]);
 
         if (value == 13)
@@ -266,17 +266,17 @@ public sealed class PropertyValidationStyleTests
     public void RejectedMixedValueReportsItsCssAndCSharpSources()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
+        var screen = new Screen(node);
         screen.SetStyleSheets([
-            new UiStyleSheet([
-                new UiStyleRule(UiStyleSelector.For<StyleNode>(), [
-                    UiStyleSetter.CreateEdge(StyleNode.SpacingProperty, UiStyleEdge.Left, 4)
+            new StyleSheet([
+                new StyleRule(StyleSelector.For<StyleNode>(), [
+                    StyleSetter.CreateEdge(StyleNode.SpacingProperty, StyleEdge.Left, 4)
                 ])
             ]),
-            UiStyleSheet.Parse("PropertyValidationStyleNode { validated-spacing-right: 5; }", "mixed.css")
+            StyleSheet.Parse("PropertyValidationStyleNode { validated-spacing-right: 5; }", "mixed.css")
         ]);
 
-        var error = Assert.Throws<UiStyleParseException>(node.UpdateStyles);
+        var error = Assert.Throws<StyleParseException>(node.UpdateStyles);
 
         Assert.Equal("mixed.css", error.SourceName);
         Assert.Contains("Spacing (Left) from C# selector 'StyleNode'", error.Message);
@@ -288,10 +288,10 @@ public sealed class PropertyValidationStyleTests
     public void CSharpRuleLocationDoesNotChangeTheRejectionException()
     {
         var node = new StyleNode();
-        var screen = new UiScreen(node);
-        screen.SetStyleSheets([new UiStyleSheet([
-            new UiStyleRule(UiStyleSelector.For<StyleNode>(), [UiStyleSetter.Create(StyleNode.ValueProperty, -1)],
-                new UiStyleSourceLocation("manual", 10, 1, 5))
+        var screen = new Screen(node);
+        screen.SetStyleSheets([new StyleSheet([
+            new StyleRule(StyleSelector.For<StyleNode>(), [StyleSetter.Create(StyleNode.ValueProperty, -1)],
+                new StyleSourceLocation("manual", 10, 1, 5))
         ], "manual")]);
 
         var error = Assert.Throws<ArgumentException>(node.UpdateStyles);
@@ -300,22 +300,22 @@ public sealed class PropertyValidationStyleTests
         Assert.StartsWith("Style value must be non-negative.", error.Message);
     }
 
-    private static UiStyleSheet CreateNullableSheet(int? value) => new([
-        new UiStyleRule(UiStyleSelector.For<StyleNode>(), [UiStyleSetter.Create(StyleNode.NullableValueProperty, value)])
+    private static StyleSheet CreateNullableSheet(int? value) => new([
+        new StyleRule(StyleSelector.For<StyleNode>(), [StyleSetter.Create(StyleNode.NullableValueProperty, value)])
     ]);
 
-    private static UiStyleSheet CreateSpacingSheet(double left, double right) => new([
-        new UiStyleRule(UiStyleSelector.For<StyleNode>(), [
-            UiStyleSetter.CreateEdge(StyleNode.SpacingProperty, UiStyleEdge.Left, left),
-            UiStyleSetter.CreateEdge(StyleNode.SpacingProperty, UiStyleEdge.Right, right)
+    private static StyleSheet CreateSpacingSheet(double left, double right) => new([
+        new StyleRule(StyleSelector.For<StyleNode>(), [
+            StyleSetter.CreateEdge(StyleNode.SpacingProperty, StyleEdge.Left, left),
+            StyleSetter.CreateEdge(StyleNode.SpacingProperty, StyleEdge.Right, right)
         ])
     ]);
 
-    private static UiStyleSheet CreateSheet(int value) => new([
-        new UiStyleRule(UiStyleSelector.For<StyleNode>(), [UiStyleSetter.Create(StyleNode.ValueProperty, value)])
+    private static StyleSheet CreateSheet(int value) => new([
+        new StyleRule(StyleSelector.For<StyleNode>(), [StyleSetter.Create(StyleNode.ValueProperty, value)])
     ]);
 
-    private sealed class StyleNode : UiNode
+    private sealed class StyleNode : Node
     {
         internal static readonly ArgumentException ValidatorError = new("validator", "candidate");
 
@@ -339,14 +339,14 @@ public sealed class PropertyValidationStyleTests
 
         static StyleNode()
         {
-            UiCssRegistry.RegisterElement<StyleNode>("PropertyValidationStyleNode");
-            UiCssRegistry.RegisterProperty<StyleNode, int>("validated-value", ValueProperty,
-                static text => checked((int)UiCssValueConverters.ParseNumber(text)));
-            UiCssRegistry.RegisterProperty<StyleNode>("validated-spacing-left", static text => [
-                UiStyleSetter.CreateEdge(SpacingProperty, UiStyleEdge.Left, UiCssValueConverters.ParseLength(text))
+            CssRegistry.RegisterElement<StyleNode>("PropertyValidationStyleNode");
+            CssRegistry.RegisterProperty<StyleNode, int>("validated-value", ValueProperty,
+                static text => checked((int)CssValueConverters.ParseNumber(text)));
+            CssRegistry.RegisterProperty<StyleNode>("validated-spacing-left", static text => [
+                StyleSetter.CreateEdge(SpacingProperty, StyleEdge.Left, CssValueConverters.ParseLength(text))
             ]);
-            UiCssRegistry.RegisterProperty<StyleNode>("validated-spacing-right", static text => [
-                UiStyleSetter.CreateEdge(SpacingProperty, UiStyleEdge.Right, UiCssValueConverters.ParseLength(text))
+            CssRegistry.RegisterProperty<StyleNode>("validated-spacing-right", static text => [
+                StyleSetter.CreateEdge(SpacingProperty, StyleEdge.Right, CssValueConverters.ParseLength(text))
             ]);
         }
 

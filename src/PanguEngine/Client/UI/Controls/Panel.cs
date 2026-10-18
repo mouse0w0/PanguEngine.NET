@@ -9,11 +9,11 @@ public class Panel : Region
 {
     static Panel()
     {
-        UiCssRegistry.RegisterElement<Panel>("Panel");
+        CssRegistry.RegisterElement<Panel>("Panel");
     }
 
     /// <summary>
     /// Gets the mutable collection of direct child nodes in drawing order.
     /// </summary>
-    public new UiNodeList Children => base.Children;
+    public new NodeList Children => base.Children;
 }

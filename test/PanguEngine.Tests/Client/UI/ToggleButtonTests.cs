@@ -23,11 +23,11 @@ public sealed class ToggleButtonTests
         Assert.False(ToggleButton.IsCheckedProperty.IsReadOnly);
         Assert.False(button.IsChecked);
         Assert.True(button.Focusable);
-        Assert.False(button.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.False(button.HasPseudoClass(PseudoClass.Checked));
         Assert.Equal("Button", BackgroundSelector(button));
 
-        var screen = new UiScreen(button);
-        screen.SetStyleSheets([UiStyleSheet.Parse("ToggleButton { spacing: 11px; }")]);
+        var screen = new Screen(button);
+        screen.SetStyleSheets([StyleSheet.Parse("ToggleButton { spacing: 11px; }")]);
         button.UpdateStyles();
 
         Assert.Equal(11d, button.Spacing);
@@ -42,7 +42,7 @@ public sealed class ToggleButtonTests
         button.Click += (_, _) => clicks++;
         using var subscription = button.Subscribe(ToggleButton.IsCheckedProperty, (_, args) =>
         {
-            Assert.Equal(args.NewValue, button.HasPseudoClass(UiPseudoClass.Checked));
+            Assert.Equal(args.NewValue, button.HasPseudoClass(PseudoClass.Checked));
             changes.Add(args.NewValue);
         });
 
@@ -85,7 +85,7 @@ public sealed class ToggleButtonTests
         Assert.Equal(key == Key.Enter, button.IsChecked);
         Assert.Equal(key == Key.Enter ? 1 : 0, observed.Count);
         if (key == Key.Space)
-            Assert.True(button.HasPseudoClass(UiPseudoClass.Pressed));
+            Assert.True(button.HasPseudoClass(PseudoClass.Pressed));
         manager.ProcessKeyUp(key, KeyModifiers.None);
         manager.ProcessKeyUp(key, KeyModifiers.None);
 
@@ -134,8 +134,8 @@ public sealed class ToggleButtonTests
             Click(manager);
 
         Assert.True(button.IsChecked);
-        Assert.True(button.HasPseudoClass(UiPseudoClass.Checked));
-        Assert.False(button.HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.True(button.HasPseudoClass(PseudoClass.Checked));
+        Assert.False(button.HasPseudoClass(PseudoClass.Pressed));
         Assert.Equal(0, clicks);
         manager.Close();
     }
@@ -180,7 +180,7 @@ public sealed class ToggleButtonTests
         model.Value = false;
 
         Assert.False(button.IsChecked);
-        Assert.False(button.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.False(button.HasPseudoClass(PseudoClass.Checked));
         manager.Close();
     }
 
@@ -216,7 +216,7 @@ public sealed class ToggleButtonTests
 
         Assert.Equal(new[] { true }, observed);
         Assert.False(model.Value);
-        Assert.True(button.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.True(button.HasPseudoClass(PseudoClass.Checked));
         Assert.True(button.IsBound(ToggleButton.IsCheckedProperty));
         manager.Close();
     }
@@ -234,7 +234,7 @@ public sealed class ToggleButtonTests
 
         Assert.Same(error, actual);
         Assert.True(button.IsChecked);
-        Assert.True(button.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.True(button.HasPseudoClass(PseudoClass.Checked));
         Assert.Equal(0, clicks);
         manager.Close();
     }
@@ -328,7 +328,7 @@ public sealed class ToggleButtonTests
         manager.ProcessPointerReleased(new Point(5, 5), button, KeyModifiers.None);
     }
 
-    private static string? BackgroundSelector(UiNode node) =>
+    private static string? BackgroundSelector(Node node) =>
         node.GetStyleValueSources(Region.BackgroundProperty).SingleOrDefault()?.SelectorText;
 
     private sealed class BooleanModel : ObservableObject

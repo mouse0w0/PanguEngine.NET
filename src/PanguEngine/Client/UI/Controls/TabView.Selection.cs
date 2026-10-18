@@ -83,7 +83,7 @@ public sealed partial class TabView
     private static bool IsAvailable(TabItem item) =>
         item.IsEnabled && item.Visibility == Visibility.Visible;
 
-    private static bool IsDescendantOrSelf(UiNode? node, UiNode ancestor)
+    private static bool IsDescendantOrSelf(Node? node, Node ancestor)
     {
         for (var current = node; current is not null; current = current.Parent)
         {

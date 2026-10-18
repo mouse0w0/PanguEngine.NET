@@ -44,10 +44,10 @@ public sealed class Path : Shape
 
     static Path()
     {
-        UiCssRegistry.RegisterElement<Path>("Path");
-        UiCssRegistry.RegisterProperty<Path, PathGeometry?>("data", DataProperty, ParsePathData);
-        UiCssRegistry.RegisterProperty<Path, ShapeFillRule>("fill-rule", FillRuleProperty, ParseFillRule);
-        UiCssRegistry.RegisterProperty<Path, PathStretch>("stretch", StretchProperty, ParsePathStretch);
+        CssRegistry.RegisterElement<Path>("Path");
+        CssRegistry.RegisterProperty<Path, PathGeometry?>("data", DataProperty, ParsePathData);
+        CssRegistry.RegisterProperty<Path, ShapeFillRule>("fill-rule", FillRuleProperty, ParseFillRule);
+        CssRegistry.RegisterProperty<Path, PathStretch>("stretch", StretchProperty, ParsePathStretch);
     }
 
     /// <summary>

@@ -20,7 +20,7 @@ internal sealed class ClientRenderer
     private readonly UiManager _uiManager;
     private readonly WorldRenderer _worldRenderer;
     private readonly UiRenderer _uiRenderer;
-    private readonly UiDrawCommandList _uiCommands = new();
+    private readonly DrawCommandList _uiCommands = new();
     private readonly ClientFrameTimeTracker _frameTimeTracker = new();
     private readonly Texture?[] _depthStencilTextures;
     private readonly TextureView?[] _depthStencilAttachments;

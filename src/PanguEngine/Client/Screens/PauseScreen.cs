@@ -13,7 +13,7 @@ internal sealed class PauseScreen : GameScreen
         CloseOnEscape = true;
     }
 
-    private static UiNode CreateRoot()
+    private static Node CreateRoot()
     {
         var title = new Text
         {

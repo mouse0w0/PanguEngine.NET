@@ -15,11 +15,11 @@ public sealed class ToggleButton : Button
         Property.Register<ToggleButton, bool>(
             nameof(IsChecked),
             false,
-            onChanged: static (node, _, value) => node.SetPseudoClass(UiPseudoClass.Checked, value));
+            onChanged: static (node, _, value) => node.SetPseudoClass(PseudoClass.Checked, value));
 
     static ToggleButton()
     {
-        UiCssRegistry.RegisterElement<ToggleButton>("ToggleButton");
+        CssRegistry.RegisterElement<ToggleButton>("ToggleButton");
     }
 
     /// <summary>

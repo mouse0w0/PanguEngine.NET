@@ -15,7 +15,7 @@ public sealed class Ellipse : Shape
 {
     static Ellipse()
     {
-        UiCssRegistry.RegisterElement<Ellipse>("Ellipse");
+        CssRegistry.RegisterElement<Ellipse>("Ellipse");
     }
 
     /// <summary>

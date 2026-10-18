@@ -35,25 +35,25 @@ public sealed class Grid : Panel
 
     /// <summary>Identifies the attached zero-based row index property.</summary>
     public static readonly Property<int> RowProperty =
-        Property.RegisterAttached<Grid, UiNode, int>("Row",
+        Property.RegisterAttached<Grid, Node, int>("Row",
             onChanged: static (node, _, _) => node.InvalidateMeasure(), validate: static value => value >= 0,
             validationMessage: "A grid row index cannot be negative.");
 
     /// <summary>Identifies the attached zero-based column index property.</summary>
     public static readonly Property<int> ColumnProperty =
-        Property.RegisterAttached<Grid, UiNode, int>("Column",
+        Property.RegisterAttached<Grid, Node, int>("Column",
             onChanged: static (node, _, _) => node.InvalidateMeasure(), validate: static value => value >= 0,
             validationMessage: "A grid column index cannot be negative.");
 
     /// <summary>Identifies the attached row span property.</summary>
     public static readonly Property<int> RowSpanProperty =
-        Property.RegisterAttached<Grid, UiNode, int>("RowSpan", 1,
+        Property.RegisterAttached<Grid, Node, int>("RowSpan", 1,
             onChanged: static (node, _, _) => node.InvalidateMeasure(), validate: static value => value >= 1,
             validationMessage: "A grid row span must be at least one.");
 
     /// <summary>Identifies the attached column span property.</summary>
     public static readonly Property<int> ColumnSpanProperty =
-        Property.RegisterAttached<Grid, UiNode, int>("ColumnSpan", 1,
+        Property.RegisterAttached<Grid, Node, int>("ColumnSpan", 1,
             onChanged: static (node, _, _) => node.InvalidateMeasure(), validate: static value => value >= 1,
             validationMessage: "A grid column span must be at least one.");
 
@@ -62,15 +62,15 @@ public sealed class Grid : Panel
 
     static Grid()
     {
-        UiCssRegistry.RegisterElement<Grid>("Grid");
-        UiCssRegistry.RegisterProperty<Grid, GridDefinitions>("row-definitions", RowDefinitionsProperty, GridDefinitions.Parse);
-        UiCssRegistry.RegisterProperty<Grid, GridDefinitions>("column-definitions", ColumnDefinitionsProperty, GridDefinitions.Parse);
-        UiCssRegistry.RegisterProperty<Grid, double>("row-spacing", RowSpacingProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<Grid, double>("column-spacing", ColumnSpacingProperty, UiCssValueConverters.ParseLength);
-        UiCssRegistry.RegisterProperty<UiNode, int>("grid-row", RowProperty, ParseIndex);
-        UiCssRegistry.RegisterProperty<UiNode, int>("grid-column", ColumnProperty, ParseIndex);
-        UiCssRegistry.RegisterProperty<UiNode, int>("grid-row-span", RowSpanProperty, ParseIndex);
-        UiCssRegistry.RegisterProperty<UiNode, int>("grid-column-span", ColumnSpanProperty, ParseIndex);
+        CssRegistry.RegisterElement<Grid>("Grid");
+        CssRegistry.RegisterProperty<Grid, GridDefinitions>("row-definitions", RowDefinitionsProperty, GridDefinitions.Parse);
+        CssRegistry.RegisterProperty<Grid, GridDefinitions>("column-definitions", ColumnDefinitionsProperty, GridDefinitions.Parse);
+        CssRegistry.RegisterProperty<Grid, double>("row-spacing", RowSpacingProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Grid, double>("column-spacing", ColumnSpacingProperty, CssValueConverters.ParseLength);
+        CssRegistry.RegisterProperty<Node, int>("grid-row", RowProperty, ParseIndex);
+        CssRegistry.RegisterProperty<Node, int>("grid-column", ColumnProperty, ParseIndex);
+        CssRegistry.RegisterProperty<Node, int>("grid-row-span", RowSpanProperty, ParseIndex);
+        CssRegistry.RegisterProperty<Node, int>("grid-column-span", ColumnSpanProperty, ParseIndex);
     }
 
     /// <summary>Gets or sets the immutable row definitions; an empty sequence represents one star row.</summary>
@@ -104,42 +104,42 @@ public sealed class Grid : Panel
     /// <summary>Gets the attached zero-based row index.</summary>
     /// <param name="node">The child node.</param>
     /// <returns>The assigned row index.</returns>
-    public static int GetRow(UiNode node) => node.GetValue(RowProperty);
+    public static int GetRow(Node node) => node.GetValue(RowProperty);
 
     /// <summary>Sets the attached zero-based row index.</summary>
     /// <param name="node">The child node.</param>
     /// <param name="value">The non-negative row index.</param>
-    public static void SetRow(UiNode node, int value) => node.SetValue(RowProperty, value);
+    public static void SetRow(Node node, int value) => node.SetValue(RowProperty, value);
 
     /// <summary>Gets the attached zero-based column index.</summary>
     /// <param name="node">The child node.</param>
     /// <returns>The assigned column index.</returns>
-    public static int GetColumn(UiNode node) => node.GetValue(ColumnProperty);
+    public static int GetColumn(Node node) => node.GetValue(ColumnProperty);
 
     /// <summary>Sets the attached zero-based column index.</summary>
     /// <param name="node">The child node.</param>
     /// <param name="value">The non-negative column index.</param>
-    public static void SetColumn(UiNode node, int value) => node.SetValue(ColumnProperty, value);
+    public static void SetColumn(Node node, int value) => node.SetValue(ColumnProperty, value);
 
     /// <summary>Gets the number of rows spanned by a node.</summary>
     /// <param name="node">The child node.</param>
     /// <returns>The assigned row span.</returns>
-    public static int GetRowSpan(UiNode node) => node.GetValue(RowSpanProperty);
+    public static int GetRowSpan(Node node) => node.GetValue(RowSpanProperty);
 
     /// <summary>Sets the number of rows spanned by a node.</summary>
     /// <param name="node">The child node.</param>
     /// <param name="value">The row span, at least one.</param>
-    public static void SetRowSpan(UiNode node, int value) => node.SetValue(RowSpanProperty, value);
+    public static void SetRowSpan(Node node, int value) => node.SetValue(RowSpanProperty, value);
 
     /// <summary>Gets the number of columns spanned by a node.</summary>
     /// <param name="node">The child node.</param>
     /// <returns>The assigned column span.</returns>
-    public static int GetColumnSpan(UiNode node) => node.GetValue(ColumnSpanProperty);
+    public static int GetColumnSpan(Node node) => node.GetValue(ColumnSpanProperty);
 
     /// <summary>Sets the number of columns spanned by a node.</summary>
     /// <param name="node">The child node.</param>
     /// <param name="value">The column span, at least one.</param>
-    public static void SetColumnSpan(UiNode node, int value) => node.SetValue(ColumnSpanProperty, value);
+    public static void SetColumnSpan(Node node, int value) => node.SetValue(ColumnSpanProperty, value);
 
     /// <inheritdoc />
     protected override Size MeasureContent(Size availableSize)
@@ -147,8 +147,8 @@ public sealed class Grid : Panel
         var screen = Screen;
         var round = screen?.UseLayoutRounding ?? true;
         var scale = screen?.Scale ?? 1;
-        var columnSpacing = round ? UiLayoutHelper.RoundLayoutValue(ColumnSpacing, scale) : ColumnSpacing;
-        var rowSpacing = round ? UiLayoutHelper.RoundLayoutValue(RowSpacing, scale) : RowSpacing;
+        var columnSpacing = round ? LayoutHelper.RoundLayoutValue(ColumnSpacing, scale) : ColumnSpacing;
+        var rowSpacing = round ? LayoutHelper.RoundLayoutValue(RowSpacing, scale) : RowSpacing;
         var columns = new GridAxis(ColumnDefinitions, columnSpacing);
         var rows = new GridAxis(RowDefinitions, rowSpacing);
         var cells = GetCells(columns, rows);
@@ -224,5 +224,5 @@ public sealed class Grid : Panel
         return result;
     }
 
-    private readonly record struct Cell(UiNode Node, int Column, int ColumnSpan, int Row, int RowSpan);
+    private readonly record struct Cell(Node Node, int Column, int ColumnSpan, int Row, int RowSpan);
 }

@@ -417,7 +417,7 @@ public sealed class PropertyTests
         return weakHandler;
     }
 
-    private class TestNode : UiNode
+    private class TestNode : Node
     {
         internal static readonly Property<int> ValueProperty =
             Property.Register<TestNode, int>(nameof(Value), 10,
@@ -443,15 +443,15 @@ public sealed class PropertyTests
     {
     }
 
-    private sealed class ForeignNode : UiNode
+    private sealed class ForeignNode : Node
     {
     }
 
-    private sealed class ConcurrentNode : UiNode
+    private sealed class ConcurrentNode : Node
     {
     }
 
-    private sealed class AttachedOwner : UiNode
+    private sealed class AttachedOwner : Node
     {
         internal static readonly Property<int> ValueProperty =
             Property.RegisterAttached<AttachedOwner, AttachedTarget, int>(
@@ -460,7 +460,7 @@ public sealed class PropertyTests
                 onChanged: static (node, _, _) => node.InvalidateArrange());
     }
 
-    private class AttachedTarget : UiNode
+    private class AttachedTarget : Node
     {
     }
 

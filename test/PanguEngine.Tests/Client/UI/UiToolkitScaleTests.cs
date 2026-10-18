@@ -31,11 +31,11 @@ public sealed class UiToolkitScaleTests
     public void ScreenUsesCurrentDefaultScaleAtConstructionAndOpening()
     {
         var original = UiToolkit.DefaultScale;
-        UiScreen? screen = null;
+        Screen? screen = null;
         try
         {
             UiToolkit.DefaultScale = 1.25;
-            screen = new UiScreen();
+            screen = new Screen();
             Assert.Equal(1.25, screen.Scale);
 
             UiToolkit.DefaultScale = 1.5;
@@ -107,11 +107,11 @@ public sealed class UiToolkitScaleTests
     public void FailedExplicitScaleAssignmentDoesNotStopFollowingDefaultScale()
     {
         var original = UiToolkit.DefaultScale;
-        UiScreen? screen = null;
+        Screen? screen = null;
         try
         {
             UiToolkit.DefaultScale = 1;
-            screen = new UiScreen();
+            screen = new Screen();
             Assert.Throws<ArgumentOutOfRangeException>(() => screen.Scale = 0);
 
             UiToolkit.DefaultScale = 2;
@@ -130,11 +130,11 @@ public sealed class UiToolkitScaleTests
     public void UnoverriddenScreenUsesLatestDefaultScaleWhenReopened()
     {
         var original = UiToolkit.DefaultScale;
-        UiScreen? screen = null;
+        Screen? screen = null;
         try
         {
             UiToolkit.DefaultScale = 1;
-            screen = new UiScreen();
+            screen = new Screen();
             screen.Open();
             screen.Close();
 
@@ -154,11 +154,11 @@ public sealed class UiToolkitScaleTests
     public void ExplicitScalePersistsWhenScreenReopens()
     {
         var original = UiToolkit.DefaultScale;
-        UiScreen? screen = null;
+        Screen? screen = null;
         try
         {
             UiToolkit.DefaultScale = 1;
-            screen = new UiScreen { Scale = 1.25 };
+            screen = new Screen { Scale = 1.25 };
             screen.Open();
             screen.Close();
 
@@ -174,7 +174,7 @@ public sealed class UiToolkitScaleTests
         }
     }
 
-    private sealed class LayoutNode : UiNode
+    private sealed class LayoutNode : Node
     {
         internal Size LastMeasureConstraint { get; private set; }
         internal int MeasureCalls { get; private set; }

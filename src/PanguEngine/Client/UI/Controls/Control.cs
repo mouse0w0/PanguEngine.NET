@@ -21,7 +21,7 @@ public abstract class Control : Region
 
     static Control()
     {
-        UiCssRegistry.RegisterElement<Control>("Control");
+        CssRegistry.RegisterElement<Control>("Control");
     }
 
     /// <summary>
@@ -54,6 +54,6 @@ public abstract class Control : Region
     /// </summary>
     protected void RefreshPressedPseudoClass()
     {
-        SetPseudoClass(UiPseudoClass.Pressed, IsPressedPseudoClassActive);
+        SetPseudoClass(PseudoClass.Pressed, IsPressedPseudoClassActive);
     }
 }

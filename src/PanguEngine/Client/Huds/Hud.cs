@@ -19,7 +19,7 @@ public abstract class Hud
     /// </summary>
     /// <param name="root">The non-null root node owned by this component.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="root"/> is null.</exception>
-    protected Hud(UiNode root)
+    protected Hud(Node root)
     {
         ArgumentNullException.ThrowIfNull(root);
         Root = root;
@@ -28,7 +28,7 @@ public abstract class Hud
     /// <summary>
     /// Gets the UI root node owned by this component.
     /// </summary>
-    public UiNode Root { get; }
+    public Node Root { get; }
 
     /// <summary>
     /// Invoked on each client fixed update.

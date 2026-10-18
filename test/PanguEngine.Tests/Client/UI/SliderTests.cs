@@ -15,11 +15,11 @@ public sealed class SliderTests
     {
         var items = new ObservableList<int>([60]);
         var slider = new Slider<int>(new ListSliderValueModel<int>(items));
-        _ = new UiScreen(slider);
+        _ = new Screen(slider);
         slider.UpdateStyles();
         var track = Part(slider, "track");
         var normalBackground = track.GetValue(Region.BackgroundProperty);
-        var noValue = UiPseudoClass.NoValue;
+        var noValue = PseudoClass.NoValue;
         Assert.False(slider.HasPseudoClass(noValue));
 
         items.Clear();
@@ -547,7 +547,7 @@ public sealed class SliderTests
     [Fact]
     public void MeasuredLabelsAvoidOverlapAndPreferTheSelectedTick()
     {
-        using var textContext = new UiTextTestContext();
+        using var textContext = new TextTestContext();
         var slider = new Slider<int>(new NumericSliderValueModel<int> { Maximum = 10, TickFrequency = 1 })
         {
             Value = 5, ShowTickLabels = true, ValueFormatter = value => $"choice {value}"
@@ -628,7 +628,7 @@ public sealed class SliderTests
     [Fact]
     public void TickLabelsCanBeEnabledAndHiddenSelectedLabelsCanBecomeVisible()
     {
-        using var textContext = new UiTextTestContext();
+        using var textContext = new TextTestContext();
         var slider = new Slider<int>(new ListSliderValueModel<int>(new ObservableList<int>(Enumerable.Range(0, 600))))
         {
             ShowTicks = true, ValueFormatter = value => $"choice {value}"
@@ -730,7 +730,7 @@ public sealed class SliderTests
         return (manager, screen);
     }
 
-    private static UiNode Part<T>(Slider<T> slider, string role) => slider.Children.Single(node => node.Classes.Contains($"slider-{role}"));
+    private static Node Part<T>(Slider<T> slider, string role) => slider.Children.Single(node => node.Classes.Contains($"slider-{role}"));
 
     private sealed class CaseInsensitiveList(IEnumerable<string> items) : ObservableList<string>(items)
     {

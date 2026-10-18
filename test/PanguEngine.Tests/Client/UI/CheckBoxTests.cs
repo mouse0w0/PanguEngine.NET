@@ -35,8 +35,8 @@ public sealed class CheckBoxTests
         box.IsChecked = true;
         box.IsChecked = null;
         Assert.Equal(0, clicks);
-        Assert.True(box.HasPseudoClass(UiPseudoClass.Indeterminate));
-        Assert.False(box.HasPseudoClass(UiPseudoClass.Checked));
+        Assert.True(box.HasPseudoClass(PseudoClass.Indeterminate));
+        Assert.False(box.HasPseudoClass(PseudoClass.Checked));
     }
 
     [Fact]
@@ -48,7 +48,7 @@ public sealed class CheckBoxTests
         using var subscription = box.Subscribe(CheckBox.IsCheckedProperty, (_, args) =>
         {
             Assert.Equal(true, args.NewValue);
-            Assert.True(box.HasPseudoClass(UiPseudoClass.Checked));
+            Assert.True(box.HasPseudoClass(PseudoClass.Checked));
             calls.Add("state");
         });
         box.Click += (_, _) => calls.Add("click");
@@ -222,11 +222,11 @@ public sealed class CheckBoxTests
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None, isRepeat: true);
         Assert.Equal(false, box.IsChecked);
-        Assert.True(box.HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.True(box.HasPseudoClass(PseudoClass.Pressed));
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
         Assert.Equal(true, box.IsChecked);
-        Assert.False(box.HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.False(box.HasPseudoClass(PseudoClass.Pressed));
         manager.Close();
     }
 
@@ -245,7 +245,7 @@ public sealed class CheckBoxTests
             screen.ClearFocus();
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
         Assert.Equal(false, box.IsChecked);
-        Assert.False(box.HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.False(box.HasPseudoClass(PseudoClass.Pressed));
         manager.Close();
     }
 
@@ -269,7 +269,7 @@ public sealed class CheckBoxTests
             screen.ClearFocus();
         Assert.True(box.Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None, isRepeat: true);
-        Assert.False(box.HasPseudoClass(UiPseudoClass.Pressed));
+        Assert.False(box.HasPseudoClass(PseudoClass.Pressed));
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
         Assert.Equal(false, box.IsChecked);
         Assert.Equal(0, clicks);
@@ -330,7 +330,7 @@ public sealed class CheckBoxTests
     public void ContentCanMoveFromAScreenRoot()
     {
         var content = new Panel();
-        var source = new UiScreen(content);
+        var source = new Screen(content);
         var box = new CheckBox { Content = content };
         Assert.Null(source.Root);
         Assert.Same(content, box.Content);
@@ -341,8 +341,8 @@ public sealed class CheckBoxTests
     public void AuthorStylesControlGeneratedTextWithoutLocalValueMasks()
     {
         var box = new CheckBox { Content = "label" };
-        var screen = new UiScreen(box);
-        screen.SetStyleSheets([UiStyleSheet.Parse("CheckBox Text.checkbox-text { font-size: 23px; color: #123456; }")]);
+        var screen = new Screen(box);
+        screen.SetStyleSheets([StyleSheet.Parse("CheckBox Text.checkbox-text { font-size: 23px; color: #123456; }")]);
         box.UpdateStyles();
         var text = AutomaticText(box);
         Assert.Equal(23, text.FontSize);
@@ -406,7 +406,7 @@ public sealed class CheckBoxTests
     private static Text AutomaticText(CheckBox box) =>
         Descendants(box).OfType<Text>().Single(text => text.Classes.Contains("checkbox-text"));
 
-    private static IEnumerable<UiNode> Descendants(Parent parent)
+    private static IEnumerable<Node> Descendants(Parent parent)
     {
         foreach (var child in parent.ReadOnlyChildren)
         {

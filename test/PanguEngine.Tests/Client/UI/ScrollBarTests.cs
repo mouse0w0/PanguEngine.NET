@@ -69,13 +69,13 @@ public sealed class ScrollBarTests
             .ToArray();
 
         Assert.Equal(expected, actual);
-        Assert.True(bar.HasPseudoClass(UiPseudoClass.Vertical));
-        Assert.False(bar.HasPseudoClass(UiPseudoClass.Horizontal));
+        Assert.True(bar.HasPseudoClass(PseudoClass.Vertical));
+        Assert.False(bar.HasPseudoClass(PseudoClass.Horizontal));
 
         bar.Orientation = Orientation.Horizontal;
 
-        Assert.True(bar.HasPseudoClass(UiPseudoClass.Horizontal));
-        Assert.False(bar.HasPseudoClass(UiPseudoClass.Vertical));
+        Assert.True(bar.HasPseudoClass(PseudoClass.Horizontal));
+        Assert.False(bar.HasPseudoClass(PseudoClass.Vertical));
         Assert.Equal(expected, bar.Children
             .Select(child => child.Classes.Single(name => name.StartsWith("scrollbar-", StringComparison.Ordinal)))
             .ToArray());
@@ -550,14 +550,14 @@ public sealed class ScrollBarTests
         var before = bar.Children
             .Select(child => child.Classes.ToArray())
             .ToArray();
-        Assert.True(bar.HasPseudoClass(UiPseudoClass.Vertical));
+        Assert.True(bar.HasPseudoClass(PseudoClass.Vertical));
 
-        screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
+        screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
         manager.UpdateFrame(new Size(100, 200), 0);
 
         Assert.Equal(Orientation.Horizontal, bar.Orientation);
-        Assert.True(bar.HasPseudoClass(UiPseudoClass.Horizontal));
-        Assert.False(bar.HasPseudoClass(UiPseudoClass.Vertical));
+        Assert.True(bar.HasPseudoClass(PseudoClass.Horizontal));
+        Assert.False(bar.HasPseudoClass(PseudoClass.Vertical));
         Assert.Equal(before, bar.Children.Select(child => child.Classes.ToArray()).ToArray());
         manager.Close();
     }
@@ -575,7 +575,7 @@ public sealed class ScrollBarTests
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             Assert.True(thumb.IsPressed);
 
-            screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
+            screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
             manager.UpdateFrame(new Size(100, 200), 0);
 
             Assert.Equal(Orientation.Horizontal, bar.Orientation);
@@ -601,7 +601,7 @@ public sealed class ScrollBarTests
             manager.ProcessPointerMoved(point);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
 
-            screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar { visibility: hidden; }")]);
+            screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { visibility: hidden; }")]);
             manager.UpdateFrame(new Size(16, 200), 0);
 
             Assert.False(thumb.IsPressed);
@@ -792,7 +792,7 @@ public sealed class ScrollBarTests
             var thumb = FindPart(bar, "thumb");
             var decrease = FindPart(bar, "decrease");
             var increase = FindPart(bar, "increase");
-            UiNode disabledNode = disabledLevel switch { 0 => bar, 1 => view, _ => host };
+            Node disabledNode = disabledLevel switch { 0 => bar, 1 => view, _ => host };
             disabledNode.IsEnabled = false;
             manager.UpdateFrame(new Size(200, 200), 0);
 
@@ -1139,7 +1139,7 @@ public sealed class ScrollBarTests
         try
         {
             var thumb = FindPart(bar, "thumb");
-            screen.SetStyleSheets([UiStyleSheet.Parse("ScrollBar:focus { minimum-thumb-length: 60; }")]);
+            screen.SetStyleSheets([StyleSheet.Parse("ScrollBar:focus { minimum-thumb-length: 60; }")]);
             manager.UpdateFrame(new Size(16, 200), 0);
             Assert.Equal(16, thumb.LayoutBounds.Height);
 
@@ -1168,10 +1168,10 @@ public sealed class ScrollBarTests
 
         var oldThickness = bar.BarThickness;
         var oldThumbLength = bar.MinimumThumbLength;
-        screen.SetStyleSheets([UiStyleSheet.Parse($"ScrollBar {{ {propertyName}: -4; }}", "scrollbar.css")]);
-        var error = Assert.Throws<UiStyleParseException>(() => manager.UpdateFrame(new Size(16, 200), 0));
+        screen.SetStyleSheets([StyleSheet.Parse($"ScrollBar {{ {propertyName}: -4; }}", "scrollbar.css")]);
+        var error = Assert.Throws<StyleParseException>(() => manager.UpdateFrame(new Size(16, 200), 0));
 
-        Assert.Equal(UiStyleParseError.InvalidValue, error.Error);
+        Assert.Equal(StyleParseError.InvalidValue, error.Error);
         Assert.Equal("scrollbar.css", error.SourceName);
         Assert.Equal(1, error.Line);
         Assert.Equal(13, error.Column);
@@ -1181,7 +1181,7 @@ public sealed class ScrollBarTests
         Assert.Equal("value", Assert.IsType<ArgumentException>(error.InnerException).ParamName);
         Assert.Equal(oldThickness, bar.BarThickness);
         Assert.Equal(oldThumbLength, bar.MinimumThumbLength);
-        screen.SetStyleSheets([UiStyleSheet.Parse($"ScrollBar {{ {propertyName}: 0; }}")]);
+        screen.SetStyleSheets([StyleSheet.Parse($"ScrollBar {{ {propertyName}: 0; }}")]);
         manager.UpdateFrame(new Size(16, 200), 0);
         Assert.Equal(0, propertyName == "bar-thickness" ? bar.BarThickness : bar.MinimumThumbLength);
         manager.Close();

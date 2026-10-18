@@ -32,7 +32,7 @@ internal static class UiShowcaseGrid
                 CreateLimitsSample()));
     }
 
-    private static UiNode CreateSizingSample()
+    private static Node CreateSizingSample()
     {
         var grid = CreateGrid("showcase-grid-sizing", 74,
             new(64, GridLength.Auto, GridLength.Star, new GridLength(2, GridUnitType.Star)),
@@ -44,7 +44,7 @@ internal static class UiShowcaseGrid
         return UiShowcaseWidgets.Sample("尺寸分配 · 64px / Auto / * / 2*", grid);
     }
 
-    private static UiNode CreateSpanSample()
+    private static Node CreateSpanSample()
     {
         var grid = CreateGrid("showcase-grid-spans", 180,
             new(64, GridLength.Star, GridLength.Star),
@@ -57,7 +57,7 @@ internal static class UiShowcaseGrid
         return UiShowcaseWidgets.Sample("跨行跨列 · 列：64px / * / *；行：36px / * / *", grid);
     }
 
-    private static UiNode CreateSpacingSample()
+    private static Node CreateSpacingSample()
     {
         var samples = new UiShowcaseGallery(170, 3);
         foreach (var spacing in new[] { 0, 8, 16 })
@@ -76,7 +76,7 @@ internal static class UiShowcaseGrid
         return UiShowcaseWidgets.Sample("行列间距 · 0 / 8 / 16", samples);
     }
 
-    private static UiNode CreateLimitsSample()
+    private static Node CreateLimitsSample()
     {
         var equal = CreateGrid("showcase-grid-equal", 74,
             new(GridLength.Star, GridLength.Star), new(GridLength.Star));

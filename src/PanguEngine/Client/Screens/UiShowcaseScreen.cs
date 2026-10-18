@@ -15,7 +15,7 @@ internal sealed class UiShowcaseScreen : GameScreen
 
     private double _openingScale;
 
-    internal UiShowcaseScreen(UiStyleSheet sheet, UiStyleSheet overrides, Action returnToPause)
+    internal UiShowcaseScreen(StyleSheet sheet, StyleSheet overrides, Action returnToPause)
     {
         _returnToPause = returnToPause;
 
@@ -54,9 +54,9 @@ internal sealed class UiShowcaseScreen : GameScreen
     internal static UiShowcaseScreen CreateForClient()
     {
         using var showcaseStream = Engine.ResourceManager.Open("pangu/ui/showcase.css");
-        var sheet = UiStyleSheet.Parse(showcaseStream, "pangu/ui/showcase.css");
+        var sheet = StyleSheet.Parse(showcaseStream, "pangu/ui/showcase.css");
         using var overridesStream = Engine.ResourceManager.Open("pangu/ui/showcase-overrides.css");
-        var overrides = UiStyleSheet.Parse(overridesStream, "pangu/ui/showcase-overrides.css");
+        var overrides = StyleSheet.Parse(overridesStream, "pangu/ui/showcase-overrides.css");
         return new UiShowcaseScreen(
             sheet,
             overrides,

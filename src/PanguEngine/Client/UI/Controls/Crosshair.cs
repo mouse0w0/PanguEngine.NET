@@ -7,7 +7,7 @@ namespace PanguEngine.Client.UI.Controls;
 /// <summary>
 /// Draws a configurable crosshair directly into the UI command stream.
 /// </summary>
-public sealed class Crosshair : UiNode
+public sealed class Crosshair : Node
 {
     /// <summary>Identifies the <see cref="Color"/> property.</summary>
     public new static readonly Property<Color> ColorProperty =
@@ -89,8 +89,8 @@ public sealed class Crosshair : UiNode
 
     static Crosshair()
     {
-        UiCssRegistry.RegisterElement<Crosshair>("Crosshair");
-        UiCssRegistry.RegisterProperty<Crosshair, Color>("color", ColorProperty, UiCssValueConverters.ParseColor);
+        CssRegistry.RegisterElement<Crosshair>("Crosshair");
+        CssRegistry.RegisterProperty<Crosshair, Color>("color", ColorProperty, CssValueConverters.ParseColor);
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public sealed class Crosshair : UiNode
     }
 
     /// <inheritdoc />
-    protected override void DrawCore(UiDrawingContext context)
+    protected override void DrawCore(DrawingContext context)
     {
         using var origin = context.PushTranslate(
             new Point(LayoutBounds.Width / 2, LayoutBounds.Height / 2));
@@ -216,19 +216,19 @@ public sealed class Crosshair : UiNode
         }
     }
 
-    private void DrawHorizontalArm(UiDrawingContext context, bool left)
+    private void DrawHorizontalArm(DrawingContext context, bool left)
     {
         var x = left ? -Gap - Length : Gap;
         DrawOutlinedRectangle(context, new Rect(x, -Thickness / 2, Length, Thickness));
     }
 
-    private void DrawVerticalArm(UiDrawingContext context, bool upward)
+    private void DrawVerticalArm(DrawingContext context, bool upward)
     {
         var y = upward ? -Gap - Length : Gap;
         DrawOutlinedRectangle(context, new Rect(-Thickness / 2, y, Thickness, Length));
     }
 
-    private void DrawOutlinedRectangle(UiDrawingContext context, Rect bounds)
+    private void DrawOutlinedRectangle(DrawingContext context, Rect bounds)
     {
         var outline = new Rect(
             bounds.X - OutlineThickness,

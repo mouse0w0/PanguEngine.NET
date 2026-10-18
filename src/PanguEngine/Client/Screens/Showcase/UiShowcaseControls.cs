@@ -147,7 +147,7 @@ internal static class UiShowcaseControls
                 })).ToArray()));
     }
 
-    private static UiImage CreatePatternImage()
+    private static Image CreatePatternImage()
     {
         const int width = 96;
         const int height = 60;
@@ -161,6 +161,6 @@ internal static class UiShowcaseControls
             pixels[offset + 2] = (byte)((x / 12 + y / 12) % 2 == 0 ? 220 : 90);
             pixels[offset + 3] = 255;
         }
-        return UiImage.FromRgba(pixels, width, height);
+        return Image.FromRgba(pixels, width, height);
     }
 }
