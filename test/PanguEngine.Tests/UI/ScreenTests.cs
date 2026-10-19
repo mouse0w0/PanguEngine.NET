@@ -12,6 +12,31 @@ namespace PanguEngine.Tests.UI;
 public sealed class ScreenTests
 {
     [Fact]
+    public void StandaloneDrivingEntryPointsArePublic()
+    {
+        var screen = new Screen();
+        Delegate[] entryPoints =
+        [
+            (Action)screen.Open,
+            (Action)screen.Close,
+            (Func<bool>)screen.IsOpen,
+            (Action<Size>)screen.PrepareFrame,
+            (Action<Size, TimeSpan>)screen.PrepareFrame,
+            (Func<Point, bool>)screen.ProcessPointerMoved,
+            (Func<Point, MouseButton, KeyModifiers, bool>)screen.ProcessPointerPressed,
+            (Func<Point, MouseButton, KeyModifiers, bool>)screen.ProcessPointerReleased,
+            (Func<Point, double, double, KeyModifiers, bool>)screen.ProcessPointerWheel,
+            (Func<Key, KeyModifiers, bool, bool>)screen.ProcessKeyDown,
+            (Func<Key, KeyModifiers, bool, bool>)screen.ProcessKeyUp,
+            (Action<string>)screen.ProcessTextInput,
+            (Action<bool>)screen.ProcessFocusChanged
+        ];
+
+        Assert.All(entryPoints, entryPoint =>
+            Assert.True(entryPoint.Method.IsPublic, entryPoint.Method.Name));
+    }
+
+    [Fact]
     public void PauseScreenEnablesGamePauseAndEscapeClose()
     {
         var screen = new PauseScreen();

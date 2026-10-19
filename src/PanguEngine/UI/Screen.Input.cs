@@ -104,7 +104,15 @@ public partial class Screen
         }
     }
 
-    internal bool ProcessPointerMoved(Point position)
+    /// <summary>
+    /// Updates pointer hover state and routes a pointer movement event.
+    /// </summary>
+    /// <param name="position">The pointer position in output coordinates.</param>
+    /// <returns>Whether the routed movement event was handled.</returns>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// </remarks>
+    public bool ProcessPointerMoved(Point position)
     {
         BeginInputRouting();
         try
@@ -137,7 +145,17 @@ public partial class Screen
         }
     }
 
-    internal bool ProcessPointerPressed(
+    /// <summary>
+    /// Updates pointer and focus state and routes a pointer press event.
+    /// </summary>
+    /// <param name="position">The pointer position in output coordinates.</param>
+    /// <param name="button">The button that was pressed.</param>
+    /// <param name="modifiers">The modifiers held when the button was pressed.</param>
+    /// <returns>Whether the routed press event was handled.</returns>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// </remarks>
+    public bool ProcessPointerPressed(
         Point position,
         MouseButton button,
         KeyModifiers modifiers)
@@ -204,7 +222,17 @@ public partial class Screen
         }
     }
 
-    internal bool ProcessPointerReleased(
+    /// <summary>
+    /// Routes a pointer release and, when applicable, a click to the corresponding press target.
+    /// </summary>
+    /// <param name="position">The pointer position in output coordinates.</param>
+    /// <param name="button">The button that was released.</param>
+    /// <param name="modifiers">The modifiers held when the button was released.</param>
+    /// <returns>Whether either the routed release or click event was handled.</returns>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// </remarks>
+    public bool ProcessPointerReleased(
         Point position,
         MouseButton button,
         KeyModifiers modifiers)
@@ -272,7 +300,18 @@ public partial class Screen
         }
     }
 
-    internal bool ProcessPointerWheel(
+    /// <summary>
+    /// Updates pointer hover state and routes a pointer wheel event.
+    /// </summary>
+    /// <param name="position">The pointer position in output coordinates.</param>
+    /// <param name="deltaX">The horizontal wheel delta.</param>
+    /// <param name="deltaY">The vertical wheel delta.</param>
+    /// <param name="modifiers">The modifiers held when the wheel event occurred.</param>
+    /// <returns>Whether the routed wheel event was handled.</returns>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// </remarks>
+    public bool ProcessPointerWheel(
         Point position,
         double deltaX,
         double deltaY,
@@ -306,24 +345,59 @@ public partial class Screen
         }
     }
 
-    internal bool ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
+    /// <summary>
+    /// Routes a key press event from the focused element.
+    /// </summary>
+    /// <param name="key">The key that was pressed.</param>
+    /// <param name="modifiers">The modifiers held when the key was pressed.</param>
+    /// <param name="isRepeat">Whether this is a repeated key press.</param>
+    /// <returns>Whether the routed key event was handled.</returns>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// </remarks>
+    public bool ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
         return ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyDown(eventArgs));
     }
 
-    internal bool ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
+    /// <summary>
+    /// Routes a key release event from the focused element.
+    /// </summary>
+    /// <param name="key">The key that was released.</param>
+    /// <param name="modifiers">The modifiers held when the key was released.</param>
+    /// <param name="isRepeat">Whether the input source marked this event as a repeat.</param>
+    /// <returns>Whether the routed key event was handled.</returns>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// </remarks>
+    public bool ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
         return ProcessKey(key, modifiers, isRepeat, static (node, eventArgs) => node.RaiseKeyUp(eventArgs));
     }
 
-    internal void ProcessTextInput(string text)
+    /// <summary>
+    /// Routes committed text input from the focused element.
+    /// </summary>
+    /// <param name="text">The text supplied by the input source.</param>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// </remarks>
+    public void ProcessTextInput(string text)
     {
         _ = ProcessFocusedInput(
             source => new TextInputEventArgs(source, text),
             static (node, eventArgs) => node.RaiseTextInput(eventArgs));
     }
 
-    internal void ProcessFocusChanged(bool focused)
+    /// <summary>
+    /// Processes a host focus change, clearing interaction state and canceling pending pointer input on focus loss.
+    /// </summary>
+    /// <param name="focused">Whether the host has focus.</param>
+    /// <remarks>
+    /// Call on the active screen's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Regaining host focus does not restore previous element focus or pointer state.
+    /// </remarks>
+    public void ProcessFocusChanged(bool focused)
     {
         BeginInputRouting();
         try

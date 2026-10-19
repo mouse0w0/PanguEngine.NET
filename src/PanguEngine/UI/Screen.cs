@@ -101,7 +101,19 @@ public partial class Screen
     {
     }
 
-    internal void Open()
+    /// <summary>
+    /// Opens this screen on the current thread.
+    /// </summary>
+    /// <remarks>
+    /// The host owns frame preparation, input forwarding, and closure.
+    /// Screens managed by a UI manager must be opened through that manager.
+    /// Callback failures propagate without rolling back completed changes.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the screen is already open or a previous operation or lifecycle transition has not completed,
+    /// or when layout or stylesheet preparation is in progress.
+    /// </exception>
+    public void Open()
     {
         BindOwnerForOpen();
         try
@@ -117,7 +129,19 @@ public partial class Screen
         }
     }
 
-    internal void Close()
+    /// <summary>
+    /// Closes this screen while preserving its root and tree ownership.
+    /// </summary>
+    /// <remarks>
+    /// Closing a screen that is not open has no effect. An open screen must be closed on its owner thread.
+    /// Screens managed by a UI manager must be closed through that manager.
+    /// Callback failures propagate immediately without invoking later callbacks or rolling back completed changes.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when an open screen is accessed from the wrong thread, is changing lifecycle state,
+    /// is updating layout or preparing stylesheets, or is generating drawing commands.
+    /// </exception>
+    public void Close()
     {
         if (!IsOpen())
             return;
@@ -136,10 +160,36 @@ public partial class Screen
 
     internal bool IsUpdating { get; private set; }
 
-    internal void PrepareFrame(Size viewportSize)
+    /// <summary>
+    /// Processes posted actions, advances tickers, and updates layout using the current monotonic time.
+    /// </summary>
+    /// <param name="viewportSize">The viewport size in output coordinates.</param>
+    /// <remarks>
+    /// Call on the open screen's owner thread before recording drawing commands.
+    /// Screens managed by a UI manager receive frame preparation from that manager.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the screen is not open, is accessed from the wrong thread, is changing lifecycle state,
+    /// is already updating or drawing, or its layout does not stabilize.
+    /// </exception>
+    public void PrepareFrame(Size viewportSize)
         => PrepareFrame(viewportSize, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
 
-    internal void PrepareFrame(Size viewportSize, TimeSpan frameTime)
+    /// <summary>
+    /// Processes posted actions, advances tickers, and updates layout using the supplied monotonic time.
+    /// </summary>
+    /// <param name="viewportSize">The viewport size in output coordinates.</param>
+    /// <param name="frameTime">The absolute monotonic time for this frame, not a frame duration.</param>
+    /// <remarks>
+    /// Call on the open screen's owner thread before recording drawing commands.
+    /// Use a consistent time origin across frames. Screens managed by a UI manager receive frame preparation
+    /// from that manager.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the screen is not open, is accessed from the wrong thread, is changing lifecycle state,
+    /// is already updating or drawing, or its layout does not stabilize.
+    /// </exception>
+    public void PrepareFrame(Size viewportSize, TimeSpan frameTime)
     {
         CreateViewportBounds(viewportSize);
         BeginUpdate();
@@ -236,7 +286,14 @@ public partial class Screen
         }
     }
 
-    internal bool IsOpen()
+    /// <summary>
+    /// Gets whether this screen is bound to an owner thread.
+    /// </summary>
+    /// <returns>Whether the screen has an owner thread.</returns>
+    /// <remarks>
+    /// This does not indicate whether opening callbacks completed successfully or the screen is accepting input.
+    /// </remarks>
+    public bool IsOpen()
     {
         lock (_stateSync)
             return _ownerThreadId is not null;
