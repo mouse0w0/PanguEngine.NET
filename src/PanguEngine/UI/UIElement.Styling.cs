@@ -81,7 +81,7 @@ public abstract partial class UIElement
                 return;
             if (value is not null)
                 StyleIdentifier.ThrowIfInvalid(value, nameof(StyleId));
-            Screen?.VerifyTreeMutationAccess();
+            Scene?.VerifyTreeMutationAccess();
             field = value;
             InvalidateStyle();
         }
@@ -91,7 +91,7 @@ public abstract partial class UIElement
     /// <remarks>
     /// The collection reference is stable. Membership uses Ordinal comparison and names are not validated.
     /// Actual changes invalidate styles before subsequent collection listeners run.
-    /// Styles are applied during screen layout.
+    /// Styles are applied during scene layout.
     /// Callers are responsible for changing classes on the owning UI thread.
     /// </remarks>
     public ObservableSet<string> Classes { get; }
@@ -102,11 +102,11 @@ public abstract partial class UIElement
     /// <remarks>
     /// The collection only changes when the requested membership differs,
     /// and a no-op does not invalidate styles. A pseudo class mirrors real control state;
-    /// its styles are applied during screen layout.
+    /// its styles are applied during scene layout.
     /// Requests for built-in structural pseudo classes have no effect because they are matched from tree structure.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the owning screen does not allow style input changes.
+    /// Thrown when the owning scene does not allow style input changes.
     /// </exception>
     protected void SetPseudoClass(PseudoClass pseudoClass, bool active)
     {
@@ -117,7 +117,7 @@ public abstract partial class UIElement
         if (isActive == active)
             return;
 
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if (active)
             _pseudoClasses.Add(pseudoClass);
         else
@@ -251,7 +251,7 @@ public abstract partial class UIElement
     }
 
     private StyleResolver GetStyleResolver() =>
-        Screen?.StyleResolver ?? StyleResolver.Default;
+        Scene?.StyleResolver ?? StyleResolver.Default;
 
     /// <summary>
     /// Gets the winning style declarations for a property's components, including local value or binding masks.
@@ -322,9 +322,9 @@ public abstract partial class UIElement
         UIElement? node,
         StyleResolver previousResolver,
         StyleResolver currentResolver,
-        bool screenChanged = false)
+        bool sceneChanged = false)
     {
-        if (node is not null && (screenChanged || !ReferenceEquals(previousResolver, currentResolver) ||
+        if (node is not null && (sceneChanged || !ReferenceEquals(previousResolver, currentResolver) ||
                                  previousResolver.HasRelationships ||
                                  currentResolver.HasRelationships || previousResolver.HasVariables ||
                                  currentResolver.HasVariables || previousResolver.HasChildIndexedPseudoClasses ||

@@ -13,7 +13,7 @@ internal sealed class InputRouter
     private readonly HashSet<InputSource> _pressed = [];
     private readonly HashSet<InputSource> _suppressed = [];
     private readonly Queue<Action> _pendingContextChanges = [];
-    private readonly HashSet<InputContext> _pendingScreenResets = [];
+    private readonly HashSet<InputContext> _pendingSceneResets = [];
     private readonly List<InputBindingChange> _pendingBindingChanges = [];
     private InputRouteIndex _routeIndex;
     private Dictionary<InputAction, HandlerRegistration[]> _handlerSnapshots = [];
@@ -40,7 +40,7 @@ internal sealed class InputRouter
     internal void NotifyUiTopologyChanged(InputContext? previousContext)
     {
         if (previousContext is not null)
-            _pendingScreenResets.Add(previousContext);
+            _pendingSceneResets.Add(previousContext);
         ScheduleContextChange(static () => { });
     }
 
@@ -158,6 +158,7 @@ internal sealed class InputRouter
             _modifiersChanged = false;
             DispatchRequiredEvents(maintenance);
         }
+
         if (!_recordedPressIsNew || skipNewRouting || _suppressed.Contains(source) || _stopDispatch)
             return;
 
@@ -184,6 +185,7 @@ internal sealed class InputRouter
             var maintenance = _stateStore.WithdrawInvalidModifiers(modifiers, source);
             DispatchRequiredEvents(maintenance);
         }
+
         if (skipNewRouting || _stopDispatch || sample == Vector2D<double>.Zero)
             return;
 
@@ -225,7 +227,7 @@ internal sealed class InputRouter
             _pressed.Clear();
             _suppressed.Clear();
             _pendingContextChanges.Clear();
-            _pendingScreenResets.Clear();
+            _pendingSceneResets.Clear();
             _pendingBindingChanges.Clear();
             _orderedContexts = [];
             StateInvalidated = null;
@@ -311,6 +313,7 @@ internal sealed class InputRouter
             if (stopOnTopologyChange && _stopDispatch)
                 return InputHandling.Pass;
         }
+
         return InputHandling.Pass;
     }
 
@@ -385,13 +388,15 @@ internal sealed class InputRouter
                     {
                         if (canceledCategories.ContainsKey(active.Context))
                         {
-                            canceledCategories[active.Context] = _pendingScreenResets.Contains(active.Context)
+                            canceledCategories[active.Context] = _pendingSceneResets.Contains(active.Context)
                                 ? InputCaptureMask.All
                                 : captured;
                         }
+
                         captured |= active.Context.CaptureMask;
                     }
-                    _pendingScreenResets.Clear();
+
+                    _pendingSceneResets.Clear();
 
                     foreach (var entry in _bindings.Entries)
                     {
@@ -412,6 +417,7 @@ internal sealed class InputRouter
                         SuppressIfPressed(change.Before.Source);
                         SuppressIfPressed(change.After.Source);
                     }
+
                     _pendingBindingChanges.Clear();
                     RebuildRouteIndex();
                 }
@@ -425,7 +431,7 @@ internal sealed class InputRouter
         catch
         {
             _pendingContextChanges.Clear();
-            _pendingScreenResets.Clear();
+            _pendingSceneResets.Clear();
             _pendingBindingChanges.Clear();
             throw;
         }

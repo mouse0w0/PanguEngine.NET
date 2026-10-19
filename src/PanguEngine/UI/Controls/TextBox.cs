@@ -339,7 +339,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Copies the selected text to the shared system clipboard.
     /// </summary>
-    public void Copy() => Copy(UiToolkit.Clipboard);
+    public void Copy() => Copy(UIToolkit.Clipboard);
 
     internal void Copy(Clipboard? clipboard)
     {
@@ -352,7 +352,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Copies and removes the selected text when editing is enabled.
     /// </summary>
-    public void Cut() => Cut(UiToolkit.Clipboard);
+    public void Cut() => Cut(UIToolkit.Clipboard);
 
     internal void Cut(Clipboard? clipboard)
     {
@@ -371,7 +371,7 @@ public sealed class TextBox : Control
     /// <summary>
     /// Replaces the selection with text from the shared system clipboard.
     /// </summary>
-    public void Paste() => Paste(UiToolkit.Clipboard);
+    public void Paste() => Paste(UIToolkit.Clipboard);
 
     internal void Paste(Clipboard? clipboard)
     {
@@ -436,7 +436,7 @@ public sealed class TextBox : Control
         else
             layoutText = " ";
 
-        _layout = UiToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
+        _layout = UIToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
             layoutText,
             CreateFontRequest(),
             FontSize,
@@ -649,7 +649,7 @@ public sealed class TextBox : Control
         EnsureCaretVisibleIfArranged();
     }
 
-    private void VerifyEditingAccess() => Screen?.VerifyTreeAccess();
+    private void VerifyEditingAccess() => Scene?.VerifyTreeAccess();
 
     private void EnsureCaretVisibleIfArranged()
     {
@@ -702,9 +702,9 @@ public sealed class TextBox : Control
 
     private double GetCaretWidth()
     {
-        var screen = Screen;
-        return screen?.UseLayoutRounding ?? true
-            ? LayoutHelper.RoundLayoutValue(1, screen?.Scale ?? 1)
+        var scene = Scene;
+        return scene?.UseLayoutRounding ?? true
+            ? LayoutHelper.RoundLayoutValue(1, scene?.Scale ?? 1)
             : 1;
     }
 

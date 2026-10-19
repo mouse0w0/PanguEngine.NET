@@ -52,16 +52,16 @@ public sealed class UIElementInputStateTests
         var background = Place(root, new TestNode(), 0, 0, 100, 100);
         var container = Place(root, new Canvas(), 0, 0, 40, 40);
         var child = Place(container, new TestNode(), 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
-        Assert.Same(child, screen.HitTest(new Point(5, 5)));
+        Assert.Same(child, scene.HitTest(new Point(5, 5)));
 
         container.IsEnabled = false;
 
-        Assert.Same(background, screen.HitTest(new Point(5, 5)));
+        Assert.Same(background, scene.HitTest(new Point(5, 5)));
         manager.Close();
     }
 
@@ -71,20 +71,20 @@ public sealed class UIElementInputStateTests
         var root = new Canvas();
         var container = Place(root, new Canvas(), 0, 0, 40, 40);
         var child = Place(container, new TestNode { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         container.IsEnabled = false;
         Assert.False(child.Focus());
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
 
         container.IsEnabled = true;
         manager.UpdateFrame(new Size(100, 100), 0);
 
         Assert.True(child.Focus());
-        Assert.Same(child, screen.FocusedNode);
+        Assert.Same(child, scene.FocusedNode);
         manager.Close();
     }
 
@@ -97,8 +97,8 @@ public sealed class UIElementInputStateTests
         var content = Place(inner, new Canvas(), 0, 0, 100, 100);
         var first = Place(content, new TestNode(), 0, 0, 20, 20);
         _ = Place(content, new TestNode(), 30, 0, 20, 20);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var outerChanges = new List<bool>();
         var innerChanges = new List<bool>();
         var childChanges = new List<bool>();
@@ -119,7 +119,7 @@ public sealed class UIElementInputStateTests
         };
         first.PointerMoved += (_, args) => args.Handled = true;
         outer.PointerMoved += (_, _) => outerMoveCalls++;
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerMoved(new Point(5, 5));
@@ -156,8 +156,8 @@ public sealed class UIElementInputStateTests
         var root = new Canvas();
         var container = Place(root, new Canvas { Focusable = true }, 0, 0, 40, 40);
         var child = Place(container, new TestNode { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var states = new List<bool>();
         using var subscription = container.Subscribe(
             UIElement.IsFocusedProperty,
@@ -171,7 +171,7 @@ public sealed class UIElementInputStateTests
         container.LostFocus += (_, _) => events.Add($"lost:{container.IsFocused}");
         child.GotFocus += (_, _) => events.Add($"child-got:{child.IsFocused}:{container.IsFocused}");
         child.KeyDown += (_, args) => args.Handled = true;
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         Assert.True(container.Focus());
@@ -182,10 +182,10 @@ public sealed class UIElementInputStateTests
 
         Assert.False(container.IsFocused);
         Assert.True(child.IsFocused);
-        Assert.Same(child, screen.FocusedNode);
+        Assert.Same(child, scene.FocusedNode);
         manager.ProcessKeyDown(Key.A, KeyModifiers.None);
         Assert.False(container.IsFocused);
-        screen.ClearFocus();
+        scene.ClearFocus();
         Assert.False(child.IsFocused);
         Assert.Equal([true, false], states);
         Assert.Equal([true, false], childStates);
@@ -199,14 +199,14 @@ public sealed class UIElementInputStateTests
         var root = new Canvas();
         var container = Place(root, new Canvas { Focusable = true }, 0, 0, 40, 40);
         var child = Place(container, new TestNode { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var events = new List<string>();
         child.LostFocus += (_, _) =>
             events.Add($"lost:{child.IsFocused}:{container.IsHovered}");
         container.PointerExited += (_, _) =>
             events.Add($"exit:{child.IsFocused}:{container.IsHovered}");
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(child.Focus());
@@ -217,7 +217,7 @@ public sealed class UIElementInputStateTests
 
         Assert.False(container.IsHovered);
         Assert.False(child.IsFocused);
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
         Assert.Equal(["lost:False:False", "exit:False:False"], events);
         manager.Close();
     }
@@ -228,12 +228,12 @@ public sealed class UIElementInputStateTests
         var root = new Canvas();
         var branch = Place(root, new Canvas(), 0, 0, 40, 40);
         var leaf = Place(branch, new TestNode(), 0, 0, 20, 20);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var exits = new List<(UIElement Node, UIElement Source)>();
         leaf.PointerExited += (_, args) => exits.Add((leaf, args.Source));
         branch.PointerExited += (_, args) => exits.Add((branch, args.Source));
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(branch.IsHovered);
@@ -242,8 +242,8 @@ public sealed class UIElementInputStateTests
         root.Children[0] = leaf;
 
         Assert.Same(leaf, root.Children[0]);
-        Assert.Null(branch.Screen);
-        Assert.Same(screen, leaf.Screen);
+        Assert.Null(branch.Scene);
+        Assert.Same(scene, leaf.Scene);
         Assert.False(branch.IsHovered);
         Assert.False(leaf.IsHovered);
         Assert.Equal([(leaf, leaf), (branch, branch)], exits);
@@ -257,8 +257,8 @@ public sealed class UIElementInputStateTests
         var background = Place(root, new TestNode(), 0, 0, 100, 100);
         var container = Place(root, new Canvas(), 0, 0, 40, 40);
         var child = Place(container, new TestControl { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var enabledNotifications = 0;
         using var subscription = container.Subscribe(
             UIElement.IsEnabledProperty,
@@ -272,9 +272,9 @@ public sealed class UIElementInputStateTests
                 Assert.False(child.IsHovered);
                 Assert.False(child.IsPressed);
                 Assert.False(child.IsFocused);
-                Assert.Null(screen.FocusedNode);
+                Assert.Null(scene.FocusedNode);
             });
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(child.Focus());
@@ -291,8 +291,8 @@ public sealed class UIElementInputStateTests
         Assert.False(child.IsHovered);
         Assert.False(child.IsPressed);
         Assert.False(child.IsFocused);
-        Assert.Null(screen.FocusedNode);
-        Assert.Same(background, screen.HitTest(new Point(5, 5)));
+        Assert.Null(scene.FocusedNode);
+        Assert.Same(background, scene.HitTest(new Point(5, 5)));
 
         container.IsEnabled = true;
         Assert.False(container.IsHovered);
@@ -314,8 +314,8 @@ public sealed class UIElementInputStateTests
     {
         var root = new Canvas();
         var node = Place(root, new TestNode { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var events = new List<string>();
         node.GotFocus += (_, _) =>
         {
@@ -323,14 +323,14 @@ public sealed class UIElementInputStateTests
             node.IsEnabled = false;
         };
         node.LostFocus += (_, _) => events.Add($"lost:{node.IsFocused}");
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         Assert.True(node.Focus());
 
         Assert.False(node.IsEnabled);
         Assert.False(node.IsFocused);
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
         Assert.Equal(["got:True", "lost:False"], events);
         manager.Close();
     }
@@ -348,13 +348,13 @@ public sealed class UIElementInputStateTests
         var container = Place(root, new Canvas(), 0, 0, 40, 40);
         var child = Place(container, new TestControl { Focusable = true }, 0, 0, 40, 40);
         UIElement target = hideParent ? container : child;
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var events = new List<string>();
 
         void AssertCleared()
         {
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             Assert.False(child.IsFocused);
             Assert.False(child.IsPressed);
             Assert.False(child.IsHovered);
@@ -378,7 +378,7 @@ public sealed class UIElementInputStateTests
             AssertCleared();
             events.Add("visibility");
         });
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.True(child.IsFocused);
@@ -406,13 +406,13 @@ public sealed class UIElementInputStateTests
         var pressed = Place(root, new TestControl { Focusable = true }, 0, 0, 40, 40);
         var container = Place(root, new Canvas(), 50, 0, 40, 40);
         var hovered = Place(container, new TestNode(), 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var lostFocusCalls = 0;
         var releaseCalls = 0;
         pressed.LostFocus += (_, _) => lostFocusCalls++;
         pressed.PointerReleased += (_, _) => releaseCalls++;
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(new Point(55, 5));
@@ -426,7 +426,7 @@ public sealed class UIElementInputStateTests
         Assert.True(root.IsHovered);
         Assert.True(pressed.IsPressed);
         Assert.True(pressed.IsFocused);
-        Assert.Same(pressed, screen.FocusedNode);
+        Assert.Same(pressed, scene.FocusedNode);
         Assert.Equal(0, lostFocusCalls);
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.Equal(1, releaseCalls);
@@ -441,15 +441,15 @@ public sealed class UIElementInputStateTests
     {
         var root = new Canvas();
         var button = Place(root, new Button(), 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var releaseCalls = 0;
         var pointerClickCalls = 0;
         var clickCalls = 0;
         button.PointerReleased += (_, _) => releaseCalls++;
         button.PointerClicked += (_, _) => pointerClickCalls++;
         button.Click += (_, _) => clickCalls++;
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.True(button.IsPressed);
@@ -483,8 +483,8 @@ public sealed class UIElementInputStateTests
     {
         var root = new Canvas();
         var node = Place(root, new TestNode { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var events = new List<string>();
         node.GotFocus += (_, _) =>
         {
@@ -492,14 +492,14 @@ public sealed class UIElementInputStateTests
             node.Visibility = visibility;
         };
         node.LostFocus += (_, _) => events.Add($"lost:{node.IsFocused}");
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         Assert.True(node.Focus());
 
         Assert.Equal(visibility, node.Visibility);
         Assert.False(node.IsFocused);
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
         Assert.Equal(["got:True", "lost:False"], events);
         manager.Close();
     }
@@ -516,8 +516,8 @@ public sealed class UIElementInputStateTests
         var root = new Canvas();
         var container = Place(root, new Canvas(), 0, 0, 40, 40);
         var child = Place(container, new TestControl { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var events = new List<string>();
         child.LostFocus += (_, _) =>
         {
@@ -533,7 +533,7 @@ public sealed class UIElementInputStateTests
                 container.Visibility = visibility;
         };
         container.PointerExited += (_, _) => events.Add("parent-exit");
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         Assert.True(child.IsFocused);
@@ -543,26 +543,26 @@ public sealed class UIElementInputStateTests
         container.Visibility = visibility;
 
         Assert.Equal(["lost", "child-exit", "parent-exit"], events);
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
         Assert.False(child.IsFocused);
         Assert.False(child.IsPressed);
         Assert.False(child.IsHovered);
         Assert.False(container.IsHovered);
         if (removeOnExit)
-            Assert.Null(container.Screen);
+            Assert.Null(container.Scene);
         else
             Assert.Equal(visibility, container.Visibility);
         manager.Close();
     }
 
     [Fact]
-    public void HoverStateCallbackClosingScreenPreventsLaterTrueProjection()
+    public void HoverStateCallbackClosingScenePreventsLaterTrueProjection()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var root = new Canvas();
         var outer = Place(root, new Canvas(), 0, 0, 40, 40);
         var inner = Place(outer, new TestNode(), 0, 0, 40, 40);
-        var screen = new GameScreen(root);
+        var scene = new GameUIScene(root);
         var movedCalls = 0;
         using var subscription = outer.Subscribe(
             UIElement.IsHoveredProperty,
@@ -572,12 +572,12 @@ public sealed class UIElementInputStateTests
                     manager.Close();
             });
         inner.PointerMoved += (_, _) => movedCalls++;
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         manager.ProcessPointerMoved(new Point(5, 5));
 
-        Assert.Null(manager.CurrentScreen);
+        Assert.Null(manager.CurrentScene);
         Assert.False(outer.IsHovered);
         Assert.False(inner.IsHovered);
         Assert.Equal(0, movedCalls);
@@ -589,8 +589,8 @@ public sealed class UIElementInputStateTests
         var root = new Canvas();
         var outer = Place(root, new Canvas(), 0, 0, 40, 40);
         var inner = Place(outer, new TestNode(), 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var outerError = new InvalidOperationException("outer hover");
         var innerError = new InvalidOperationException("inner hover");
         using var outerSubscription = outer.Subscribe(
@@ -610,7 +610,7 @@ public sealed class UIElementInputStateTests
         var events = new List<string>();
         outer.PointerEntered += (_, _) => events.Add("outer-enter");
         inner.PointerEntered += (_, _) => events.Add("inner-enter");
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         var actual = Assert.Throws<InvalidOperationException>(() =>
@@ -624,18 +624,18 @@ public sealed class UIElementInputStateTests
     }
 
     [Fact]
-    public void OrdinaryNodeEnabledWritesUseOpenScreenOwnerThreadOnly()
+    public void OrdinaryNodeEnabledWritesUseOpenSceneOwnerThreadOnly()
     {
         var node = new TestNode();
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
 
         var openError = RunOnBackgroundThread(() =>
             Record.Exception(() => node.IsEnabled = false));
 
         Assert.IsType<InvalidOperationException>(openError);
         Assert.True(node.IsEnabled);
-        screen.Close();
+        scene.Close();
 
         var closedError = RunOnBackgroundThread(() =>
             Record.Exception(() => node.IsEnabled = false));

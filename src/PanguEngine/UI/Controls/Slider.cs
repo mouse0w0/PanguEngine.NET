@@ -187,7 +187,7 @@ public sealed class Slider<T> : Slider
     private SliderValueState<T> _dragStart;
     private double _pointerOffset;
     private double _lastDragPointer;
-    private Rect _dragScreenBounds;
+    private Rect _dragSceneBounds;
     private double _dragScale;
     private double _trackStart;
     private double _travel;
@@ -209,7 +209,7 @@ public sealed class Slider<T> : Slider
         Focusable = true;
         SynchronizePseudoClasses(HasValue);
         UpdateValueVisibility();
-        Subscribe(ScreenProperty, (_, _) => CancelInteraction());
+        Subscribe(SceneProperty, (_, _) => CancelInteraction());
         Subscribe(IsFocusedProperty, (_, _) =>
         {
             if (!IsFocused)
@@ -401,8 +401,8 @@ public sealed class Slider<T> : Slider
         CancelInteraction();
         _dragStart = _state;
         _isDragging = true;
-        _dragScreenBounds = GetScreenTrackBounds();
-        _dragScale = Screen!.Scale;
+        _dragSceneBounds = GetSceneTrackBounds();
+        _dragScale = Scene!.Scale;
         var pointer = Main(eventArgs.GetPosition(this));
         _lastDragPointer = pointer;
         _pointerOffset = ReferenceEquals(eventArgs.Source, _thumb)
@@ -501,7 +501,7 @@ public sealed class Slider<T> : Slider
 
     private bool CanInteract()
     {
-        if (!HasValue || Screen is not { } screen || !screen.IsOpen())
+        if (!HasValue || Scene is not { } scene || !scene.IsOpen())
             return false;
         for (UIElement? node = this; node is not null; node = node.Parent)
             if (!node.IsEnabled || !node.IsHitTestVisible || node.Visibility != Visibility.Visible)
@@ -518,14 +518,14 @@ public sealed class Slider<T> : Slider
         CommitState(_valueModel.ResolvePosition(Orientation == Orientation.Vertical ? 1 - fraction : fraction));
     }
 
-    private Rect GetScreenTrackBounds()
+    private Rect GetSceneTrackBounds()
     {
-        var origin = LocalToScreen(new Point(_hitBounds.X, _hitBounds.Y));
+        var origin = LocalToScene(new Point(_hitBounds.X, _hitBounds.Y));
         return new Rect(origin.X, origin.Y, _hitBounds.Width, _hitBounds.Height);
     }
 
     private bool HasStableDragGeometry() =>
-        Screen!.Scale.Equals(_dragScale) && GetScreenTrackBounds() == _dragScreenBounds;
+        Scene!.Scale.Equals(_dragScale) && GetSceneTrackBounds() == _dragSceneBounds;
 
     private void CancelInteraction()
     {

@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
-using PanguEngine.Client.Huds;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.UI;
@@ -22,7 +22,7 @@ public sealed class TickerTests
         Assert.Throws<ArgumentNullException>(() => node.AddTicker(null!));
         Assert.Throws<InvalidOperationException>(ticker.Start);
         ticker.Stop();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Assert.Throws<InvalidOperationException>(ticker.Start);
     }
 
@@ -39,11 +39,11 @@ public sealed class TickerTests
     }
 
     [Fact]
-    public void StoppedTickerIsNotRetainedByItsNodeOrScreen()
+    public void StoppedTickerIsNotRetainedByItsNodeOrScene()
     {
         var node = new TickingNode();
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             var weakTicker = CreateStoppedTicker(node);
@@ -53,7 +53,7 @@ public sealed class TickerTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -61,14 +61,14 @@ public sealed class TickerTests
     public void ActiveTickerRunsWithoutConsumerReferenceAndIsReleasedOnStop()
     {
         var node = new TickingNode();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         var times = new List<TimeSpan>();
-        screen.Open();
+        scene.Open();
         try
         {
             var weakTicker = CreateStartedTicker(node, times.Add);
             ForceCollection();
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal([TimeSpan.FromSeconds(10)], times);
 
             StopTicker(weakTicker);
@@ -78,34 +78,34 @@ public sealed class TickerTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void LifecycleStopReleasesTickerWhileNodeAndScreenRemainAlive(bool close)
+    public void LifecycleStopReleasesTickerWhileNodeAndSceneRemainAlive(bool close)
     {
         var node = new TickingNode();
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             var weakTicker = CreateStartedTicker(node, static _ => { });
             if (close)
-                screen.Close();
+                scene.Close();
             else
-                screen.Root = null;
+                scene.Root = null;
 
             ForceCollection();
             Assert.False(weakTicker.TryGetTarget(out _));
             GC.KeepAlive(node);
-            GC.KeepAlive(screen);
+            GC.KeepAlive(scene);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -116,14 +116,14 @@ public sealed class TickerTests
         var calls = new List<string>();
         var first = node.AddTicker(_ => calls.Add("first"));
         var second = node.AddTicker(_ => calls.Add("second"));
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             first.Start();
             second.Start();
             first.Start();
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal(["first", "second"], calls);
 
             calls.Clear();
@@ -131,12 +131,12 @@ public sealed class TickerTests
             first.Stop();
             Assert.False(first.IsActive);
             first.Start();
-            Prepare(screen, 11);
+            Prepare(scene, 11);
             Assert.Equal(["second", "first"], calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -154,14 +154,14 @@ public sealed class TickerTests
                 distance += 100 * (now - baseline).TotalSeconds;
             previous = now;
         });
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             ticker.Start();
-            screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10));
-            screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.02));
-            screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.05));
+            scene.PrepareFrame(Viewport, TimeSpan.FromSeconds(10));
+            scene.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.02));
+            scene.PrepareFrame(Viewport, TimeSpan.FromSeconds(10.05));
             Assert.Equal(5, distance, 8);
             Assert.Equal([
                 TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(10.02),
@@ -171,13 +171,13 @@ public sealed class TickerTests
             ticker.Stop();
             previous = null;
             ticker.Start();
-            Prepare(screen, 20);
-            Prepare(screen, 20.01);
+            Prepare(scene, 20);
+            Prepare(scene, 20.01);
             Assert.Equal(6, distance, 8);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -187,18 +187,18 @@ public sealed class TickerTests
         var node = new TickingNode();
         var calls = 0;
         var ticker = node.AddTicker(_ => calls++);
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             ticker.Start();
-            Prepare(screen, 10);
-            Prepare(screen, 10);
+            Prepare(scene, 10);
+            Prepare(scene, 10);
             Assert.Equal(2, calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -217,21 +217,21 @@ public sealed class TickerTests
             if (restart)
                 second.Start();
         });
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             first.Start();
             second.Start();
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal(["first"], calls);
             first.Stop();
-            Prepare(screen, 11);
+            Prepare(scene, 11);
             Assert.Equal(restart ? ["first", "second"] : new[] { "first" }, calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -250,20 +250,20 @@ public sealed class TickerTests
             first.Start();
             calls.Add("first:end");
         });
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             first.Start();
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal(["first:begin", "first:end"], calls);
             calls.Clear();
-            Prepare(screen, 11);
+            Prepare(scene, 11);
             Assert.Equal(["second", "first:begin", "first:end"], calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -275,22 +275,22 @@ public sealed class TickerTests
         var node = new TickingNode();
         var calls = 0;
         var ticker = node.AddTicker(_ => calls++);
-        var screen = new CallbackScreen(node);
-        screen.Open();
+        var scene = new CallbackScene(node);
+        scene.Open();
         try
         {
             if (fromPost)
-                screen.Post(ticker.Start);
+                scene.Post(ticker.Start);
             else
-                screen.FrameAction = ticker.Start;
-            Prepare(screen, 10);
+                scene.FrameAction = ticker.Start;
+            Prepare(scene, 10);
             Assert.Equal(fromPost ? 0 : 1, calls);
-            Prepare(screen, 11);
+            Prepare(scene, 11);
             Assert.Equal(fromPost ? 1 : 2, calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -300,41 +300,41 @@ public sealed class TickerTests
         var node = new TickingNode();
         var calls = new List<TimeSpan>();
         var ticker = node.AddTicker(calls.Add);
-        var screen = new CallbackScreen(node);
-        screen.FrameAction = () => screen.Post(ticker.Start);
-        screen.Open();
+        var scene = new CallbackScene(node);
+        scene.FrameAction = () => scene.Post(ticker.Start);
+        scene.Open();
         try
         {
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.True(ticker.IsActive);
             Assert.Empty(calls);
 
-            Prepare(screen, 11);
+            Prepare(scene, 11);
             Assert.Equal([TimeSpan.FromSeconds(11)], calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Fact]
-    public void HudAndScreenShareTimeAndUseStableScreenOrder()
+    public void HudAndSceneShareTimeAndUseStableSceneOrder()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var hudNode = MountHudNode(manager);
-        var screenNode = new TickingNode();
-        var screen = new GameScreen(screenNode);
-        manager.Open(screen);
+        var sceneNode = new TickingNode();
+        var scene = new GameUIScene(sceneNode);
+        manager.Open(scene);
         var calls = new List<(string Name, TimeSpan Time)>();
-        var regular = screenNode.AddTicker(now => calls.Add(("screen", now)));
+        var regular = sceneNode.AddTicker(now => calls.Add(("scene", now)));
         var hud = hudNode.AddTicker(now => calls.Add(("hud", now)));
         try
         {
             regular.Start();
             hud.Start();
             Prepare(manager, 10);
-            Assert.Equal([("hud", TimeSpan.FromSeconds(10)), ("screen", TimeSpan.FromSeconds(10))], calls);
+            Assert.Equal([("hud", TimeSpan.FromSeconds(10)), ("scene", TimeSpan.FromSeconds(10))], calls);
         }
         finally
         {
@@ -347,14 +347,14 @@ public sealed class TickerTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void CrossScreenStartAndRestartFollowTargetPreparationOrder(bool fromHud, bool restart)
+    public void CrossSceneStartAndRestartFollowTargetPreparationOrder(bool fromHud, bool restart)
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var hudNode = MountHudNode(manager);
-        var screenNode = new TickingNode();
-        manager.Open(new GameScreen(screenNode));
-        var source = fromHud ? hudNode : screenNode;
-        var target = fromHud ? screenNode : hudNode;
+        var sceneNode = new TickingNode();
+        manager.Open(new GameUIScene(sceneNode));
+        var source = fromHud ? hudNode : sceneNode;
+        var target = fromHud ? sceneNode : hudNode;
         var calls = new List<TimeSpan>();
         var targetTicker = target.AddTicker(calls.Add);
         var sourceTicker = source.AddTicker(_ =>
@@ -384,16 +384,16 @@ public sealed class TickerTests
     [Fact]
     public void HudExceptionStopsRemainingWorkAndAllowsNextFrame()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var hudNode = MountHudNode(manager);
-        var screenNode = new TickingNode();
-        var screen = new GameScreen(screenNode);
-        manager.Open(screen);
+        var sceneNode = new TickingNode();
+        var scene = new GameUIScene(sceneNode);
+        manager.Open(scene);
         var expected = new InvalidOperationException("tick failed");
         var failure = hudNode.AddTicker(_ => throw expected);
         var calls = 0;
         var laterHud = hudNode.AddTicker(_ => calls++);
-        var regular = screenNode.AddTicker(_ => calls++);
+        var regular = sceneNode.AddTicker(_ => calls++);
         try
         {
             failure.Start();
@@ -402,10 +402,10 @@ public sealed class TickerTests
             Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => Prepare(manager, 10)));
             Assert.True(failure.IsActive);
             Assert.Equal(0, calls);
-            Assert.False(screenNode.IsArrangeValid);
+            Assert.False(sceneNode.IsArrangeValid);
             failure.Stop();
-            Prepare(manager.Hud.Screen, 11);
-            Prepare(screen, 11);
+            Prepare(manager.Hud.Scene, 11);
+            Prepare(scene, 11);
             Assert.Equal(2, calls);
             Prepare(manager, 12);
             Assert.Equal(4, calls);
@@ -421,25 +421,25 @@ public sealed class TickerTests
     {
         var events = new List<string>();
         var node = new MeasuringNode(events);
-        var screen = new CallbackScreen(node) { FrameAction = () => events.Add("frame") };
+        var scene = new CallbackScene(node) { FrameAction = () => events.Add("frame") };
         var ticker = node.AddTicker(_ =>
         {
             events.Add("tick");
             node.Width = 40;
         });
-        screen.Open();
+        scene.Open();
         try
         {
-            screen.Post(() => events.Add("post"));
+            scene.Post(() => events.Add("post"));
             ticker.Start();
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal(["frame", "post", "tick", "measure", "measure", "measure"], events);
             Assert.Equal(40, node.LayoutBounds.Width);
             Assert.True(node.IsArrangeValid);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -449,17 +449,17 @@ public sealed class TickerTests
         var node = new TickingNode();
         var calls = 0;
         var ticker = node.AddTicker(_ => calls++);
-        var screen = new CallbackScreen(node) { OpeningAction = ticker.Start };
-        screen.Open();
+        var scene = new CallbackScene(node) { OpeningAction = ticker.Start };
+        scene.Open();
         try
         {
             Assert.True(ticker.IsActive);
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal(1, calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -468,8 +468,8 @@ public sealed class TickerTests
     {
         var node = new TickingNode();
         var ticker = node.AddTicker(_ => { });
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             Assert.IsType<InvalidOperationException>(OnOtherThread(ticker.Start));
@@ -480,7 +480,7 @@ public sealed class TickerTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -501,14 +501,14 @@ public sealed class TickerTests
         firstParent.Children.Add(node);
         root.Children.Add(firstParent);
         root.Children.Add(secondParent);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var otherRoot = new Panel();
-        var otherScreen = new Screen(otherRoot);
+        var otherScene = new UIScene(otherRoot);
         var calls = 0;
         var ticker = node.AddTicker(_ => calls++);
         var childTicker = child.AddTicker(_ => calls++);
-        screen.Open();
-        otherScreen.Open();
+        scene.Open();
+        otherScene.Open();
         try
         {
             ticker.Start();
@@ -518,27 +518,27 @@ public sealed class TickerTests
                 case 0: firstParent.Children.Remove(node); break;
                 case 1: secondParent.Children.Add(node); break;
                 case 2: otherRoot.Children.Add(node); break;
-                case 3: screen.Root = new Panel(); break;
-                case 4: otherScreen.Root = root; break;
+                case 3: scene.Root = new Panel(); break;
+                case 4: otherScene.Root = root; break;
             }
 
             Assert.False(ticker.IsActive);
             Assert.False(childTicker.IsActive);
             if (transfer == 3)
-                screen.Root = root;
-            else if (node.Screen is null)
+                scene.Root = root;
+            else if (node.Scene is null)
                 firstParent.Children.Add(node);
-            Prepare(screen, 10);
-            Prepare(otherScreen, 10);
+            Prepare(scene, 10);
+            Prepare(otherScene, 10);
             Assert.Equal(0, calls);
             ticker.Start();
-            Prepare(node.Screen!, 11);
+            Prepare(node.Scene!, 11);
             Assert.Equal(1, calls);
         }
         finally
         {
-            otherScreen.Close();
-            screen.Close();
+            otherScene.Close();
+            scene.Close();
         }
     }
 
@@ -551,20 +551,20 @@ public sealed class TickerTests
         root.Children.Add(new Panel());
         var calls = 0;
         var ticker = node.AddTicker(_ => calls++);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             ticker.Start();
             node.MoveToFront();
             node.MoveToBack();
             Assert.True(ticker.IsActive);
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal(1, calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -582,20 +582,20 @@ public sealed class TickerTests
             calls.Add("end");
         });
         var second = node.AddTicker(_ => calls.Add("second"));
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             first.Start();
             second.Start();
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.Equal(["begin", "end"], calls);
             Assert.False(first.IsActive);
             Assert.False(second.IsActive);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -605,7 +605,7 @@ public sealed class TickerTests
         var node = new TickingNode();
         var ticker = node.AddTicker(_ => { });
         var events = new List<string>();
-        var screen = new CallbackScreen(node)
+        var scene = new CallbackScene(node)
         {
             ClosingAction = () =>
             {
@@ -620,21 +620,21 @@ public sealed class TickerTests
             ticker.Stop();
             events.Add("commit");
         };
-        screen.Open();
-        Prepare(screen, 10);
-        screen.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
+        scene.Open();
+        Prepare(scene, 10);
+        scene.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         ticker.Start();
-        screen.Close();
+        scene.Close();
         Assert.Equal(["closing", "commit"], events);
-        Assert.Same(screen, node.Screen);
-        screen.Open();
+        Assert.Same(scene, node.Scene);
+        scene.Open();
         try
         {
             Assert.False(ticker.IsActive);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -644,14 +644,14 @@ public sealed class TickerTests
         var node = new TickingNode();
         var ticker = node.AddTicker(_ => { });
         var expected = new InvalidOperationException("closing failed");
-        var screen = new CallbackScreen(node) { ClosingAction = () => throw expected };
-        screen.Open();
+        var scene = new CallbackScene(node) { ClosingAction = () => throw expected };
+        scene.Open();
         ticker.Start();
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Close));
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(scene.Close));
         Assert.False(ticker.IsActive);
         Assert.Throws<InvalidOperationException>(ticker.Start);
-        screen.ClosingAction = null;
-        screen.Close();
+        scene.ClosingAction = null;
+        scene.Close();
     }
 
     [Fact]
@@ -660,18 +660,18 @@ public sealed class TickerTests
         var root = new Panel();
         var node = new TickingNode();
         root.Children.Add(node);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var ticker = node.AddTicker(_ => { });
-        screen.Open();
+        scene.Open();
         ticker.Start();
-        screen.Close();
+        scene.Close();
 
         Assert.Null(OnOtherThread(() =>
         {
             ticker.Stop();
             root.Children.Remove(node);
         }));
-        Assert.Null(node.Screen);
+        Assert.Null(node.Scene);
         Assert.False(ticker.IsActive);
     }
 
@@ -690,7 +690,7 @@ public sealed class TickerTests
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
         definitions.Register(ResourceKey.Create("test", "ticker"), new HudDefinition(() => hud));
         definitions.Freeze();
-        var manager = new UiManager();
+        var manager = new UIManager();
         manager.InitializeHud(definitions);
         ticker.Start();
 
@@ -705,21 +705,21 @@ public sealed class TickerTests
         var node = new TickingNode();
         var calls = 0;
         var ticker = node.AddTicker(_ => calls++);
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         try
         {
             ticker.Start();
-            screen.ProcessFocusChanged(false);
+            scene.ProcessFocusChanged(false);
             node.Visibility = Visibility.Hidden;
             node.IsEnabled = false;
-            Prepare(screen, 10);
+            Prepare(scene, 10);
             Assert.True(ticker.IsActive);
             Assert.Equal(1, calls);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -729,15 +729,15 @@ public sealed class TickerTests
         var root = new TickingNode();
         var child = new TickingNode();
         root.Children.Add(child);
-        var source = new Screen(root);
-        var target = new Screen();
+        var source = new UIScene(root);
+        var target = new UIScene();
         var expected = new InvalidOperationException("ownership notification failed");
         var calls = new List<string>();
         var rootTicker = root.AddTicker(_ => calls.Add("root"));
         var childTicker = child.AddTicker(_ => calls.Add("child"));
         root.PropertyChanged += (_, args) =>
         {
-            if (args.Property == UIElement.ScreenProperty && ReferenceEquals(root.Screen, target))
+            if (args.Property == UIElement.SceneProperty && ReferenceEquals(root.Scene, target))
                 throw expected;
         };
         source.Open();
@@ -747,8 +747,8 @@ public sealed class TickerTests
             rootTicker.Start();
             childTicker.Start();
             Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => target.Root = root));
-            Assert.Same(target, root.Screen);
-            Assert.Same(source, child.Screen);
+            Assert.Same(target, root.Scene);
+            Assert.Same(source, child.Scene);
             Assert.False(rootTicker.IsActive);
             Assert.True(childTicker.IsActive);
             Prepare(source, 10);
@@ -769,12 +769,12 @@ public sealed class TickerTests
         var second = new TickingNode();
         root.Children.Add(first);
         root.Children.Add(second);
-        var source = new Screen(root);
-        var target = new Screen();
+        var source = new UIScene(root);
+        var target = new UIScene();
         var ticker = second.AddTicker(_ => { });
         first.PropertyChanged += (_, args) =>
         {
-            if (args.Property == UIElement.ScreenProperty && ReferenceEquals(first.Screen, target))
+            if (args.Property == UIElement.SceneProperty && ReferenceEquals(first.Scene, target))
                 root.Children.Remove(second);
         };
         source.Open();
@@ -783,10 +783,10 @@ public sealed class TickerTests
         {
             ticker.Start();
             Assert.Throws<InvalidOperationException>(() => target.Root = root);
-            Assert.Null(second.Screen);
+            Assert.Null(second.Scene);
             Assert.Null(second.Parent);
             Assert.False(ticker.IsActive);
-            Assert.Same(target, first.Screen);
+            Assert.Same(target, first.Scene);
         }
         finally
         {
@@ -796,38 +796,38 @@ public sealed class TickerTests
     }
 
     [Fact]
-    public void IndependentScreenExceptionAllowsNextPreparation()
+    public void IndependentSceneExceptionAllowsNextPreparation()
     {
         var node = new TickingNode();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         var expected = new InvalidOperationException("independent tick failed");
         var ticker = node.AddTicker(_ => throw expected);
-        screen.Open();
+        scene.Open();
         try
         {
             ticker.Start();
-            Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => Prepare(screen, 10)));
+            Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => Prepare(scene, 10)));
             ticker.Stop();
-            Prepare(screen, 11);
+            Prepare(scene, 11);
             Assert.True(node.IsArrangeValid);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void StartUsesScreenOwnershipDuringParentNotification(bool startedBeforeRemoval)
+    public void StartUsesSceneOwnershipDuringParentNotification(bool startedBeforeRemoval)
     {
         var root = new Panel();
         var node = new TickingNode();
         var child = new TickingNode();
         node.Children.Add(child);
         root.Children.Add(node);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var ticker = node.AddTicker(_ => { });
         var childTicker = child.AddTicker(_ => { });
         var notifications = new List<string>();
@@ -836,46 +836,46 @@ public sealed class TickerTests
             if (args.Property == UIElement.ParentProperty && node.Parent is null)
             {
                 notifications.Add("parent");
-                Assert.Same(screen, node.Screen);
+                Assert.Same(scene, node.Scene);
                 Assert.Equal(startedBeforeRemoval, ticker.IsActive);
                 Assert.True(childTicker.IsActive);
                 ticker.Start();
                 Assert.True(ticker.IsActive);
             }
 
-            if (args.Property == UIElement.ScreenProperty && node.Screen is null)
+            if (args.Property == UIElement.SceneProperty && node.Scene is null)
             {
-                notifications.Add("node:screen");
+                notifications.Add("node:scene");
                 Assert.False(ticker.IsActive);
-                Assert.Same(screen, child.Screen);
+                Assert.Same(scene, child.Scene);
                 Assert.True(childTicker.IsActive);
             }
         };
         child.PropertyChanged += (_, args) =>
         {
-            if (args.Property == UIElement.ScreenProperty && child.Screen is null)
+            if (args.Property == UIElement.SceneProperty && child.Scene is null)
             {
-                notifications.Add("child:screen");
+                notifications.Add("child:scene");
                 Assert.False(ticker.IsActive);
                 Assert.False(childTicker.IsActive);
             }
         };
-        screen.Open();
+        scene.Open();
         try
         {
             if (startedBeforeRemoval)
                 ticker.Start();
             childTicker.Start();
             root.Children.Remove(node);
-            Assert.Equal(["parent", "node:screen", "child:screen"], notifications);
-            Assert.Null(node.Screen);
-            Assert.Null(child.Screen);
+            Assert.Equal(["parent", "node:scene", "child:scene"], notifications);
+            Assert.Null(node.Scene);
+            Assert.Null(child.Scene);
             Assert.False(ticker.IsActive);
             Assert.False(childTicker.IsActive);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -914,22 +914,22 @@ public sealed class TickerTests
         GC.Collect();
     }
 
-    private static void Prepare(Screen screen, double seconds) =>
-        screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(seconds));
+    private static void Prepare(UIScene scene, double seconds) =>
+        scene.PrepareFrame(Viewport, TimeSpan.FromSeconds(seconds));
 
-    private static void Prepare(GameScreen screen, double seconds)
+    private static void Prepare(GameUIScene scene, double seconds)
     {
-        screen.UpdateFrame(0);
-        screen.PrepareFrame(Viewport, TimeSpan.FromSeconds(seconds));
+        scene.UpdateFrame(0);
+        scene.PrepareFrame(Viewport, TimeSpan.FromSeconds(seconds));
     }
 
-    private static void Prepare(UiManager manager, double seconds) =>
+    private static void Prepare(UIManager manager, double seconds) =>
         manager.UpdateFrame(Viewport, 0, TimeSpan.FromSeconds(seconds));
 
-    private static TickingNode MountHudNode(UiManager manager)
+    private static TickingNode MountHudNode(UIManager manager)
     {
         var node = new TickingNode();
-        Assert.IsType<Panel>(manager.Hud.Screen.Root).Children.Add(node);
+        Assert.IsType<Panel>(manager.Hud.Scene.Root).Children.Add(node);
         return node;
     }
 
@@ -960,7 +960,7 @@ public sealed class TickerTests
         }
     }
 
-    private sealed class CallbackScreen(UIElement root) : GameScreen(root)
+    private sealed class CallbackScene(UIElement root) : GameUIScene(root)
     {
         internal Action? OpeningAction { get; init; }
         internal Action? FrameAction { get; set; }

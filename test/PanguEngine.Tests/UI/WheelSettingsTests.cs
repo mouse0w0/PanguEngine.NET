@@ -5,7 +5,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
-[Collection(UiToolkitCollection.Name)]
+[Collection(UIToolkitCollection.Name)]
 public sealed class WheelSettingsTests
 {
     [Theory]
@@ -64,7 +64,7 @@ public sealed class WheelSettingsTests
         {
             Assert.True(manager.ProcessPointerWheel(new Point(50, 50), 0, -1, KeyModifiers.None));
             Assert.Equal(80, view.Offset.Y);
-            UiToolkit.WheelScrollLines = 2;
+            UIToolkit.WheelScrollLines = 2;
             manager.UpdateFrame(new Size(200, 200), 0);
             Assert.True(manager.ProcessPointerWheel(new Point(50, 50), 0, -1, KeyModifiers.None));
             Assert.Equal(112, view.Offset.Y);
@@ -187,7 +187,7 @@ public sealed class WheelSettingsTests
         {
             var viewport = Assert.IsType<TabStripPanel>(view.Children[0]).Viewport;
             Assert.True(viewport.HasOverflow);
-            var position = viewport.LocalToScreen(new Point(10, 10));
+            var position = viewport.LocalToScene(new Point(10, 10));
             var before = viewport.ScrollOffset;
             var expected = lines == -1 ? viewport.ViewportLength / 2 : lines * 8d;
 
@@ -210,22 +210,22 @@ public sealed class WheelSettingsTests
         Content = new Panel { Width = 1000, Height = 1000 }
     };
 
-    private static UiManager Open(UIElement root, Size size)
+    private static UIManager Open(UIElement root, Size size)
     {
-        var screen = new GameScreen(root) { Scale = 1 };
-        screen.SetBaseStyleSheets([]);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(root) { Scale = 1 };
+        scene.SetBaseStyleSheets([]);
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(size, 0);
         return manager;
     }
 
     private sealed class WheelSettingsScope : IDisposable
     {
-        private readonly int _original = UiToolkit.WheelScrollLines;
+        private readonly int _original = UIToolkit.WheelScrollLines;
 
-        internal WheelSettingsScope(int lines) => UiToolkit.WheelScrollLines = lines;
+        internal WheelSettingsScope(int lines) => UIToolkit.WheelScrollLines = lines;
 
-        public void Dispose() => UiToolkit.WheelScrollLines = _original;
+        public void Dispose() => UIToolkit.WheelScrollLines = _original;
     }
 }

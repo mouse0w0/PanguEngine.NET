@@ -53,8 +53,8 @@ public sealed class DockPanelStylingTests
         var fill = new TestNode();
         edge.Classes.Add("edge");
         panel.Children.AddRange([edge, fill]);
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              DockPanel { last-child-fill: false; }
                              .edge { dock: top; }

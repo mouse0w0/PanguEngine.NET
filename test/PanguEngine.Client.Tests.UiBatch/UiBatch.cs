@@ -24,9 +24,9 @@ internal sealed class UiBatchScene : IClientTestScene
     private const double UiScale = 1.25;
     private Presenter _presenter = null!;
     private UiRenderer _renderer = null!;
-    private UiManager _uiManager = null!;
+    private UIManager _uiManager = null!;
     private UiBatchNode _root = null!;
-    private GameScreen _screen = null!;
+    private GameUIScene _scene = null!;
     private Clipboard _clipboard = null!;
     private Image _firstImage = null!;
     private Image _secondImage = null!;
@@ -48,7 +48,7 @@ internal sealed class UiBatchScene : IClientTestScene
         _clipboard = new SdlClipboard();
         var monitor = window.Monitor ?? throw new InvalidOperationException(
             "UI scale initialization requires a current monitor.");
-        UiToolkit.Initialize(
+        UIToolkit.Initialize(
             TextServices.FontManager,
             TextServices.TextLayoutEngine,
             _clipboard,
@@ -75,9 +75,9 @@ internal sealed class UiBatchScene : IClientTestScene
             _fourthImage,
             _nineSliceImage,
             _oversizedImage);
-        _screen = new GameScreen(_root) { Scale = UiScale };
-        _uiManager = new UiManager();
-        _uiManager.Open(_screen);
+        _scene = new GameUIScene(_root) { Scale = UiScale };
+        _uiManager = new UIManager();
+        _uiManager.Open(_scene);
         window.PreRender += (_, alpha) => PrepareFrame(alpha);
         window.Render += (_, _) => DrawFrame();
     }
@@ -86,7 +86,7 @@ internal sealed class UiBatchScene : IClientTestScene
     {
         _uiManager.Destroy();
         _renderer.Destroy();
-        UiToolkit.Shutdown();
+        UIToolkit.Shutdown();
         TextServices.Shutdown();
         _clipboard.Destroy();
     }
@@ -119,7 +119,7 @@ internal sealed class UiBatchScene : IClientTestScene
             }
             else
             {
-                var drawCommands = _screen.CreateDrawCommandList();
+                var drawCommands = _scene.CreateDrawCommandList();
 
                 commandList.BeginRendering(new RenderingDescription
                 {
@@ -376,7 +376,7 @@ internal sealed class UiBatchScene : IClientTestScene
 
         internal bool Dense { get; set; }
 
-        internal void EstablishButtonStates(UiManager manager) =>
+        internal void EstablishButtonStates(UIManager manager) =>
             _buttonPanel.EstablishStates(manager);
 
         protected override Size MeasureContent(Size availableSize)
@@ -550,7 +550,7 @@ internal sealed class UiBatchScene : IClientTestScene
                     Children.Add(button);
             }
 
-            internal void EstablishStates(UiManager manager)
+            internal void EstablishStates(UIManager manager)
             {
                 var pressedCenter = GetOutputCenter(_pressedButton);
                 manager.ProcessPointerMoved(pressedCenter);
@@ -600,10 +600,10 @@ internal sealed class UiBatchScene : IClientTestScene
 
             private static Point GetOutputCenter(Button button)
             {
-                var logicalCenter = button.LocalToScreen(new Point(
+                var logicalCenter = button.LocalToScene(new Point(
                     button.LayoutBounds.Width / 2,
                     button.LayoutBounds.Height / 2));
-                var scale = button.Screen!.Scale;
+                var scale = button.Scene!.Scale;
                 return new Point(logicalCenter.X * scale, logicalCenter.Y * scale);
             }
         }

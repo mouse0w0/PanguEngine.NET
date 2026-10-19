@@ -102,8 +102,8 @@ public sealed class TabViewLayoutTests
     public void SufficientSpaceHidesScrollButtons()
     {
         var (view, strip, _, _) = CreateView(3);
-        var manager = new UiManager();
-        manager.Open(new GameScreen(view));
+        var manager = new UIManager();
+        manager.Open(new GameUIScene(view));
         manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.False(strip.Viewport.HasOverflow);
@@ -127,16 +127,18 @@ public sealed class TabViewLayoutTests
         var (view, strip, _, _) = CreateView(6, placement);
         var viewport = strip.Viewport;
         var buttons = ScrollButtons(strip);
-        var screen = new Screen(view);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            ".tab-scroll-button { width: 24; height: 24; } " +
-            ".tab-scroll-button:disabled { width: 32; height: 32; }")]);
+        var scene = new UIScene(view);
+        scene.SetStyleSheets([
+            StyleSheet.Parse(
+                ".tab-scroll-button { width: 24; height: 24; } " +
+                ".tab-scroll-button:disabled { width: 32; height: 32; }")
+        ]);
         var smallSize = view.IsHorizontalPlacement ? new Size(200, 100) : new Size(400, 100);
         var largeSize = view.IsHorizontalPlacement ? new Size(1000, 100) : new Size(400, 1000);
-        screen.Open();
+        scene.Open();
         try
         {
-            screen.PrepareFrame(smallSize);
+            scene.PrepareFrame(smallSize);
 
             Assert.True(viewport.HasOverflow);
             Assert.All(buttons, button => Assert.Equal(Visibility.Visible, button.Visibility));
@@ -145,12 +147,12 @@ public sealed class TabViewLayoutTests
             Assert.Equal(32d, buttons[0].Width);
             Assert.Equal(24d, buttons[1].Width);
 
-            screen.ProcessPointerMoved(buttons[1].LocalToScreen(new Point(
+            scene.ProcessPointerMoved(buttons[1].LocalToScene(new Point(
                 buttons[1].LayoutBounds.Width / 2, buttons[1].LayoutBounds.Height / 2)));
             Assert.True(buttons[1].IsHovered);
 
             viewport.ScrollBy(viewport.GetMaxOffset());
-            screen.PrepareFrame(smallSize);
+            scene.PrepareFrame(smallSize);
 
             Assert.Equal(viewport.GetMaxOffset(), viewport.ScrollOffset, 3);
             Assert.True(buttons[0].IsEnabled);
@@ -159,7 +161,7 @@ public sealed class TabViewLayoutTests
             Assert.Equal(24d, buttons[0].Width);
             Assert.Equal(32d, buttons[1].Width);
 
-            screen.PrepareFrame(largeSize);
+            scene.PrepareFrame(largeSize);
 
             Assert.False(viewport.HasOverflow);
             Assert.Equal(0d, viewport.ScrollOffset);
@@ -169,7 +171,7 @@ public sealed class TabViewLayoutTests
                 Assert.False(button.IsEnabled);
             });
 
-            screen.PrepareFrame(smallSize);
+            scene.PrepareFrame(smallSize);
 
             Assert.True(viewport.HasOverflow);
             Assert.False(buttons[0].IsEnabled);
@@ -186,7 +188,7 @@ public sealed class TabViewLayoutTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 

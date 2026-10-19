@@ -15,7 +15,7 @@ public sealed class SliderTests
     {
         var items = new ObservableList<int>([60]);
         var slider = new Slider<int>(new ListSliderValueModel<int>(items));
-        _ = new Screen(slider);
+        _ = new UIScene(slider);
         slider.UpdateStyles();
         var track = Part(slider, "track");
         var normalBackground = track.GetValue(Region.BackgroundProperty);
@@ -552,18 +552,18 @@ public sealed class SliderTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
-    public void LosingInputStateDuringValueNotificationsSuppressesCompletion(bool pointerRelease, bool closeScreen)
+    public void LosingInputStateDuringValueNotificationsSuppressesCompletion(bool pointerRelease, bool closeScene)
     {
         var slider = new Slider<int>(new NumericSliderValueModel<int>()) { Value = 50 };
         var committed = new List<SliderValueCommittedEventArgs<int>>();
         slider.ValueCommitted += (_, change) => committed.Add(change);
-        var (manager, screen) = Open(slider);
+        var (manager, scene) = Open(slider);
         using var subscription = slider.Subscribe(Slider<int>.ValueProperty, (_, _) =>
         {
-            if (closeScreen)
+            if (closeScene)
                 manager.Close();
             else
-                screen.ClearFocus();
+                scene.ClearFocus();
         });
         try
         {
@@ -596,7 +596,7 @@ public sealed class SliderTests
         {
             Value = 5, ShowTickLabels = true, ValueFormatter = value => $"choice {value}"
         };
-        var (manager, screen) = Open(slider, 240, 80);
+        var (manager, scene) = Open(slider, 240, 80);
         try
         {
             var labels = slider.Children.OfType<Text>().Where(label => label.Visibility == Visibility.Visible)
@@ -610,7 +610,7 @@ public sealed class SliderTests
                 node => node.Classes.Contains("slider-tick") && node.Visibility == Visibility.Visible);
             foreach (var label in labels)
                 Assert.NotSame(label,
-                    screen.HitTest(slider.LocalToScreen(new Point(label.LayoutBounds.X, label.LayoutBounds.Y))));
+                    scene.HitTest(slider.LocalToScene(new Point(label.LayoutBounds.X, label.LayoutBounds.Y))));
         }
         finally
         {
@@ -664,10 +664,10 @@ public sealed class SliderTests
         {
             ShowTicks = true, HorizontalAlignment = HorizontalAlignment.Left
         };
-        var screen = new GameScreen(slider);
-        screen.SetBaseStyleSheets([]);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(slider);
+        scene.SetBaseStyleSheets([]);
+        var manager = new UIManager();
+        manager.Open(scene);
         try
         {
             manager.UpdateFrame(new Size(320, 80), 0);
@@ -713,21 +713,21 @@ public sealed class SliderTests
     }
 
     [Fact]
-    public void MovingTheSliderOnScreenCancelsDraggingBeforeRelease()
+    public void MovingTheSliderOnSceneCancelsDraggingBeforeRelease()
     {
         var slider = new Slider<int>(new NumericSliderValueModel<int>()) { Width = 200, Height = 32, Value = 50 };
         var canvas = new Canvas();
         canvas.Children.Add(slider);
-        var screen = new GameScreen(canvas);
-        screen.SetBaseStyleSheets([]);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(canvas);
+        scene.SetBaseStyleSheets([]);
+        var manager = new UIManager();
+        manager.Open(scene);
         var count = 0;
         slider.ValueCommitted += (_, _) => count++;
         try
         {
             manager.UpdateFrame(new Size(320, 80), 0);
-            var point = slider.LocalToScreen(new Point(100, 16));
+            var point = slider.LocalToScene(new Point(100, 16));
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             Canvas.SetLeft(slider, 50);
             manager.UpdateFrame(new Size(320, 80), 0);
@@ -787,19 +787,19 @@ public sealed class SliderTests
         }
     }
 
-    private static (UiManager Manager, GameScreen Screen) Open<T>(Slider<T> slider, double width = 200,
+    private static (UIManager Manager, GameUIScene Scene) Open<T>(Slider<T> slider, double width = 200,
         double height = 32)
     {
         slider.Width = width;
         slider.Height = height;
         slider.HorizontalAlignment = HorizontalAlignment.Left;
         slider.VerticalAlignment = VerticalAlignment.Top;
-        var screen = new GameScreen(slider);
-        screen.SetBaseStyleSheets([]);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(slider);
+        scene.SetBaseStyleSheets([]);
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(320, 320), 0);
-        return (manager, screen);
+        return (manager, scene);
     }
 
     private static UIElement Part<T>(Slider<T> slider, string role) =>

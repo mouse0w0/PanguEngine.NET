@@ -73,7 +73,7 @@ public sealed class ToggleSwitchTests
         try
         {
             var thumb = FindThumb(control);
-            var point = control.LocalToScreen(new Point(
+            var point = control.LocalToScene(new Point(
                 thumb.LayoutBounds.X + thumb.LayoutBounds.Width / 2,
                 thumb.LayoutBounds.Y + thumb.LayoutBounds.Height / 2));
             UIElement? source = null;
@@ -285,13 +285,13 @@ public sealed class ToggleSwitchTests
     public void RepeatAfterFocusLossCannotReactivateAKey(Key key)
     {
         var control = new ToggleSwitch();
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
             Assert.True(control.Focus());
             manager.ProcessKeyDown(key, KeyModifiers.None);
             var state = control.IsOn;
-            screen.ClearFocus();
+            scene.ClearFocus();
             Assert.True(control.Focus());
 
             manager.ProcessKeyDown(key, KeyModifiers.None, true);
@@ -317,7 +317,7 @@ public sealed class ToggleSwitchTests
     public void UnavailabilityCancelsSpaceEvenAfterInputIsRestored(string reason)
     {
         var control = new ToggleSwitch();
-        var (manager, screen, root) = OpenScene(control);
+        var (manager, scene, root) = OpenScene(control);
         try
         {
             Assert.True(control.Focus());
@@ -330,8 +330,8 @@ public sealed class ToggleSwitchTests
             root.Visibility = Visibility.Visible;
             if (control.Parent is null)
                 root.Children.Add(control);
-            if (manager.CurrentScreen is null)
-                manager.Open(screen);
+            if (manager.CurrentScene is null)
+                manager.Open(scene);
             manager.ProcessFocusChanged(true);
             manager.UpdateFrame(new Size(120, 80), 0);
             Assert.True(control.Focus());
@@ -385,11 +385,11 @@ public sealed class ToggleSwitchTests
     public void LosingFocusInSpaceReleaseCallbackSuppressesDefaultToggle()
     {
         var control = new ToggleSwitch();
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
             Assert.True(control.Focus());
-            control.KeyUp += (_, _) => screen.ClearFocus();
+            control.KeyUp += (_, _) => scene.ClearFocus();
             manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
 
             manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
@@ -409,13 +409,13 @@ public sealed class ToggleSwitchTests
     public void RefocusingInKeyDownCallbackAllowsDefaultKeyboardAction(Key key)
     {
         var control = new ToggleSwitch();
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
             Assert.True(control.Focus());
             control.KeyDown += (_, _) =>
             {
-                screen.ClearFocus();
+                scene.ClearFocus();
                 Assert.True(control.Focus());
             };
 
@@ -437,13 +437,13 @@ public sealed class ToggleSwitchTests
         var source = new ToggleSwitch();
         var control = new ToggleSwitch();
         control.BindTwoWay(ToggleSwitch.IsOnProperty, source, ToggleSwitch.IsOnProperty);
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
             Assert.True(control.Focus());
             control.KeyUp += (_, _) =>
             {
-                screen.ClearFocus();
+                scene.ClearFocus();
                 Assert.True(control.Focus());
             };
             manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
@@ -553,11 +553,11 @@ public sealed class ToggleSwitchTests
     public void StateMovesThumbBetweenContentEndpoints(double scale, bool rounding)
     {
         var control = new ToggleSwitch();
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
-            screen.Scale = scale;
-            screen.UseLayoutRounding = rounding;
+            scene.Scale = scale;
+            scene.UseLayoutRounding = rounding;
             manager.UpdateFrame(new Size(120, 80), 0);
             var thumb = FindThumb(control);
             var off = thumb.LayoutBounds;
@@ -591,11 +591,11 @@ public sealed class ToggleSwitchTests
         double width, double height, double scale, bool rounding)
     {
         var control = new ToggleSwitch { Width = width, Height = height };
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
-            screen.Scale = scale;
-            screen.UseLayoutRounding = rounding;
+            scene.Scale = scale;
+            scene.UseLayoutRounding = rounding;
             var tolerance = rounding ? 1 / scale : 1e-9;
             foreach (var isOn in new[] { false, true })
             {
@@ -619,10 +619,10 @@ public sealed class ToggleSwitchTests
     public void AuthorStylesConfigureTrackAndThumbAndLocalValuesTakePrecedence()
     {
         var control = new ToggleSwitch();
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
-            screen.SetStyleSheets([
+            scene.SetStyleSheets([
                 StyleSheet.Parse("""
                                  ToggleSwitch { width: 60px; padding: 4px; background-color: #112233; }
                                  ToggleSwitch:checked { background-color: #445566; }
@@ -658,7 +658,7 @@ public sealed class ToggleSwitchTests
     public void DisabledStyleWinsOverCheckedHoverAndPressedCombinations()
     {
         var control = new ToggleSwitch();
-        var (manager, screen, _) = OpenScene(control);
+        var (manager, scene, _) = OpenScene(control);
         try
         {
             control.IsEnabled = false;
@@ -718,20 +718,20 @@ public sealed class ToggleSwitchTests
         }
     }
 
-    private static (UiManager Manager, GameScreen Screen, Canvas Root) OpenScene(ToggleSwitch control)
+    private static (UIManager Manager, GameUIScene Scene, Canvas Root) OpenScene(ToggleSwitch control)
     {
         var root = new Canvas();
         Canvas.SetLeft(control, 10);
         Canvas.SetTop(control, 10);
         root.Children.Add(control);
-        var screen = new GameScreen(root) { UseLayoutRounding = false };
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(root) { UseLayoutRounding = false };
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(120, 80), 0);
-        return (manager, screen, root);
+        return (manager, scene, root);
     }
 
-    private static void Click(UiManager manager, Point point, MouseButton button = MouseButton.Left)
+    private static void Click(UIManager manager, Point point, MouseButton button = MouseButton.Left)
     {
         manager.ProcessPointerPressed(point, button, KeyModifiers.None);
         manager.ProcessPointerReleased(point, button, KeyModifiers.None);
@@ -743,7 +743,7 @@ public sealed class ToggleSwitchTests
     private static void AssertCentered(Rect content, Rect thumb, double tolerance) =>
         Assert.InRange(Math.Abs(content.Y + content.Height / 2 - thumb.Y - thumb.Height / 2), 0, tolerance);
 
-    private static void MakeUnavailable(string reason, UiManager manager, Canvas root, ToggleSwitch control)
+    private static void MakeUnavailable(string reason, UIManager manager, Canvas root, ToggleSwitch control)
     {
         switch (reason)
         {

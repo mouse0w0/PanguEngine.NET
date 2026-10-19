@@ -186,7 +186,7 @@ public sealed class Crosshair : UIElement
         var halfExtent = Math.Max(
             Gap + Length + OutlineThickness,
             (ShowCenterDot ? CenterDotSize / 2 : 0) + OutlineThickness);
-        var scale = UseUiScale ? 1 : Screen?.Scale ?? 1;
+        var scale = UseUiScale ? 1 : Scene?.Scale ?? 1;
         var size = halfExtent / scale * 2;
         return new Size(size, size);
     }

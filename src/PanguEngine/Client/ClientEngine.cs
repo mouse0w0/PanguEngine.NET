@@ -1,12 +1,12 @@
 using Microsoft.Extensions.Logging;
 using PanguEngine.Audio;
 using PanguEngine.Client.Game;
-using PanguEngine.Client.Huds;
 using PanguEngine.Client.Input;
 using PanguEngine.Client.Rendering;
 using PanguEngine.Client.Resources.Models;
-using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Huds;
+using PanguEngine.Client.UI.Scenes;
 using PanguEngine.Desktop;
 using PanguEngine.Desktop.Sdl;
 using PanguEngine.Graphics;
@@ -85,7 +85,7 @@ public sealed class ClientEngine
     /// <summary>
     /// Gets the client UI manager.
     /// </summary>
-    public UiManager Ui { get; private set; } = null!;
+    public UIManager Ui { get; private set; } = null!;
 
     /// <summary>
     /// The client input manager.
@@ -178,14 +178,14 @@ public sealed class ClientEngine
         Clipboard = new SdlClipboard();
         var monitor = PrimaryWindow.Monitor ?? throw new InvalidOperationException(
             "UI scale initialization requires a current monitor.");
-        UiToolkit.Initialize(
+        UIToolkit.Initialize(
             TextServices.FontManager,
             TextServices.TextLayoutEngine,
             Clipboard,
             Log.CreateLogger("UI"),
             monitor.ContentScale,
             3);
-        Ui = new UiManager();
+        Ui = new UIManager();
         Ui.InitializeHud(Engine.RegistryManager.Get<HudDefinition>(RegistryKeys.Hud));
         Input = new InputManager(
             PrimaryWindow,
@@ -208,8 +208,8 @@ public sealed class ClientEngine
         Game = new ClientGame(this);
         Input.RegisterHandler(BuiltinInputActions.TogglePause, HandleTogglePause);
         Input.RegisterHandler(BuiltinInputActions.ToggleDebugInfo, HandleToggleDebugInfo);
-        Ui.CurrentScreenChanged += OnCurrentScreenChanged;
-        OnCurrentScreenChanged(null, Ui.CurrentScreen);
+        Ui.CurrentSceneChanged += OnCurrentSceneChanged;
+        OnCurrentSceneChanged(null, Ui.CurrentScene);
         Engine.ModManager.RunClientSetup();
         BlockModelManager = new BlockModelManager(
             Engine.ResourceManager,
@@ -261,9 +261,9 @@ public sealed class ClientEngine
         Ui.Update();
     }
 
-    private void OnCurrentScreenChanged(GameScreen? oldScreen, GameScreen? newScreen)
+    private void OnCurrentSceneChanged(GameUIScene? oldScene, GameUIScene? newScene)
     {
-        if (newScreen?.PausesGame == true)
+        if (newScene?.PausesGame == true)
             Game.Pause();
         else
             Game.Resume();
@@ -274,13 +274,13 @@ public sealed class ClientEngine
         if (args.Phase != InputActionPhase.Started)
             return InputHandling.Pass;
 
-        if (Ui.CurrentScreen is null)
+        if (Ui.CurrentScene is null)
         {
-            Ui.Open(new PauseScreen());
+            Ui.Open(new PauseMenu());
             return InputHandling.Handled;
         }
 
-        if (Ui.CurrentScreen.CloseOnEscape)
+        if (Ui.CurrentScene.CloseOnEscape)
         {
             Ui.Close();
             return InputHandling.Handled;
@@ -291,7 +291,7 @@ public sealed class ClientEngine
 
     private InputHandling HandleToggleDebugInfo(InputActionEvent args)
     {
-        if (args.Phase != InputActionPhase.Started || Ui.CurrentScreen is not null)
+        if (args.Phase != InputActionPhase.Started || Ui.CurrentScene is not null)
             return InputHandling.Pass;
 
         ((DebugInfoHud)Ui.Hud.Get(ResourceKey.Create("pangu", "debug_info"))).Toggle();
@@ -311,12 +311,12 @@ public sealed class ClientEngine
             Thread.Sleep(1);
         }
 
-        Ui.CurrentScreenChanged -= OnCurrentScreenChanged;
+        Ui.CurrentSceneChanged -= OnCurrentSceneChanged;
         Ui.Destroy();
         Input.Destroy();
         Game.Destroy();
         Renderer.Destroy();
-        UiToolkit.Shutdown();
+        UIToolkit.Shutdown();
         Audio.Destroy();
         TextServices.Shutdown();
         Clipboard.Destroy();

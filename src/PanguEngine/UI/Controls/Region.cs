@@ -192,9 +192,9 @@ public abstract class Region : Container
     /// <inheritdoc />
     protected sealed override Size MeasureCore(Size availableSize)
     {
-        var screen = Screen;
-        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var useLayoutRounding = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         var borderThickness = BorderThickness;
         var padding = Padding;
         if (useLayoutRounding)
@@ -213,9 +213,9 @@ public abstract class Region : Container
     /// <inheritdoc />
     protected sealed override void ArrangeCore(Size finalSize)
     {
-        var screen = Screen;
-        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var useLayoutRounding = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         var borderThickness = BorderThickness;
         var padding = Padding;
         if (useLayoutRounding)

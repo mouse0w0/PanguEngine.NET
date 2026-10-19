@@ -168,7 +168,7 @@ public sealed class NumericUpDownTests
         scene.Key(Key.Enter);
         Assert.Equal(100, scene.Node.Value);
         scene.Edit("-20");
-        scene.Screen.ClearFocus();
+        scene.GameScene.ClearFocus();
         Assert.Equal(0, scene.Node.Value);
         Assert.Equal("0", scene.Editor.Text);
     }
@@ -217,7 +217,7 @@ public sealed class NumericUpDownTests
         Assert.Equal(1.234m, scene.Node.Value);
         scene.Node.Value = 2.345m;
         Assert.Equal("1.23", scene.Editor.Text);
-        scene.Screen.ClearFocus();
+        scene.GameScene.ClearFocus();
         Assert.Equal(2.345m, scene.Node.Value);
         Assert.Equal("2.35", scene.Editor.Text);
     }
@@ -364,7 +364,7 @@ public sealed class NumericUpDownTests
         using var scene = new Scene<int>(new() { Value = 10 });
         Assert.True(scene.Node.Focus());
         Assert.False(scene.Node.IsFocused);
-        Assert.Same(scene.Editor, scene.Screen.FocusedNode);
+        Assert.Same(scene.Editor, scene.GameScene.FocusedNode);
         Assert.True(scene.Editor.IsFocusWithin);
         Assert.True(scene.Node.IsFocusWithin);
         Assert.True(scene.Root.IsFocusWithin);
@@ -374,7 +374,7 @@ public sealed class NumericUpDownTests
         var point = scene.PartCenter("increase");
         scene.Press(point);
         Assert.Equal(11, scene.Node.Value);
-        Assert.Same(scene.Editor, scene.Screen.FocusedNode);
+        Assert.Same(scene.Editor, scene.GameScene.FocusedNode);
         Assert.True(scene.Node.IsFocusWithin);
         Assert.True(scene.Node.HasPseudoClass(PseudoClass.FocusWithin));
         scene.Release(point);
@@ -402,7 +402,7 @@ public sealed class NumericUpDownTests
         var point = scene.PartCenter("decrease");
         Assert.True(scene.Manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None));
         Assert.Equal(99, scene.Node.Value);
-        Assert.Same(scene.Editor, scene.Screen.FocusedNode);
+        Assert.Same(scene.Editor, scene.GameScene.FocusedNode);
         scene.Release(point);
     }
 
@@ -414,8 +414,8 @@ public sealed class NumericUpDownTests
         using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         var otherRoot = new Canvas();
-        var otherScreen = new GameScreen(otherRoot);
-        var otherManager = new UiManager();
+        var otherScene = new GameUIScene(otherRoot);
+        var otherManager = new UIManager();
         var transferred = false;
         using var subscription = scene.Editor.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
@@ -425,7 +425,7 @@ public sealed class NumericUpDownTests
             otherRoot.Children.Add(scene.Node);
             Assert.True(scene.Node.Focus());
         });
-        otherManager.Open(otherScreen);
+        otherManager.Open(otherScene);
         try
         {
             Assert.True(scene.Node.Focus());
@@ -434,7 +434,7 @@ public sealed class NumericUpDownTests
             else
                 Assert.True(scene.Other.Focus());
             Assert.True(transferred);
-            Assert.Same(scene.Editor, otherScreen.FocusedNode);
+            Assert.Same(scene.Editor, otherScene.FocusedNode);
             Assert.True(scene.Editor.IsFocused);
             Assert.True(scene.Node.IsFocusWithin);
             otherManager.UpdateFrame(new Size(400, 120), 0, TimeSpan.Zero);
@@ -526,7 +526,7 @@ public sealed class NumericUpDownTests
         using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
         scene.Node.Focus();
-        var point = scene.Editor.LocalToScreen(new Point(10, 10));
+        var point = scene.Editor.LocalToScene(new Point(10, 10));
         scene.Manager.ProcessPointerWheel(point, 0, 0.5);
         scene.Press(point);
         scene.Release(point);
@@ -574,7 +574,7 @@ public sealed class NumericUpDownTests
         scene.Frame(0);
         scene.Frame(400);
         Assert.Equal(10, scene.Node.Value);
-        Assert.Null(scene.Screen.FocusedNode);
+        Assert.Null(scene.GameScene.FocusedNode);
     }
 
     [Theory]
@@ -619,7 +619,7 @@ public sealed class NumericUpDownTests
                 break;
             case "close":
                 scene.Manager.Close();
-                scene.Manager.Open(scene.Screen);
+                scene.Manager.Open(scene.GameScene);
                 break;
         }
 
@@ -652,7 +652,7 @@ public sealed class NumericUpDownTests
     {
         using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
-        var point = scene.Editor.LocalToScreen(new Point(10, 10));
+        var point = scene.Editor.LocalToScene(new Point(10, 10));
         Assert.False(scene.Manager.ProcessPointerWheel(point, 0, 1));
         scene.Node.Focus();
         Assert.True(scene.Manager.ProcessPointerWheel(point, 0, 0.4));
@@ -661,17 +661,17 @@ public sealed class NumericUpDownTests
         Assert.Equal(11, scene.Node.Value);
         scene.Node.Value = 100;
         scene.Frame(0);
-        Assert.Same(scene.Editor, scene.Screen.HitTest(point));
+        Assert.Same(scene.Editor, scene.GameScene.HitTest(point));
         Assert.True(scene.Manager.ProcessPointerWheel(point, 0, 1));
         Assert.Equal(100, scene.Node.Value);
         scene.Node.IsReadOnly = true;
         scene.Frame(0);
-        Assert.Same(scene.Editor, scene.Screen.HitTest(point));
+        Assert.Same(scene.Editor, scene.GameScene.HitTest(point));
         Assert.False(scene.Manager.ProcessPointerWheel(point, 0, 1));
         scene.Node.IsReadOnly = false;
         scene.Node.Increment = 0;
         scene.Frame(0);
-        Assert.Same(scene.Editor, scene.Screen.HitTest(point));
+        Assert.Same(scene.Editor, scene.GameScene.HitTest(point));
         Assert.False(scene.Manager.ProcessPointerWheel(point, 0, 1));
     }
 
@@ -709,8 +709,8 @@ public sealed class NumericUpDownTests
         var root = new StackPanel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("NumericUpDown .numeric-up-down-editor { font-size: 23px; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("NumericUpDown .numeric-up-down-editor { font-size: 23px; }")]);
         root.UpdateStyles();
         Assert.Equal(23, first.ReadOnlyChildren.OfType<TextBox>().Single().FontSize);
         Assert.Equal(23, second.ReadOnlyChildren.OfType<TextBox>().Single().FontSize);
@@ -805,16 +805,16 @@ public sealed class NumericUpDownTests
             Root.Children.Add(node);
             Canvas.SetTop(Other, 60);
             Root.Children.Add(Other);
-            Screen = new GameScreen(Root);
-            Manager.Open(Screen);
+            GameScene = new GameUIScene(Root);
+            Manager.Open(GameScene);
             Frame(0);
             Editor = node.ReadOnlyChildren.OfType<TextBox>().Single();
         }
 
-        internal UiManager Manager { get; } = new();
+        internal UIManager Manager { get; } = new();
         internal Canvas Root { get; } = new();
         internal Button Other { get; } = new() { Width = 100, Height = 30, Text = "other" };
-        internal GameScreen Screen { get; }
+        internal GameUIScene GameScene { get; }
         internal NumericUpDown<T> Node { get; }
         internal TextBox Editor { get; }
 
@@ -842,7 +842,7 @@ public sealed class NumericUpDownTests
         internal Point PartCenter(string role)
         {
             var part = Node.ReadOnlyChildren.Single(child => child.Classes.Contains($"numeric-up-down-{role}"));
-            return part.LocalToScreen(new Point(part.LayoutBounds.Width / 2, part.LayoutBounds.Height / 2));
+            return part.LocalToScene(new Point(part.LayoutBounds.Width / 2, part.LayoutBounds.Height / 2));
         }
 
         public void Dispose() => Manager.Close();

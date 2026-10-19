@@ -92,7 +92,7 @@ public sealed class Text : UIElement
     /// <inheritdoc />
     protected override Size MeasureCore(Size availableSize)
     {
-        var layout = UiToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
+        var layout = UIToolkit.TextLayoutEngine.Layout(new TextLayoutRequest(
             Content,
             CreateFontRequest(),
             FontSize,

@@ -198,7 +198,7 @@ public sealed class ButtonTests
             Text = "Play",
             Spacing = 5.3
         };
-        _ = new Screen(button) { Scale = scale };
+        _ = new UIScene(button) { Scale = scale };
         button.GetStyleRoot().UpdateStyles();
 
         button.Measure(new Size(200, 80));
@@ -299,38 +299,38 @@ public sealed class ButtonTests
     {
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 80, 32);
-        var manager = new UiManager();
-        var screen = new GameScreen(root) { UseLayoutRounding = false };
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root) { UseLayoutRounding = false };
+        manager.Open(scene);
         manager.UpdateFrame(new Size(120, 80), 0);
 
-        var normalCommands = screen.CreateDrawCommandList();
+        var normalCommands = scene.CreateDrawCommandList();
         var normal = normalCommands.OfType<FillRectangleCommand>().ToArray();
         Assert.Equal(5, normal.Length);
         Assert.Equal(new Color(48, 54, 62), normal[0].Color);
         Assert.DoesNotContain(normalCommands, command => command is PushClipCommand);
 
         manager.ProcessPointerMoved(new Point(20, 20));
-        var hovered = GetFills(screen);
+        var hovered = GetFills(scene);
         Assert.Equal(5, hovered.Count);
         Assert.Equal(new Color(67, 73, 80), hovered[0].Color);
         Assert.Equal(new Rect(1, 1, 78, 30), hovered[0].Bounds);
 
         var builder = new DrawBuilder();
-        builder.Build(screen.CreateDrawCommandList(), 120, 80, false);
+        builder.Build(scene.CreateDrawCommandList(), 120, 80, false);
         Assert.Equal(11f, builder.Vertices[0].X);
         Assert.Equal(11f, builder.Vertices[0].Y);
         Assert.Equal(89f, builder.Vertices[2].X);
         Assert.Equal(41f, builder.Vertices[2].Y);
 
         manager.ProcessPointerPressed(new Point(20, 20), MouseButton.Left, KeyModifiers.None);
-        var pressed = GetFills(screen);
+        var pressed = GetFills(scene);
         Assert.Equal(5, pressed.Count);
         Assert.Equal(new Color(37, 42, 48), pressed[0].Color);
         Assert.All(pressed.Skip(1), command => Assert.Equal(new Color(84, 169, 255), command.Color));
 
         button.IsEnabled = false;
-        var disabled = GetFills(screen);
+        var disabled = GetFills(scene);
         Assert.Equal(5, disabled.Count);
         Assert.Equal(new Color(27, 30, 35), disabled[0].Color);
         Assert.All(disabled.Skip(1), command => Assert.Equal(new Color(52, 58, 65), command.Color));
@@ -353,21 +353,21 @@ public sealed class ButtonTests
             10,
             80,
             32);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(120, 80), 0);
 
         manager.ProcessPointerMoved(new Point(20, 20));
         Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
-        Assert.Equal(new Color(104, 43, 45), GetFills(screen)[0].Color);
+        Assert.Equal(new Color(104, 43, 45), GetFills(scene)[0].Color);
         manager.ProcessPointerPressed(new Point(20, 20), MouseButton.Left, KeyModifiers.None);
         Assert.True(button.IsFocused);
         Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
         Assert.Equal(new SolidColorBrush(157, 73, 77), button.BorderBrush);
 
         button.IsEnabled = false;
-        var fills = GetFills(screen);
+        var fills = GetFills(scene);
         Assert.Equal(5, fills.Count);
         Assert.Equal(new Color(104, 43, 45), fills[0].Color);
         Assert.All(fills.Skip(1), command => Assert.Equal(new Color(157, 73, 77), command.Color));
@@ -388,9 +388,9 @@ public sealed class ButtonTests
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 80, 32);
         button.Classes.Add("danger");
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(120, 80), 0);
 
         Assert.Equal(new SolidColorBrush(104, 43, 45), button.Background);
@@ -399,26 +399,26 @@ public sealed class ButtonTests
         Assert.False(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
 
         manager.ProcessPointerMoved(new Point(20, 20));
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(118, 63, 65), button.Background);
         Assert.Equal("Button.danger:hover", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
 
         manager.ProcessPointerPressed(new Point(20, 20), MouseButton.Left, KeyModifiers.None);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(81, 34, 35), button.Background);
         Assert.Equal(new SolidColorBrush(84, 169, 255), button.BorderBrush);
         Assert.Equal("Button.danger:pressed", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         Assert.Equal("Button.danger:focus", StyleSource(button, Region.BorderBrushProperty)?.SelectorText);
 
         button.IsEnabled = false;
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(58, 24, 25), button.Background);
         Assert.Equal(new SolidColorBrush(88, 41, 43), button.BorderBrush);
         Assert.Equal(new Color(139, 148, 160), button.Color);
         Assert.Equal("Button.danger:disabled", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
 
         button.Classes.Remove("danger");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(27, 30, 35), button.Background);
         Assert.Equal(new SolidColorBrush(52, 58, 65), button.BorderBrush);
         manager.Close();
@@ -428,8 +428,8 @@ public sealed class ButtonTests
     public void StyleDrivenContentRemovalLeavesDetachedChildStylesPending()
     {
         var button = new Button();
-        var screen = new Screen(button);
-        screen.SetStyleSheets([
+        var scene = new UIScene(button);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(
                     StyleSelector.For<Button>(),
@@ -439,14 +439,14 @@ public sealed class ButtonTests
                     [StyleSetter.Create(UIElement.OpacityProperty, 0.4)])
             ])
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         var oldText = Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         var opacityNotifications = 0;
         oldText.PropertyChanged += (_, e) =>
             opacityNotifications += ReferenceEquals(e.Property, UIElement.OpacityProperty) ? 1 : 0;
 
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(
                     StyleSelector.For<Button>(),
@@ -456,10 +456,10 @@ public sealed class ButtonTests
                     [StyleSetter.Create(UIElement.OpacityProperty, 0.8)])
             ])
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Empty(button.ReadOnlyChildren);
-        Assert.Null(oldText.Screen);
+        Assert.Null(oldText.Scene);
         Assert.Equal(0.4, oldText.Opacity);
         Assert.Equal(0, opacityNotifications);
         oldText.UpdateStyles();
@@ -472,14 +472,14 @@ public sealed class ButtonTests
     {
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 80, 32);
-        var manager = new UiManager();
-        var screen = new GameScreen(root) { UseLayoutRounding = false };
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root) { UseLayoutRounding = false };
+        manager.Open(scene);
         manager.UpdateFrame(new Size(120, 80), 0);
-        var originalBounds = GetFills(screen).Select(command => command.Bounds).ToArray();
+        var originalBounds = GetFills(scene).Select(command => command.Bounds).ToArray();
         Assert.True(button.Focus());
 
-        var fills = GetFills(screen);
+        var fills = GetFills(scene);
 
         Assert.True(button.IsMeasureValid);
         Assert.True(button.IsArrangeValid);
@@ -537,14 +537,14 @@ public sealed class ButtonTests
     {
         var root = new Canvas();
         var button = Place(root, new Button(), 10, 10, 40, 20);
-        var manager = new UiManager();
-        var screen = new GameScreen(root) { Scale = 0.25 };
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root) { Scale = 0.25 };
+        manager.Open(scene);
         manager.UpdateFrame(new Size(30, 20), 0);
         Assert.True(button.Focus());
 
         Assert.DoesNotContain(
-            GetFills(screen),
+            GetFills(scene),
             command => command.Color == new Color(84, 169, 255));
         manager.Close();
     }
@@ -554,14 +554,14 @@ public sealed class ButtonTests
     {
         var root = new Canvas();
         var button = Place(root, new Button { BorderThickness = Thickness.Zero }, 10, 10, 80, 32);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(120, 80), 0);
 
         Assert.True(button.Focus());
 
-        Assert.Single(GetFills(screen));
+        Assert.Single(GetFills(scene));
         Assert.Equal(Thickness.Zero, button.BorderThickness);
         manager.Close();
     }
@@ -578,12 +578,12 @@ public sealed class ButtonTests
             10,
             100,
             40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(140, 80), 0);
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var imageCommand = Assert.Single(commands.OfType<DrawImageCommand>());
         var textCommand = Assert.Single(commands.OfType<DrawTextCommand>());
         var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
@@ -608,13 +608,13 @@ public sealed class ButtonTests
             10,
             100,
             40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         UIElement? source = null;
         var clicks = 0;
         button.PointerClicked += (_, eventArgs) => source = eventArgs.Source;
         button.Click += (_, _) => clicks++;
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(140, 80), 0);
 
         Click(manager, new Point(60, 30), MouseButton.Left);
@@ -630,13 +630,13 @@ public sealed class ButtonTests
         var root = new Canvas();
         _ = Place(root, new Button(), 0, 0, 80, 32);
         var button = Assert.IsType<Button>(root.Children[0]);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var calls = new List<string>();
         button.PointerClicked += (_, eventArgs) => calls.Add($"raw:{eventArgs.Handled}");
         button.Click += (_, _) => calls.Add("click");
         root.PointerClicked += (_, _) => calls.Add("root");
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         Click(manager, new Point(5, 5), MouseButton.Left);
@@ -648,7 +648,7 @@ public sealed class ButtonTests
     [Fact]
     public void HandledRawClickDoesNotCancelButtonClick()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var ancestorClicks = 0;
         var clicks = 0;
         button.PointerClicked += (_, eventArgs) => eventArgs.Handled = true;
@@ -665,7 +665,7 @@ public sealed class ButtonTests
     [Fact]
     public void NonLeftButtonsContinueBubblingWithoutClick()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var clicks = 0;
         var ancestorButtons = new List<MouseButton>();
         button.Click += (_, _) => clicks++;
@@ -684,19 +684,19 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void ReleaseOutsideOrAfterCrossScreenMoveDoesNotClick()
+    public void ReleaseOutsideOrAfterCrossSceneMoveDoesNotClick()
     {
         var firstRoot = new Canvas();
         var button = Place(firstRoot, new Button(), 0, 0, 40, 40);
-        var firstManager = new UiManager();
-        var firstScreen = new GameScreen(firstRoot);
+        var firstManager = new UIManager();
+        var firstScene = new GameUIScene(firstRoot);
         var secondRoot = new Canvas();
-        var secondManager = new UiManager();
-        var secondScreen = new GameScreen(secondRoot);
+        var secondManager = new UIManager();
+        var secondScene = new GameUIScene(secondRoot);
         var clicks = 0;
         button.Click += (_, _) => clicks++;
-        firstManager.Open(firstScreen);
-        secondManager.Open(secondScreen);
+        firstManager.Open(firstScene);
+        secondManager.Open(secondScene);
         firstManager.UpdateFrame(new Size(100, 100), 0);
         secondManager.UpdateFrame(new Size(100, 100), 0);
 
@@ -708,7 +708,7 @@ public sealed class ButtonTests
 
         Assert.Equal(0, clicks);
         Assert.False(button.IsPressed);
-        Assert.Same(secondScreen, button.Screen);
+        Assert.Same(secondScene, button.Scene);
         firstManager.Close();
         secondManager.Close();
     }
@@ -716,7 +716,7 @@ public sealed class ButtonTests
     [Fact]
     public void RawPointerClickCanRemoveButtonWithoutCancellingAcceptedClick()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var calls = new List<string>();
         button.PointerClicked += (_, _) =>
         {
@@ -735,7 +735,7 @@ public sealed class ButtonTests
     [Fact]
     public void RawPointerExceptionStopsClickAndKeepsTheExceptionInstance()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var error = new InvalidOperationException("raw click");
         var clicks = 0;
         button.PointerClicked += (_, _) => throw error;
@@ -754,7 +754,7 @@ public sealed class ButtonTests
     [Fact]
     public void PointerReleasedExceptionSuppressesPointerClickedAndClick()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var error = new InvalidOperationException("release");
         var rawClicks = 0;
         var clicks = 0;
@@ -776,7 +776,7 @@ public sealed class ButtonTests
     [Fact]
     public void EnterClicksOncePerKeyPairAndHandlesItsEvents()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var calls = new List<string>();
         button.KeyDown += (_, eventArgs) => calls.Add($"down:{eventArgs.Handled}");
         button.KeyUp += (_, eventArgs) => calls.Add($"up:{eventArgs.Handled}");
@@ -799,7 +799,7 @@ public sealed class ButtonTests
     [Fact]
     public void SpaceClicksOnKeyUpAndUsesPressedAppearanceWhilePaired()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var calls = new List<string>();
         button.KeyDown += (_, eventArgs) => calls.Add($"down:{eventArgs.Handled}");
         button.KeyUp += (_, eventArgs) => calls.Add($"up:{eventArgs.Handled}");
@@ -808,21 +808,21 @@ public sealed class ButtonTests
 
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(["down:False", "down:False"], calls);
         Assert.Equal(
             "Button:pressed",
             StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         Assert.Contains(
-            GetFills(screen),
+            GetFills(scene),
             command => command.Color == new Color(37, 42, 48));
 
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
         Assert.Equal(["down:False", "down:False", "up:False", "click"], calls);
         Assert.DoesNotContain(
-            GetFills(screen),
+            GetFills(scene),
             command => command.Color == new Color(37, 42, 48));
         Assert.Equal("Button", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         manager.Close();
@@ -831,16 +831,16 @@ public sealed class ButtonTests
     [Fact]
     public void LostFocusClearsSpacePressedStyleSource()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         Assert.True(button.Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(
             "Button:pressed",
             StyleSource(button, Region.BackgroundProperty)?.SelectorText);
 
-        screen.ClearFocus();
-        screen.Root!.UpdateStyles();
+        scene.ClearFocus();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal("Button", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         manager.Close();
@@ -849,20 +849,20 @@ public sealed class ButtonTests
     [Fact]
     public void PressedStyleRemainsUntilPointerAndSpaceAreBothReleased()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         Assert.True(button.Focus());
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
 
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(
             "Button:pressed",
             StyleSource(button, Region.BackgroundProperty)?.SelectorText);
 
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(
             button.IsHovered ? "Button:hover" : "Button",
@@ -873,7 +873,7 @@ public sealed class ButtonTests
     [Fact]
     public void OtherKeysContinueBubblingAndUnmatchedActivationKeyUpDoesNotClick()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var rootKeys = new List<Key>();
         var clicks = 0;
         root.KeyDown += (_, eventArgs) => rootKeys.Add(eventArgs.Key);
@@ -894,13 +894,13 @@ public sealed class ButtonTests
     [Fact]
     public void LostFocusClearsEnterPairBeforeNewFocus()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var clicks = 0;
         button.Click += (_, _) => clicks++;
         Assert.True(button.Focus());
         manager.ProcessKeyDown(Key.Enter, KeyModifiers.None);
 
-        screen.ClearFocus();
+        scene.ClearFocus();
         Assert.True(button.Focus());
         manager.ProcessKeyDown(Key.Enter, KeyModifiers.None);
 
@@ -916,7 +916,7 @@ public sealed class ButtonTests
     [InlineData(4)]
     public void LifecycleLossCancelsSpaceActivation(int cleanupKind)
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var clicks = 0;
         button.Click += (_, _) => clicks++;
         Assert.True(button.Focus());
@@ -925,7 +925,7 @@ public sealed class ButtonTests
         switch (cleanupKind)
         {
             case 0:
-                screen.ClearFocus();
+                scene.ClearFocus();
                 break;
             case 1:
                 button.IsEnabled = false;
@@ -934,7 +934,7 @@ public sealed class ButtonTests
                 Assert.True(root.Children.Remove(button));
                 break;
             case 3:
-                screen.Root = new Canvas();
+                scene.Root = new Canvas();
                 break;
             case 4:
                 manager.Close();
@@ -944,14 +944,14 @@ public sealed class ButtonTests
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
         Assert.Equal(0, clicks);
-        if (manager.CurrentScreen is not null)
+        if (manager.CurrentScene is not null)
             manager.Close();
     }
 
     [Fact]
     public void AcceptedKeyboardActivationSurvivesRawHandlerTreeChanges()
     {
-        var (enterManager, enterScreen, enterRoot, enterButton) = OpenButtonScene();
+        var (enterManager, enterScene, enterRoot, enterButton) = OpenButtonScene();
         var enterClicks = 0;
         enterButton.KeyDown += (_, eventArgs) =>
         {
@@ -966,7 +966,7 @@ public sealed class ButtonTests
         Assert.Equal(1, enterClicks);
         enterManager.Close();
 
-        var (spaceManager, spaceScreen, spaceRoot, spaceButton) = OpenButtonScene();
+        var (spaceManager, spaceScene, spaceRoot, spaceButton) = OpenButtonScene();
         var spaceClicks = 0;
         spaceButton.KeyUp += (_, eventArgs) =>
         {
@@ -980,13 +980,13 @@ public sealed class ButtonTests
         spaceManager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
         Assert.Equal(1, spaceClicks);
-        Assert.Null(spaceManager.CurrentScreen);
+        Assert.Null(spaceManager.CurrentScene);
     }
 
     [Fact]
     public void RawKeyboardExceptionsKeepPhysicalPairTransitionsAndStopClick()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var enterError = new InvalidOperationException("enter");
         var spaceError = new InvalidOperationException("space");
         var clicks = 0;
@@ -1028,16 +1028,16 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void ClickCanCloseScreenAndLaterSubscribersStillRun()
+    public void ClickCanCloseSceneAndLaterSubscribersStillRun()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var calls = new List<string>();
         InvalidOperationException? reopenError = null;
         button.Click += (_, _) =>
         {
             calls.Add("first");
             manager.Close();
-            reopenError = Assert.Throws<InvalidOperationException>(() => manager.Open(screen));
+            reopenError = Assert.Throws<InvalidOperationException>(() => manager.Open(scene));
         };
         button.Click += (_, _) => calls.Add("second");
 
@@ -1045,13 +1045,13 @@ public sealed class ButtonTests
 
         Assert.Equal(["first", "second"], calls);
         Assert.NotNull(reopenError);
-        Assert.Null(manager.CurrentScreen);
+        Assert.Null(manager.CurrentScene);
     }
 
     [Fact]
     public void ClickCannotStartNestedPhysicalInput()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         InvalidOperationException? nestedError = null;
         button.Click += (_, _) => nestedError = Assert.Throws<InvalidOperationException>(() =>
             manager.ProcessKeyDown(Key.A, KeyModifiers.None));
@@ -1065,7 +1065,7 @@ public sealed class ButtonTests
     [Fact]
     public void ClickExceptionKeepsInstanceStopsSubscribersAndDoesNotRollbackInput()
     {
-        var (manager, screen, root, button) = OpenButtonScene();
+        var (manager, scene, root, button) = OpenButtonScene();
         var error = new InvalidOperationException("click");
         var laterCalls = 0;
         button.Click += (_, _) => throw error;
@@ -1079,7 +1079,7 @@ public sealed class ButtonTests
         Assert.Equal(0, laterCalls);
         Assert.False(button.IsPressed);
         Assert.True(button.IsFocused);
-        Assert.Same(screen, button.Screen);
+        Assert.Same(scene, button.Scene);
         manager.Close();
     }
 
@@ -1088,11 +1088,11 @@ public sealed class ButtonTests
     {
         var root = new Canvas();
         var button = Place(root, new ActivationButton(), 0, 0, 80, 32);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
         var clicks = 0;
         button.Click += (_, _) => clicks++;
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
 
         Click(manager, new Point(5, 5), MouseButton.Left);
@@ -1120,15 +1120,15 @@ public sealed class ButtonTests
         }
     }
 
-    private static (UiManager Manager, GameScreen Screen, Canvas Root, Button Button) OpenButtonScene()
+    private static (UIManager Manager, GameUIScene Scene, Canvas Root, Button Button) OpenButtonScene()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var root = new Canvas();
         var button = Place(root, new Button(), 0, 0, 80, 32);
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
-        return (manager, screen, root, button);
+        return (manager, scene, root, button);
     }
 
     private static T Place<T>(
@@ -1148,16 +1148,16 @@ public sealed class ButtonTests
         return child;
     }
 
-    private static void Click(UiManager manager, Point point, MouseButton button)
+    private static void Click(UIManager manager, Point point, MouseButton button)
     {
         manager.ProcessPointerPressed(point, button, KeyModifiers.None);
         manager.ProcessPointerReleased(point, button, KeyModifiers.None);
     }
 
-    private static IReadOnlyList<FillRectangleCommand> GetFills(Screen screen)
+    private static IReadOnlyList<FillRectangleCommand> GetFills(UIScene scene)
     {
-        screen.Root!.UpdateStyles();
-        return screen.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
+        scene.Root!.UpdateStyles();
+        return scene.CreateDrawCommandList().OfType<FillRectangleCommand>().ToArray();
     }
 
     private static StyleValueSource? StyleSource(UIElement node, Property property) =>

@@ -25,12 +25,12 @@ public sealed class FocusWithinTests
         var child = new Canvas { Focusable = true };
         root.Children.Add(group);
         group.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var gotFocusCalls = 0;
         child.GotFocus += (_, _) =>
         {
             gotFocusCalls++;
-            Assert.Same(child, screen.FocusedNode);
+            Assert.Same(child, scene.FocusedNode);
             Assert.True(child.IsFocused);
             Assert.False(group.IsFocused);
             Assert.False(root.IsFocused);
@@ -38,7 +38,7 @@ public sealed class FocusWithinTests
             AssertFocusWithin(group, true);
             AssertFocusWithin(root, true);
         };
-        screen.Open();
+        scene.Open();
         try
         {
             AssertFocusWithin(root, false);
@@ -50,14 +50,14 @@ public sealed class FocusWithinTests
             Assert.True(child.Focus());
 
             Assert.Equal(1, gotFocusCalls);
-            screen.ClearFocus();
+            scene.ClearFocus();
             AssertFocusWithin(child, false);
             AssertFocusWithin(group, false);
             AssertFocusWithin(root, false);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -76,8 +76,8 @@ public sealed class FocusWithinTests
         root.Children.Add(outside);
         group.Children.Add(first);
         group.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 ".group:focus-within { opacity: 0.4; }" +
                 ".group:focus-within > .target { opacity: 0.7; }")
@@ -93,7 +93,7 @@ public sealed class FocusWithinTests
             AssertFocusWithin(first, false);
             AssertFocusWithin(second, true);
         };
-        screen.Open();
+        scene.Open();
         try
         {
             Assert.True(first.Focus());
@@ -118,7 +118,7 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -131,9 +131,9 @@ public sealed class FocusWithinTests
         root.Classes.Add("outer");
         root.Children.Add(group);
         group.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".outer:focus-within { opacity: 0.4; }")]);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".outer:focus-within { opacity: 0.4; }")]);
+        scene.Open();
         try
         {
             Assert.True(child.Focus());
@@ -150,7 +150,7 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -159,7 +159,7 @@ public sealed class FocusWithinTests
     [InlineData("remove-child")]
     [InlineData("remove-group")]
     [InlineData("reparent")]
-    [InlineData("other-screen")]
+    [InlineData("other-scene")]
     [InlineData("transfer-root")]
     [InlineData("replace-root")]
     [InlineData("clear-root")]
@@ -177,69 +177,69 @@ public sealed class FocusWithinTests
         root.Children.Add(group);
         root.Children.Add(destination);
         group.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var otherRoot = new Canvas();
-        var otherScreen = new Screen(otherRoot);
+        var otherScene = new UIScene(otherRoot);
         var lostFocusCalls = 0;
         child.LostFocus += (_, _) =>
         {
             lostFocusCalls++;
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             AssertFocusWithin(child, false);
             AssertFocusWithin(group, false);
             AssertFocusWithin(root, false);
         };
-        screen.Open();
-        otherScreen.Open();
+        scene.Open();
+        otherScene.Open();
         try
         {
             Assert.True(child.Focus());
             AssertFocusWithin(root, true);
             switch (change)
             {
-                case "clear": screen.ClearFocus(); break;
+                case "clear": scene.ClearFocus(); break;
                 case "remove-child": group.Children.Remove(child); break;
                 case "remove-group": root.Children.Remove(group); break;
                 case "reparent": destination.Children.Add(group); break;
-                case "other-screen": otherRoot.Children.Add(group); break;
-                case "transfer-root": otherScreen.Root = root; break;
-                case "replace-root": screen.Root = new Canvas(); break;
-                case "clear-root": screen.Root = null; break;
+                case "other-scene": otherRoot.Children.Add(group); break;
+                case "transfer-root": otherScene.Root = root; break;
+                case "replace-root": scene.Root = new Canvas(); break;
+                case "clear-root": scene.Root = null; break;
                 case "disable": group.IsEnabled = false; break;
                 case "hide": group.Visibility = Visibility.Hidden; break;
                 case "collapse": group.Visibility = Visibility.Collapsed; break;
-                case "window-focus": screen.ProcessFocusChanged(false); break;
-                case "close": screen.Close(); break;
+                case "window-focus": scene.ProcessFocusChanged(false); break;
+                case "close": scene.Close(); break;
             }
 
             Assert.Equal(1, lostFocusCalls);
             AssertFocusWithin(destination, false);
             AssertFocusWithin(otherRoot, false);
             Assert.False(child.IsFocused);
-            Assert.Null(otherScreen.FocusedNode);
+            Assert.Null(otherScene.FocusedNode);
         }
         finally
         {
-            screen.Close();
-            otherScreen.Close();
+            scene.Close();
+            otherScene.Close();
         }
     }
 
     [Fact]
-    public void MovingFocusedSubtreeToAnotherScreenPreservesDestinationFocusWithin()
+    public void MovingFocusedSubtreeToAnotherScenePreservesDestinationFocusWithin()
     {
         var root = new Canvas();
         var group = new Canvas();
         var child = new Canvas { Focusable = true };
         root.Children.Add(group);
         group.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var otherRoot = new Canvas();
         var otherChild = new Canvas { Focusable = true };
         otherRoot.Children.Add(otherChild);
-        var otherScreen = new Screen(otherRoot);
-        screen.Open();
-        otherScreen.Open();
+        var otherScene = new UIScene(otherRoot);
+        scene.Open();
+        otherScene.Open();
         try
         {
             Assert.True(child.Focus());
@@ -247,18 +247,18 @@ public sealed class FocusWithinTests
 
             otherRoot.Children.Add(group);
 
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             AssertFocusWithin(root, false);
             AssertFocusWithin(group, false);
             AssertFocusWithin(child, false);
-            Assert.Same(otherChild, otherScreen.FocusedNode);
+            Assert.Same(otherChild, otherScene.FocusedNode);
             AssertFocusWithin(otherChild, true);
             AssertFocusWithin(otherRoot, true);
         }
         finally
         {
-            screen.Close();
-            otherScreen.Close();
+            scene.Close();
+            otherScene.Close();
         }
     }
 
@@ -270,18 +270,18 @@ public sealed class FocusWithinTests
         var child = new Canvas { Focusable = true };
         root.Children.Add(group);
         group.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         using var subscription = child.Subscribe(UIElement.IsFocusedProperty, (_, args) =>
         {
             if (args.NewValue)
                 group.IsEnabled = false;
         });
-        screen.Open();
+        scene.Open();
         try
         {
             Assert.True(child.Focus());
 
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             Assert.False(child.IsFocused);
             AssertFocusWithin(child, false);
             AssertFocusWithin(group, false);
@@ -289,7 +289,7 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -320,8 +320,8 @@ public sealed class FocusWithinTests
                 propertyValues.Add(group.IsFocusWithin);
             }
         };
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(first.Focus());
@@ -334,7 +334,7 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -350,8 +350,8 @@ public sealed class FocusWithinTests
         group.Children.Add(child);
         var receiver = new Canvas();
         receiver.Bind(UIElement.IsHitTestVisibleProperty, group, UIElement.IsFocusWithinProperty);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.False(receiver.IsHitTestVisible);
@@ -362,33 +362,33 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Fact]
-    public void ReopeningAScreenDoesNotRestoreItsFormerFocusWithin()
+    public void ReopeningASceneDoesNotRestoreItsFormerFocusWithin()
     {
         var root = new Canvas();
         var child = new Canvas { Focusable = true };
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(child.Focus());
-            screen.Close();
+            scene.Close();
             AssertFocusWithin(root, false);
             AssertFocusWithin(child, false);
-            screen.Open();
-            Assert.Null(screen.FocusedNode);
+            scene.Open();
+            Assert.Null(scene.FocusedNode);
             Assert.False(child.IsFocused);
             AssertFocusWithin(root, false);
             AssertFocusWithin(child, false);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -403,7 +403,7 @@ public sealed class FocusWithinTests
         var child = new Canvas { Focusable = true };
         root.Children.Add(group);
         group.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         using var subscription = group.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
             AssertFocusWithin(group, args.NewValue);
@@ -416,11 +416,11 @@ public sealed class FocusWithinTests
                 case "remove": root.Children.Remove(group); break;
             }
         });
-        screen.Open();
+        scene.Open();
         try
         {
             Assert.True(child.Focus());
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             Assert.False(child.IsFocused);
             AssertFocusWithin(root, false);
             AssertFocusWithin(group, false);
@@ -428,7 +428,7 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -449,13 +449,13 @@ public sealed class FocusWithinTests
             if (!args.NewValue)
                 newGroup.IsEnabled = false;
         });
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(oldLeaf.Focus());
             Assert.True(newLeaf.Focus());
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             Assert.False(oldLeaf.IsFocused);
             Assert.False(newLeaf.IsFocused);
             AssertFocusWithin(root, false);
@@ -466,7 +466,7 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -487,14 +487,14 @@ public sealed class FocusWithinTests
                 rejectedCalls++;
             }
         });
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(child.Focus());
             child.IsEnabled = false;
             Assert.Equal(1, rejectedCalls);
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             Assert.False(child.IsFocused);
             AssertFocusWithin(root, false);
             AssertFocusWithin(child, false);
@@ -503,14 +503,14 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void RangeCleanupPreservesFocusEstablishedByItsCallbackInAnotherScreen(bool cleanup)
+    public void RangeCleanupPreservesFocusEstablishedByItsCallbackInAnotherScene(bool cleanup)
     {
         var root = new Canvas();
         var group = new Canvas();
@@ -519,9 +519,9 @@ public sealed class FocusWithinTests
         root.Children.Add(group);
         root.Children.Add(next);
         group.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var otherRoot = new Canvas();
-        var otherScreen = new Screen(otherRoot);
+        var otherScene = new UIScene(otherRoot);
         var transferred = false;
         using var subscription = child.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
@@ -531,8 +531,8 @@ public sealed class FocusWithinTests
             otherRoot.Children.Add(group);
             Assert.True(child.Focus());
         });
-        screen.Open();
-        otherScreen.Open();
+        scene.Open();
+        otherScene.Open();
         try
         {
             Assert.True(child.Focus());
@@ -541,7 +541,7 @@ public sealed class FocusWithinTests
             else
                 Assert.True(next.Focus());
             Assert.True(transferred);
-            Assert.Same(child, otherScreen.FocusedNode);
+            Assert.Same(child, otherScene.FocusedNode);
             Assert.True(child.IsFocused);
             AssertFocusWithin(child, true);
             AssertFocusWithin(group, true);
@@ -549,28 +549,28 @@ public sealed class FocusWithinTests
             AssertFocusWithin(root, !cleanup);
             AssertFocusWithin(next, !cleanup);
             if (cleanup)
-                Assert.Null(screen.FocusedNode);
+                Assert.Null(scene.FocusedNode);
             else
-                Assert.Same(next, screen.FocusedNode);
+                Assert.Same(next, scene.FocusedNode);
         }
         finally
         {
-            screen.Close();
-            otherScreen.Close();
+            scene.Close();
+            otherScene.Close();
         }
     }
 
     [Fact]
-    public void RangeActivationCanTransferFocusToAnotherScreen()
+    public void RangeActivationCanTransferFocusToAnotherScene()
     {
         var root = new Canvas();
         var group = new Canvas();
         var child = new Canvas { Focusable = true };
         root.Children.Add(group);
         group.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var otherRoot = new Canvas();
-        var otherScreen = new Screen(otherRoot);
+        var otherScene = new UIScene(otherRoot);
         var transferred = false;
         using var subscription = group.Subscribe(UIElement.IsFocusWithinProperty, (_, args) =>
         {
@@ -580,14 +580,14 @@ public sealed class FocusWithinTests
             otherRoot.Children.Add(group);
             Assert.True(child.Focus());
         });
-        screen.Open();
-        otherScreen.Open();
+        scene.Open();
+        otherScene.Open();
         try
         {
             Assert.True(child.Focus());
             Assert.True(transferred);
-            Assert.Null(screen.FocusedNode);
-            Assert.Same(child, otherScreen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
+            Assert.Same(child, otherScene.FocusedNode);
             Assert.True(child.IsFocused);
             AssertFocusWithin(root, false);
             AssertFocusWithin(otherRoot, true);
@@ -596,8 +596,8 @@ public sealed class FocusWithinTests
         }
         finally
         {
-            screen.Close();
-            otherScreen.Close();
+            scene.Close();
+            otherScene.Close();
         }
     }
 
@@ -613,21 +613,21 @@ public sealed class FocusWithinTests
             if (args.NewValue)
                 throw failure;
         });
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => child.Focus()));
-            Assert.Same(child, screen.FocusedNode);
+            Assert.Same(child, scene.FocusedNode);
             AssertFocusWithin(child, true);
             AssertFocusWithin(root, true);
-            screen.ClearFocus();
+            scene.ClearFocus();
             AssertFocusWithin(child, false);
             AssertFocusWithin(root, false);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 

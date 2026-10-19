@@ -1,7 +1,6 @@
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Styling;
-using Screen = PanguEngine.UI.Screen;
 
 namespace PanguEngine.Tests.UI;
 
@@ -68,8 +67,8 @@ public sealed class FontSizeInheritanceTests
         var input = new TextBox();
         root.Children.Add(text);
         root.Children.Add(input);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; } Text { font-size: 14px; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; } Text { font-size: 14px; }")]);
         root.UpdateStyles();
 
         Assert.Equal(20d, root.FontSize);
@@ -84,7 +83,7 @@ public sealed class FontSizeInheritanceTests
         Assert.Equal(30d, text.FontSize);
         text.ClearValue(UIElement.FontSizeProperty);
         Assert.Equal(14d, text.FontSize);
-        screen.SetStyleSheets([]);
+        scene.SetStyleSheets([]);
         root.UpdateStyles();
         Assert.Equal(26d, text.FontSize);
     }
@@ -97,7 +96,7 @@ public sealed class FontSizeInheritanceTests
         var text = new Text();
         middle.Children.Add(text);
         root.Children.Add(middle);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var changes = new List<(UIElement Node, double Old, double New)>();
         foreach (var node in new UIElement[] { root, middle, text })
         {
@@ -109,7 +108,7 @@ public sealed class FontSizeInheritanceTests
             });
         }
 
-        screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
         Assert.Empty(changes);
         root.UpdateStyles();
 
@@ -124,16 +123,16 @@ public sealed class FontSizeInheritanceTests
         var root = new Panel { StyleId = "root" };
         var text = new Text();
         root.Children.Add(text);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; } Text { font-size: 14px; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; } Text { font-size: 14px; }")]);
         root.UpdateStyles();
         var changes = new List<(double Old, double New)>();
         using var subscription = text.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
-        screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 28px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { font-size: 28px; }")]);
         root.UpdateStyles();
-        screen.SetStyleSheets([]);
+        scene.SetStyleSheets([]);
         root.UpdateStyles();
 
         Assert.Equal(new[] { (14d, 28d), (28d, 16d) }, changes);
@@ -145,14 +144,14 @@ public sealed class FontSizeInheritanceTests
         var root = new Panel { StyleId = "root" };
         var text = new Text();
         root.Children.Add(text);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; }")]);
         root.UpdateStyles();
         var changes = 0;
         using var subscription = text.Subscribe(UIElement.FontSizeProperty, (_, _) => changes++);
 
         var invalidSheet = StyleSheet.Parse("#root { font-size: 28px; } Text { font-size: var(--missing); }");
-        screen.SetStyleSheets([invalidSheet]);
+        scene.SetStyleSheets([invalidSheet]);
         Assert.Throws<StyleParseException>(() => root.UpdateStyles());
 
         Assert.Equal(28d, root.FontSize);
@@ -169,7 +168,7 @@ public sealed class FontSizeInheritanceTests
         var root = new Panel { StyleId = "root" };
         var text = new Text();
         root.Children.Add(text);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         using var subscription = root.Subscribe(UIElement.FontSizeProperty, (_, args) =>
         {
             if (args.NewValue == 24)
@@ -179,7 +178,7 @@ public sealed class FontSizeInheritanceTests
         using var childSubscription = text.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
-        screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
         root.UpdateStyles();
 
         Assert.Equal(30d, text.FontSize);
@@ -192,7 +191,7 @@ public sealed class FontSizeInheritanceTests
         var root = new Panel { StyleId = "root" };
         var text = new Text();
         root.Children.Add(text);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         var changed = false;
         using var subscription = root.Subscribe(UIElement.FontSizeProperty, (_, args) =>
         {
@@ -206,7 +205,7 @@ public sealed class FontSizeInheritanceTests
         using var childSubscription = text.Subscribe(UIElement.FontSizeProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
-        screen.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { font-size: 24px; }")]);
         root.UpdateStyles();
 
         Assert.Equal(24d, text.FontSize);
@@ -214,27 +213,27 @@ public sealed class FontSizeInheritanceTests
     }
 
     [Fact]
-    public void ScreenRootTransferAndRemovalRefreshDescendantFontSizes()
+    public void SceneRootTransferAndRemovalRefreshDescendantFontSizes()
     {
         var root = new Panel { StyleId = "root" };
         var text = new Text();
         root.Children.Add(text);
-        var first = new Screen(root);
+        var first = new UIScene(root);
         first.SetStyleSheets([StyleSheet.Parse("#root { font-size: 20px; }")]);
         root.UpdateStyles();
-        var second = new Screen();
+        var second = new UIScene();
         second.SetStyleSheets([StyleSheet.Parse("#root { font-size: 28px; }")]);
 
         second.Root = root;
         root.UpdateStyles();
 
         Assert.Null(first.Root);
-        Assert.Same(second, text.Screen);
+        Assert.Same(second, text.Scene);
         Assert.Equal(28d, root.FontSize);
         Assert.Equal(28d, text.FontSize);
         second.Root = null;
         root.UpdateStyles();
-        Assert.Null(text.Screen);
+        Assert.Null(text.Scene);
         Assert.Equal(16d, root.FontSize);
         Assert.Equal(16d, text.FontSize);
     }
@@ -268,8 +267,8 @@ public sealed class FontSizeInheritanceTests
         var text = new Text();
         root.Children.Add(text);
         root.Children.Add(new FontMutationNode());
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("Text { font-size: 14px; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("Text { font-size: 14px; }")]);
         root.UpdateStyles();
         var changes = new List<(double Old, double New)>();
         using var subscription = text.Subscribe(UIElement.FontSizeProperty,
@@ -281,7 +280,7 @@ public sealed class FontSizeInheritanceTests
         };
         try
         {
-            screen.SetStyleSheets([
+            scene.SetStyleSheets([
                 StyleSheet.Parse("Text { font-size: 16px; } FontMutationNode { trigger: 1; }")
             ]);
             root.UpdateStyles();
@@ -303,15 +302,15 @@ public sealed class FontSizeInheritanceTests
         root.Children.Add(button);
         var text = Assert.Single(button.ReadOnlyChildren.OfType<Text>());
         Assert.Equal(22d, text.FontSize);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
 
-        screen.SetStyleSheets([StyleSheet.Parse("Button Text { font-size: 14px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("Button Text { font-size: 14px; }")]);
         root.UpdateStyles();
         Assert.Equal(14d, text.FontSize);
         root.FontSize = 26;
         Assert.Equal(26d, button.FontSize);
         Assert.Equal(14d, text.FontSize);
-        screen.SetStyleSheets([]);
+        scene.SetStyleSheets([]);
         root.UpdateStyles();
         Assert.Equal(26d, text.FontSize);
         button.Text = string.Empty;
@@ -323,8 +322,8 @@ public sealed class FontSizeInheritanceTests
     public void ConvertersCanEstablishLocalValuesBeforeStyleCommit()
     {
         var root = new FontMutationNode();
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("FontMutationNode { font-size: 24px; trigger: 1; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("FontMutationNode { font-size: 24px; trigger: 1; }")]);
         FontMutationNode.OnConvert = () => root.FontSize = 30;
         try
         {
@@ -347,9 +346,9 @@ public sealed class FontSizeInheritanceTests
         var root = new Panel();
         var child = new Text();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<Panel>(), [
                     StyleSetter.Create(UIElement.OpacityProperty, 0.5d),
@@ -381,13 +380,13 @@ public sealed class FontSizeInheritanceTests
         var child = new Text();
         moving.Children.Add(child);
         oldRoot.Children.Add(moving);
-        var oldScreen = new Screen(oldRoot);
-        var newScreen = new Screen(newRoot);
+        var oldScene = new UIScene(oldRoot);
+        var newScene = new UIScene(newRoot);
         var sheet = StyleSheet.Parse("#moving { opacity: 0.5; font-size: 24px; }");
-        oldScreen.SetBaseStyleSheets([]);
-        newScreen.SetBaseStyleSheets([]);
-        oldScreen.SetStyleSheets([sheet]);
-        newScreen.SetStyleSheets([sheet]);
+        oldScene.SetBaseStyleSheets([]);
+        newScene.SetBaseStyleSheets([]);
+        oldScene.SetStyleSheets([sheet]);
+        newScene.SetStyleSheets([sheet]);
         using var opacitySubscription = moving.Subscribe(UIElement.OpacityProperty,
             (_, _) => newRoot.Children.Add(moving));
         var movingNotifications = 0;

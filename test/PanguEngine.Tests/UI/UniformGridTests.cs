@@ -16,7 +16,7 @@ public sealed class UniformGridTests
         int rows, int columns, int count, int resolvedRows, int resolvedColumns)
     {
         var grid = new UniformGrid { Rows = rows, Columns = columns };
-        _ = new Screen(grid) { UseLayoutRounding = false };
+        _ = new UIScene(grid) { UseLayoutRounding = false };
         var children = Enumerable.Range(0, count)
             .Select(_ => new TestNode { CoreDesiredSize = new Size(10, 5) }).ToArray();
         foreach (var child in children)
@@ -168,7 +168,7 @@ public sealed class UniformGridTests
     public void BoundariesDistributeCellsWithoutGapsOrOverflow(bool rounding)
     {
         var grid = new UniformGrid { Columns = 3 };
-        _ = new Screen(grid) { Scale = 1.25, UseLayoutRounding = rounding };
+        _ = new UIScene(grid) { Scale = 1.25, UseLayoutRounding = rounding };
         for (var index = 0; index < 3; index++)
             grid.Children.Add(new TestNode());
 
@@ -216,7 +216,7 @@ public sealed class UniformGridTests
     public void FractionalSpacingFollowsLayoutRoundingOnBothAxes(bool rounding, double expectedGap)
     {
         var grid = new UniformGrid { Rows = 2, Columns = 3, RowSpacing = 0.6, ColumnSpacing = 0.6 };
-        _ = new Screen(grid) { Scale = 1.25, UseLayoutRounding = rounding };
+        _ = new UIScene(grid) { Scale = 1.25, UseLayoutRounding = rounding };
         for (var index = 0; index < 6; index++)
             grid.Children.Add(new TestNode { CoreDesiredSize = new Size(8, 4) });
 
@@ -374,7 +374,7 @@ public sealed class UniformGridTests
     public void MeasurementOverflowLeavesLayoutInvalid(bool spacingOverflow)
     {
         var grid = new UniformGrid { Columns = 3 };
-        _ = new Screen(grid) { UseLayoutRounding = false };
+        _ = new UIScene(grid) { UseLayoutRounding = false };
         if (spacingOverflow)
             grid.ColumnSpacing = double.MaxValue;
         grid.Children.Add(new TestNode { CoreDesiredSize = new Size(double.MaxValue, 0) });
@@ -410,9 +410,9 @@ public sealed class UniformGridTests
     public void CssUpdatesAllGridPropertiesAndInvalidatesLayout()
     {
         var grid = new UniformGrid();
-        var screen = new Screen(grid);
+        var scene = new UIScene(grid);
         Layout(grid);
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 "UniformGrid { rows: 2; columns: +3; row-spacing: 4px; column-spacing: 5; }")
         ]);
@@ -445,8 +445,8 @@ public sealed class UniformGridTests
     public void CssNegativeCountsUseRegisteredPropertyValidation()
     {
         var grid = new UniformGrid();
-        var screen = new Screen(grid);
-        screen.SetStyleSheets([StyleSheet.Parse("UniformGrid { rows: -1; }")]);
+        var scene = new UIScene(grid);
+        scene.SetStyleSheets([StyleSheet.Parse("UniformGrid { rows: -1; }")]);
 
         var error = Assert.Throws<StyleParseException>(grid.UpdateStyles);
         Assert.Equal(StyleParseError.InvalidValue, error.Error);
@@ -464,8 +464,8 @@ public sealed class UniformGridTests
     public void CssInvalidSpacingReportsAValueError(string property, string value)
     {
         var grid = new UniformGrid();
-        var screen = new Screen(grid);
-        screen.SetStyleSheets([StyleSheet.Parse($"UniformGrid {{ {property}: {value}; }}")]);
+        var scene = new UIScene(grid);
+        scene.SetStyleSheets([StyleSheet.Parse($"UniformGrid {{ {property}: {value}; }}")]);
 
         var error = Assert.Throws<StyleParseException>(grid.UpdateStyles);
 

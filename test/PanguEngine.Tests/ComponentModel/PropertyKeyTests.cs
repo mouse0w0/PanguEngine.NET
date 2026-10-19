@@ -12,8 +12,8 @@ public sealed class PropertyKeyTests
     public void ReadOnlyDefaultsAndOwnerWritesDoNotResolveStyles()
     {
         var node = new ReadOnlyNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<ReadOnlyNode>(), [StyleSetter.Create(UIElement.OpacityProperty, 0.5d)])
             ])
@@ -106,11 +106,11 @@ public sealed class PropertyKeyTests
     }
 
     [Fact]
-    public void KeyWritesOnOpenScreenRejectWrongThreadBeforeMutation()
+    public void KeyWritesOnOpenSceneRejectWrongThreadBeforeMutation()
     {
         var node = new ReadOnlyNode();
-        var screen = new Screen(node);
-        screen.Open();
+        var scene = new UIScene(node);
+        scene.Open();
         Exception? setError = null;
         Exception? clearError = null;
         var thread = new Thread(() =>
@@ -125,7 +125,7 @@ public sealed class PropertyKeyTests
         Assert.IsType<InvalidOperationException>(setError);
         Assert.IsType<InvalidOperationException>(clearError);
         Assert.Equal(5, node.Value);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]

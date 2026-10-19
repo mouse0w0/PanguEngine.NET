@@ -9,8 +9,8 @@ namespace PanguEngine.Tests.UI;
 internal sealed class TextTestContext : IDisposable
 {
     private const string SourceFamily = "Source Han Sans CN";
-    private readonly double _originalScale = UiToolkit.DefaultScale;
-    private readonly int _originalWheelScrollLines = UiToolkit.WheelScrollLines;
+    private readonly double _originalScale = UIToolkit.DefaultScale;
+    private readonly int _originalWheelScrollLines = UIToolkit.WheelScrollLines;
 
     private static readonly string FontPath = Path.Combine(
         AppContext.BaseDirectory,
@@ -31,7 +31,7 @@ internal sealed class TextTestContext : IDisposable
         var font = Assert.Single(FontManager.Register(stream, 0));
         FontManager.DefaultFont = font;
         DefaultFace = FontManager.Match(font);
-        UiToolkit.Initialize(FontManager, LayoutEngine, Clipboard, Logger, 1, 3);
+        UIToolkit.Initialize(FontManager, LayoutEngine, Clipboard, Logger, 1, 3);
     }
 
     internal FontManager FontManager => TextServices.FontManager;
@@ -64,10 +64,10 @@ internal sealed class TextTestContext : IDisposable
 
     public void Dispose()
     {
-        UiToolkit.Shutdown();
+        UIToolkit.Shutdown();
         TextServices.Shutdown();
         Clipboard.Destroy();
-        UiToolkit.DefaultScale = _originalScale;
-        UiToolkit.WheelScrollLines = _originalWheelScrollLines;
+        UIToolkit.DefaultScale = _originalScale;
+        UIToolkit.WheelScrollLines = _originalWheelScrollLines;
     }
 }

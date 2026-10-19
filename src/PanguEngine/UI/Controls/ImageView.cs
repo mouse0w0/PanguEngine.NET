@@ -146,9 +146,9 @@ public sealed class ImageView : UIElement
             return;
 
         var viewBounds = new Rect(0, 0, LayoutBounds.Width, LayoutBounds.Height);
-        var screen = Screen;
-        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var useLayoutRounding = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         var destinationBounds = ImageLayout.GetDestinationBounds(
             viewBounds,
             sourceRect.Width,

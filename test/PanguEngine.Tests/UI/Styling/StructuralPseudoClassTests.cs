@@ -294,8 +294,8 @@ public sealed class StructuralPseudoClassTests
     {
         var node = new Panel();
         node.Classes.Add("row");
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .row:nth-child(odd) { opacity: 0.4; }
                              .row { opacity: 0.8; }

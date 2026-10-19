@@ -7,7 +7,7 @@ using Path = PanguEngine.UI.Controls.Path;
 
 namespace PanguEngine.Tests.UI.Styling;
 
-[Collection(UiToolkitCollection.Name)]
+[Collection(UIToolkitCollection.Name)]
 public sealed class CssBindingTests
 {
     [Fact]
@@ -102,9 +102,9 @@ public sealed class CssBindingTests
                                      """);
         var root = new Panel();
         root.Children.Add(node);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([sheet]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([sheet]);
+        scene.Root!.UpdateStyles();
 
         var afterInitial = CountingNode.Conversions;
         Assert.True(afterInitial > 0);
@@ -112,17 +112,17 @@ public sealed class CssBindingTests
         node.Classes.Add("primary");
         node.StyleId = "save";
         node.SetHovered(true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(afterInitial, CountingNode.Conversions);
         Assert.Equal(3d, node.GetValue(CountingNode.ValueProperty));
 
         var second = new CountingNode();
         root.Children.Add(second);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, second.GetValue(CountingNode.ValueProperty));
         Assert.Equal(afterInitial, CountingNode.Conversions);
-        Assert.Same(screen, second.Screen);
+        Assert.Same(scene, second.Scene);
     }
 
     [Fact]
@@ -204,8 +204,8 @@ public sealed class CssBindingTests
     public void UnqualifiedClassIdAndStateRulesRefreshOnChanges()
     {
         var node = new Panel();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .danger { opacity: 0.25; }
                              #save { opacity: 0.6; }
@@ -217,20 +217,20 @@ public sealed class CssBindingTests
         Assert.Empty(node.GetStyleValueSources(Region.BackgroundProperty));
 
         node.Classes.Add("danger");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.25, node.Opacity);
 
         node.StyleId = "save";
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.6, node.Opacity);
 
         node.SetHovered(true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new SolidColorBrush(4, 4, 4), node.Background);
         Assert.Equal(0.6, node.Opacity);
 
         node.StyleId = null;
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.25, node.Opacity);
     }
 
@@ -300,25 +300,25 @@ public sealed class CssBindingTests
     public void StyleSheetApplicationFailureLeavesPreviousValueAndNewSources()
     {
         var button = new Button();
-        var screen = new Screen(button);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(button);
+        scene.Root!.UpdateStyles();
         var original = button.Background;
         Assert.Equal(new SolidColorBrush(48, 54, 62), original);
 
-        var previous = screen.StyleResolver;
-        screen.SetStyleSheets([StyleSheet.Parse("Button { background: nope; }")]);
-        var error = Assert.Throws<StyleParseException>(screen.Root!.UpdateStyles);
+        var previous = scene.StyleResolver;
+        scene.SetStyleSheets([StyleSheet.Parse("Button { background: nope; }")]);
+        var error = Assert.Throws<StyleParseException>(scene.Root!.UpdateStyles);
 
         Assert.Equal(StyleParseError.InvalidValue, error.Error);
-        Assert.NotSame(previous, screen.StyleResolver);
-        Assert.Single(screen.StyleSheets);
+        Assert.NotSame(previous, scene.StyleResolver);
+        Assert.Single(scene.StyleSheets);
         Assert.Equal(original, button.Background);
 
         var goodSheet = StyleSheet.Parse("Button { background: #010203; }");
-        screen.SetStyleSheets([goodSheet]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([goodSheet]);
+        scene.Root!.UpdateStyles();
 
-        Assert.Same(goodSheet, Assert.Single(screen.StyleSheets));
+        Assert.Same(goodSheet, Assert.Single(scene.StyleSheets));
         Assert.Equal(new SolidColorBrush(1, 2, 3), button.Background);
     }
 
@@ -341,13 +341,13 @@ public sealed class CssBindingTests
     public void PropertyWithoutCssDefinitionIsIgnoredDuringStyleSheetApplication()
     {
         var button = new Button();
-        var screen = new Screen(button);
+        var scene = new UIScene(button);
         var sheet = StyleSheet.Parse("Button { text: hello; opacity: 0.6; }");
 
-        screen.SetStyleSheets([sheet]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([sheet]);
+        scene.Root!.UpdateStyles();
 
-        Assert.Same(sheet, Assert.Single(screen.StyleSheets));
+        Assert.Same(sheet, Assert.Single(scene.StyleSheets));
         Assert.Equal(Button.TextProperty.DefaultValue, button.Text);
         Assert.Empty(button.GetStyleValueSources(Button.TextProperty));
         Assert.Equal(0.6, button.Opacity);
@@ -356,15 +356,15 @@ public sealed class CssBindingTests
     [Fact]
     public void ValueAndSourceQueriesDuringFirstBindingDoNotResolveRecursively()
     {
-        var screen = new Screen();
-        screen.SetStyleSheets([StyleSheet.Parse("SourceQueryNode { query-value: 2; }")]);
+        var scene = new UIScene();
+        scene.SetStyleSheets([StyleSheet.Parse("SourceQueryNode { query-value: 2; }")]);
         var node = new SourceQueryNode();
         SourceQueryNode.Current = node;
         SourceQueryNode.Conversions = 0;
         try
         {
-            screen.Root = node;
-            screen.Root!.UpdateStyles();
+            scene.Root = node;
+            scene.Root!.UpdateStyles();
 
             Assert.Equal(1, SourceQueryNode.Conversions);
             Assert.Empty(node.SourceDuringBinding!);
@@ -379,13 +379,13 @@ public sealed class CssBindingTests
     }
 
     [Fact]
-    public void SharedSheetDoesNotShareMutableScreenStyleState()
+    public void SharedSheetDoesNotShareMutableSceneStyleState()
     {
         var sheet = StyleSheet.Parse("CountingNode { counted-value: abc; }");
         var firstNode = new CountingNode();
         var secondNode = new CountingNode();
-        var first = new Screen(firstNode);
-        var second = new Screen(secondNode);
+        var first = new UIScene(firstNode);
+        var second = new UIScene(secondNode);
         CountingNode.Conversions = 0;
 
         first.SetStyleSheets([sheet]);
@@ -410,9 +410,9 @@ public sealed class CssBindingTests
     public void ValueAndSourceQueriesDuringReplacementReadCommittedState(bool localOverride)
     {
         var node = new SourceQueryNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse("SourceQueryNode { opacity: 0.3; }", "old.css")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse("SourceQueryNode { opacity: 0.3; }", "old.css")]);
+        scene.Root!.UpdateStyles();
         if (localOverride)
             node.Opacity = 0.8;
         var previousSource = node.GetStyleValueSources(UIElement.OpacityProperty);
@@ -420,11 +420,11 @@ public sealed class CssBindingTests
         SourceQueryNode.Conversions = 0;
         try
         {
-            screen.SetStyleSheets([
+            scene.SetStyleSheets([
                 StyleSheet.Parse(
                     "SourceQueryNode { query-value: 2; opacity: 0.6; }", "new.css")
             ]);
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
 
             Assert.NotEmpty(previousSource);
             Assert.NotNull(node.SourceDuringBinding);
@@ -445,15 +445,15 @@ public sealed class CssBindingTests
     [Fact]
     public void ConverterStateChangesKeepStylesPending()
     {
-        var screen = new Screen();
-        screen.SetStyleSheets([StyleSheet.Parse("PseudoMutationNode { mutating-value: 2; }")]);
+        var scene = new UIScene();
+        scene.SetStyleSheets([StyleSheet.Parse("PseudoMutationNode { mutating-value: 2; }")]);
         var node = new PseudoMutationNode();
         PseudoMutationNode.Current = node;
         PseudoMutationNode.Conversions = 0;
         try
         {
-            screen.Root = node;
-            screen.Root!.UpdateStyles();
+            scene.Root = node;
+            scene.Root!.UpdateStyles();
 
             Assert.False(node.IsEnabled);
             Assert.True(node.HasPseudoClass(PseudoClass.Disabled));
@@ -461,7 +461,7 @@ public sealed class CssBindingTests
             Assert.False(node.IsStyleSubtreeValid);
             Assert.Equal(2d, node.GetValue(PseudoMutationNode.ValueProperty));
 
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
 
             Assert.True(node.IsStyleSubtreeValid);
             Assert.Equal(1, PseudoMutationNode.Conversions);
@@ -477,11 +477,11 @@ public sealed class CssBindingTests
     [InlineData(true)]
     public void SiblingQueriesDuringApplicationPreserveNotificationsAndRestoreGuards(bool failAfterQuery)
     {
-        var screen = new Screen();
+        var scene = new UIScene();
         var readerRule = failAfterQuery
             ? "SourceQueryNode { query-value: 2; width: bad; }"
             : "SourceQueryNode { query-value: 2; }";
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.6; } " + readerRule)]);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.6; } " + readerRule)]);
         var reader = new SourceQueryNode();
         var sibling = new Panel();
         var root = new Panel();
@@ -498,11 +498,11 @@ public sealed class CssBindingTests
         SourceQueryNode.Conversions = 0;
         try
         {
-            screen.Root = root;
+            scene.Root = root;
             if (failAfterQuery)
-                Assert.Throws<StyleParseException>(screen.Root!.UpdateStyles);
+                Assert.Throws<StyleParseException>(scene.Root!.UpdateStyles);
             else
-                screen.Root!.UpdateStyles();
+                scene.Root!.UpdateStyles();
 
             Assert.Equal(1, SourceQueryNode.Conversions);
             Assert.NotNull(reader.SourceDuringBinding);
@@ -511,8 +511,8 @@ public sealed class CssBindingTests
             if (failAfterQuery)
             {
                 Assert.Empty(changes);
-                screen.SetStyleSheets([]);
-                screen.Root!.UpdateStyles();
+                scene.SetStyleSheets([]);
+                scene.Root!.UpdateStyles();
                 Assert.Equal(1d, sibling.Opacity);
             }
             else

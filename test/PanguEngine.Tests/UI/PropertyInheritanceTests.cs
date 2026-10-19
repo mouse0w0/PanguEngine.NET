@@ -104,10 +104,10 @@ public sealed class PropertyInheritanceTests
         var child = new Text();
         middle.Children.Add(child);
         first.Children.Add(middle);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         if (useStyle)
         {
-            screen.SetStyleSheets([StyleSheet.Parse("#moving { inherited-number: 14; }")]);
+            scene.SetStyleSheets([StyleSheet.Parse("#moving { inherited-number: 14; }")]);
             root.UpdateStyles();
         }
         else
@@ -134,7 +134,7 @@ public sealed class PropertyInheritanceTests
 
         if (useStyle)
         {
-            screen.SetStyleSheets([]);
+            scene.SetStyleSheets([]);
             root.UpdateStyles();
         }
         else
@@ -247,8 +247,8 @@ public sealed class PropertyInheritanceTests
         var root = new InheritedPanel { StyleId = "root" };
         var child = new InheritedPanel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("#root { inherited-number: 20; inherited-label: parent; }")
         ]);
         var changedProperties = new List<Property>();
@@ -282,15 +282,15 @@ public sealed class PropertyInheritanceTests
         var leaf = new Text();
         child.Children.Add(leaf);
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 "#root { inherited-number: 20; } #child { inherited-number: 14; }")
         ]);
         root.UpdateStyles();
         Assert.Equal(14d, leaf.GetValue(NumberProperty));
         child.SetValue(NumberProperty, 40);
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 "#root { inherited-number: 30; } #child { inherited-number: 15; }")
         ]);
@@ -298,7 +298,7 @@ public sealed class PropertyInheritanceTests
         Assert.Equal(40d, leaf.GetValue(NumberProperty));
         child.ClearValue(NumberProperty);
         Assert.Equal(15d, leaf.GetValue(NumberProperty));
-        screen.SetStyleSheets([StyleSheet.Parse("#root { inherited-number: 30; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { inherited-number: 30; }")]);
         root.UpdateStyles();
         Assert.Equal(30d, leaf.GetValue(NumberProperty));
     }
@@ -311,8 +311,8 @@ public sealed class PropertyInheritanceTests
         var child = new ScopedPanel();
         bridge.Children.Add(child);
         root.Children.Add(bridge);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("#root { scoped-value: 28; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("#root { scoped-value: 28; }")]);
         var changes = new List<(int Old, int New)>();
         using var subscription = child.Subscribe(ScopedPanel.ValueProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
@@ -556,8 +556,8 @@ public sealed class PropertyInheritanceTests
         root.SetValue(LabelProperty, "parent");
         var child = new InheritedPanel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<InheritedPanel>(),
                     [StyleSetter.Create(LabelProperty, (string?)null)])
@@ -573,7 +573,7 @@ public sealed class PropertyInheritanceTests
 
         Assert.Null(child.GetValue(LabelProperty));
         Assert.False(Assert.Single(child.GetStyleValueSources(LabelProperty)).IsMaskedByLocalValue);
-        screen.SetStyleSheets([]);
+        scene.SetStyleSheets([]);
         root.UpdateStyles();
         Assert.Equal("latest", child.GetValue(LabelProperty));
         Assert.Empty(child.GetStyleValueSources(LabelProperty));
@@ -587,8 +587,8 @@ public sealed class PropertyInheritanceTests
         var child = new InheritedPanel();
         root.Children.Add(child);
         Assert.Null(child.GetValue(LabelProperty));
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<InheritedPanel>(),
                     [StyleSetter.Create(LabelProperty, (string?)"styled")])
@@ -600,7 +600,7 @@ public sealed class PropertyInheritanceTests
         using var subscription = child.Subscribe(LabelProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
 
-        screen.SetStyleSheets([]);
+        scene.SetStyleSheets([]);
         root.UpdateStyles();
         Assert.Null(child.GetValue(LabelProperty));
         root.Children.Remove(child);
@@ -620,10 +620,10 @@ public sealed class PropertyInheritanceTests
         root.SetValue(property, 20);
         var child = new InheritedPanel();
         root.Children.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         if (useStyle)
         {
-            screen.SetStyleSheets([CreateStyle(25)]);
+            scene.SetStyleSheets([CreateStyle(25)]);
             root.UpdateStyles();
         }
 
@@ -636,7 +636,7 @@ public sealed class PropertyInheritanceTests
         root.SetValue(property, 30);
         if (useStyle)
         {
-            screen.SetStyleSheets([CreateStyle(35)]);
+            scene.SetStyleSheets([CreateStyle(35)]);
             root.UpdateStyles();
             Assert.False(Assert.Single(child.GetStyleValueSources(property)).IsMaskedByLocalValue);
         }

@@ -417,10 +417,10 @@ public sealed class DockPanelTests
     [InlineData(Dock.Right, true)]
     [InlineData(Dock.Left, false)]
     [InlineData(Dock.Right, false)]
-    public void DockThicknessUsesChildDesiredSizeWithScreenLayoutRounding(Dock dock, bool rounding)
+    public void DockThicknessUsesChildDesiredSizeWithSceneLayoutRounding(Dock dock, bool rounding)
     {
         var panel = new DockPanel();
-        var screen = new Screen(panel) { Scale = 1.25, UseLayoutRounding = rounding };
+        var scene = new UIScene(panel) { Scale = 1.25, UseLayoutRounding = rounding };
         var edge = new TestNode { CoreDesiredSize = new Size(10.1, 8.1) };
         var fill = new TestNode();
         DockPanel.SetDock(edge, dock);
@@ -433,7 +433,7 @@ public sealed class DockPanelTests
         Assert.Equal(100 - thickness, fill.LayoutBounds.Width, 10);
         Assert.Equal(dock == Dock.Left ? 0 : 100 - thickness, edge.LayoutBounds.X, 10);
         Assert.Equal(dock == Dock.Left ? thickness : 0, fill.LayoutBounds.X, 10);
-        Assert.Same(screen, panel.Screen);
+        Assert.Same(scene, panel.Scene);
     }
 
     private static void ValidateLayout(UIElement node)

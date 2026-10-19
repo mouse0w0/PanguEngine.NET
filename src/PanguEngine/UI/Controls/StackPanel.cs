@@ -130,9 +130,9 @@ public sealed class StackPanel : Panel
         var orientation = Orientation;
         var spacing = Spacing;
 
-        var screen = Screen;
-        if (screen?.UseLayoutRounding ?? true)
-            spacing = LayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1);
+        var scene = Scene;
+        if (scene?.UseLayoutRounding ?? true)
+            spacing = LayoutHelper.RoundLayoutValue(spacing, scene?.Scale ?? 1);
 
         return (orientation, spacing);
     }

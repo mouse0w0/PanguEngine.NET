@@ -268,7 +268,7 @@ public sealed partial class TabView
 
     private TabItem? GetFocusedTabItem()
     {
-        return Screen?.FocusedNode is TabItem tab && ReferenceEquals(tab.OwnerView, this)
+        return Scene?.FocusedNode is TabItem tab && ReferenceEquals(tab.OwnerView, this)
             ? tab
             : null;
     }

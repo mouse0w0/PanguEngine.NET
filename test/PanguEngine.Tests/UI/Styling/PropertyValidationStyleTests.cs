@@ -15,25 +15,25 @@ public sealed class PropertyValidationStyleTests
         var node = new StyleNode();
         if (masked)
             node.Value = 40;
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         var original = CreateSheet(20);
-        screen.SetStyleSheets([original]);
+        scene.SetStyleSheets([original]);
         node.UpdateStyles();
         var notifications = 0;
         using var subscription = node.Subscribe(StyleNode.ValueProperty, (_, _) => notifications++);
 
         var invalid = CreateSheet(-1);
-        screen.SetStyleSheets([invalid]);
+        scene.SetStyleSheets([invalid]);
         var error = Assert.Throws<ArgumentException>(node.UpdateStyles);
 
         Assert.StartsWith("Style value must be non-negative.", error.Message);
         Assert.Equal("value", error.ParamName);
-        Assert.Same(invalid, Assert.Single(screen.StyleSheets));
+        Assert.Same(invalid, Assert.Single(scene.StyleSheets));
         Assert.Equal(masked ? 40 : 20, node.Value);
         Assert.Equal(0, notifications);
         node.ClearValue(StyleNode.ValueProperty);
         Assert.Equal(20, node.Value);
-        screen.SetStyleSheets([CreateSheet(30)]);
+        scene.SetStyleSheets([CreateSheet(30)]);
         node.UpdateStyles();
         Assert.Equal(30, node.Value);
     }
@@ -47,8 +47,8 @@ public sealed class PropertyValidationStyleTests
         var panel = new Panel();
         panel.Children.Add(first);
         panel.Children.Add(second);
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([CreateSheet(20)]);
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([CreateSheet(20)]);
         panel.UpdateStyles();
         var notifications = 0;
         using var subscription = first.Subscribe(StyleNode.ValueProperty, (_, _) => notifications++);
@@ -58,13 +58,13 @@ public sealed class PropertyValidationStyleTests
                 [StyleSetter.Create(StyleNode.ValueProperty, -1)])
         ]);
 
-        screen.SetStyleSheets([candidate]);
+        scene.SetStyleSheets([candidate]);
         Assert.Throws<ArgumentException>(panel.UpdateStyles);
 
         Assert.Equal(30, first.Value);
         Assert.Equal(20, second.Value);
         Assert.Equal(1, notifications);
-        screen.SetStyleSheets([CreateSheet(40)]);
+        scene.SetStyleSheets([CreateSheet(40)]);
         panel.UpdateStyles();
         Assert.Equal(40, first.Value);
         Assert.Equal(40, second.Value);
@@ -74,14 +74,14 @@ public sealed class PropertyValidationStyleTests
     public void ReadingDoesNotResolvePendingInvalidStyles()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([CreateSheet(-1)]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([CreateSheet(-1)]);
         Assert.Equal(0, node.Value);
 
         Assert.Throws<ArgumentException>(node.UpdateStyles);
         Assert.Equal(0, node.Value);
         Assert.Empty(node.GetStyleValueSources(StyleNode.ValueProperty));
-        screen.SetStyleSheets([CreateSheet(20)]);
+        scene.SetStyleSheets([CreateSheet(20)]);
         Assert.Equal(0, node.Value);
         node.UpdateStyles();
         Assert.Equal(20, node.Value);
@@ -91,8 +91,8 @@ public sealed class PropertyValidationStyleTests
     public void NullableStyleValuesArePassedToTheValidator()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<StyleNode>(),
                     [StyleSetter.Create<string?>(StyleNode.OptionalProperty, "invalid")])
@@ -101,7 +101,7 @@ public sealed class PropertyValidationStyleTests
         Assert.Throws<ArgumentException>(node.UpdateStyles);
         Assert.Equal("initial", node.GetValue(StyleNode.OptionalProperty));
 
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<StyleNode>(),
                     [StyleSetter.Create<string?>(StyleNode.OptionalProperty, null)])
@@ -116,16 +116,16 @@ public sealed class PropertyValidationStyleTests
     public void NullableValueTypeStylesValidateBothBoxingForms()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([CreateNullableSheet(null)]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([CreateNullableSheet(null)]);
         node.UpdateStyles();
         Assert.Null(node.GetValue(StyleNode.NullableValueProperty));
 
-        screen.SetStyleSheets([CreateNullableSheet(7)]);
+        scene.SetStyleSheets([CreateNullableSheet(7)]);
         node.UpdateStyles();
         Assert.Equal(7, node.GetValue(StyleNode.NullableValueProperty));
 
-        screen.SetStyleSheets([CreateNullableSheet(-1)]);
+        scene.SetStyleSheets([CreateNullableSheet(-1)]);
         Assert.Throws<ArgumentException>(node.UpdateStyles);
         Assert.Equal(7, node.GetValue(StyleNode.NullableValueProperty));
     }
@@ -134,14 +134,14 @@ public sealed class PropertyValidationStyleTests
     public void ComponentWinnersAreCombinedBeforeValidation()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([CreateSpacingSheet(4, 4)]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([CreateSpacingSheet(4, 4)]);
         node.UpdateStyles();
         Assert.Equal(new Thickness(4, 0, 4, 0), node.GetValue(StyleNode.SpacingProperty));
         var notifications = 0;
         using var subscription = node.Subscribe(StyleNode.SpacingProperty, (_, _) => notifications++);
 
-        screen.SetStyleSheets([CreateSpacingSheet(4, 5)]);
+        scene.SetStyleSheets([CreateSpacingSheet(4, 5)]);
         Assert.Throws<ArgumentException>(node.UpdateStyles);
 
         Assert.Equal(new Thickness(4, 0, 4, 0), node.GetValue(StyleNode.SpacingProperty));
@@ -157,12 +157,12 @@ public sealed class PropertyValidationStyleTests
         var node = new StyleNode();
         if (masked)
             node.Value = 40;
-        var screen = new Screen(node);
-        screen.SetStyleSheets([CreateSheet(20)]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([CreateSheet(20)]);
         node.UpdateStyles();
         var notifications = 0;
         using var subscription = node.Subscribe(StyleNode.ValueProperty, (_, _) => notifications++);
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 "PropertyValidationStyleNode {\n    validated-value: -1;\n}", sourceName)
         ]);
@@ -185,7 +185,7 @@ public sealed class PropertyValidationStyleTests
         Assert.Equal(0, notifications);
         node.ClearValue(StyleNode.ValueProperty);
         Assert.Equal(20, node.Value);
-        screen.SetStyleSheets([CreateSheet(30)]);
+        scene.SetStyleSheets([CreateSheet(30)]);
         node.UpdateStyles();
         Assert.Equal(30, node.Value);
     }
@@ -194,8 +194,8 @@ public sealed class PropertyValidationStyleTests
     public void InvalidCssLoserIsNotValidated()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             StyleSheet.Parse("PropertyValidationStyleNode { validated-value: -1; }", "loser.css"),
             StyleSheet.Parse("PropertyValidationStyleNode { validated-value: 20; }", "winner.css")
         ]);
@@ -210,8 +210,8 @@ public sealed class PropertyValidationStyleTests
     public void RejectedVariableValueReportsTheConsumingDeclaration()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 "PropertyValidationStyleNode {\n    --candidate: -1;\n    validated-value: var(--candidate);\n}",
                 "variables.css")
@@ -230,10 +230,10 @@ public sealed class PropertyValidationStyleTests
     public void RejectedCombinedValueReportsAllWinningDeclarations()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([CreateSpacingSheet(4, 4)]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([CreateSpacingSheet(4, 4)]);
         node.UpdateStyles();
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             StyleSheet.Parse("PropertyValidationStyleNode {\n    validated-spacing-left: 4;\n}", "left.css"),
             StyleSheet.Parse("PropertyValidationStyleNode {\n    validated-spacing-right: 5;\n}", "right.css")
         ]);
@@ -255,10 +255,10 @@ public sealed class PropertyValidationStyleTests
     public void CssValidatorExceptionsPropagateWithoutWrappingAndUpdatesRecover(int value)
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([CreateSheet(20)]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([CreateSheet(20)]);
         node.UpdateStyles();
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 $"PropertyValidationStyleNode {{ validated-value: {value}; }}", "validator.css")
         ]);
@@ -268,7 +268,7 @@ public sealed class PropertyValidationStyleTests
         else
             Assert.Same(StyleNode.ValidatorError, Assert.Throws<ArgumentException>(node.UpdateStyles));
         Assert.Equal(20, node.Value);
-        screen.SetStyleSheets([CreateSheet(30)]);
+        scene.SetStyleSheets([CreateSheet(30)]);
         node.UpdateStyles();
         Assert.Equal(30, node.Value);
     }
@@ -277,8 +277,8 @@ public sealed class PropertyValidationStyleTests
     public void RejectedMixedValueReportsItsCssAndCSharpSources()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<StyleNode>(), [
                     StyleSetter.CreateEdge(StyleNode.SpacingProperty, StyleEdge.Left, 4)
@@ -299,8 +299,8 @@ public sealed class PropertyValidationStyleTests
     public void CSharpRuleLocationDoesNotChangeTheRejectionException()
     {
         var node = new StyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<StyleNode>(), [StyleSetter.Create(StyleNode.ValueProperty, -1)],
                     new StyleSourceLocation("manual", 10, 1, 5))

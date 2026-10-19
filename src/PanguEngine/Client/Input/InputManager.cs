@@ -12,9 +12,9 @@ namespace PanguEngine.Client.Input;
 public sealed class InputManager
 {
     private readonly Window _window;
-    private readonly UiManager _uiManager;
+    private readonly UIManager _uiManager;
     private readonly InputRouter _router;
-    private IDisposable? _screenActivation;
+    private IDisposable? _sceneActivation;
     private Vector2D<float> _pointerPosition;
     private bool _hasPointerPosition;
     private Vector2D<float> _mouseBaseline;
@@ -34,7 +34,7 @@ public sealed class InputManager
     /// <param name="bindings">The runtime input bindings.</param>
     public InputManager(
         Window window,
-        UiManager uiManager,
+        UIManager uiManager,
         InputBindingMap bindings)
     {
         _window = window;
@@ -73,9 +73,9 @@ public sealed class InputManager
         _window.MouseUp += OnMouseUp;
         _window.Scroll += OnScroll;
         _window.FocusChanged += OnFocusChanged;
-        _uiManager.CurrentScreenChanged += OnCurrentScreenChanged;
+        _uiManager.CurrentSceneChanged += OnCurrentSceneChanged;
         _started = true;
-        OnCurrentScreenChanged(null, _uiManager.CurrentScreen);
+        OnCurrentSceneChanged(null, _uiManager.CurrentScene);
     }
 
     /// <summary>
@@ -175,8 +175,8 @@ public sealed class InputManager
         }
         finally
         {
-            _screenActivation?.Dispose();
-            _screenActivation = null;
+            _sceneActivation?.Dispose();
+            _sceneActivation = null;
             if (_started)
             {
                 _window.KeyDown -= OnKeyDown;
@@ -187,8 +187,9 @@ public sealed class InputManager
                 _window.MouseUp -= OnMouseUp;
                 _window.Scroll -= OnScroll;
                 _window.FocusChanged -= OnFocusChanged;
-                _uiManager.CurrentScreenChanged -= OnCurrentScreenChanged;
+                _uiManager.CurrentSceneChanged -= OnCurrentSceneChanged;
             }
+
             ReleasePointerCore();
             _started = false;
             _destroying = false;
@@ -202,7 +203,7 @@ public sealed class InputManager
         _router.BeginInputEvent();
         _router.RecordPress(source, args.Modifiers);
         var topologyVersion = _uiTopologyVersion;
-        var handled = _uiManager.CurrentScreen is not null
+        var handled = _uiManager.CurrentScene is not null
                       && _uiManager.ProcessKeyDown(args.Key, args.Modifiers, args.IsRepeat);
         _router.RoutePress(source, args.IsRepeat || handled || topologyVersion != _uiTopologyVersion);
         _router.EndInputEvent();
@@ -213,7 +214,7 @@ public sealed class InputManager
         var source = InputSource.FromKey(args.Key);
         _router.BeginInputEvent();
         _router.RecordRelease(source, args.Modifiers);
-        if (_uiManager.CurrentScreen is not null)
+        if (_uiManager.CurrentScene is not null)
             _ = _uiManager.ProcessKeyUp(args.Key, args.Modifiers, args.IsRepeat);
         _router.RouteRelease(source);
         _router.EndInputEvent();
@@ -221,7 +222,7 @@ public sealed class InputManager
 
     private void OnTextInput(Window window, string text)
     {
-        if (_uiManager.CurrentScreen is not null)
+        if (_uiManager.CurrentScene is not null)
             _uiManager.ProcessTextInput(text);
     }
 
@@ -307,36 +308,37 @@ public sealed class InputManager
             ReleasePointerCore();
         }
 
-        if (_uiManager.CurrentScreen is not null)
+        if (_uiManager.CurrentScene is not null)
             _uiManager.ProcessFocusChanged(focused);
     }
 
-    private void OnCurrentScreenChanged(GameScreen? oldScreen, GameScreen? newScreen)
+    private void OnCurrentSceneChanged(GameUIScene? oldScene, GameUIScene? newScene)
     {
         _router.BeginInputEvent();
-        _router.NotifyUiTopologyChanged(oldScreen?.InputContext);
+        _router.NotifyUiTopologyChanged(oldScene?.InputContext);
         var topologyVersion = ++_uiTopologyVersion;
-        var oldActivation = _screenActivation;
-        _screenActivation = null;
+        var oldActivation = _sceneActivation;
+        _sceneActivation = null;
         oldActivation?.Dispose();
 
-        if (topologyVersion == _uiTopologyVersion && newScreen is not null)
+        if (topologyVersion == _uiTopologyVersion && newScene is not null)
         {
-            var activation = ActivateContext(newScreen.InputContext);
+            var activation = ActivateContext(newScene.InputContext);
             if (topologyVersion == _uiTopologyVersion)
-                _screenActivation = activation;
+                _sceneActivation = activation;
             else
                 activation.Dispose();
         }
+
         _router.EndInputEvent();
     }
 
     private bool TryRoutePointer(
         float x,
         float y,
-        Func<UiManager, Point, bool> route)
+        Func<UIManager, Point, bool> route)
     {
-        if (_uiManager.CurrentScreen is null
+        if (_uiManager.CurrentScene is null
             || !TryGetFramebufferPosition(x, y, out var position))
         {
             return false;
@@ -401,5 +403,4 @@ public sealed class InputManager
 
         public void Dispose() => Interlocked.Exchange(ref _callback, null)?.Invoke();
     }
-
 }

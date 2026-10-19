@@ -1,8 +1,8 @@
 using PanguEngine.Client.Game;
-using PanguEngine.Client.Huds;
 using PanguEngine.Client.Input;
-using PanguEngine.Client.Screens;
 using PanguEngine.Client.UI;
+using PanguEngine.Client.UI.Huds;
+using PanguEngine.Client.UI.Scenes;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.Tests.Windowing;
@@ -127,7 +127,7 @@ public sealed class InputManagerTests
             [InputBinding.Button("default", game, Key.E)]);
         var (input, window, ui) = CreateManager(("test:action", action));
         var leaf = new TestNode { Focusable = true };
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         Assert.True(leaf.Focus());
         leaf.KeyDown += (_, args) => args.Handled = true;
         using var contextToken = input.ActivateContext(game);
@@ -154,7 +154,7 @@ public sealed class InputManagerTests
             [InputBinding.Button("default", game, Key.E)]);
         var (input, window, ui) = CreateManager(("test:action", action));
         var leaf = new TestNode { Focusable = true };
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         Assert.True(leaf.Focus());
         leaf.KeyUp += (_, args) => args.Handled = true;
         using var contextToken = input.ActivateContext(game);
@@ -181,9 +181,9 @@ public sealed class InputManagerTests
         window.Size = new Vector2D<int>(100, 50);
         window.SetFramebufferSize(new Vector2D<int>(200, 150));
         var leaf = new TestNode();
-        OpenScreen(ui, new GameScreen(leaf), new Size(200, 150));
+        OpenScene(ui, new GameUIScene(leaf), new Size(200, 150));
         Point? position = null;
-        leaf.PointerMoved += (_, args) => position = args.ScreenPosition;
+        leaf.PointerMoved += (_, args) => position = args.ScenePosition;
         input.Start();
 
         window.RaiseMouseMove(new MouseMoveEventArgs(25, 10));
@@ -208,11 +208,11 @@ public sealed class InputManagerTests
             return InputHandling.Handled;
         });
         var firstLeaf = new TestNode { Focusable = true };
-        var first = new GameScreen(firstLeaf)
+        var first = new GameUIScene(firstLeaf)
         {
             InputContext = new InputContext(InputScope.Ui)
         };
-        OpenScreen(ui, first);
+        OpenScene(ui, first);
         Assert.True(firstLeaf.Focus());
         UiKeyEventArgs? keyDown = null;
         UiKeyEventArgs? keyUp = null;
@@ -285,7 +285,7 @@ public sealed class InputManagerTests
             ("test:move", move),
             ("test:control", control));
         var leaf = new TestNode { Focusable = true };
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         Assert.True(leaf.Focus());
         leaf.KeyDown += (_, args) =>
         {
@@ -360,7 +360,7 @@ public sealed class InputManagerTests
             [InputBinding.Button("default", game, Key.E)]);
         var (input, window, ui) = CreateManager(("test:action", action));
         var control = new TestControl { Focusable = true };
-        OpenScreen(ui, new GameScreen(control) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(control) { InputContext = new InputContext(InputScope.Ui) });
         using var gameToken = input.ActivateContext(game);
         var phases = new List<InputActionPhase>();
         input.RegisterHandler(action, args =>
@@ -403,7 +403,7 @@ public sealed class InputManagerTests
             Size = new Vector2D<int>(100, 100),
             CursorState = CursorState.Normal
         };
-        var ui = new UiManager();
+        var ui = new UIManager();
         var input = new InputManager(window, ui, map);
         using var game = input.ActivateContext(BuiltinInputContexts.Game);
         var breaks = 0;
@@ -435,12 +435,12 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void OpeningScreenUsesDefaultUiContext()
+    public void OpeningSceneUsesDefaultUiContext()
     {
         var action = new InputAction(InputValueType.Button,
             [InputBinding.Button("default", BuiltinInputContexts.Ui, Key.E)]);
         var (input, window, ui) = CreateManager(("test:action", action));
-        OpenScreen(ui, new GameScreen());
+        OpenScene(ui, new GameUIScene());
         var calls = 0;
         input.RegisterHandler(action, _ =>
         {
@@ -459,7 +459,7 @@ public sealed class InputManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ScreenContextUsesItsOwnActionsAndPointerPolicy(bool externalOwner)
+    public void SceneContextUsesItsOwnActionsAndPointerPolicy(bool externalOwner)
     {
         var context = new InputContext(
             InputScope.Ui,
@@ -478,7 +478,7 @@ public sealed class InputManagerTests
         input.Start();
         Assert.True(input.TryCapturePointer());
         using var externalToken = externalOwner ? input.ActivateContext(context) : null;
-        OpenScreen(ui, new GameScreen { InputContext = context });
+        OpenScene(ui, new GameUIScene { InputContext = context });
         Assert.False(input.IsPointerCaptured);
 
         window.RaiseKeyDown(new KeyEventArgs(Key.E, KeyAction.Press, KeyModifiers.None));
@@ -494,7 +494,7 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void PauseScreenCapturesGameKeyboardActions()
+    public void PauseMenuCapturesGameKeyboardActions()
     {
         var (input, window, ui) = CreateManager(("test:move", BuiltinInputActions.Move));
         using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
@@ -505,7 +505,7 @@ public sealed class InputManagerTests
             return InputHandling.Handled;
         });
         input.Start();
-        ui.Open(new PauseScreen());
+        ui.Open(new PauseMenu());
 
         window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
 
@@ -517,7 +517,7 @@ public sealed class InputManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ScreenActivationFollowsQueuedScreenNotifications(bool closeCurrent)
+    public void SceneActivationFollowsQueuedSceneNotifications(bool closeCurrent)
     {
         var firstContext = new InputContext(InputScope.Ui);
         var secondContext = new InputContext(InputScope.Ui);
@@ -533,7 +533,7 @@ public sealed class InputManagerTests
             ("test:second", secondAction),
             ("test:third", thirdAction));
         var routes = new List<string>();
-        var replacement = new GameScreen { InputContext = thirdContext };
+        var replacement = new GameUIScene { InputContext = thirdContext };
         var replaced = false;
         input.RegisterHandler(firstAction, args =>
         {
@@ -557,18 +557,18 @@ public sealed class InputManagerTests
         });
         input.Start();
         var observedContexts = new List<InputContext?>();
-        ui.CurrentScreenChanged += (_, current) =>
+        ui.CurrentSceneChanged += (_, current) =>
         {
-            Assert.Same(current, ui.CurrentScreen);
+            Assert.Same(current, ui.CurrentScene);
             observedContexts.Add(current?.InputContext);
         };
-        OpenScreen(ui, new GameScreen { InputContext = firstContext });
+        OpenScene(ui, new GameUIScene { InputContext = firstContext });
         window.RaiseKeyDown(new KeyEventArgs(Key.E, KeyAction.Press, KeyModifiers.None));
 
         if (closeCurrent)
             ui.Close();
         else
-            ui.Open(new GameScreen { InputContext = secondContext });
+            ui.Open(new GameUIScene { InputContext = secondContext });
         window.RaiseKeyDown(new KeyEventArgs(Key.F, KeyAction.Press, KeyModifiers.None));
 
         InputContext?[] expectedContexts = closeCurrent
@@ -581,7 +581,7 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void ScreenTransitionFailureStillAllowsManagerCleanup()
+    public void SceneTransitionFailureStillAllowsManagerCleanup()
     {
         var firstContext = new InputContext(InputScope.Ui);
         var secondContext = new InputContext(InputScope.Ui,
@@ -598,11 +598,11 @@ public sealed class InputManagerTests
         });
         input.Start();
         Assert.True(input.TryCapturePointer());
-        OpenScreen(ui, new GameScreen { InputContext = firstContext });
+        OpenScene(ui, new GameUIScene { InputContext = firstContext });
         window.RaiseKeyDown(new KeyEventArgs(Key.E, KeyAction.Press, KeyModifiers.None));
 
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(() =>
-            ui.Open(new GameScreen { InputContext = secondContext })));
+            ui.Open(new GameUIScene { InputContext = secondContext })));
 
         input.Destroy();
         Assert.Equal(CursorState.Normal, window.CursorState);
@@ -619,7 +619,7 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:action", action));
         using var gameToken = input.ActivateContext(game);
         var control = new TestControl { Focusable = true };
-        OpenScreen(ui, new GameScreen(control) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(control) { InputContext = new InputContext(InputScope.Ui) });
         var expected = new InvalidOperationException("stop failed");
         var starts = 0;
         input.RegisterHandler(action, args =>
@@ -686,20 +686,20 @@ public sealed class InputManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void NonCapturingScreenChangeKeepsMovementAndStopsCurrentPropagation(bool externalOwner)
+    public void NonCapturingSceneChangeKeepsMovementAndStopsCurrentPropagation(bool externalOwner)
     {
         var game = new InputContext(InputScope.Game);
-        var screenContext = new InputContext(InputScope.Ui);
+        var sceneContext = new InputContext(InputScope.Ui);
         var move = new InputAction(InputValueType.Axis1D, [InputBinding.Axis1D("default", game, Key.W, 1)]);
         var open = new InputAction(InputValueType.Button, [InputBinding.Button("default", game, Key.E)]);
         var (input, window, ui) = CreateManager(("test:move", move), ("test:open", open));
         using var gameToken = input.ActivateContext(game);
-        using var externalToken = externalOwner ? input.ActivateContext(screenContext) : null;
+        using var externalToken = externalOwner ? input.ActivateContext(sceneContext) : null;
         var secondHandlerCalls = 0;
         input.RegisterHandler(open, args =>
         {
             if (args.Phase == InputActionPhase.Started)
-                ui.Open(new GameScreen { InputContext = screenContext });
+                ui.Open(new GameUIScene { InputContext = sceneContext });
             return InputHandling.Pass;
         }, priority: 1);
         input.RegisterHandler(open, args =>
@@ -729,17 +729,17 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void ReplacingScreenWithSameContextCancelsOnlyScreenState()
+    public void ReplacingSceneWithSameContextCancelsOnlySceneState()
     {
         var game = new InputContext(InputScope.Game);
-        var screenContext = new InputContext(InputScope.Ui);
+        var sceneContext = new InputContext(InputScope.Ui);
         var move = new InputAction(InputValueType.Axis1D,
             [InputBinding.Axis1D("default", game, Key.W, 1)]);
         var select = new InputAction(InputValueType.Button,
-            [InputBinding.Button("default", screenContext, Key.E)]);
+            [InputBinding.Button("default", sceneContext, Key.E)]);
         var (input, window, ui) = CreateManager(("test:move", move), ("test:select", select));
         using var gameToken = input.ActivateContext(game);
-        using var externalToken = input.ActivateContext(screenContext);
+        using var externalToken = input.ActivateContext(sceneContext);
         var events = new List<InputActionEvent>();
         input.RegisterHandler(select, args =>
         {
@@ -747,11 +747,11 @@ public sealed class InputManagerTests
             return InputHandling.Pass;
         });
         input.Start();
-        ui.Open(new GameScreen { InputContext = screenContext });
+        ui.Open(new GameUIScene { InputContext = sceneContext });
         window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
         window.RaiseKeyDown(new KeyEventArgs(Key.E, KeyAction.Press, KeyModifiers.None));
 
-        ui.Open(new GameScreen { InputContext = screenContext });
+        ui.Open(new GameUIScene { InputContext = sceneContext });
 
         Assert.Equal(1, input.GetValue(move).Axis1D);
         Assert.Equal(InputActionValue.Zero, input.GetValue(select));
@@ -767,7 +767,7 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void ModalScreenCancellationFailureStillAllowsCleanup()
+    public void ModalSceneCancellationFailureStillAllowsCleanup()
     {
         var game = new InputContext(InputScope.Game);
         var action = new InputAction(InputValueType.Button,
@@ -790,11 +790,11 @@ public sealed class InputManagerTests
         input.Start();
         Assert.True(input.TryCapturePointer());
         window.RaiseKeyDown(new KeyEventArgs(Key.E, KeyAction.Press, KeyModifiers.None));
-        var screen = new GameScreen();
+        var scene = new GameUIScene();
 
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => ui.Open(screen)));
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => ui.Open(scene)));
 
-        Assert.Same(screen, ui.CurrentScreen);
+        Assert.Same(scene, ui.CurrentScene);
         Assert.False(input.IsPointerCaptured);
         Assert.Equal(1, starts);
         Assert.Equal(InputActionValue.Zero, input.GetValue(action));
@@ -806,7 +806,7 @@ public sealed class InputManagerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ReleasedInteractionIsInvalidatedBeforeNextTick(bool changeScreen)
+    public void ReleasedInteractionIsInvalidatedBeforeNextTick(bool changeScene)
     {
         var action = BuiltinInputActions.BreakBlock;
         var (input, window, ui) = CreateManager(("test:action", action));
@@ -820,8 +820,8 @@ public sealed class InputManagerTests
         Assert.True(requested);
         Assert.Equal(InputActionValue.Zero, input.GetValue(action));
 
-        if (changeScreen)
-            ui.Open(new GameScreen { PausesGame = false });
+        if (changeScene)
+            ui.Open(new GameUIScene { PausesGame = false });
         else
             window.RaiseFocusChanged(false);
 
@@ -838,7 +838,7 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:action", action));
         using var gameToken = input.ActivateContext(game);
         var leaf = new TestNode { Focusable = true };
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         Assert.True(leaf.Focus());
         var expected = new InvalidOperationException("UI release failed");
         leaf.KeyUp += (_, _) => throw expected;
@@ -871,7 +871,7 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:action", action));
         using var gameToken = input.ActivateContext(game);
         var leaf = new TestNode();
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         var expected = new InvalidOperationException("UI release failed");
         if (clicked)
             leaf.PointerClicked += (_, _) => throw expected;
@@ -898,7 +898,7 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:action", action));
         using var gameToken = input.ActivateContext(game);
         var leaf = new TestNode { Focusable = true };
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         Assert.True(leaf.Focus());
         var expected = new InvalidOperationException("UI modifier failed");
         leaf.KeyDown += (_, args) =>
@@ -930,8 +930,8 @@ public sealed class InputManagerTests
             [InputBinding.Axis2D("default", context, InputSource.MouseMove, new Vector2D<double>(1, 1))]);
         var (input, window, ui) = CreateManager(("test:action", action));
         var leaf = new TestNode();
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = context });
-        leaf.PointerMoved += (_, args) => args.Handled = args.ScreenPosition.X == 14;
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = context });
+        leaf.PointerMoved += (_, args) => args.Handled = args.ScenePosition.X == 14;
         var deltas = new List<Vector2D<double>>();
         input.RegisterHandler(action, args =>
         {
@@ -961,7 +961,7 @@ public sealed class InputManagerTests
             [InputBinding.Button("default", game, Key.W, KeyModifiers.Shift)]);
         var (input, window, ui) = CreateManager(("test:action", action));
         using var gameToken = input.ActivateContext(game);
-        OpenScreen(ui, new GameScreen
+        OpenScene(ui, new GameUIScene
         {
             InputContext = new InputContext(InputScope.Ui,
                 pointerCapturePolicy: PointerCapturePolicy.Suspend)
@@ -988,7 +988,7 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:action", action));
         using var gameToken = input.ActivateContext(game);
         var leaf = new TestNode();
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         leaf.PointerPressed += (_, args) => args.Handled = true;
         input.Start();
 
@@ -1010,7 +1010,7 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:first", first), ("test:second", second));
         using var gameToken = input.ActivateContext(game);
         var leaf = new TestNode { Focusable = true };
-        OpenScreen(ui, new GameScreen(leaf) { InputContext = new InputContext(InputScope.Ui) });
+        OpenScene(ui, new GameUIScene(leaf) { InputContext = new InputContext(InputScope.Ui) });
         Assert.True(leaf.Focus());
         var uiError = new InvalidOperationException("UI release failed");
         var actionError = new InvalidOperationException("action stop failed");
@@ -1059,7 +1059,7 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void DebugInfoToggleIgnoresRepeatAndIsBlockedByOpenScreen()
+    public void DebugInfoToggleIgnoresRepeatAndIsBlockedByOpenScene()
     {
         var action = BuiltinInputActions.ToggleDebugInfo;
         var (input, window, ui) = CreateManager(("pangu:toggle_debug_info", action));
@@ -1090,7 +1090,7 @@ public sealed class InputManagerTests
         window.RaiseKeyUp(new KeyEventArgs(Key.F3, KeyAction.Release, KeyModifiers.None));
         Assert.Equal(Visibility.Visible, debugInfo.Root.Visibility);
 
-        ui.Open(new GameScreen(new Panel()));
+        ui.Open(new GameUIScene(new Panel()));
         window.RaiseKeyDown(new KeyEventArgs(Key.F3, KeyAction.Press, KeyModifiers.None));
         window.RaiseKeyUp(new KeyEventArgs(Key.F3, KeyAction.Release, KeyModifiers.None));
         Assert.Equal(Visibility.Visible, debugInfo.Root.Visibility);
@@ -1103,7 +1103,7 @@ public sealed class InputManagerTests
         ui.Destroy();
     }
 
-    private static (InputManager Input, TestWindow Window, UiManager Ui) CreateManager(
+    private static (InputManager Input, TestWindow Window, UIManager Ui) CreateManager(
         params (string Key, InputAction Action)[] definitions)
     {
         var map = InputBindingMapTests.CreateMap(definitions);
@@ -1112,14 +1112,14 @@ public sealed class InputManagerTests
             Size = new Vector2D<int>(100, 100),
             CursorState = CursorState.Normal
         };
-        var ui = new UiManager();
+        var ui = new UIManager();
         var input = new InputManager(window, ui, map);
         return (input, window, ui);
     }
 
-    private static void OpenScreen(UiManager manager, GameScreen screen, Size? size = null)
+    private static void OpenScene(UIManager manager, GameUIScene scene, Size? size = null)
     {
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(size ?? new Size(100, 100), 0);
     }
 

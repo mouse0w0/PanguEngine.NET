@@ -9,12 +9,12 @@ public sealed class PointerWheelEventArgs : PointerEventArgs
 {
     internal PointerWheelEventArgs(
         UIElement source,
-        Point screenPosition,
+        Point scenePosition,
         double deltaX,
         double deltaY,
         KeyModifiers modifiers,
         IReadOnlyList<HitPathEntry> path)
-        : base(source, screenPosition, path)
+        : base(source, scenePosition, path)
     {
         DeltaX = deltaX;
         DeltaY = deltaY;

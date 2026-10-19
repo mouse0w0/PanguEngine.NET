@@ -153,86 +153,86 @@ public sealed class HitTestTests
     }
 
     [Fact]
-    public void ScreenHitTestConvertsFromScreenToRootLocalCoordinatesWhileInactive()
+    public void SceneHitTestConvertsFromSceneToRootLocalCoordinatesWhileInactive()
     {
         var root = new TestNode { Width = 20, Height = 20 };
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(10, 20, 20, 20));
 
-        Assert.Same(root, screen.HitTest(new Point(10, 20)));
-        Assert.Same(root, screen.HitTest(new Point(29.999, 39.999)));
-        Assert.Null(screen.HitTest(new Point(30, 40)));
+        Assert.Same(root, scene.HitTest(new Point(10, 20)));
+        Assert.Same(root, scene.HitTest(new Point(29.999, 39.999)));
+        Assert.Null(scene.HitTest(new Point(30, 40)));
     }
 
     [Fact]
-    public void CoordinateConversionUsesOwnedScreenAndAllCommittedLayoutOffsets()
+    public void CoordinateConversionUsesOwnedSceneAndAllCommittedLayoutOffsets()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var root = new TestParent();
         var branch = new TestParent();
         var leaf = new TestNode();
         root.Add(branch);
         branch.Add(leaf);
-        var screen = new GameScreen(root);
+        var scene = new GameUIScene(root);
 
-        Assert.Same(screen, leaf.Screen);
+        Assert.Same(scene, leaf.Scene);
 
-        manager.Open(screen);
+        manager.Open(scene);
         Arrange(root, new Rect(10, 20, 100, 100));
         Arrange(branch, new Rect(3, 4, 50, 50));
         Arrange(leaf, new Rect(5, 6, 20, 20));
 
-        Assert.Same(screen, leaf.Screen);
-        Assert.Equal(new Point(1, 2), leaf.ScreenToLocal(new Point(19, 32)));
-        Assert.Equal(new Point(19, 32), leaf.LocalToScreen(new Point(1, 2)));
+        Assert.Same(scene, leaf.Scene);
+        Assert.Equal(new Point(1, 2), leaf.SceneToLocal(new Point(19, 32)));
+        Assert.Equal(new Point(19, 32), leaf.LocalToScene(new Point(1, 2)));
 
         leaf.InvalidateArrange();
-        Assert.Equal(new Point(1, 2), leaf.ScreenToLocal(new Point(19, 32)));
+        Assert.Equal(new Point(1, 2), leaf.SceneToLocal(new Point(19, 32)));
 
         manager.Close();
 
-        Assert.Same(screen, leaf.Screen);
-        Assert.Equal(new Point(1, 2), leaf.ScreenToLocal(new Point(19, 32)));
-        Assert.Equal(new Point(19, 32), leaf.LocalToScreen(new Point(1, 2)));
+        Assert.Same(scene, leaf.Scene);
+        Assert.Equal(new Point(1, 2), leaf.SceneToLocal(new Point(19, 32)));
+        Assert.Equal(new Point(19, 32), leaf.LocalToScene(new Point(1, 2)));
     }
 
     [Fact]
-    public void CoordinateConversionUsesOpenScreenOwnerThread()
+    public void CoordinateConversionUsesOpenSceneOwnerThread()
     {
         var root = new TestNode();
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
 
-        var screenToLocalError = RunOnBackgroundThread(() =>
-            Record.Exception(() => root.ScreenToLocal(Point.Zero)));
-        var localToScreenError = RunOnBackgroundThread(() =>
-            Record.Exception(() => root.LocalToScreen(Point.Zero)));
+        var sceneToLocalError = RunOnBackgroundThread(() =>
+            Record.Exception(() => root.SceneToLocal(Point.Zero)));
+        var localToSceneError = RunOnBackgroundThread(() =>
+            Record.Exception(() => root.LocalToScene(Point.Zero)));
 
-        Assert.IsType<InvalidOperationException>(screenToLocalError);
-        Assert.IsType<InvalidOperationException>(localToScreenError);
-        Assert.Equal(Point.Zero, root.ScreenToLocal(Point.Zero));
-        Assert.Equal(Point.Zero, root.LocalToScreen(Point.Zero));
+        Assert.IsType<InvalidOperationException>(sceneToLocalError);
+        Assert.IsType<InvalidOperationException>(localToSceneError);
+        Assert.Equal(Point.Zero, root.SceneToLocal(Point.Zero));
+        Assert.Equal(Point.Zero, root.LocalToScene(Point.Zero));
 
-        screen.Close();
+        scene.Close();
 
-        Assert.Null(RunOnBackgroundThread(() => Record.Exception(() => root.ScreenToLocal(Point.Zero))));
-        Assert.Null(RunOnBackgroundThread(() => Record.Exception(() => root.LocalToScreen(Point.Zero))));
+        Assert.Null(RunOnBackgroundThread(() => Record.Exception(() => root.SceneToLocal(Point.Zero))));
+        Assert.Null(RunOnBackgroundThread(() => Record.Exception(() => root.LocalToScene(Point.Zero))));
     }
 
     [Fact]
     public void CoordinateConversionRejectsNonFiniteAccumulation()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var root = new TestParent();
         var leaf = new TestNode();
         root.Add(leaf);
-        manager.Open(new GameScreen(root));
+        manager.Open(new GameUIScene(root));
         Arrange(root, new Rect(double.MaxValue, 0, 1, 1));
         Arrange(leaf, new Rect(double.MaxValue, 0, 1, 1));
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => leaf.LocalToScreen(Point.Zero));
+        Assert.Throws<ArgumentOutOfRangeException>(() => leaf.LocalToScene(Point.Zero));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
-            leaf.ScreenToLocal(new Point(-double.MaxValue, 0)));
+            leaf.SceneToLocal(new Point(-double.MaxValue, 0)));
     }
 
     [Fact]
@@ -240,15 +240,15 @@ public sealed class HitTestTests
     {
         var root = new TestNode { Width = 20, Height = 20 };
         Arrange(root, new Rect(0, 0, 20, 20));
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
 
         var error = RunOnBackgroundThread(() => Record.Exception(() => root.Contains(new Point(1, 1))));
         var hitTestError = RunOnBackgroundThread(() => Record.Exception(() => root.HitTest(new Point(1, 1))));
 
         Assert.IsType<InvalidOperationException>(error);
         Assert.IsType<InvalidOperationException>(hitTestError);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]

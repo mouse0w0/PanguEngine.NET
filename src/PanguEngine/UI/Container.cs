@@ -9,7 +9,7 @@ namespace PanguEngine.UI;
 /// Provides the only UI element branch that can own child elements.
 /// </summary>
 /// <remarks>
-/// Real child structure changes are rejected while the owning screen is generating drawing commands.
+/// Real child structure changes are rejected while the owning scene is generating drawing commands.
 /// Existing operations that would not change the child list remain no-ops outside a mutation.
 /// </remarks>
 public abstract class Container : UIElement

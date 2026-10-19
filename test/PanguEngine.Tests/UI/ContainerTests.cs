@@ -161,8 +161,8 @@ public sealed class ContainerTests
         var last = new TestNode();
         parent.Add(first);
         parent.Add(last);
-        var screen = new Screen(parent);
-        screen.Open();
+        var scene = new UIScene(parent);
+        scene.Open();
 
         var backgroundResult = RunOnBackgroundThread(() =>
             (BackError: Record.Exception(first.MoveToBack),
@@ -171,7 +171,7 @@ public sealed class ContainerTests
         Assert.Null(backgroundResult.BackError);
         Assert.Null(backgroundResult.FrontError);
         Assert.Equal(new UIElement[] { first, last }, parent.Children);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
@@ -184,20 +184,20 @@ public sealed class ContainerTests
         parent.Add(first);
         parent.Add(middle);
         parent.Add(last);
-        var screen = new Screen(parent);
-        screen.Open();
+        var scene = new UIScene(parent);
+        scene.Open();
 
         middle.MoveToFront();
         Assert.Equal(new UIElement[] { first, last, middle }, parent.Children);
 
         middle.MoveToBack();
         Assert.Equal(new UIElement[] { middle, first, last }, parent.Children);
-        Assert.Same(screen, middle.Screen);
-        screen.Close();
+        Assert.Same(scene, middle.Scene);
+        scene.Close();
     }
 
     [Fact]
-    public void AssigningAndClearingRootPropagateScreenThroughSubtree()
+    public void AssigningAndClearingRootPropagateSceneThroughSubtree()
     {
         var root = new TestParent();
         var nested = new TestParent();
@@ -205,61 +205,61 @@ public sealed class ContainerTests
         root.Add(nested);
         nested.Add(leaf);
 
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
 
-        Assert.Same(screen, root.Screen);
-        Assert.Same(screen, nested.Screen);
-        Assert.Same(screen, leaf.Screen);
+        Assert.Same(scene, root.Scene);
+        Assert.Same(scene, nested.Scene);
+        Assert.Same(scene, leaf.Scene);
 
-        screen.Root = null;
+        scene.Root = null;
 
-        Assert.Null(root.Screen);
-        Assert.Null(nested.Screen);
-        Assert.Null(leaf.Screen);
+        Assert.Null(root.Scene);
+        Assert.Null(nested.Scene);
+        Assert.Null(leaf.Scene);
     }
 
     [Fact]
-    public void ScreenRootMustBeClearedBeforeBecomingAChild()
+    public void SceneRootMustBeClearedBeforeBecomingAChild()
     {
         var activeRoot = new TestParent();
         var target = new TestParent();
-        var screen = new Screen(activeRoot);
-        screen.Open();
+        var scene = new UIScene(activeRoot);
+        scene.Open();
 
         Assert.Throws<InvalidOperationException>(() => target.Add(activeRoot));
         Assert.Null(activeRoot.Parent);
-        Assert.Same(screen, activeRoot.Screen);
+        Assert.Same(scene, activeRoot.Scene);
         Assert.Empty(target.Children);
 
-        screen.Close();
-        screen.Root = null;
+        scene.Close();
+        scene.Root = null;
         target.Add(activeRoot);
 
         Assert.Same(target, activeRoot.Parent);
-        Assert.Null(activeRoot.Screen);
+        Assert.Null(activeRoot.Scene);
     }
 
     [Fact]
     public void ActiveParentActivatesAddedSubtreeAndDeactivatesRemovedSubtree()
     {
         var root = new TestParent();
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         var nested = new TestParent();
         var leaf = new TestNode();
         nested.Add(leaf);
 
         root.Add(nested);
 
-        Assert.Same(screen, nested.Screen);
-        Assert.Same(screen, leaf.Screen);
+        Assert.Same(scene, nested.Scene);
+        Assert.Same(scene, leaf.Scene);
 
         Assert.True(root.Remove(nested));
 
         Assert.Null(nested.Parent);
-        Assert.Null(nested.Screen);
-        Assert.Null(leaf.Screen);
-        screen.Close();
+        Assert.Null(nested.Scene);
+        Assert.Null(leaf.Scene);
+        scene.Close();
     }
 
     [Fact]
@@ -272,23 +272,23 @@ public sealed class ContainerTests
         first.Add(firstLeaf);
         root.Add(first);
         root.Add(second);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
 
         root.Clear();
 
         Assert.Empty(root.Children);
         Assert.Null(first.Parent);
         Assert.Null(second.Parent);
-        Assert.Null(first.Screen);
-        Assert.Null(firstLeaf.Screen);
-        Assert.Null(second.Screen);
-        Assert.Same(screen, root.Screen);
-        screen.Close();
+        Assert.Null(first.Scene);
+        Assert.Null(firstLeaf.Scene);
+        Assert.Null(second.Scene);
+        Assert.Same(scene, root.Scene);
+        scene.Close();
     }
 
     [Fact]
-    public void ClearingScreenParentInvalidatesEveryRemovedSubtree()
+    public void ClearingSceneParentInvalidatesEveryRemovedSubtree()
     {
         var root = new Canvas();
         var first = new Canvas();
@@ -297,9 +297,9 @@ public sealed class ContainerTests
         first.Children.Add(firstLeaf);
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.Open();
-        screen.PrepareFrame(new Size(100, 100));
+        var scene = new UIScene(root);
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
         Assert.True(first.IsMeasureValid);
         Assert.True(firstLeaf.IsMeasureValid);
         Assert.True(second.IsMeasureValid);
@@ -312,11 +312,11 @@ public sealed class ContainerTests
         Assert.False(firstLeaf.IsArrangeValid);
         Assert.False(second.IsMeasureValid);
         Assert.False(second.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
-    public void ReparentWithinSameScreenInvalidatesSubtreeLayout()
+    public void ReparentWithinSameSceneInvalidatesSubtreeLayout()
     {
         var root = new Canvas();
         var oldParent = new Canvas();
@@ -327,9 +327,9 @@ public sealed class ContainerTests
         oldParent.Children.Add(child);
         root.Children.Add(oldParent);
         root.Children.Add(newParent);
-        var screen = new Screen(root);
-        screen.Open();
-        screen.PrepareFrame(new Size(100, 100));
+        var scene = new UIScene(root);
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
         Assert.True(child.IsMeasureValid);
         Assert.True(child.IsArrangeValid);
         Assert.True(leaf.IsMeasureValid);
@@ -340,17 +340,17 @@ public sealed class ContainerTests
         Assert.Empty(oldParent.Children);
         Assert.Equal(new UIElement[] { child }, newParent.Children);
         Assert.Same(newParent, child.Parent);
-        Assert.Same(screen, child.Screen);
-        Assert.Same(screen, leaf.Screen);
+        Assert.Same(scene, child.Scene);
+        Assert.Same(scene, leaf.Scene);
         Assert.False(child.IsMeasureValid);
         Assert.False(child.IsArrangeValid);
         Assert.False(leaf.IsMeasureValid);
         Assert.False(leaf.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
-    public void ReparentAcrossSameThreadScreensChangesScreen()
+    public void ReparentAcrossSameThreadScenesChangesScene()
     {
         var oldRoot = new TestParent();
         var newRoot = new TestParent();
@@ -358,24 +358,24 @@ public sealed class ContainerTests
         var leaf = new TestNode();
         child.Add(leaf);
         oldRoot.Add(child);
-        var oldScreen = new Screen(oldRoot);
-        var newScreen = new Screen(newRoot);
-        oldScreen.Open();
-        newScreen.Open();
+        var oldScene = new UIScene(oldRoot);
+        var newScene = new UIScene(newRoot);
+        oldScene.Open();
+        newScene.Open();
 
         newRoot.Add(child);
 
         Assert.Empty(oldRoot.Children);
         Assert.Equal(new UIElement[] { child }, newRoot.Children);
         Assert.Same(newRoot, child.Parent);
-        Assert.Same(newScreen, child.Screen);
-        Assert.Same(newScreen, leaf.Screen);
-        newScreen.Close();
-        oldScreen.Close();
+        Assert.Same(newScene, child.Scene);
+        Assert.Same(newScene, leaf.Scene);
+        newScene.Close();
+        oldScene.Close();
     }
 
     [Fact]
-    public void ReparentAcrossDifferentScreenScalesInvalidatesEntireSubtree()
+    public void ReparentAcrossDifferentSceneScalesInvalidatesEntireSubtree()
     {
         var oldRoot = new Canvas();
         var newRoot = new Canvas();
@@ -383,11 +383,11 @@ public sealed class ContainerTests
         var grandchild = new TestNode();
         child.Children.Add(grandchild);
         oldRoot.Children.Add(child);
-        var oldScreen = new Screen(oldRoot) { Scale = 2 };
-        var newScreen = new Screen(newRoot) { Scale = 3 };
-        oldScreen.Open();
-        newScreen.Open();
-        oldScreen.PrepareFrame(new Size(100, 100));
+        var oldScene = new UIScene(oldRoot) { Scale = 2 };
+        var newScene = new UIScene(newRoot) { Scale = 3 };
+        oldScene.Open();
+        newScene.Open();
+        oldScene.PrepareFrame(new Size(100, 100));
         Assert.True(child.IsMeasureValid);
         Assert.True(grandchild.IsMeasureValid);
 
@@ -397,8 +397,8 @@ public sealed class ContainerTests
         Assert.False(child.IsArrangeValid);
         Assert.False(grandchild.IsMeasureValid);
         Assert.False(grandchild.IsArrangeValid);
-        newScreen.Close();
-        oldScreen.Close();
+        newScene.Close();
+        oldScene.Close();
     }
 
     [Fact]
@@ -410,11 +410,11 @@ public sealed class ContainerTests
         var grandchild = new TestNode();
         child.Children.Add(grandchild);
         oldRoot.Children.Add(child);
-        var oldScreen = new Screen(oldRoot);
-        var newScreen = new Screen(newRoot) { UseLayoutRounding = false };
-        oldScreen.Open();
-        newScreen.Open();
-        oldScreen.PrepareFrame(new Size(100, 100));
+        var oldScene = new UIScene(oldRoot);
+        var newScene = new UIScene(newRoot) { UseLayoutRounding = false };
+        oldScene.Open();
+        newScene.Open();
+        oldScene.PrepareFrame(new Size(100, 100));
 
         newRoot.Children.Add(child);
 
@@ -422,12 +422,12 @@ public sealed class ContainerTests
         Assert.False(child.IsArrangeValid);
         Assert.False(grandchild.IsMeasureValid);
         Assert.False(grandchild.IsArrangeValid);
-        newScreen.Close();
-        oldScreen.Close();
+        newScene.Close();
+        oldScene.Close();
     }
 
     [Fact]
-    public void ReparentAcrossScreensWithEqualLayoutSettingsInvalidatesEntireSubtree()
+    public void ReparentAcrossScenesWithEqualLayoutSettingsInvalidatesEntireSubtree()
     {
         var oldRoot = new Canvas();
         var newRoot = new Canvas();
@@ -435,11 +435,11 @@ public sealed class ContainerTests
         var grandchild = new TestNode();
         child.Children.Add(grandchild);
         oldRoot.Children.Add(child);
-        var oldScreen = new Screen(oldRoot) { Scale = 2, UseLayoutRounding = false };
-        var newScreen = new Screen(newRoot) { Scale = 2, UseLayoutRounding = false };
-        oldScreen.Open();
-        newScreen.Open();
-        oldScreen.PrepareFrame(new Size(100, 100));
+        var oldScene = new UIScene(oldRoot) { Scale = 2, UseLayoutRounding = false };
+        var newScene = new UIScene(newRoot) { Scale = 2, UseLayoutRounding = false };
+        oldScene.Open();
+        newScene.Open();
+        oldScene.PrepareFrame(new Size(100, 100));
 
         newRoot.Children.Add(child);
 
@@ -447,21 +447,21 @@ public sealed class ContainerTests
         Assert.False(child.IsArrangeValid);
         Assert.False(grandchild.IsMeasureValid);
         Assert.False(grandchild.IsArrangeValid);
-        newScreen.Close();
-        oldScreen.Close();
+        newScene.Close();
+        oldScene.Close();
     }
 
     [Fact]
-    public void RemovingSubtreeFromScreenInvalidatesDescendants()
+    public void RemovingSubtreeFromSceneInvalidatesDescendants()
     {
         var root = new Canvas();
         var child = new Canvas();
         var grandchild = new TestNode();
         child.Children.Add(grandchild);
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.Open();
-        screen.PrepareFrame(new Size(100, 100));
+        var scene = new UIScene(root);
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
 
         root.Children.Remove(child);
 
@@ -469,11 +469,11 @@ public sealed class ContainerTests
         Assert.False(child.IsArrangeValid);
         Assert.False(grandchild.IsMeasureValid);
         Assert.False(grandchild.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
-    public void AddingDetachedSubtreeToScreenInvalidatesDescendants()
+    public void AddingDetachedSubtreeToSceneInvalidatesDescendants()
     {
         var root = new Canvas();
         var child = new Canvas();
@@ -483,8 +483,8 @@ public sealed class ContainerTests
         child.Arrange(new Rect(0, 0, 100, 100));
         Assert.True(child.IsMeasureValid);
         Assert.True(grandchild.IsMeasureValid);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
 
         root.Children.Add(child);
 
@@ -492,11 +492,11 @@ public sealed class ContainerTests
         Assert.False(child.IsArrangeValid);
         Assert.False(grandchild.IsMeasureValid);
         Assert.False(grandchild.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
-    public void ReplacingAcrossScreensInvalidatesIncomingAndReplacedSubtrees()
+    public void ReplacingAcrossScenesInvalidatesIncomingAndReplacedSubtrees()
     {
         var sourceRoot = new Canvas();
         var incoming = new Canvas();
@@ -508,12 +508,12 @@ public sealed class ContainerTests
         var replacedLeaf = new TestNode();
         replaced.Children.Add(replacedLeaf);
         targetRoot.Children.Add(replaced);
-        var sourceScreen = new Screen(sourceRoot);
-        var targetScreen = new Screen(targetRoot);
-        sourceScreen.Open();
-        targetScreen.Open();
-        sourceScreen.PrepareFrame(new Size(100, 100));
-        targetScreen.PrepareFrame(new Size(100, 100));
+        var sourceScene = new UIScene(sourceRoot);
+        var targetScene = new UIScene(targetRoot);
+        sourceScene.Open();
+        targetScene.Open();
+        sourceScene.PrepareFrame(new Size(100, 100));
+        targetScene.PrepareFrame(new Size(100, 100));
         Assert.True(incoming.IsMeasureValid);
         Assert.True(incomingLeaf.IsMeasureValid);
         Assert.True(replaced.IsMeasureValid);
@@ -529,8 +529,8 @@ public sealed class ContainerTests
         Assert.False(replaced.IsArrangeValid);
         Assert.False(replacedLeaf.IsMeasureValid);
         Assert.False(replacedLeaf.IsArrangeValid);
-        targetScreen.Close();
-        sourceScreen.Close();
+        targetScene.Close();
+        sourceScene.Close();
     }
 
     [Fact]
@@ -544,40 +544,40 @@ public sealed class ContainerTests
         child.Add(leaf);
         activeParent.Add(child);
         activeRoot.Add(activeParent);
-        var screen = new Screen(activeRoot);
-        screen.Open();
+        var scene = new UIScene(activeRoot);
+        scene.Open();
 
         inactiveParent.Add(child);
 
         Assert.Empty(activeParent.Children);
         Assert.Same(inactiveParent, child.Parent);
-        Assert.Null(child.Screen);
-        Assert.Null(leaf.Screen);
+        Assert.Null(child.Scene);
+        Assert.Null(leaf.Scene);
 
         activeParent.Add(child);
 
         Assert.Empty(inactiveParent.Children);
         Assert.Same(activeParent, child.Parent);
-        Assert.Same(screen, child.Screen);
-        Assert.Same(screen, leaf.Screen);
-        screen.Close();
+        Assert.Same(scene, child.Scene);
+        Assert.Same(scene, leaf.Scene);
+        scene.Close();
     }
 
     [Fact]
-    public void WrongThreadCannotReplaceOpenScreenRoot()
+    public void WrongThreadCannotReplaceOpenSceneRoot()
     {
         var root = new TestParent();
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
 
         var result = RunOnBackgroundThread(() =>
-            (RootError: Record.Exception(() => screen.Root = null),
-                CloseError: Record.Exception(screen.Close)));
+            (RootError: Record.Exception(() => scene.Root = null),
+                CloseError: Record.Exception(scene.Close)));
 
         Assert.IsType<InvalidOperationException>(result.RootError);
         Assert.IsType<InvalidOperationException>(result.CloseError);
-        Assert.Same(screen, root.Screen);
-        screen.Close();
+        Assert.Same(scene, root.Scene);
+        scene.Close();
     }
 
     [Fact]
@@ -588,8 +588,8 @@ public sealed class ContainerTests
         var second = new TestNode();
         root.Add(first);
         root.Add(second);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         var added = new TestNode();
 
         var result = RunOnBackgroundThread(() =>
@@ -606,8 +606,8 @@ public sealed class ContainerTests
         Assert.Same(root, first.Parent);
         Assert.Same(root, second.Parent);
         Assert.Null(added.Parent);
-        Assert.Null(added.Screen);
-        screen.Close();
+        Assert.Null(added.Scene);
+        scene.Close();
     }
 
     [Fact]
@@ -615,8 +615,8 @@ public sealed class ContainerTests
     {
         var root = new TestParent();
         var foreign = new TestNode();
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
 
         var result = RunOnBackgroundThread(() =>
             (RemoveResult: root.Remove(foreign),
@@ -625,12 +625,12 @@ public sealed class ContainerTests
         Assert.False(result.RemoveResult);
         Assert.Null(result.ClearError);
         Assert.Empty(root.Children);
-        Assert.Same(screen, root.Screen);
-        screen.Close();
+        Assert.Same(scene, root.Scene);
+        scene.Close();
     }
 
     [Fact]
-    public void CrossThreadScreenMoveFailsWithoutChangingEitherTree()
+    public void CrossThreadSceneMoveFailsWithoutChangingEitherTree()
     {
         var backgroundTree = RunOnBackgroundThread(() =>
         {
@@ -639,52 +639,52 @@ public sealed class ContainerTests
             var leaf = new TestNode();
             child.Add(leaf);
             root.Add(child);
-            var screen = new Screen(root);
-            screen.Open();
-            return (Screen: screen, Root: root, Child: child, Leaf: leaf);
+            var scene = new UIScene(root);
+            scene.Open();
+            return (Scene: scene, Root: root, Child: child, Leaf: leaf);
         });
         var target = new TestParent();
-        var targetScreen = new Screen(target);
-        targetScreen.Open();
+        var targetScene = new UIScene(target);
+        targetScene.Open();
 
         Assert.Throws<InvalidOperationException>(() => target.Add(backgroundTree.Child));
 
         Assert.Equal(new UIElement[] { backgroundTree.Child }, backgroundTree.Root.Children);
         Assert.Same(backgroundTree.Root, backgroundTree.Child.Parent);
-        Assert.Same(backgroundTree.Screen, backgroundTree.Child.Screen);
-        Assert.Same(backgroundTree.Screen, backgroundTree.Leaf.Screen);
+        Assert.Same(backgroundTree.Scene, backgroundTree.Child.Scene);
+        Assert.Same(backgroundTree.Scene, backgroundTree.Leaf.Scene);
         Assert.Empty(target.Children);
-        Assert.Same(targetScreen, target.Screen);
-        targetScreen.Close();
+        Assert.Same(targetScene, target.Scene);
+        targetScene.Close();
     }
 
     [Fact]
-    public void NewScreenCheckFailsBeforeDetachingFromAccessibleOldTree()
+    public void NewSceneCheckFailsBeforeDetachingFromAccessibleOldTree()
     {
         var oldRoot = new TestParent();
         var child = new TestParent();
         var leaf = new TestNode();
         child.Add(leaf);
         oldRoot.Add(child);
-        var oldScreen = new Screen(oldRoot);
-        oldScreen.Open();
+        var oldScene = new UIScene(oldRoot);
+        oldScene.Open();
         var backgroundTarget = RunOnBackgroundThread(() =>
         {
             var root = new TestParent();
-            var screen = new Screen(root);
-            screen.Open();
-            return (Screen: screen, Root: root);
+            var scene = new UIScene(root);
+            scene.Open();
+            return (Scene: scene, Root: root);
         });
 
         Assert.Throws<InvalidOperationException>(() => backgroundTarget.Root.Add(child));
 
         Assert.Equal(new UIElement[] { child }, oldRoot.Children);
         Assert.Same(oldRoot, child.Parent);
-        Assert.Same(oldScreen, child.Screen);
-        Assert.Same(oldScreen, leaf.Screen);
+        Assert.Same(oldScene, child.Scene);
+        Assert.Same(oldScene, leaf.Scene);
         Assert.Empty(backgroundTarget.Root.Children);
-        Assert.Same(backgroundTarget.Screen, backgroundTarget.Root.Screen);
-        oldScreen.Close();
+        Assert.Same(backgroundTarget.Scene, backgroundTarget.Root.Scene);
+        oldScene.Close();
     }
 
     [Fact]
@@ -708,24 +708,24 @@ public sealed class ContainerTests
         Assert.Empty(result.Parent.Children);
         Assert.Null(result.First.Parent);
         Assert.Null(result.Second.Parent);
-        Assert.Null(result.Parent.Screen);
-        Assert.Null(result.First.Screen);
-        Assert.Null(result.Second.Screen);
+        Assert.Null(result.Parent.Scene);
+        Assert.Null(result.First.Scene);
+        Assert.Null(result.Second.Scene);
     }
 
     [Fact]
-    public void ClosedScreenKeepsRootAssociated()
+    public void ClosedSceneKeepsRootAssociated()
     {
         var root = new TestParent();
         var child = new TestNode();
         root.Add(child);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
 
-        screen.Close();
+        scene.Close();
 
-        Assert.Same(screen, root.Screen);
-        Assert.Same(screen, child.Screen);
+        Assert.Same(scene, root.Scene);
+        Assert.Same(scene, child.Scene);
         Assert.Same(root, child.Parent);
     }
 

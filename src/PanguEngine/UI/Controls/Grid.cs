@@ -147,9 +147,9 @@ public sealed class Grid : Panel
     /// <inheritdoc />
     protected override Size MeasureContent(Size availableSize)
     {
-        var screen = Screen;
-        var round = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var round = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         var columnSpacing = round ? LayoutHelper.RoundLayoutValue(ColumnSpacing, scale) : ColumnSpacing;
         var rowSpacing = round ? LayoutHelper.RoundLayoutValue(RowSpacing, scale) : RowSpacing;
         var columns = new GridAxis(ColumnDefinitions, columnSpacing);
@@ -183,9 +183,9 @@ public sealed class Grid : Panel
     /// <inheritdoc />
     protected override void ArrangeContent(Rect contentBounds)
     {
-        var screen = Screen;
-        var round = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var round = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         _columns.Allocate(contentBounds.Width, round, scale);
         _rows.Allocate(contentBounds.Height, round, scale);
         foreach (var cell in GetCells(_columns, _rows))

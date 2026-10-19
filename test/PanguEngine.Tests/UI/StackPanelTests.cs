@@ -298,9 +298,9 @@ public sealed class StackPanelTests
     public void ActiveStackPanelPropertiesRejectWrongThreadWithoutPartialState()
     {
         var panel = new StackPanel();
-        var screen = new Screen(panel);
+        var scene = new UIScene(panel);
         ValidateLayout(panel);
-        screen.Open();
+        scene.Open();
 
         var result = RunOnBackgroundThread(() =>
             (Spacing: Record.Exception(() => panel.Spacing = 4),
@@ -312,14 +312,14 @@ public sealed class StackPanelTests
         Assert.Equal(Orientation.Vertical, panel.Orientation);
         Assert.True(panel.IsMeasureValid);
         Assert.True(panel.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
     public void VerticalMeasurementAndArrangementUseRoundedSpacingAndSharedBoundaries()
     {
         var panel = new StackPanel { Spacing = 0.6 };
-        var screen = new Screen(panel) { Scale = 1.25 };
+        var scene = new UIScene(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
         var second = new TestNode { CoreDesiredSize = new Size(10, 12) };
         panel.Children.Add(first);
@@ -347,7 +347,7 @@ public sealed class StackPanelTests
     public void HorizontalMeasurementAndArrangementUseRoundedSpacingAndSharedBoundaries()
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0.81 };
-        var screen = new Screen(panel) { Scale = 1.25 };
+        var scene = new UIScene(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(12, 10) };
         var second = new TestNode { CoreDesiredSize = new Size(12, 10) };
         panel.Children.Add(first);
@@ -374,7 +374,7 @@ public sealed class StackPanelTests
     public void DisabledLayoutRoundingPreservesRawSpacingAndFractions()
     {
         var panel = new StackPanel { Spacing = 0.6 };
-        var screen = new Screen(panel) { Scale = 1.25, UseLayoutRounding = false };
+        var scene = new UIScene(panel) { Scale = 1.25, UseLayoutRounding = false };
         var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
         var second = new TestNode { CoreDesiredSize = new Size(10, 12) };
         panel.Children.Add(first);
@@ -391,7 +391,7 @@ public sealed class StackPanelTests
         Assert.Equal(0.6, gap, 10);
         Assert.Equal(0.75, gap * 1.25, 10);
 
-        screen.UseLayoutRounding = true;
+        scene.UseLayoutRounding = true;
         panel.Measure(new Size(100, 100));
         panel.Arrange(new Rect(0, 0, 100, 100));
 
@@ -403,7 +403,7 @@ public sealed class StackPanelTests
     public void CollapsedChildProducesNoSpacingGap()
     {
         var panel = new StackPanel { Spacing = 0.6 };
-        var screen = new Screen(panel) { Scale = 1.25 };
+        var scene = new UIScene(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(10, 12) };
         var collapsed = new TestNode
         {
@@ -434,7 +434,7 @@ public sealed class StackPanelTests
     public void MultipleChildrenAccumulateRoundedDesiredSizesWithoutLastChildCompensation()
     {
         var panel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 0.81 };
-        var screen = new Screen(panel) { Scale = 1.25 };
+        var scene = new UIScene(panel) { Scale = 1.25 };
         var first = new TestNode { CoreDesiredSize = new Size(4, 12) };
         var second = new TestNode { CoreDesiredSize = new Size(4, 12) };
         var third = new TestNode { CoreDesiredSize = new Size(4, 12) };

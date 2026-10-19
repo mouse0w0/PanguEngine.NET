@@ -194,18 +194,18 @@ public sealed class TabItem : Control
 
     private void ValidateHeaderAssignment(UIElement? value)
     {
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if (value is null)
             return;
-        value.Screen?.VerifyTreeMutationAccess();
+        value.Scene?.VerifyTreeMutationAccess();
         if (ReferenceEquals(value, this))
             throw new InvalidOperationException("A tab item cannot use itself as its header.");
         if (ReferenceEquals(value, _content))
             throw new InvalidOperationException("The header and content cannot reference the same node.");
         if (ReferenceEquals(value, _contentHost) || ReferenceEquals(value, _closeButton))
             throw new InvalidOperationException("An internal tab item node cannot be used as a header.");
-        if (value.Parent is null && value.Screen is not null)
-            throw new InvalidOperationException("A UI screen root must be cleared before it can be a tab header.");
+        if (value.Parent is null && value.Scene is not null)
+            throw new InvalidOperationException("A UI scene root must be cleared before it can be a tab header.");
         if (TabView.IsInternalPartNode(value))
             throw new InvalidOperationException("A tab view internal node cannot be used as a header.");
 
@@ -221,18 +221,18 @@ public sealed class TabItem : Control
 
     private void ValidateContentAssignment(UIElement? value)
     {
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if (value is null)
             return;
-        value.Screen?.VerifyTreeMutationAccess();
+        value.Scene?.VerifyTreeMutationAccess();
         if (ReferenceEquals(value, this))
             throw new InvalidOperationException("A tab item cannot use itself as its content.");
         if (ReferenceEquals(value, _header))
             throw new InvalidOperationException("The content and header cannot reference the same node.");
         if (ReferenceEquals(value, _contentHost) || ReferenceEquals(value, _closeButton))
             throw new InvalidOperationException("An internal tab item node cannot be used as content.");
-        if (value.Parent is null && value.Screen is not null)
-            throw new InvalidOperationException("A UI screen root must be cleared before it can be tab content.");
+        if (value.Parent is null && value.Scene is not null)
+            throw new InvalidOperationException("A UI scene root must be cleared before it can be tab content.");
         if (TabView.IsInternalPartNode(value))
             throw new InvalidOperationException("A tab view internal node cannot be used as content.");
 

@@ -20,7 +20,7 @@ public sealed partial class TabView
     private void UpdateSelection(TabItem? oldItem, TabItem? newItem, int oldIndex)
     {
         var focusWasInOldContent = oldItem?.ContentHost is { } oldHost &&
-                                   IsDescendantOrSelf(Screen?.FocusedNode, oldHost);
+                                   IsDescendantOrSelf(Scene?.FocusedNode, oldHost);
 
         _selectionUpdateDepth++;
         try
@@ -96,7 +96,7 @@ public sealed partial class TabView
 
     private bool IsFocusInsideItem(TabItem item)
     {
-        if (Screen?.FocusedNode is not { } focused)
+        if (Scene?.FocusedNode is not { } focused)
             return false;
 
         return IsDescendantOrSelf(focused, item) ||

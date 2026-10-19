@@ -4,16 +4,16 @@ namespace PanguEngine.UI;
 /// Runs a callback tied to a UI element once per prepared frame while active.
 /// </summary>
 /// <remarks>
-/// The owning screen supplies the same absolute monotonic time to all tickers in a client frame.
-/// Changing the element's screen ownership or closing its screen stops the current run without invoking business callbacks.
+/// The owning scene supplies the same absolute monotonic time to all tickers in a client frame.
+/// Changing the element's scene ownership or closing its scene stops the current run without invoking business callbacks.
 /// Remounting or reopening does not resume a stopped run. Callback exceptions propagate immediately.
-/// Consumers retain tickers for reuse. Elements and screens register active runs only.
+/// Consumers retain tickers for reuse. Elements and scenes register active runs only.
 /// </remarks>
 public sealed class Ticker
 {
     private readonly UIElement _owner;
     private readonly Action<TimeSpan> _onTick;
-    private Screen? _screen;
+    private UIScene? _scene;
     private LinkedListNode<Ticker>? _registration;
 
     internal Ticker(UIElement owner, Action<TimeSpan> onTick)
@@ -31,24 +31,24 @@ public sealed class Ticker
     /// Starts a new run, or leaves an already active run unchanged.
     /// </summary>
     /// <remarks>
-    /// Requires screen ownership, the owning screen's UI thread, and an open screen that has not begun closing.
-    /// Screen ownership is determined by the element's Screen property.
-    /// Starting after the owning screen begins frame preparation takes effect no earlier than its next prepared frame.
+    /// Requires scene ownership, the owning scene's UI thread, and an open scene that has not begun closing.
+    /// Scene ownership is determined by the element's Scene property.
+    /// Starting after the owning scene begins frame preparation takes effect no earlier than its next prepared frame.
     /// No callback runs synchronously; consumers reset their time baseline for each new run.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the element has no screen ownership, its screen is closed or closing, or access is on the wrong thread.
+    /// Thrown when the element has no scene ownership, its scene is closed or closing, or access is on the wrong thread.
     /// </exception>
     public void Start()
     {
-        var screen = _owner.Screen
-                     ?? throw new InvalidOperationException("The UI node has no screen ownership.");
-        screen.VerifyTickerStart();
+        var scene = _owner.Scene
+                    ?? throw new InvalidOperationException("The UI node has no scene ownership.");
+        scene.VerifyTickerStart();
         if (_registration is not null)
             return;
 
-        _screen = screen;
-        _registration = screen.RegisterTicker(this);
+        _scene = scene;
+        _registration = scene.RegisterTicker(this);
         _owner.RegisterTicker(this);
     }
 
@@ -65,7 +65,7 @@ public sealed class Ticker
         if (_registration is null)
             return;
 
-        _screen!.VerifyOwnerThread();
+        _scene!.VerifyOwnerThread();
         StopCore();
     }
 
@@ -74,10 +74,10 @@ public sealed class Ticker
         if (_registration is null)
             return;
 
-        _screen!.UnregisterTicker(_registration);
+        _scene!.UnregisterTicker(_registration);
         _owner.UnregisterTicker(this);
         _registration = null;
-        _screen = null;
+        _scene = null;
     }
 
     internal void Tick(LinkedListNode<Ticker> registration, TimeSpan frameTime)

@@ -433,7 +433,7 @@ public sealed partial class ScrollView : Control
 
     private void HandleWheel(PointerWheelEventArgs eventArgs)
     {
-        var lines = UiToolkit.WheelScrollLines;
+        var lines = UIToolkit.WheelScrollLines;
         if (lines == 0)
             return;
 
@@ -448,8 +448,8 @@ public sealed partial class ScrollView : Control
         if (deltaX == 0 && deltaY == 0)
             return;
 
-        var stepX = UiToolkit.GetWheelScrollStep(lines, SmallChange, Viewport.Width);
-        var stepY = UiToolkit.GetWheelScrollStep(lines, SmallChange, Viewport.Height);
+        var stepX = UIToolkit.GetWheelScrollStep(lines, SmallChange, Viewport.Width);
+        var stepY = UIToolkit.GetWheelScrollStep(lines, SmallChange, Viewport.Height);
         var before = Offset;
         Offset = new Point(before.X - deltaX * stepX, before.Y - deltaY * stepY);
         if (Offset != before)

@@ -315,20 +315,20 @@ public sealed class RadioButtonTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void SpacingUsesTheScreenScaleAndLayoutRoundingPolicy(bool rounding)
+    public void SpacingUsesTheSceneScaleAndLayoutRoundingPolicy(bool rounding)
     {
         var content = new Panel { Width = 15, Height = 12, HorizontalAlignment = HorizontalAlignment.Left };
         var button = new RadioButton<string>
         {
             Content = content, Spacing = 1.1, Padding = Thickness.Zero, BorderThickness = Thickness.Zero
         };
-        _ = new Screen(button) { Scale = 1.5, UseLayoutRounding = rounding };
+        _ = new UIScene(button) { Scale = 1.5, UseLayoutRounding = rounding };
         button.GetStyleRoot().UpdateStyles();
         button.Measure(new Size(100, 30));
         button.Arrange(new Rect(0, 0, 100, 30));
         var indicator = Descendants(button).Single(node => node.Classes.Contains("radio-button-indicator"));
-        var gap = content.LocalToScreen(new Point(0, 0)).X -
-                  indicator.LocalToScreen(new Point(0, 0)).X - indicator.LayoutBounds.Width;
+        var gap = content.LocalToScene(new Point(0, 0)).X -
+                  indicator.LocalToScene(new Point(0, 0)).X - indicator.LayoutBounds.Width;
         Assert.Equal(rounding ? 2d / 1.5 : 1.1, gap, 10);
     }
 
@@ -387,8 +387,8 @@ public sealed class RadioButtonTests
         var root = new StackPanel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("RadioButton { spacing: 5px; } RadioButton:checked { background-color: #010203; }")
         ]);
         firstGroup.Select(first);
@@ -453,10 +453,10 @@ public sealed class RadioButtonTests
     [Fact]
     public void FocusLossCancelsSpaceAndRepeatDoesNotReestablishThePair()
     {
-        var (manager, screen, _, group, buttons) = OpenScene();
+        var (manager, scene, _, group, buttons) = OpenScene();
         Assert.True(buttons[0].Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
-        screen.ClearFocus();
+        scene.ClearFocus();
         Assert.True(buttons[0].Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None, true);
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
@@ -469,14 +469,14 @@ public sealed class RadioButtonTests
     [InlineData(Key.Space)]
     public void FocusLossAndReturnDuringAKeyCallbackCancelTheActivation(Key key)
     {
-        var (manager, screen, _, group, buttons) = OpenScene();
+        var (manager, scene, _, group, buttons) = OpenScene();
         Assert.True(buttons[0].Focus());
 
         void LoseAndReturnFocus(object? sender, KeyEventArgs args)
         {
             if (args.Key == key)
             {
-                screen.ClearFocus();
+                scene.ClearFocus();
                 Assert.True(buttons[0].Focus());
             }
         }
@@ -495,12 +495,12 @@ public sealed class RadioButtonTests
     [Fact]
     public void SpacePressedStyleIsSeparateFromMousePressedAndClearsOnFocusLoss()
     {
-        var (manager, screen, _, _, buttons) = OpenScene();
+        var (manager, scene, _, _, buttons) = OpenScene();
         Assert.True(buttons[0].Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
         Assert.False(buttons[0].IsPressed);
         Assert.True(buttons[0].HasPseudoClass(PseudoClass.Pressed));
-        screen.ClearFocus();
+        scene.ClearFocus();
         Assert.False(buttons[0].HasPseudoClass(PseudoClass.Pressed));
         manager.Close();
     }
@@ -553,11 +553,11 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
-    public void NavigationSkipsDetachedAndOtherScreenMembers()
+    public void NavigationSkipsDetachedAndOtherSceneMembers()
     {
         var (manager, _, root, group, buttons) = OpenScene();
         root.Children.Remove(buttons[1]);
-        _ = new Screen(buttons[1]);
+        _ = new UIScene(buttons[1]);
         buttons[2].Visibility = Visibility.Hidden;
         Assert.True(buttons[0].Focus());
         manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
@@ -587,7 +587,7 @@ public sealed class RadioButtonTests
         inner.Click += (_, _) => clicks++;
         buttons[0].Content = inner;
         manager.UpdateFrame(new Size(300, 180), 0);
-        var point = ToScreen(inner, new Point(5, 5));
+        var point = ToScene(inner, new Point(5, 5));
         Click(manager, point);
         Assert.Equal(1, clicks);
         Assert.Null(group.SelectedButton);
@@ -595,7 +595,7 @@ public sealed class RadioButtonTests
         manager.Close();
     }
 
-    private static (UiManager Manager, GameScreen Screen, Canvas Root,
+    private static (UIManager Manager, GameUIScene Scene, Canvas Root,
         RadioGroup<int?> Group, RadioButton<int?>[] Buttons) OpenScene()
     {
         var group = new RadioGroup<int?>();
@@ -610,20 +610,20 @@ public sealed class RadioButtonTests
             root.Children.Add(buttons[index]);
         }
 
-        var screen = new GameScreen(root);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(root);
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(300, 180), 0);
-        return (manager, screen, root, group, buttons);
+        return (manager, scene, root, group, buttons);
     }
 
-    private static void Click(UiManager manager, Point point)
+    private static void Click(UIManager manager, Point point)
     {
         manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerReleased(point, MouseButton.Left, KeyModifiers.None);
     }
 
-    private static Point ToScreen(UIElement node, Point local)
+    private static Point ToScene(UIElement node, Point local)
     {
         for (UIElement? current = node; current is not null; current = current.Parent)
             local = new Point(local.X + current.LayoutBounds.X, local.Y + current.LayoutBounds.Y);

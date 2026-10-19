@@ -5,7 +5,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI.Styling;
 
-[Collection(UiToolkitCollection.Name)]
+[Collection(UIToolkitCollection.Name)]
 public sealed class CssRegistryTests
 {
     private static bool LazyAliasInitialized;

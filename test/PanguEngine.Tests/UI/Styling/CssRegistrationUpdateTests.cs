@@ -5,7 +5,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI.Styling;
 
-[Collection(UiToolkitCollection.Name)]
+[Collection(UIToolkitCollection.Name)]
 public sealed class CssRegistrationUpdateTests
 {
     private static bool LayoutInitialized;
@@ -16,19 +16,19 @@ public sealed class CssRegistrationUpdateTests
         var child = new Panel();
         var root = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([StyleSheet.Parse("* { late-layout-offset: 7; }")]);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([StyleSheet.Parse("* { late-layout-offset: 7; }")]);
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.False(LayoutInitialized);
             Assert.Null(CssRegistry.FindProperty(typeof(Panel), "late-layout-offset"));
 
             _ = new LateLayout();
 
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.True(LayoutInitialized);
             Assert.Equal(0d, root.GetValue(LateLayout.OffsetProperty));
             Assert.Equal(0d, child.GetValue(LateLayout.OffsetProperty));
@@ -36,20 +36,20 @@ public sealed class CssRegistrationUpdateTests
             root.Classes.Add("refresh");
             child.Classes.Add("refresh");
 
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.Equal(7d, root.GetValue(LateLayout.OffsetProperty));
             Assert.Equal(7d, child.GetValue(LateLayout.OffsetProperty));
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Theory]
     [InlineData("8")]
     [InlineData("var(--offset)")]
-    public void LateAttachedDefinitionWaitsForEachScreenStyleInvalidationAndPreservesLocalValues(string value)
+    public void LateAttachedDefinitionWaitsForEachSceneStyleInvalidationAndPreservesLocalValues(string value)
     {
         var name = $"late-offset-{Guid.NewGuid():N}";
         var property = Property.RegisterAttached<AttachedOwner, UIElement, double>(name, 0,
@@ -60,8 +60,8 @@ public sealed class CssRegistrationUpdateTests
         root.Children.Add(child);
         root.SetValue(property, 3d);
         var secondRoot = new Panel();
-        var first = new Screen(root);
-        var second = new Screen(secondRoot);
+        var first = new UIScene(root);
+        var second = new UIScene(secondRoot);
         first.SetBaseStyleSheets([]);
         second.SetBaseStyleSheets([]);
         first.SetStyleSheets([sheet]);
@@ -111,9 +111,9 @@ public sealed class CssRegistrationUpdateTests
     public void LateAliasReplacesClrNameRulesAfterStyleInvalidation()
     {
         var node = new LateAliasNode();
-        var screen = new Screen(node);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([
             StyleSheet.Parse("LateAliasNode { opacity: 0.3; } late-update-tag { opacity: 0.7; }")
         ]);
         node.UpdateStyles();
@@ -137,9 +137,9 @@ public sealed class CssRegistrationUpdateTests
         var root = new LateAncestorNode();
         var child = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              late-ancestor-tag { --alpha: 0.4; }
                              * { opacity: var(--alpha, 1); }
@@ -171,9 +171,9 @@ public sealed class CssRegistrationUpdateTests
         var root = new Panel();
         var child = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([StyleSheet.Parse($"* {{ {name}: 6; opacity: 0.5; }}")]);
+        var scene = new UIScene(root);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([StyleSheet.Parse($"* {{ {name}: 6; opacity: 0.5; }}")]);
         var notifications = 0;
         root.PropertyChanged += (_, args) =>
         {
@@ -183,18 +183,18 @@ public sealed class CssRegistrationUpdateTests
             CssRegistry.RegisterProperty<UIElement, double>(name, property, CssValueConverters.ParseLength);
         };
 
-        screen.Open();
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.Equal(0d, root.GetValue(property));
 
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.Equal(0d, root.GetValue(property));
 
             root.Classes.Add("refresh");
             child.Classes.Add("refresh");
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
 
             Assert.Equal(6d, root.GetValue(property));
             Assert.Equal(6d, child.GetValue(property));
@@ -202,7 +202,7 @@ public sealed class CssRegistrationUpdateTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 

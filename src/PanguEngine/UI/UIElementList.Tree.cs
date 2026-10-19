@@ -4,7 +4,7 @@ namespace PanguEngine.UI;
 
 public sealed partial class UIElementList
 {
-    private void VerifyTreeAccess() => _owner.Screen?.VerifyTreeMutationAccess();
+    private void VerifyTreeAccess() => _owner.Scene?.VerifyTreeMutationAccess();
 
     private void ReplaceChildren(int index, int count, IReadOnlyList<UIElement> newItems, Action updateStorage)
     {
@@ -46,26 +46,26 @@ public sealed partial class UIElementList
 
     private void VerifyIncomingChild(UIElement child)
     {
-        child.Screen?.VerifyTreeMutationAccess();
+        child.Scene?.VerifyTreeMutationAccess();
         for (UIElement? ancestor = _owner; ancestor is not null; ancestor = ancestor.Parent)
         {
             if (ReferenceEquals(ancestor, child))
                 throw new InvalidOperationException("Adding the UI node would create a parent cycle.");
         }
 
-        if (child.Parent is null && child.Screen is not null)
-            throw new InvalidOperationException("A UI screen root must be cleared before it can become a child.");
+        if (child.Parent is null && child.Scene is not null)
+            throw new InvalidOperationException("A UI scene root must be cleared before it can become a child.");
     }
 
     private void UpdateChildren(UIElement[] incoming, UIElement[] outgoing, Action updateStorage)
     {
         var changedNodes = outgoing.Concat(incoming)
-            .Select(child => (Child: child, OldScreen: child.Screen)).ToArray();
-        var affectedScreens = new List<Screen>();
-        AddAffectedScreen(affectedScreens, _owner.Screen);
-        foreach (var (_, oldScreen) in changedNodes)
-            AddAffectedScreen(affectedScreens, oldScreen);
-        var activeScreens = BeginRuntimeOperations(affectedScreens);
+            .Select(child => (Child: child, OldScene: child.Scene)).ToArray();
+        var affectedScenes = new List<UIScene>();
+        AddAffectedScene(affectedScenes, _owner.Scene);
+        foreach (var (_, oldScene) in changedNodes)
+            AddAffectedScene(affectedScenes, oldScene);
+        var activeScenes = BeginRuntimeOperations(affectedScenes);
         try
         {
             updateStorage();
@@ -75,12 +75,12 @@ public sealed partial class UIElementList
             foreach (var child in incoming)
                 child.SetParent(_owner);
             foreach (var child in outgoing)
-                child.SetScreenRecursive(null);
+                child.SetSceneRecursive(null);
             foreach (var child in incoming)
-                child.SetScreenRecursive(_owner.Screen);
-            foreach (var (child, oldScreen) in changedNodes)
+                child.SetSceneRecursive(_owner.Scene);
+            foreach (var (child, oldScene) in changedNodes)
             {
-                if (!ReferenceEquals(oldScreen, child.Screen))
+                if (!ReferenceEquals(oldScene, child.Scene))
                     child.InvalidateMeasureSubtree();
             }
 
@@ -89,31 +89,31 @@ public sealed partial class UIElementList
 
             var styleEntries = new List<UIElement>();
             UIElement.AddRelationshipRefreshEntry(styleEntries, _owner,
-                _owner.Screen?.StyleResolver ?? StyleResolver.Default);
-            foreach (var (child, oldScreen) in changedNodes)
+                _owner.Scene?.StyleResolver ?? StyleResolver.Default);
+            foreach (var (child, oldScene) in changedNodes)
             {
                 UIElement.AddSubtreeRefreshEntry(styleEntries, child,
-                    oldScreen?.StyleResolver ?? StyleResolver.Default,
-                    child.Screen?.StyleResolver ?? StyleResolver.Default,
-                    screenChanged: !ReferenceEquals(oldScreen, child.Screen));
+                    oldScene?.StyleResolver ?? StyleResolver.Default,
+                    child.Scene?.StyleResolver ?? StyleResolver.Default,
+                    sceneChanged: !ReferenceEquals(oldScene, child.Scene));
             }
 
-            CommitAndNotifyWithStyle(activeScreens, styleEntries);
+            CommitAndNotifyWithStyle(activeScenes, styleEntries);
         }
         finally
         {
-            EndRuntimeOperations(activeScreens);
+            EndRuntimeOperations(activeScenes);
         }
     }
 
     private void ReorderChildren(Action updateStorage)
     {
-        var resolver = _owner.Screen?.StyleResolver ?? StyleResolver.Default;
+        var resolver = _owner.Scene?.StyleResolver ?? StyleResolver.Default;
         var refreshStyles = resolver.HasSiblingRelationships || resolver.HasChildIndexedPseudoClasses;
-        var affectedScreens = new List<Screen>();
+        var affectedScenes = new List<UIScene>();
         if (refreshStyles)
-            AddAffectedScreen(affectedScreens, _owner.Screen);
-        var activeScreens = BeginRuntimeOperations(affectedScreens);
+            AddAffectedScene(affectedScenes, _owner.Scene);
+        var activeScenes = BeginRuntimeOperations(affectedScenes);
         try
         {
             var preserveHitTestLayout = _owner.CanPreserveHitTestLayoutAfterChildOrderChange();
@@ -122,59 +122,59 @@ public sealed partial class UIElementList
             if (preserveHitTestLayout)
                 _owner.RestoreHitTestLayoutAfterChildOrderChange();
             if (refreshStyles)
-                CommitAndNotifyWithStyle(activeScreens, [_owner]);
+                CommitAndNotifyWithStyle(activeScenes, [_owner]);
         }
         finally
         {
-            EndRuntimeOperations(activeScreens);
+            EndRuntimeOperations(activeScenes);
         }
     }
 
-    private static void AddAffectedScreen(List<Screen> screens, Screen? screen)
+    private static void AddAffectedScene(List<UIScene> scenes, UIScene? scene)
     {
-        if (screen is not null && !screens.Contains(screen))
-            screens.Add(screen);
+        if (scene is not null && !scenes.Contains(scene))
+            scenes.Add(scene);
     }
 
-    private static List<Screen> BeginRuntimeOperations(List<Screen> screens)
+    private static List<UIScene> BeginRuntimeOperations(List<UIScene> scenes)
     {
-        var activeScreens = new List<Screen>(screens.Count);
+        var activeScenes = new List<UIScene>(scenes.Count);
         try
         {
-            foreach (var screen in screens)
+            foreach (var scene in scenes)
             {
-                if (screen.BeginRuntimeOperationIfOpen())
-                    activeScreens.Add(screen);
+                if (scene.BeginRuntimeOperationIfOpen())
+                    activeScenes.Add(scene);
             }
         }
         catch
         {
-            EndRuntimeOperations(activeScreens);
+            EndRuntimeOperations(activeScenes);
             throw;
         }
 
-        return activeScreens;
+        return activeScenes;
     }
 
-    private static void EndRuntimeOperations(List<Screen> screens)
+    private static void EndRuntimeOperations(List<UIScene> scenes)
     {
-        for (var index = screens.Count - 1; index >= 0; index--)
-            screens[index].EndRuntimeOperation();
+        for (var index = scenes.Count - 1; index >= 0; index--)
+            scenes[index].EndRuntimeOperation();
     }
 
     private static void CommitAndNotifyWithStyle(
-        List<Screen> screens,
+        List<UIScene> scenes,
         IReadOnlyList<UIElement> styleEntries)
     {
-        var snapshots = new List<(Screen Screen, Screen.InputStateCleanupSnapshot Snapshot)>();
-        foreach (var screen in screens)
+        var snapshots = new List<(UIScene Scene, UIScene.InputStateCleanupSnapshot Snapshot)>();
+        foreach (var scene in scenes)
         {
-            if (screen.CommitInputStateAfterTreeChange() is { } snapshot)
-                snapshots.Add((screen, snapshot));
+            if (scene.CommitInputStateAfterTreeChange() is { } snapshot)
+                snapshots.Add((scene, snapshot));
         }
 
         UIElement.InvalidateStyleSubtreeBatch(styleEntries);
-        foreach (var (screen, snapshot) in snapshots)
-            screen.NotifyInputStateLoss(snapshot);
+        foreach (var (scene, snapshot) in snapshots)
+            scene.NotifyInputStateLoss(snapshot);
     }
 }

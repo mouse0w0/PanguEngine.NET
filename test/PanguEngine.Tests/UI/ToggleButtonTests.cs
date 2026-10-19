@@ -29,8 +29,8 @@ public sealed class ToggleButtonTests
         Assert.False(button.HasPseudoClass(PseudoClass.Checked));
         Assert.Equal("Button", BackgroundSelector(button));
 
-        var screen = new Screen(button);
-        screen.SetStyleSheets([StyleSheet.Parse("ToggleButton { spacing: 11px; }")]);
+        var scene = new UIScene(button);
+        scene.SetStyleSheets([StyleSheet.Parse("ToggleButton { spacing: 11px; }")]);
         button.UpdateStyles();
 
         Assert.Equal(11d, button.Spacing);
@@ -61,7 +61,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void PointerActivationTogglesBeforeClick()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var observed = new List<bool>();
         button.Click += (_, _) => observed.Add(button.IsChecked);
 
@@ -78,7 +78,7 @@ public sealed class ToggleButtonTests
     [InlineData(Key.Space)]
     public void KeyboardActivationUsesExistingTimingAndIgnoresRepeats(Key key)
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var observed = new List<bool>();
         button.Click += (_, _) => observed.Add(button.IsChecked);
         Assert.True(button.Focus());
@@ -102,7 +102,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void OtherPointerButtonsAndReleaseOutsideDoNotToggle()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var clicks = 0;
         button.Click += (_, _) => clicks++;
 
@@ -121,7 +121,7 @@ public sealed class ToggleButtonTests
     [InlineData(true)]
     public void FocusLossOrDisableCancelsSpaceWithoutClearingSelection(bool disable)
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         button.IsChecked = true;
         var clicks = 0;
         button.Click += (_, _) => clicks++;
@@ -131,7 +131,7 @@ public sealed class ToggleButtonTests
         if (disable)
             button.IsEnabled = false;
         else
-            screen.ClearFocus();
+            scene.ClearFocus();
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
         if (disable)
             Click(manager);
@@ -146,7 +146,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void TwoWayPropertyBindingSurvivesActivationAndSynchronizesPeers()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var model = new BooleanModel();
         var peer = new ToggleButton();
         button.BindTwoWay(ToggleButton.IsCheckedProperty, model, BooleanModel.ValueProperty);
@@ -171,7 +171,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void OneWayBindingDoesNotWriteBackAndLaterSourceChangesResynchronize()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var model = new BooleanModel();
         button.Bind(ToggleButton.IsCheckedProperty, model, BooleanModel.ValueProperty);
 
@@ -190,7 +190,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void NotifyPropertyChangedBindingWritesBackAndReflectsExternalChanges()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var model = new NotifyingBooleanModel();
         button.BindTwoWay(ToggleButton.IsCheckedProperty, model, source => source.Value);
         var clicks = 0;
@@ -209,7 +209,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void ClickObservesTheTargetValueWhenTheSourceRejectsWithoutNotification()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var model = new NotifyingBooleanModel { RejectTrue = true };
         button.BindTwoWay(ToggleButton.IsCheckedProperty, model, source => source.Value);
         var observed = new List<bool>();
@@ -227,7 +227,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void PropertyNotificationFailurePreservesStateAndStopsClick()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var error = new InvalidOperationException("state notification");
         var clicks = 0;
         button.Click += (_, _) => clicks++;
@@ -245,7 +245,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void BindingWriteFailurePreservesTargetAndStopsClick()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var error = new InvalidOperationException("source write");
         var model = new NotifyingBooleanModel { WriteError = error };
         button.BindTwoWay(ToggleButton.IsCheckedProperty, model, source => source.Value);
@@ -265,7 +265,7 @@ public sealed class ToggleButtonTests
     [Fact]
     public void ClickFailureDoesNotRollbackTheToggle()
     {
-        var (manager, screen, button) = OpenScene();
+        var (manager, scene, button) = OpenScene();
         var error = new InvalidOperationException("click");
         button.Click += (_, _) => throw error;
 
@@ -313,19 +313,19 @@ public sealed class ToggleButtonTests
         Assert.Equal(ordinary.Background, button.Background);
     }
 
-    private static (UiManager Manager, GameScreen Screen, ToggleButton Button) OpenScene()
+    private static (UIManager Manager, GameUIScene Scene, ToggleButton Button) OpenScene()
     {
         var root = new Canvas();
         var button = new ToggleButton { Width = 80, Height = 32 };
         root.Children.Add(button);
-        var screen = new GameScreen(root);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(root);
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
-        return (manager, screen, button);
+        return (manager, scene, button);
     }
 
-    private static void Click(UiManager manager, MouseButton button = MouseButton.Left)
+    private static void Click(UIManager manager, MouseButton button = MouseButton.Left)
     {
         manager.ProcessPointerPressed(new Point(5, 5), button, KeyModifiers.None);
         manager.ProcessPointerReleased(new Point(5, 5), button, KeyModifiers.None);

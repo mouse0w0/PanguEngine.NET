@@ -8,7 +8,7 @@ namespace PanguEngine.UI.Controls;
 /// Provides the base class for UI elements that draw filled and stroked vector geometry.
 /// </summary>
 /// <remarks>
-/// Geometry meshes are rebuilt lazily only when the data, stroke parameters, arranged size, or screen scale
+/// Geometry meshes are rebuilt lazily only when the data, stroke parameters, arranged size, or scene scale
 /// change. Changing a brush color never rebuilds geometry.
 /// </remarks>
 public abstract partial class Shape : UIElement
@@ -251,7 +251,7 @@ public abstract partial class Shape : UIElement
             StrokeMiterLimit,
             arranged ? LayoutBounds.Width : 0,
             arranged ? LayoutBounds.Height : 0,
-            Screen?.Scale ?? 1,
+            Scene?.Scale ?? 1,
             radii.X,
             radii.Y);
     }

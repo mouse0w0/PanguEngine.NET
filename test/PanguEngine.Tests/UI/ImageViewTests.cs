@@ -99,11 +99,11 @@ public sealed class ImageViewTests
     public void UniformDrawsCenteredAndClipsToTheImageViewBounds()
     {
         var view = CreateView(200, 100);
-        var screen = new Screen(view);
+        var scene = new UIScene(view);
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(0, 25, 100, 50), command.Bounds);
@@ -130,11 +130,11 @@ public sealed class ImageViewTests
     {
         var view = CreateView(200, 100);
         view.Stretch = ImageStretch.UniformToFill;
-        var screen = new Screen(view);
+        var scene = new UIScene(view);
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(-50, 0, 200, 100), command.Bounds);
@@ -146,11 +146,11 @@ public sealed class ImageViewTests
     {
         var view = CreateView(101, 99);
         view.Stretch = ImageStretch.None;
-        var screen = new Screen(view) { Scale = 1.5 };
+        var scene = new UIScene(view) { Scale = 1.5 };
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var command = GetImageCommand(commands);
 
         Assert.Equal(-1d / 1.5, command.Bounds.X, 12);
@@ -167,11 +167,11 @@ public sealed class ImageViewTests
     public void UniformRoundsCenteredDestinationOriginAndSizeToThePhysicalGrid()
     {
         var view = CreateView(200, 100);
-        var screen = new Screen(view) { Scale = 1.5 };
+        var scene = new UIScene(view) { Scale = 1.5 };
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var command = GetImageCommand(commands);
 
         Assert.Equal(0, command.Bounds.X);
@@ -189,11 +189,11 @@ public sealed class ImageViewTests
     {
         var view = CreateView(101, 100);
         view.Stretch = ImageStretch.UniformToFill;
-        var screen = new Screen(view) { Scale = 1.5 };
+        var scene = new UIScene(view) { Scale = 1.5 };
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var command = GetImageCommand(commands);
 
         Assert.Equal(-1d / 1.5, command.Bounds.X, 12);
@@ -211,11 +211,11 @@ public sealed class ImageViewTests
     {
         var view = CreateView(200, 100);
         view.Stretch = ImageStretch.Fill;
-        var screen = new Screen(view) { Scale = 1.5 };
+        var scene = new UIScene(view) { Scale = 1.5 };
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(0, 0, 100, 100), command.Bounds);
@@ -229,22 +229,22 @@ public sealed class ImageViewTests
     {
         var view = CreateView(101, 99);
         view.Stretch = ImageStretch.None;
-        var screen = new Screen(view) { Scale = 1.5, UseLayoutRounding = false };
+        var scene = new UIScene(view) { Scale = 1.5, UseLayoutRounding = false };
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var command = GetImageCommand(commands);
 
         Assert.Equal(new Rect(-0.5, 0.5, 101, 99), command.Bounds);
         Assert.Equal(new Rect(0, 0, 101, 99), command.SourceRect);
         Assert.Equal(new Rect(0, 0, 100, 100), GetImageClip(commands));
 
-        screen.UseLayoutRounding = true;
+        scene.UseLayoutRounding = true;
         view.Measure(new Size(100, 100));
         view.Arrange(new Rect(0, 0, 100, 100));
 
-        command = GetImageCommand(screen.CreateDrawCommandList());
+        command = GetImageCommand(scene.CreateDrawCommandList());
         Assert.Equal(-1d / 1.5, command.Bounds.X, 12);
         Assert.Equal(1d / 1.5, command.Bounds.Y, 12);
     }

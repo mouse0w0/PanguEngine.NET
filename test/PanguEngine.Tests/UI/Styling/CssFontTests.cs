@@ -182,12 +182,12 @@ public sealed class CssFontTests
         Assert.True(error.Column > 0);
     }
 
-    private static Screen Apply(UIElement root, string css)
+    private static UIScene Apply(UIElement root, string css)
     {
-        var screen = new Screen(root);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([StyleSheet.Parse(css, "fonts.css")]);
+        var scene = new UIScene(root);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([StyleSheet.Parse(css, "fonts.css")]);
         root.UpdateStyles();
-        return screen;
+        return scene;
     }
 }

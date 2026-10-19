@@ -427,43 +427,43 @@ public sealed class ShapeTests
     public void ValidGeometryRecordsDrawingCommands()
     {
         var rectangle = new Rectangle { Width = 10, Height = 10 };
-        var screen = CreateScreen(rectangle);
+        var scene = CreateScene(rectangle);
         try
         {
-            var commands = screen.CreateDrawCommandList();
+            var commands = scene.CreateDrawCommandList();
 
             Assert.NotEmpty(commands);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Fact]
-    public void ScreenScaleChangesKeepLocalHitGeometryConsistent()
+    public void SceneScaleChangesKeepLocalHitGeometryConsistent()
     {
         var rectangle = new Rectangle { Width = 20, Height = 20 };
         var root = new Panel();
         root.Children.Add(rectangle);
-        var screen = new Screen(root) { UseLayoutRounding = false, Scale = 1 };
-        screen.Open();
+        var scene = new UIScene(root) { UseLayoutRounding = false, Scale = 1 };
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(200, 100));
+            scene.PrepareFrame(new Size(200, 100));
 
             Assert.True(rectangle.Contains(new Point(10, 10)));
             Assert.False(rectangle.Contains(new Point(-1, 10)));
 
-            screen.Scale = 2;
-            screen.PrepareFrame(new Size(200, 100));
+            scene.Scale = 2;
+            scene.PrepareFrame(new Size(200, 100));
 
             Assert.True(rectangle.Contains(new Point(10, 10)));
             Assert.False(rectangle.Contains(new Point(-1, 10)));
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -473,13 +473,13 @@ public sealed class ShapeTests
         node.Arrange(bounds);
     }
 
-    private static Screen CreateScreen(UIElement child)
+    private static UIScene CreateScene(UIElement child)
     {
         var root = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root) { UseLayoutRounding = false };
-        screen.Open();
-        screen.PrepareFrame(new Size(200, 100));
-        return screen;
+        var scene = new UIScene(root) { UseLayoutRounding = false };
+        scene.Open();
+        scene.PrepareFrame(new Size(200, 100));
+        return scene;
     }
 }

@@ -28,9 +28,9 @@ public sealed class KeyBindingsTests
     [Fact]
     public void PressBindingRunsForMatchingKeyAndStopsAncestorRoute()
     {
-        var (manager, screen, node) = Open(new PressBindingNode());
+        var (manager, scene, node) = Open(new PressBindingNode());
         var ancestorCalls = 0;
-        screen.Root!.KeyDown += (_, _) => ancestorCalls++;
+        scene.Root!.KeyDown += (_, _) => ancestorCalls++;
 
         try
         {
@@ -204,10 +204,10 @@ public sealed class KeyBindingsTests
     [Fact]
     public void CurrentNodeHandledFlagDoesNotSuppressItsBinding()
     {
-        var (manager, screen, node) = Open(new HandledBindingNode());
+        var (manager, scene, node) = Open(new HandledBindingNode());
         var ancestorCalls = 0;
         node.KeyDown += (_, args) => args.Handled = true;
-        screen.Root!.KeyDown += (_, _) => ancestorCalls++;
+        scene.Root!.KeyDown += (_, _) => ancestorCalls++;
 
         try
         {
@@ -223,7 +223,7 @@ public sealed class KeyBindingsTests
         }
     }
 
-    private static (UiManager Manager, GameScreen Screen, TNode Node) Open<TNode>(TNode node)
+    private static (UIManager Manager, GameUIScene Scene, TNode Node) Open<TNode>(TNode node)
         where TNode : UIElement
     {
         node.Focusable = true;
@@ -231,11 +231,11 @@ public sealed class KeyBindingsTests
         node.Height = 40;
         var root = new Canvas();
         root.Children.Add(node);
-        var screen = new GameScreen(root);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(root);
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
-        return (manager, screen, node);
+        return (manager, scene, node);
     }
 
     private sealed class PressBindingNode : UIElement

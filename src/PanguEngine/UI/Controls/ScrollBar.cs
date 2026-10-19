@@ -205,7 +205,7 @@ public sealed partial class ScrollBar : Control
             if (!IsPressed)
                 CancelInteraction();
         });
-        Subscribe(ScreenProperty, (_, _) => CancelInteraction());
+        Subscribe(SceneProperty, (_, _) => CancelInteraction());
     }
 
     /// <summary>
@@ -531,8 +531,8 @@ public sealed partial class ScrollBar : Control
 
     private BarPlan ComputePlan(double main)
     {
-        var useLayoutRounding = Screen?.UseLayoutRounding ?? true;
-        var scale = Screen?.Scale ?? 1;
+        var useLayoutRounding = Scene?.UseLayoutRounding ?? true;
+        var scale = Scene?.Scale ?? 1;
         if (useLayoutRounding)
             main = LayoutHelper.RoundLayoutValueUp(main, scale);
         var showArrows = ShowArrows;
@@ -583,8 +583,8 @@ public sealed partial class ScrollBar : Control
     private double ResolveBarThickness(double cross)
     {
         var thickness = BarThickness;
-        if (Screen?.UseLayoutRounding ?? true)
-            thickness = LayoutHelper.RoundLayoutValueUp(thickness, Screen?.Scale ?? 1);
+        if (Scene?.UseLayoutRounding ?? true)
+            thickness = LayoutHelper.RoundLayoutValueUp(thickness, Scene?.Scale ?? 1);
         return Math.Min(thickness, Math.Max(0, cross));
     }
 

@@ -24,52 +24,52 @@ public sealed class DrawingTests
     [Fact]
     public void EmptyAndNonDrawableRootsProduceNoCommands()
     {
-        Assert.Empty(new Screen().CreateDrawCommandList());
+        Assert.Empty(new UIScene().CreateDrawCommandList());
 
         var unarranged = new DrawingNode
         {
             DrawAction = DrawUnitRectangle
         };
-        Assert.Empty(new Screen(unarranged).CreateDrawCommandList());
+        Assert.Empty(new UIScene(unarranged).CreateDrawCommandList());
 
         var hidden = new DrawingNode
         {
             Visibility = Visibility.Hidden,
             DrawAction = DrawUnitRectangle
         };
-        var hiddenScreen = new Screen(hidden);
+        var hiddenScene = new UIScene(hidden);
         Arrange(hidden, new Rect(0, 0, 10, 10));
-        Assert.Empty(hiddenScreen.CreateDrawCommandList());
+        Assert.Empty(hiddenScene.CreateDrawCommandList());
 
         var collapsed = new DrawingNode
         {
             Visibility = Visibility.Collapsed,
             DrawAction = DrawUnitRectangle
         };
-        var collapsedScreen = new Screen(collapsed);
+        var collapsedScene = new UIScene(collapsed);
         Arrange(collapsed, new Rect(0, 0, 10, 10));
-        Assert.Empty(collapsedScreen.CreateDrawCommandList());
+        Assert.Empty(collapsedScene.CreateDrawCommandList());
 
         var transparent = new DrawingNode
         {
             Opacity = 0,
             DrawAction = DrawUnitRectangle
         };
-        var transparentScreen = new Screen(transparent);
+        var transparentScene = new UIScene(transparent);
         Arrange(transparent, new Rect(0, 0, 10, 10));
-        Assert.Empty(transparentScreen.CreateDrawCommandList());
+        Assert.Empty(transparentScene.CreateDrawCommandList());
     }
 
     [Fact]
-    public void ClosedScreenRecordsScaleOnlyAroundNonEmptyCommands()
+    public void ClosedSceneRecordsScaleOnlyAroundNonEmptyCommands()
     {
-        var emptyScreen = new Screen { Scale = 1.5 };
+        var emptyScene = new UIScene { Scale = 1.5 };
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
-        var screen = new Screen(node) { Scale = 2 };
+        var scene = new UIScene(node) { Scale = 2 };
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        var empty = emptyScreen.CreateDrawCommandList();
-        var nonEmpty = screen.CreateDrawCommandList();
+        var empty = emptyScene.CreateDrawCommandList();
+        var nonEmpty = scene.CreateDrawCommandList();
 
         Assert.Empty(empty);
         Assert.Single(nonEmpty.OfType<FillRectangleCommand>());
@@ -82,55 +82,55 @@ public sealed class DrawingTests
     public void ScaleChangeProducesEmptySnapshotUntilLayoutUpdates()
     {
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
-        var screen = new Screen(node);
-        screen.Open();
-        screen.PrepareFrame(new Size(100, 100));
-        var before = screen.CreateDrawCommandList();
+        var scene = new UIScene(node);
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
+        var before = scene.CreateDrawCommandList();
 
-        screen.Scale = 2;
-        var pending = screen.CreateDrawCommandList();
-        screen.PrepareFrame(new Size(100, 100));
-        var after = screen.CreateDrawCommandList();
+        scene.Scale = 2;
+        var pending = scene.CreateDrawCommandList();
+        scene.PrepareFrame(new Size(100, 100));
+        var after = scene.CreateDrawCommandList();
 
         Assert.Single(before.OfType<FillRectangleCommand>());
         Assert.Empty(before.OfType<PushTransformCommand>());
         Assert.Empty(pending);
         Assert.Single(after.OfType<FillRectangleCommand>());
         Assert.Equal(2, Assert.Single(after.OfType<PushTransformCommand>()).Scale);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
     public void LayoutRoundingChangeProducesEmptySnapshotUntilLayoutUpdates()
     {
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
-        var screen = new Screen(node);
-        screen.Open();
-        screen.PrepareFrame(new Size(100, 100));
-        var before = screen.CreateDrawCommandList();
+        var scene = new UIScene(node);
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
+        var before = scene.CreateDrawCommandList();
 
-        screen.UseLayoutRounding = false;
-        var pending = screen.CreateDrawCommandList();
-        screen.PrepareFrame(new Size(100, 100));
-        var after = screen.CreateDrawCommandList();
+        scene.UseLayoutRounding = false;
+        var pending = scene.CreateDrawCommandList();
+        scene.PrepareFrame(new Size(100, 100));
+        var after = scene.CreateDrawCommandList();
 
         Assert.Single(before.OfType<FillRectangleCommand>());
         Assert.Empty(pending);
         Assert.Single(after.OfType<FillRectangleCommand>());
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
-    public void OpenEmptyScreenDoesNotLeaveAnEmptyScaleScope()
+    public void OpenEmptySceneDoesNotLeaveAnEmptyScaleScope()
     {
-        var screen = new Screen { Scale = 2 };
-        screen.Open();
-        screen.PrepareFrame(new Size(100, 100));
+        var scene = new UIScene { Scale = 2 };
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
 
         Assert.Empty(commands);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
@@ -142,9 +142,9 @@ public sealed class DrawingTests
                 new Rect(0.3, 0.7, 3.1, 4.1),
                 new Color(255, 255, 255))
         };
-        var screen = new Screen(node) { Scale = 1.5 };
+        var scene = new UIScene(node) { Scale = 1.5 };
         Arrange(node, new Rect(0, 0, 10, 10));
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
 
         Assert.Equal(
             new Rect(0.3, 0.7, 3.1, 4.1),
@@ -177,12 +177,12 @@ public sealed class DrawingTests
         };
         root.Add(first);
         root.Add(second);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(10, 20, 100, 100));
         Arrange(first, new Rect(5, 6, 20, 20));
         Arrange(second, new Rect(7, 8, 20, 20));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var commands = list.OfType<FillRectangleCommand>().ToArray();
 
         Assert.Equal(
@@ -218,10 +218,10 @@ public sealed class DrawingTests
             Background = new SolidColorBrush(background),
             BorderThickness = new Thickness(2, 3, 4, 5)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(5, 7, 20, 30));
 
-        var command = Assert.Single(screen.CreateDrawCommandList().OfType<FillRectangleCommand>());
+        var command = Assert.Single(scene.CreateDrawCommandList().OfType<FillRectangleCommand>());
 
         Assert.Equal(new Rect(2, 3, 14, 22), command.Bounds);
         Assert.Equal(background, command.Color);
@@ -247,10 +247,10 @@ public sealed class DrawingTests
             DrawAction = context =>
                 context.FillRectangle(new Rect(0, 0, 1, 1), childColor)
         });
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(5, 7, 100, 120));
 
-        var commands = screen.CreateDrawCommandList()
+        var commands = scene.CreateDrawCommandList()
             .OfType<FillRectangleCommand>()
             .ToArray();
 
@@ -274,10 +274,10 @@ public sealed class DrawingTests
             BorderBrush = new SolidColorBrush(40, 50, 60, 170),
             BorderThickness = new Thickness(25, 20, 30, 15)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 40, 30));
 
-        var commands = screen.CreateDrawCommandList()
+        var commands = scene.CreateDrawCommandList()
             .OfType<FillRectangleCommand>()
             .ToArray();
 
@@ -294,10 +294,10 @@ public sealed class DrawingTests
             BorderBrush = new SolidColorBrush(40, 50, 60),
             BorderThickness = new Thickness(4, 0, 0, 0)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 20, 30));
 
-        var command = Assert.Single(screen.CreateDrawCommandList().OfType<FillRectangleCommand>());
+        var command = Assert.Single(scene.CreateDrawCommandList().OfType<FillRectangleCommand>());
 
         Assert.Equal(new Rect(0, 0, 4, 30), command.Bounds);
     }
@@ -313,10 +313,10 @@ public sealed class DrawingTests
             BorderBrush = new SolidColorBrush(border),
             BorderThickness = new Thickness(0.6)
         };
-        var screen = new Screen(region) { Scale = 1.25 };
+        var scene = new UIScene(region) { Scale = 1.25 };
         Arrange(region, new Rect(0, 0, 40, 30));
 
-        var commands = screen.CreateDrawCommandList()
+        var commands = scene.CreateDrawCommandList()
             .OfType<FillRectangleCommand>()
             .ToArray();
 
@@ -338,13 +338,13 @@ public sealed class DrawingTests
             BorderBrush = new SolidColorBrush(40, 50, 60),
             BorderThickness = new Thickness(2)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 20, 20));
-        Assert.NotEmpty(screen.CreateDrawCommandList());
+        Assert.NotEmpty(scene.CreateDrawCommandList());
 
         region.InvalidateArrange();
 
-        Assert.Empty(screen.CreateDrawCommandList());
+        Assert.Empty(scene.CreateDrawCommandList());
     }
 
     [Fact]
@@ -366,10 +366,10 @@ public sealed class DrawingTests
             DrawAction = context =>
                 context.FillRectangle(new Rect(0, 0, 1, 1), childColor)
         });
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 20, 20));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var commands = list.OfType<FillRectangleCommand>().ToArray();
 
         Assert.Equal([customColor, childColor], commands.Select(command => command.Color));
@@ -394,11 +394,11 @@ public sealed class DrawingTests
             Background = new SolidColorBrush(10, 20, 30)
         };
         parent.Add(region);
-        var screen = new Screen(parent);
+        var scene = new UIScene(parent);
         Arrange(parent, new Rect(10, 20, 30, 30));
         Arrange(region, new Rect(20, 20, 40, 40));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<FillRectangleCommand>());
 
         Assert.Equal(new Rect(0, 0, 40, 40), command.Bounds);
@@ -429,10 +429,10 @@ public sealed class DrawingTests
         {
             Background = new ImageBrush(image, stretch)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 100, 100));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<DrawImageCommand>());
 
         Assert.Equal(new Rect(x, y, width, height), command.Bounds);
@@ -452,14 +452,14 @@ public sealed class DrawingTests
                 CreateImage(101, 99),
                 ImageStretch.None)
         };
-        var screen = new Screen(region)
+        var scene = new UIScene(region)
         {
             Scale = 1.5,
             UseLayoutRounding = useLayoutRounding
         };
         Arrange(region, new Rect(0, 0, 100, 100));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<DrawImageCommand>());
 
         Assert.Equal(new Rect(-0.5, 0.5, 101, 99), command.Bounds);
@@ -485,10 +485,10 @@ public sealed class DrawingTests
             BorderBrush = new ImageBrush(image, stretch),
             BorderThickness = new Thickness(10, 20, 30, 15)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(5, 7, 100, 80));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var commands = list.OfType<DrawImageCommand>().ToArray();
 
         var expectedClips = new List<Rect>
@@ -527,10 +527,10 @@ public sealed class DrawingTests
                 new Rect(5, 4, 20, 18),
                 new ImageSlice(3, 2, 5, 4))
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 40, 30));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var commands = list.OfType<DrawImageCommand>().ToArray();
         var sourceX = new[] { 5d, 8, 20, 25 };
         var sourceY = new[] { 4d, 6, 18, 22 };
@@ -567,10 +567,10 @@ public sealed class DrawingTests
                 image,
                 new ImageSlice(7, 4, 5, 4))
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 10, 6));
 
-        var commands = screen.CreateDrawCommandList()
+        var commands = scene.CreateDrawCommandList()
             .OfType<DrawImageCommand>()
             .ToArray();
         var split = 70d / 12;
@@ -601,10 +601,10 @@ public sealed class DrawingTests
                 new ImageSlice(4, 3, 6, 5)),
             BorderThickness = new Thickness(10, 20, 30, 15)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(5, 7, 100, 80));
 
-        var commands = screen.CreateDrawCommandList()
+        var commands = scene.CreateDrawCommandList()
             .OfType<DrawImageCommand>()
             .ToArray();
         var expectedBounds = new[]
@@ -651,10 +651,10 @@ public sealed class DrawingTests
                 new ImageSlice(0, 4, 4, 4)),
             BorderThickness = new Thickness(5)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 20, 20));
 
-        var commands = screen.CreateDrawCommandList()
+        var commands = scene.CreateDrawCommandList()
             .OfType<DrawImageCommand>()
             .ToArray();
 
@@ -673,10 +673,10 @@ public sealed class DrawingTests
                 new ImageSlice(4, 3, 6, 5)),
             BorderThickness = new Thickness(25, 20, 30, 15)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 40, 30));
 
-        var commands = screen.CreateDrawCommandList()
+        var commands = scene.CreateDrawCommandList()
             .OfType<DrawImageCommand>()
             .ToArray();
 
@@ -703,11 +703,11 @@ public sealed class DrawingTests
                 new ImageSlice(2))
         };
         parent.Add(region);
-        var screen = new Screen(parent);
+        var scene = new UIScene(parent);
         Arrange(parent, new Rect(10, 20, 30, 30));
         Arrange(region, new Rect(20, 20, 40, 40));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var commands = list.OfType<DrawImageCommand>().ToArray();
 
         Assert.Equal(9, commands.Length);
@@ -741,10 +741,10 @@ public sealed class DrawingTests
             thicknessError = Record.Exception(() =>
                 region.BorderThickness = new Thickness(1));
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         Arrange(region, new Rect(0, 0, 20, 20));
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
 
         Assert.IsType<InvalidOperationException>(brushError);
         Assert.IsType<InvalidOperationException>(thicknessError);
@@ -762,13 +762,13 @@ public sealed class DrawingTests
             DrawAction = context =>
                 context.FillRectangle(new Rect(0, 0, 2, 3), firstColor)
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(5, 7, 10, 10));
 
-        var firstSnapshot = screen.CreateDrawCommandList();
+        var firstSnapshot = scene.CreateDrawCommandList();
         node.DrawAction = context =>
             context.FillRectangle(new Rect(1, 1, 4, 5), secondColor);
-        var secondSnapshot = screen.CreateDrawCommandList();
+        var secondSnapshot = scene.CreateDrawCommandList();
 
         var firstCommand = Assert.Single(firstSnapshot.OfType<FillRectangleCommand>());
         Assert.Equal(new Rect(0, 0, 2, 3), firstCommand.Bounds);
@@ -786,15 +786,15 @@ public sealed class DrawingTests
         var second = CreateColorNode(2);
         root.Add(first);
         root.Add(second);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(0, 0, 10, 10));
         Arrange(first, new Rect(0, 0, 10, 10));
         Arrange(second, new Rect(0, 0, 10, 10));
 
-        var original = screen.CreateDrawCommandList();
+        var original = scene.CreateDrawCommandList();
         first.MoveToFront();
         Arrange(root, new Rect(0, 0, 10, 10));
-        var reordered = screen.CreateDrawCommandList();
+        var reordered = scene.CreateDrawCommandList();
 
         Assert.Equal(
             [new Color(1, 0, 0), new Color(2, 0, 0)],
@@ -819,11 +819,11 @@ public sealed class DrawingTests
             }
         };
         root.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(10, 20, 30, 30));
         Arrange(child, new Rect(20, 20, 40, 40));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<FillRectangleCommand>());
 
         Assert.Equal(new Rect(0, 0, 40, 40), command.Bounds);
@@ -852,11 +852,11 @@ public sealed class DrawingTests
                 context.FillRectangle(new Rect(20, 0, 5, 5), new Color(2, 0, 0))
         };
         root.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(0, 0, 10, 10));
         Arrange(child, new Rect(0, 0, 10, 10));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var commands = list.OfType<FillRectangleCommand>().ToArray();
 
         Assert.Equal(2, commands.Length);
@@ -880,11 +880,11 @@ public sealed class DrawingTests
                 context.FillRectangle(new Rect(20, 0, 5, 5), new Color(1, 0, 0))
         };
         root.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(0, 0, 10, 10));
         Arrange(child, new Rect(0, 0, 10, 10));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<FillRectangleCommand>());
 
         Assert.Equal(new Rect(20, 0, 5, 5), command.Bounds);
@@ -911,10 +911,10 @@ public sealed class DrawingTests
                     context.FillRectangle(new Rect(0, 0, 1, 1), new Color(1, 1, 1));
             }
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
 
         Assert.Equal(3, list.OfType<FillRectangleCommand>().Count());
 
@@ -939,10 +939,10 @@ public sealed class DrawingTests
                     new SolidColorBrush(color));
             }
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(10, 20, 10, 10));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<FillRectangleCommand>());
 
         Assert.Equal(new Rect(0, 0, 5, 6), command.Bounds);
@@ -966,11 +966,11 @@ public sealed class DrawingTests
             }
         };
         root.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(0, 0, 10, 10));
         Arrange(child, new Rect(0, 0, 10, 10));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<FillRectangleCommand>());
 
         Assert.Equal(color, command.Color);
@@ -996,10 +996,10 @@ public sealed class DrawingTests
                 context.FillRectangle(new Rect(0, 0, 1, 1), new Color(1, 1, 1));
             }
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
 
         Assert.All(errors, error => Assert.IsType<ArgumentOutOfRangeException>(error));
         Assert.Equal(
@@ -1039,10 +1039,10 @@ public sealed class DrawingTests
                 }
             }
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
         default(DrawingScope).Dispose();
 
         Assert.IsType<InvalidOperationException>(outOfOrderError);
@@ -1057,13 +1057,13 @@ public sealed class DrawingTests
             DrawAction = context =>
                 _ = context.PushClip(new Rect(0, 0, 1, 1))
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
+        Assert.Throws<InvalidOperationException>(scene.CreateDrawCommandList);
 
         node.DrawAction = DrawUnitRectangle;
-        Assert.Single(screen.CreateDrawCommandList().OfType<FillRectangleCommand>());
+        Assert.Single(scene.CreateDrawCommandList().OfType<FillRectangleCommand>());
     }
 
     [Fact]
@@ -1074,10 +1074,10 @@ public sealed class DrawingTests
         {
             DrawAction = context => captured = context
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
 
         Assert.Throws<InvalidOperationException>(() =>
             captured!.FillRectangle(
@@ -1093,14 +1093,14 @@ public sealed class DrawingTests
         {
             DrawAction = _ => throw expected
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        var actual = Assert.Throws<InvalidOperationException>(screen.CreateDrawCommandList);
+        var actual = Assert.Throws<InvalidOperationException>(scene.CreateDrawCommandList);
 
         Assert.Same(expected, actual);
         node.DrawAction = DrawUnitRectangle;
-        Assert.Single(screen.CreateDrawCommandList().OfType<FillRectangleCommand>());
+        Assert.Single(scene.CreateDrawCommandList().OfType<FillRectangleCommand>());
     }
 
     [Fact]
@@ -1113,16 +1113,16 @@ public sealed class DrawingTests
         var replacement = new DrawingNode();
         root.Add(first);
         root.Add(second);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(0, 0, 100, 100));
         Arrange(first, new Rect(0, 0, 10, 10));
         Arrange(second, new Rect(20, 0, 10, 10));
-        screen.Open();
-        screen.PrepareFrame(new Size(100, 100));
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
         var errors = new List<Exception?>();
         root.DrawAction = _ =>
         {
-            errors.Add(Record.Exception(() => screen.Root = replacement));
+            errors.Add(Record.Exception(() => scene.Root = replacement));
             errors.Add(Record.Exception(() => root.Add(added)));
             errors.Add(Record.Exception(() => root.Remove(first)));
             errors.Add(Record.Exception(root.Clear));
@@ -1134,26 +1134,26 @@ public sealed class DrawingTests
             errors.Add(Record.Exception(() => root.Opacity = 0.5));
             errors.Add(Record.Exception(() => root.Width = 50));
             errors.Add(Record.Exception(() => root.Focusable = true));
-            errors.Add(Record.Exception(() => screen.Scale = 2));
-            errors.Add(Record.Exception(() => screen.UseLayoutRounding = false));
+            errors.Add(Record.Exception(() => scene.Scale = 2));
+            errors.Add(Record.Exception(() => scene.UseLayoutRounding = false));
         };
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
 
         Assert.Equal(14, errors.Count);
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
-        Assert.Same(root, screen.Root);
+        Assert.Same(root, scene.Root);
         Assert.Equal(new UIElement[] { first, second }, root.Children);
         Assert.Null(added.Parent);
-        Assert.Null(replacement.Screen);
+        Assert.Null(replacement.Scene);
         Assert.Equal(1, root.Opacity);
         Assert.True(double.IsNaN(root.Width));
         Assert.False(root.Focusable);
-        Assert.Equal(1, screen.Scale);
-        Assert.True(screen.UseLayoutRounding);
+        Assert.Equal(1, scene.Scale);
+        Assert.True(scene.UseLayoutRounding);
         Assert.True(root.IsMeasureValid);
         Assert.True(root.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
@@ -1166,21 +1166,21 @@ public sealed class DrawingTests
         var independent = new DrawingNode();
         root.Add(first);
         root.Add(emptyFront);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(0, 0, 100, 100));
         Arrange(first, new Rect(0, 0, 10, 10));
         Arrange(emptyFront, new Rect(20, 0, 10, 10));
         var errors = new List<Exception?>();
         root.DrawAction = _ =>
         {
-            errors.Add(Record.Exception(() => screen.Root = root));
+            errors.Add(Record.Exception(() => scene.Root = root));
             errors.Add(Record.Exception(independent.MoveToFront));
             errors.Add(Record.Exception(emptyFront.MoveToFront));
             errors.Add(Record.Exception(() => root.Remove(foreign)));
             errors.Add(Record.Exception(emptyFront.Clear));
         };
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
 
         Assert.All(errors, Assert.Null);
         Assert.Equal(new UIElement[] { first, emptyFront }, root.Children);
@@ -1191,42 +1191,42 @@ public sealed class DrawingTests
     [Fact]
     public void DrawingRejectsManagerLifecycleOperationsBeforeManagerStateChanges()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var root = new DrawingNode();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         Arrange(root, new Rect(0, 0, 10, 10));
         var errors = new List<Exception?>();
         root.DrawAction = _ =>
         {
-            errors.Add(Record.Exception(() => manager.Open(new GameScreen())));
+            errors.Add(Record.Exception(() => manager.Open(new GameUIScene())));
             errors.Add(Record.Exception(manager.Close));
             errors.Add(Record.Exception(manager.Destroy));
         };
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
 
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
-        Assert.Same(screen, manager.CurrentScreen);
+        Assert.Same(scene, manager.CurrentScene);
         manager.Close();
     }
 
     [Fact]
-    public void ClosedDrawingScreenCannotOpenUntilGenerationReturns()
+    public void ClosedDrawingSceneCannotOpenUntilGenerationReturns()
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var node = new DrawingNode();
-        var screen = new GameScreen(node);
+        var scene = new GameUIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
         Exception? openError = null;
         node.DrawAction = _ =>
-            openError = Record.Exception(() => manager.Open(screen));
+            openError = Record.Exception(() => manager.Open(scene));
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
 
         Assert.IsType<InvalidOperationException>(openError);
-        Assert.Null(manager.CurrentScreen);
-        manager.Open(screen);
+        Assert.Null(manager.CurrentScene);
+        manager.Open(scene);
         manager.Close();
     }
 
@@ -1235,12 +1235,12 @@ public sealed class DrawingTests
     {
         Exception? error = null;
         var node = new DrawingNode();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         node.DrawAction = _ =>
-            error = Record.Exception(screen.CreateDrawCommandList);
+            error = Record.Exception(scene.CreateDrawCommandList);
         Arrange(node, new Rect(0, 0, 10, 10));
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
 
         Assert.IsType<InvalidOperationException>(error);
     }
@@ -1250,35 +1250,35 @@ public sealed class DrawingTests
     {
         var calls = 0;
         var node = new DrawingNode();
-        var screen = new Screen(node);
-        node.DrawAction = _ => screen.Post(() => calls++);
+        var scene = new UIScene(node);
+        node.DrawAction = _ => scene.Post(() => calls++);
         Arrange(node, new Rect(0, 0, 10, 10));
-        screen.Open();
+        scene.Open();
 
-        _ = screen.CreateDrawCommandList();
+        _ = scene.CreateDrawCommandList();
         Assert.Equal(0, calls);
 
-        screen.PrepareFrame(new Size(10, 10));
+        scene.PrepareFrame(new Size(10, 10));
         Assert.Equal(1, calls);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
-    public void OpenScreenRequiresOwnerThreadAndClosedScreenAllowsBackgroundDrawing()
+    public void OpenSceneRequiresOwnerThreadAndClosedSceneAllowsBackgroundDrawing()
     {
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(0, 0, 10, 10));
-        screen.Open();
+        scene.Open();
 
         var openError = RunOnBackgroundThread(() =>
-            Record.Exception(screen.CreateDrawCommandList));
+            Record.Exception(scene.CreateDrawCommandList));
 
         Assert.IsType<InvalidOperationException>(openError);
-        screen.Close();
+        scene.Close();
 
         var closedCount = RunOnBackgroundThread(() =>
-            screen.CreateDrawCommandList().OfType<FillRectangleCommand>().Count());
+            scene.CreateDrawCommandList().OfType<FillRectangleCommand>().Count());
         Assert.Equal(1, closedCount);
     }
 
@@ -1292,10 +1292,10 @@ public sealed class DrawingTests
                     new Rect(double.MaxValue, 0, 1, 1),
                     new Color(1, 1, 1))
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(double.MaxValue, 0, 1, 1));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
 
         var builder = new DrawBuilder();
         Assert.Throws<InvalidOperationException>(() => builder.Build(list, 100, 100, false));
@@ -1311,11 +1311,11 @@ public sealed class DrawingTests
             DrawAction = _ => drawCalls++
         };
         root.Add(child);
-        var screen = new Screen(root);
+        var scene = new UIScene(root);
         Arrange(root, new Rect(double.MaxValue, 0, 1, 1));
         Arrange(child, new Rect(double.MaxValue, 0, 1, 1));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
 
         Assert.Empty(list);
         Assert.Equal(1, drawCalls);
@@ -1336,10 +1336,10 @@ public sealed class DrawingTests
                     context.FillRectangle(new Rect(0, 0, 1, 1), new Color(1, 1, 1));
             }
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(double.MaxValue, 0, 1, 1));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
 
         var builder = new DrawBuilder();
         Assert.Throws<InvalidOperationException>(() => builder.Build(list, 100, 100, false));
@@ -1358,10 +1358,10 @@ public sealed class DrawingTests
                     context.DrawImage(new Rect(0, 0, 5, 6), image, new Rect(0, 0, 1, 2));
             }
         };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Arrange(node, new Rect(10, 20, 10, 10));
 
-        var list = screen.CreateDrawCommandList();
+        var list = scene.CreateDrawCommandList();
         var command = Assert.Single(list.OfType<DrawImageCommand>());
 
         Assert.Same(image, command.Image);

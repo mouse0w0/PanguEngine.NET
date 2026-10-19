@@ -159,9 +159,9 @@ public sealed class UniformGrid : Panel
             return;
         }
 
-        var screen = Screen;
-        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var useLayoutRounding = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         var (rowSpacing, columnSpacing) = GetLayoutSpacing();
         var cellWidth = GetCellExtent(contentBounds.Width, GetTotalSpacing(_columns, columnSpacing), _columns);
         var cellHeight = GetCellExtent(contentBounds.Height, GetTotalSpacing(_rows, rowSpacing), _rows);
@@ -203,10 +203,10 @@ public sealed class UniformGrid : Panel
     {
         var rowSpacing = RowSpacing;
         var columnSpacing = ColumnSpacing;
-        var screen = Screen;
-        if (screen?.UseLayoutRounding ?? true)
+        var scene = Scene;
+        if (scene?.UseLayoutRounding ?? true)
         {
-            var scale = screen?.Scale ?? 1;
+            var scale = scene?.Scale ?? 1;
             rowSpacing = LayoutHelper.RoundLayoutValue(rowSpacing, scale);
             columnSpacing = LayoutHelper.RoundLayoutValue(columnSpacing, scale);
         }

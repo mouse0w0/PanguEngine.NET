@@ -159,7 +159,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
                 _wheelRemainder = 0;
             }
         });
-        Subscribe(ScreenProperty, (_, _) =>
+        Subscribe(SceneProperty, (_, _) =>
         {
             CancelRepeat();
             _wheelRemainder = 0;
@@ -300,7 +300,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
 
     private void OnEditorLostFocus(object? sender, FocusChangedEventArgs eventArgs)
     {
-        if (ReferenceEquals(_editor.Screen?.FocusedNode, _editor))
+        if (ReferenceEquals(_editor.Scene?.FocusedNode, _editor))
             return;
 
         CancelRepeat();
@@ -483,7 +483,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     {
         if (_pressedPart is not { } part)
             return;
-        if (!CanStep || !part.IsPressed || !part.IsEnabled || Screen is null)
+        if (!CanStep || !part.IsPressed || !part.IsEnabled || Scene is null)
         {
             CancelRepeat();
             return;

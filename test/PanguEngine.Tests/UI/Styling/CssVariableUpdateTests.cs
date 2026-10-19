@@ -14,38 +14,38 @@ public sealed class CssVariableUpdateTests
         var root = new Panel { StyleId = "root" };
         var child = new Panel { StyleId = "child" };
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(css)]);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(css)]);
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsMeasureValid);
             Assert.True(child.IsArrangeValid);
 
             root.SetHovered(true);
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
 
             Assert.Equal(new Thickness(8), child.Padding);
             Assert.False(child.IsMeasureValid);
             Assert.False(child.IsArrangeValid);
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsMeasureValid);
             Assert.True(child.IsArrangeValid);
 
             root.SetHovered(false);
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
 
             Assert.Equal(Thickness.Zero, child.Padding);
             Assert.False(child.IsMeasureValid);
             Assert.False(child.IsArrangeValid);
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsMeasureValid);
             Assert.True(child.IsArrangeValid);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -55,29 +55,29 @@ public sealed class CssVariableUpdateTests
         var child = new Panel { StyleId = "child" };
         var root = new Canvas();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("#child { left: 0; } #child:hover { left: 8px; }")]);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("#child { left: 0; } #child:hover { left: 8px; }")]);
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             child.SetHovered(true);
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
             Assert.Equal(8d, child.GetValue(Canvas.LeftProperty));
             Assert.True(child.IsMeasureValid);
             Assert.False(child.IsArrangeValid);
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.True(child.IsArrangeValid);
 
             child.SetHovered(false);
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
             Assert.Equal(0d, child.GetValue(Canvas.LeftProperty));
             Assert.True(child.IsMeasureValid);
             Assert.False(child.IsArrangeValid);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -87,8 +87,8 @@ public sealed class CssVariableUpdateTests
         var root = new Panel();
         var child = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .theme { --n: 4px; }
                              #large { --n: 8px; }
@@ -96,16 +96,16 @@ public sealed class CssVariableUpdateTests
                              """)
         ]);
         root.Classes.Add("theme");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), child.Padding);
         root.StyleId = "large";
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(8), child.Padding);
         root.StyleId = null;
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), child.Padding);
         root.Classes.Remove("theme");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(Thickness.Zero, child.Padding);
     }
 
@@ -115,26 +115,26 @@ public sealed class CssVariableUpdateTests
         var root = new Panel { StyleId = "root" };
         var child = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              #root { --alpha: 0.8; }
                              #root:hover { --alpha: 0.4; }
                              Panel { opacity: var(--alpha); }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, child.Opacity);
         root.SetHovered(true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, child.Opacity);
         root.SetHovered(false);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, child.Opacity);
     }
 
     [Fact]
-    public void SameScreenReparentRefreshesAnEntireInheritedSubtree()
+    public void SameSceneReparentRefreshesAnEntireInheritedSubtree()
     {
         var first = new Panel { StyleId = "first" };
         var second = new Panel { StyleId = "second" };
@@ -145,18 +145,18 @@ public sealed class CssVariableUpdateTests
         var root = new Panel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              #first { --n: 4px; }
                              #second { --n: 8px; }
                              Panel { padding: var(--n, 0); }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), leaf.Padding);
         second.Children.Add(subtree);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(8), subtree.Padding);
         Assert.Equal(new Thickness(8), leaf.Padding);
         second.Children.Remove(subtree);
@@ -166,24 +166,24 @@ public sealed class CssVariableUpdateTests
     }
 
     [Fact]
-    public void CrossScreenMoveAndStylesheetReplacementUseNewVariableEnvironment()
+    public void CrossSceneMoveAndStylesheetReplacementUseNewVariableEnvironment()
     {
         var first = new Panel { StyleId = "root" };
         var second = new Panel { StyleId = "root" };
         var child = new Panel();
         first.Children.Add(child);
-        var firstScreen = new Screen(first);
-        var secondScreen = new Screen(second);
-        firstScreen.SetStyleSheets([StyleSheet.Parse("#root { --n: 4px; } Panel { padding: var(--n); }")]);
-        secondScreen.SetStyleSheets([StyleSheet.Parse("#root { --n: 8px; } Panel { padding: var(--n); }")]);
+        var firstScene = new UIScene(first);
+        var secondScene = new UIScene(second);
+        firstScene.SetStyleSheets([StyleSheet.Parse("#root { --n: 4px; } Panel { padding: var(--n); }")]);
+        secondScene.SetStyleSheets([StyleSheet.Parse("#root { --n: 8px; } Panel { padding: var(--n); }")]);
         second.Children.Add(child);
-        secondScreen.Root!.UpdateStyles();
+        secondScene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(8), child.Padding);
-        secondScreen.SetStyleSheets([StyleSheet.Parse("#root { --n: 12px; } Panel { padding: var(--n); }")]);
-        secondScreen.Root!.UpdateStyles();
+        secondScene.SetStyleSheets([StyleSheet.Parse("#root { --n: 12px; } Panel { padding: var(--n); }")]);
+        secondScene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(12), child.Padding);
-        secondScreen.SetStyleSheets([]);
-        secondScreen.Root!.UpdateStyles();
+        secondScene.SetStyleSheets([]);
+        secondScene.Root!.UpdateStyles();
         Assert.Equal(Thickness.Zero, child.Padding);
     }
 
@@ -195,8 +195,8 @@ public sealed class CssVariableUpdateTests
         var second = new Panel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .theme { --alpha: 0.4; }
                              .theme.same { --alpha: 0.4; }
@@ -213,12 +213,12 @@ public sealed class CssVariableUpdateTests
             observed = second.Opacity;
         };
         root.Classes.Add("theme");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, observed);
         Assert.Equal(0.4, second.Opacity);
         Assert.Equal(1, notifications);
         root.Classes.Add("same");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1, notifications);
     }
 
@@ -228,10 +228,10 @@ public sealed class CssVariableUpdateTests
         var root = new Panel { Opacity = 0.9 };
         var child = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".theme { --alpha: 0.4; } Panel { opacity: var(--alpha, 1); }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".theme { --alpha: 0.4; } Panel { opacity: var(--alpha, 1); }")]);
         root.Classes.Add("theme");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.9, root.Opacity);
         Assert.Equal(0.4, child.Opacity);
         Assert.True(Assert.Single(root.GetStyleValueSources(UIElement.OpacityProperty)).IsMaskedByLocalValue);
@@ -267,8 +267,8 @@ public sealed class CssVariableUpdateTests
         var last = new Panel();
         root.Children.Add(first);
         root.Children.Add(last);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              :root { --alpha: 0.4; }
                              :root.changed { --alpha: 0.7; }
@@ -281,14 +281,14 @@ public sealed class CssVariableUpdateTests
                 root.Classes.Add("changed");
         };
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, root.Opacity);
         Assert.Equal(0.4, first.Opacity);
         Assert.Equal(0.7, last.Opacity);
         Assert.False(root.IsStyleSubtreeValid);
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.7, root.Opacity);
         Assert.Equal(0.7, first.Opacity);
@@ -305,15 +305,15 @@ public sealed class CssVariableUpdateTests
         var root = new Panel();
         root.Children.Add(leader);
         root.Children.Add(follower);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse(".leader + Panel { --alpha: 0.4; } Panel { opacity: var(--alpha, 1); }")
         ]);
         leader.Classes.Add("leader");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, leaf.Opacity);
         root.Children.Move(0, 1);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, leaf.Opacity);
     }
 
@@ -323,13 +323,13 @@ public sealed class CssVariableUpdateTests
         var root = new Panel();
         var child = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { --n: 4px; padding: var(--n); }")]);
-        screen.Root!.UpdateStyles();
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { --n: 4px; padding: var(--n); }")]);
+        scene.Root!.UpdateStyles();
+        scene.SetStyleSheets([
             StyleSheet.Parse("Panel { --n: var(--missing); padding: var(--n); }")
         ]);
-        Assert.Throws<StyleParseException>(screen.Root!.UpdateStyles);
+        Assert.Throws<StyleParseException>(scene.Root!.UpdateStyles);
         Assert.Equal(new Thickness(4), root.Padding);
         Assert.Equal(new Thickness(4), child.Padding);
     }
@@ -340,23 +340,23 @@ public sealed class CssVariableUpdateTests
         var root = new Panel();
         var child = new Panel();
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { padding: 2px; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { padding: 2px; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(2), child.Padding);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 4px; }")]);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { padding: var(--n); }")]);
-        screen.Root!.UpdateStyles();
+        scene.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 4px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { padding: var(--n); }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), child.Padding);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 8px; }")]);
-        screen.Root!.UpdateStyles();
+        scene.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 8px; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(8), child.Padding);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { --n: 12px; padding: var(--n); }")]);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 16px; }")]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { --n: 12px; padding: var(--n); }")]);
+        scene.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 16px; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(12), child.Padding);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { padding: var(--n); }")]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { padding: var(--n); }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(16), child.Padding);
     }
 }

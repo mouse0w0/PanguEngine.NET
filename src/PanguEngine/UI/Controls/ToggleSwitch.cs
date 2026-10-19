@@ -92,13 +92,13 @@ public sealed class ToggleSwitch : Control
     /// <inheritdoc />
     protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
-        var screen = Screen;
+        var scene = Scene;
         base.OnPointerClicked(eventArgs);
         if (eventArgs.Handled || eventArgs.Button != MouseButton.Left)
             return;
 
         eventArgs.Handled = true;
-        if (CanReceivePointerInput(screen))
+        if (CanReceivePointerInput(scene))
             IsOn = !IsOn;
     }
 
@@ -160,9 +160,9 @@ public sealed class ToggleSwitch : Control
     /// <inheritdoc />
     protected override bool IsPressedPseudoClassActive => IsPressed || _spaceKeyDown;
 
-    private bool CanReceivePointerInput(Screen? screen)
+    private bool CanReceivePointerInput(UIScene? scene)
     {
-        if (screen is null || !ReferenceEquals(Screen, screen) || !screen.IsOpen())
+        if (scene is null || !ReferenceEquals(Scene, scene) || !scene.IsOpen())
             return false;
 
         for (UIElement? node = this; node is not null; node = node.Parent)

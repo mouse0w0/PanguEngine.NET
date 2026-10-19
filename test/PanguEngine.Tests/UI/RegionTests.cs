@@ -258,7 +258,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.6),
             ContentDesiredSize = Size.Zero
         };
-        _ = new Screen(region) { Scale = 1.25 };
+        _ = new UIScene(region) { Scale = 1.25 };
 
         region.Measure(new Size(100, 100));
 
@@ -277,7 +277,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.6),
             ContentDesiredSize = Size.Zero
         };
-        _ = new Screen(region) { Scale = 1.25 };
+        _ = new UIScene(region) { Scale = 1.25 };
         region.Measure(new Size(100, 100));
 
         region.Arrange(new Rect(10, 20, 100, 120));
@@ -299,7 +299,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.4),
             ContentDesiredSize = Size.Zero
         };
-        var screen = new Screen(region) { Scale = 1.25, UseLayoutRounding = false };
+        var scene = new UIScene(region) { Scale = 1.25, UseLayoutRounding = false };
         region.Measure(new Size(100, 100));
 
         region.Arrange(new Rect(0, 0, 100, 100));
@@ -307,7 +307,7 @@ public sealed class RegionTests
         Assert.Equal(0.8, region.ContentBounds.X, 12);
         Assert.Equal(98.4, region.ContentBounds.Width, 12);
 
-        screen.UseLayoutRounding = true;
+        scene.UseLayoutRounding = true;
         region.Measure(new Size(100, 100));
         region.Arrange(new Rect(0, 0, 100, 100));
 
@@ -324,10 +324,10 @@ public sealed class RegionTests
             Padding = new Thickness(0.6),
             ContentDesiredSize = Size.Zero
         };
-        var screen = new Screen(region) { Scale = 1.25 };
+        var scene = new UIScene(region) { Scale = 1.25 };
         region.Measure(new Size(100, 100));
         region.Arrange(new Rect(10, 20, 100, 120));
-        screen.Scale = 2;
+        scene.Scale = 2;
 
         Assert.Equal(Rect.Zero, region.ContentBounds);
         Assert.Equal(Rect.Zero, region.DecorationBounds);
@@ -350,7 +350,7 @@ public sealed class RegionTests
             Padding = new Thickness(0.4),
             ContentDesiredSize = Size.Zero
         };
-        _ = new Screen(region) { Scale = 1.25 };
+        _ = new UIScene(region) { Scale = 1.25 };
         region.Measure(new Size(100, 100));
         region.Arrange(new Rect(0, 0, 100, 100));
         Assert.NotEqual(Rect.Zero, region.ContentBounds);
@@ -652,9 +652,9 @@ public sealed class RegionTests
         var original = new SolidColorBrush(10, 20, 30);
         var changed = new SolidColorBrush(40, 50, 60);
         region.Background = original;
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         ValidateLayout(region);
-        screen.Open();
+        scene.Open();
 
         var setterError = RunOnBackgroundThread(() => Record.Exception(() => region.Background = changed));
         Assert.IsType<InvalidOperationException>(setterError);
@@ -696,7 +696,7 @@ public sealed class RegionTests
         Assert.True(region.IsMeasureValid);
         Assert.True(region.IsArrangeValid);
 
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
@@ -709,9 +709,9 @@ public sealed class RegionTests
             BorderBrush = originalBrush,
             BorderThickness = new Thickness(1)
         };
-        var screen = new Screen(region);
+        var scene = new UIScene(region);
         ValidateLayout(region);
-        screen.Open();
+        scene.Open();
 
         var brushError = RunOnBackgroundThread(() => Record.Exception(() => region.BorderBrush = changedBrush));
         var thicknessError =
@@ -724,7 +724,7 @@ public sealed class RegionTests
         Assert.True(region.IsMeasureValid);
         Assert.True(region.IsArrangeValid);
 
-        screen.Close();
+        scene.Close();
     }
 
     private static void ValidateLayout(UIElement node)

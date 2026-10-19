@@ -1,0 +1,284 @@
+using PanguEngine.UI;
+using PanguEngine.UI.Controls;
+using PanguEngine.UI.Drawing;
+
+namespace PanguEngine.Client.UI.Scenes.Showcase;
+
+/// <summary>
+/// Builds fixed layout comparisons for alignment, spacing, docking, placement and visibility.
+/// </summary>
+internal static class UiShowcaseLayout
+{
+    /// <summary>
+    /// Creates the ordered layout gallery examples.
+    /// </summary>
+    /// <returns>The layout examples.</returns>
+    internal static UiShowcaseExample[] CreateExamples() =>
+    [
+        CreatePanelExample(),
+        CreateStackExample(),
+        CreateWrapExample(),
+        CreateUniformGridExample(),
+        CreateDockExample(),
+        CreateGridExample(),
+        CreateCanvasExample(),
+        CreateVisibilityExample()
+    ];
+
+    private static UiShowcaseExample CreatePanelExample()
+    {
+        var samples = new UiShowcaseGallery(130, 3);
+        foreach (var vertical in new[] { VerticalAlignment.Top, VerticalAlignment.Center, VerticalAlignment.Bottom })
+        foreach (var horizontal in new[]
+                     { HorizontalAlignment.Left, HorizontalAlignment.Center, HorizontalAlignment.Right })
+        {
+            var host = new Panel { Height = 72 };
+            host.Classes.Add("showcase-layout-host");
+            var target = CreateSlot($"showcase-panel-{horizontal}-{vertical}");
+            target.Width = 40;
+            target.Height = 24;
+            target.HorizontalAlignment = horizontal;
+            target.VerticalAlignment = vertical;
+            host.Children.Add(target);
+            samples.Children.Add(UiShowcaseWidgets.Sample($"{HorizontalName(horizontal)} / {VerticalName(vertical)}",
+                host));
+        }
+
+        return new UiShowcaseExample("Panel 对齐", "九个独立样本展示水平与垂直对齐组合。", samples);
+    }
+
+    private static UiShowcaseExample CreateStackExample()
+    {
+        var horizontal = CreateStack("showcase-stack-horizontal", Orientation.Horizontal, 8);
+        var vertical = CreateStack("showcase-stack-vertical", Orientation.Vertical, 8);
+        var margin = CreateStack("showcase-stack-margin", Orientation.Horizontal, 8);
+        margin.Children[1].StyleId = "showcase-stack-margin-target";
+        margin.Children[1].Margin = new Thickness(6);
+        return new UiShowcaseExample(
+            "StackPanel 布局",
+            "对比排列方向、元素间距及中间项的外边距。",
+            UiShowcaseWidgets.Samples(
+                UiShowcaseWidgets.Sample("横向", horizontal),
+                UiShowcaseWidgets.Sample("纵向", vertical),
+                UiShowcaseWidgets.Sample("间距 0", CreateStack("showcase-stack-spacing-0", Orientation.Horizontal, 0)),
+                UiShowcaseWidgets.Sample("间距 8", CreateStack("showcase-stack-spacing-8", Orientation.Horizontal, 8)),
+                UiShowcaseWidgets.Sample("间距 16", CreateStack("showcase-stack-spacing-16", Orientation.Horizontal, 16)),
+                UiShowcaseWidgets.Sample("中间项外边距 6", margin)));
+    }
+
+    private static StackPanel CreateStack(string id, Orientation orientation, double spacing)
+    {
+        var stack = new StackPanel { StyleId = id, Orientation = orientation, Spacing = spacing };
+        for (var index = 0; index < 3; index++)
+            stack.Children.Add(CreateSlot());
+        return stack;
+    }
+
+    private static UiShowcaseExample CreateUniformGridExample()
+    {
+        var spacing = CreateUniformGrid("showcase-uniform-grid-spacing", 0, 3);
+        spacing.RowSpacing = 4;
+        spacing.ColumnSpacing = 12;
+        var hidden = CreateUniformGrid("showcase-uniform-grid-hidden", 0, 3);
+        hidden.Children[1].Visibility = Visibility.Hidden;
+        var collapsed = CreateUniformGrid("showcase-uniform-grid-collapsed", 0, 3);
+        collapsed.Children[1].Visibility = Visibility.Collapsed;
+        return new UiShowcaseExample(
+            "UniformGrid 布局",
+            "八个编号格子等分内容区，对比自动行列、固定行列及独立间距。隐藏保留占位，折叠后后续格子前移。",
+            UiShowcaseWidgets.Samples(
+                UiShowcaseWidgets.Sample("自动行列 · 3 × 3", CreateUniformGrid("showcase-uniform-grid-auto", 0, 0)),
+                UiShowcaseWidgets.Sample("固定 3 列 · 自动行数", CreateUniformGrid("showcase-uniform-grid-columns", 0, 3)),
+                UiShowcaseWidgets.Sample("固定 2 行 · 自动列数", CreateUniformGrid("showcase-uniform-grid-rows", 2, 0)),
+                UiShowcaseWidgets.Sample("行间距 4 · 列间距 12", spacing),
+                UiShowcaseWidgets.Sample("3 列 · 第 2 项隐藏", hidden),
+                UiShowcaseWidgets.Sample("3 列 · 第 2 项折叠", collapsed)));
+    }
+
+    private static UniformGrid CreateUniformGrid(string id, int rows, int columns)
+    {
+        var grid = new UniformGrid { StyleId = id, Rows = rows, Columns = columns };
+        grid.Classes.Add("showcase-layout-host");
+        grid.Classes.Add("showcase-uniform-grid");
+        for (var index = 0; index < 8; index++)
+        {
+            var cell = new Panel { StyleId = $"{id}-cell-{index + 1}" };
+            cell.Classes.Add("showcase-uniform-grid-cell");
+            var label = UiShowcaseWidgets.Label($"{index + 1:00}");
+            label.HorizontalAlignment = HorizontalAlignment.Center;
+            label.VerticalAlignment = VerticalAlignment.Center;
+            cell.Children.Add(label);
+            grid.Children.Add(cell);
+        }
+
+        return grid;
+    }
+
+    /// <summary>
+    /// Creates fixed comparisons of dock order and last-child filling.
+    /// </summary>
+    private static UiShowcaseExample CreateDockExample()
+    {
+        var samples = new UiShowcaseGallery(190, 2);
+        samples.Children.AddRange([
+            UiShowcaseWidgets.Sample("上边先停靠 · 填充开启", CreateDockSample("showcase-dock-top-fill", true, true)),
+            UiShowcaseWidgets.Sample("左边先停靠 · 填充开启", CreateDockSample("showcase-dock-left-fill", false, true)),
+            UiShowcaseWidgets.Sample("上边先停靠 · 填充关闭", CreateDockSample("showcase-dock-top-no-fill", true, false)),
+            UiShowcaseWidgets.Sample("左边先停靠 · 填充关闭", CreateDockSample("showcase-dock-left-no-fill", false, false))
+        ]);
+        return new UiShowcaseExample(
+            "DockPanel 布局",
+            "比较上边与左边的停靠先后；关闭最后节点填充后，留白显示剩余空间。",
+            samples);
+    }
+
+    /// <summary>
+    /// Creates a dock layout sample with the specified edge priority and filling policy.
+    /// </summary>
+    /// <param name="id">The sample's style identifier.</param>
+    /// <param name="topFirst">Whether the top edge takes priority over the left edge.</param>
+    /// <param name="lastChildFill">Whether the content region receives the remaining area.</param>
+    private static DockPanel CreateDockSample(string id, bool topFirst, bool lastChildFill)
+    {
+        var host = new DockPanel { StyleId = id, Height = 148, LastChildFill = lastChildFill };
+        host.Classes.Add("showcase-layout-host");
+        var top = CreateDockRegion("上", Dock.Top, "showcase-dock-top");
+        top.Height = 32;
+        var left = CreateDockRegion("左", Dock.Left, "showcase-dock-left");
+        left.Width = 40;
+        var right = CreateDockRegion("右", Dock.Right, "showcase-dock-right");
+        right.Width = 40;
+        var bottom = CreateDockRegion("下", Dock.Bottom, "showcase-dock-bottom");
+        bottom.Height = 32;
+        var content = CreateDockRegion("内容", Dock.Left, "showcase-dock-content");
+
+        if (topFirst)
+            host.Children.AddRange([top, left]);
+        else
+            host.Children.AddRange([left, top]);
+        host.Children.AddRange([right, bottom, content]);
+        return host;
+    }
+
+    /// <summary>
+    /// Creates a labeled region for a dock layout sample.
+    /// </summary>
+    /// <param name="text">The region label.</param>
+    /// <param name="dock">The region's dock direction.</param>
+    /// <param name="cssClass">The CSS class that distinguishes the region.</param>
+    private static Panel CreateDockRegion(string text, Dock dock, string cssClass)
+    {
+        var label = UiShowcaseWidgets.Label(text);
+        label.HorizontalAlignment = HorizontalAlignment.Center;
+        label.VerticalAlignment = VerticalAlignment.Center;
+        var region = new Panel();
+        region.Classes.Add("showcase-dock-region");
+        region.Classes.Add(cssClass);
+        region.Children.Add(label);
+        DockPanel.SetDock(region, dock);
+        return region;
+    }
+
+    private static UiShowcaseExample CreateGridExample() => UiShowcaseGrid.CreateExample();
+
+    private static UiShowcaseExample CreateWrapExample()
+    {
+        var variableWidths = CreateWrap("showcase-wrap-variable-widths", Orientation.Horizontal);
+        var widths = new[] { 32d, 48d, 40d, 56d, 32d, 48d };
+        for (var index = 0; index < widths.Length; index++)
+            variableWidths.Children[index].Width = widths[index];
+
+        return new UiShowcaseExample(
+            "WrapPanel 布局",
+            "空间不足时横向换行或纵向换列，分别对比元素间距、行间距和不同元素宽度。",
+            UiShowcaseWidgets.Samples(
+                UiShowcaseWidgets.Sample("横向换行", CreateWrap("showcase-wrap-horizontal", Orientation.Horizontal)),
+                UiShowcaseWidgets.Sample("纵向换列", CreateWrap("showcase-wrap-vertical", Orientation.Vertical)),
+                UiShowcaseWidgets.Sample("无间距", CreateWrap("showcase-wrap-spacing-0", Orientation.Horizontal, 0, 0)),
+                UiShowcaseWidgets.Sample("元素间距 16",
+                    CreateWrap("showcase-wrap-item-spacing-16", Orientation.Horizontal, 16)),
+                UiShowcaseWidgets.Sample("行间距 16",
+                    CreateWrap("showcase-wrap-line-spacing-16", Orientation.Horizontal, 8, 16)),
+                UiShowcaseWidgets.Sample("不同元素宽度", variableWidths)));
+    }
+
+    private static WrapPanel CreateWrap(
+        string id,
+        Orientation orientation,
+        double itemSpacing = 8,
+        double lineSpacing = 8)
+    {
+        var panel = new WrapPanel
+        {
+            StyleId = id,
+            Orientation = orientation,
+            ItemSpacing = itemSpacing,
+            LineSpacing = lineSpacing,
+            Width = 144,
+            Height = 112,
+            Padding = new Thickness(8),
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        panel.Classes.Add("showcase-layout-host");
+        for (var index = 0; index < 6; index++)
+            panel.Children.Add(CreateSlot());
+        return panel;
+    }
+
+    private static UiShowcaseExample CreateCanvasExample()
+    {
+        var samples = new UiShowcaseGallery(190, 2);
+        var positions = new[] { (12d, 12d), (128d, 12d), (12d, 80d), (128d, 80d) };
+        for (var index = 0; index < positions.Length; index++)
+        {
+            var host = new Canvas { Width = 180, Height = 116 };
+            host.Classes.Add("showcase-layout-host");
+            var target = CreateSlot($"showcase-canvas-target-{index}");
+            target.Width = 40;
+            target.Height = 24;
+            var (x, y) = positions[index];
+            Canvas.SetLeft(target, x);
+            Canvas.SetTop(target, y);
+            host.Children.Add(target);
+            samples.Children.Add(UiShowcaseWidgets.Sample($"坐标 ({x}, {y})", host));
+        }
+
+        return new UiShowcaseExample("Canvas 位置", "四组固定坐标展示自由定位。", samples);
+    }
+
+    private static UiShowcaseExample CreateVisibilityExample()
+    {
+        return new UiShowcaseExample(
+            "可见性三态",
+            "隐藏保留中间项占位，折叠移除占位。",
+            UiShowcaseWidgets.Samples(new[] { Visibility.Visible, Visibility.Hidden, Visibility.Collapsed }
+                .Select(visibility =>
+                {
+                    var row = CreateStack($"showcase-visibility-{visibility}", Orientation.Horizontal, 8);
+                    row.Children[1].Visibility = visibility;
+                    return UiShowcaseWidgets.Sample(visibility.ToString(), UiShowcaseWidgets.Preview(row));
+                }).ToArray()));
+    }
+
+    private static Panel CreateSlot(string? id = null) => new()
+    {
+        StyleId = id,
+        Width = 32,
+        Height = 24,
+        Background = new SolidColorBrush(79, 141, 245)
+    };
+
+    private static string HorizontalName(HorizontalAlignment alignment) => alignment switch
+    {
+        HorizontalAlignment.Left => "左",
+        HorizontalAlignment.Center => "中",
+        _ => "右"
+    };
+
+    private static string VerticalName(VerticalAlignment alignment) => alignment switch
+    {
+        VerticalAlignment.Top => "上",
+        VerticalAlignment.Center => "中",
+        _ => "下"
+    };
+}

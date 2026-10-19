@@ -71,12 +71,13 @@ public sealed partial class ScrollView
     {
         var horizontalThickness = _horizontalBar.BarThickness;
         var verticalThickness = _verticalBar.BarThickness;
-        if (Screen?.UseLayoutRounding ?? true)
+        if (Scene?.UseLayoutRounding ?? true)
         {
-            var scale = Screen?.Scale ?? 1;
+            var scale = Scene?.Scale ?? 1;
             horizontalThickness = LayoutHelper.RoundLayoutValueUp(horizontalThickness, scale);
             verticalThickness = LayoutHelper.RoundLayoutValueUp(verticalThickness, scale);
         }
+
         var showHorizontal = HorizontalScrollBarVisibility == ScrollBarVisibility.Visible;
         var showVertical = VerticalScrollBarVisibility == ScrollBarVisibility.Visible;
         var viewport = Size.Zero;
@@ -96,9 +97,9 @@ public sealed partial class ScrollView
             var overflowHorizontal = IsHorizontalScrollable && extent.Width > viewport.Width;
             var overflowVertical = IsVerticalScrollable && extent.Height > viewport.Height;
             var nextShowHorizontal = showHorizontal ||
-                (HorizontalScrollBarVisibility == ScrollBarVisibility.Auto && overflowHorizontal);
+                                     (HorizontalScrollBarVisibility == ScrollBarVisibility.Auto && overflowHorizontal);
             var nextShowVertical = showVertical ||
-                (VerticalScrollBarVisibility == ScrollBarVisibility.Auto && overflowVertical);
+                                   (VerticalScrollBarVisibility == ScrollBarVisibility.Auto && overflowVertical);
 
             if (nextShowHorizontal == showHorizontal && nextShowVertical == showVertical)
                 break;

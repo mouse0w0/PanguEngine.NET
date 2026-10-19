@@ -1,4 +1,4 @@
-using PanguEngine.Client.Screens.Showcase;
+using PanguEngine.Client.UI.Scenes.Showcase;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 

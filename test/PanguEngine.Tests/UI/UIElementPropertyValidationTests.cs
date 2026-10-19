@@ -73,12 +73,12 @@ public sealed class UIElementPropertyValidationTests
         var property = GetProperty(propertyName);
         var node = new ValidationNode();
         node.Classes.Add("validated");
-        var screen = new Screen(node);
-        screen.SetStyleSheets([CreateStyleSheet(property, 0.5)]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([CreateStyleSheet(property, 0.5)]);
         node.UpdateStyles();
         var sheet = StyleSheet.Parse($".validated {{ {cssName}: {text}; }}", "node.css");
 
-        screen.SetStyleSheets([sheet]);
+        scene.SetStyleSheets([sheet]);
         var error = Assert.Throws<StyleParseException>(node.UpdateStyles);
 
         Assert.Contains(propertyName, error.Message);

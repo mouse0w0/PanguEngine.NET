@@ -13,11 +13,13 @@ public sealed class GridStyleTests
         var child = new Panel();
         child.Classes.Add("field");
         grid.Children.Add(child);
-        var screen = new Screen(grid);
-        screen.SetStyleSheets([StyleSheet.Parse("""
-            Grid { column-definitions: 20px, *, 2*; row-definitions: Auto, *; column-spacing: 5px; row-spacing: 4px; }
-            .field { grid-column: 1; grid-row: 1; grid-column-span: 2; }
-            """)]);
+        var scene = new UIScene(grid);
+        scene.SetStyleSheets([
+            StyleSheet.Parse("""
+                             Grid { column-definitions: 20px, *, 2*; row-definitions: Auto, *; column-spacing: 5px; row-spacing: 4px; }
+                             .field { grid-column: 1; grid-row: 1; grid-column-span: 2; }
+                             """)
+        ]);
         grid.UpdateStyles();
         grid.Measure(new Size(120, 40));
         grid.Arrange(new Rect(0, 0, 120, 40));
@@ -33,15 +35,17 @@ public sealed class GridStyleTests
         var grid = new Grid();
         var child = new Panel();
         grid.Children.Add(child);
-        var screen = new Screen(grid);
-        screen.SetStyleSheets([StyleSheet.Parse("Grid { column-definitions: 20, *; }")]);
+        var scene = new UIScene(grid);
+        scene.SetStyleSheets([StyleSheet.Parse("Grid { column-definitions: 20, *; }")]);
         grid.UpdateStyles();
         grid.Measure(new Size(100, 20));
         grid.Arrange(new Rect(0, 0, 100, 20));
 
         child.Classes.Add("second");
-        screen.SetStyleSheets([StyleSheet.Parse(
-            "Grid { column-definitions: 30, *; } .second { grid-column: 1; }")]);
+        scene.SetStyleSheets([
+            StyleSheet.Parse(
+                "Grid { column-definitions: 30, *; } .second { grid-column: 1; }")
+        ]);
         grid.UpdateStyles();
         Assert.False(grid.IsMeasureValid);
         Assert.Equal(1, Grid.GetColumn(child));
@@ -51,7 +55,7 @@ public sealed class GridStyleTests
         grid.ClearValue(Grid.ColumnDefinitionsProperty);
         Assert.Equal(new GridLength(30), grid.ColumnDefinitions[0].Length);
 
-        screen.SetStyleSheets([]);
+        scene.SetStyleSheets([]);
         grid.UpdateStyles();
         Assert.Equal(GridDefinitions.Empty, grid.ColumnDefinitions);
         Assert.Equal(0, Grid.GetColumn(child));
@@ -63,9 +67,11 @@ public sealed class GridStyleTests
         var grid = new Grid();
         var child = new Panel();
         grid.Children.Add(child);
-        var screen = new Screen(grid);
-        screen.SetStyleSheets([StyleSheet.Parse(
-            "Grid { column-definitions: 20, *; } .second { grid-column: 1; }")]);
+        var scene = new UIScene(grid);
+        scene.SetStyleSheets([
+            StyleSheet.Parse(
+                "Grid { column-definitions: 20, *; } .second { grid-column: 1; }")
+        ]);
         grid.UpdateStyles();
         grid.Measure(new Size(100, 20));
         grid.Arrange(new Rect(0, 0, 100, 20));
@@ -91,8 +97,8 @@ public sealed class GridStyleTests
     public void InvalidCssReportsInvalidValue(string declaration)
     {
         var grid = new Grid();
-        var screen = new Screen(grid);
-        screen.SetStyleSheets([StyleSheet.Parse($"Grid {{ {declaration} }}")]);
+        var scene = new UIScene(grid);
+        scene.SetStyleSheets([StyleSheet.Parse($"Grid {{ {declaration} }}")]);
         var error = Assert.Throws<StyleParseException>(grid.UpdateStyles);
         Assert.Equal(StyleParseError.InvalidValue, error.Error);
     }

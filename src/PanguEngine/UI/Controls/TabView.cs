@@ -104,7 +104,7 @@ public sealed partial class TabView : Control
             if (!IsEnabled)
                 CancelDrag();
         });
-        Subscribe(ScreenProperty, (_, change) =>
+        Subscribe(SceneProperty, (_, change) =>
         {
             CancelDrag();
             if (change.NewValue is null)

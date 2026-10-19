@@ -9,18 +9,18 @@ public class PointerEventArgs : InputEventArgs
 
     internal PointerEventArgs(
         UIElement source,
-        Point screenPosition,
+        Point scenePosition,
         IReadOnlyList<HitPathEntry> path)
         : base(source)
     {
         _path = path;
-        ScreenPosition = screenPosition;
+        ScenePosition = scenePosition;
     }
 
     /// <summary>
-    /// Gets the pointer position in screen coordinates.
+    /// Gets the pointer position in scene logical coordinates.
     /// </summary>
-    public Point ScreenPosition { get; }
+    public Point ScenePosition { get; }
 
     /// <summary>
     /// Gets the pointer position relative to an element.
@@ -46,7 +46,7 @@ public class PointerEventArgs : InputEventArgs
                 return entry.LocalPosition;
         }
 
-        relativeTo.Screen?.VerifyTreeAccess();
+        relativeTo.Scene?.VerifyTreeAccess();
         var eventRoot = _path[0].Node;
         var ancestors = new List<UIElement>();
         for (var current = relativeTo; current is not null; current = current.Parent)
@@ -59,7 +59,7 @@ public class PointerEventArgs : InputEventArgs
         if (!ReferenceEquals(ancestors[^1], eventRoot))
             throw new ArgumentException("The node does not belong to the event's root tree.", nameof(relativeTo));
 
-        var localPoint = ScreenPosition;
+        var localPoint = ScenePosition;
         for (var index = ancestors.Count - 1; index >= 0; index--)
         {
             localPoint = new Point(

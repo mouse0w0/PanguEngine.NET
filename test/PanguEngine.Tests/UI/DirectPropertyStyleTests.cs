@@ -61,17 +61,17 @@ public sealed class DirectPropertyStyleTests
     public void DirectSetterHonorsDrawingWriteRestriction()
     {
         var node = new DirectNode();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Exception? error = null;
         node.DrawAction = () => error = Record.Exception(() => node.Value = 9);
-        screen.Open();
+        scene.Open();
 
-        screen.PrepareFrame(new Size(20, 20));
-        _ = screen.CreateDrawCommandList();
+        scene.PrepareFrame(new Size(20, 20));
+        _ = scene.CreateDrawCommandList();
 
         Assert.IsType<InvalidOperationException>(error);
         Assert.Equal(7, node.Value);
-        screen.Close();
+        scene.Close();
     }
 
     private class DirectNode : UIElement

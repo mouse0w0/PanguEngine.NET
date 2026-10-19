@@ -16,7 +16,7 @@ public sealed partial class TabView
         Action updateStorage)
     {
         EnsureCollectionAccess();
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if ((uint)index > (uint)Items.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
         ValidateNewItems(items);
@@ -49,7 +49,7 @@ public sealed partial class TabView
         Action updateStorage)
     {
         EnsureCollectionAccess();
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if ((uint)index > (uint)Items.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
         if (count < 0 || count > Items.Count - index)
@@ -85,7 +85,7 @@ public sealed partial class TabView
     {
         ArgumentNullException.ThrowIfNull(item);
         EnsureCollectionAccess();
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if ((uint)index >= (uint)Items.Count)
             throw new ArgumentOutOfRangeException(nameof(index));
 
@@ -124,7 +124,7 @@ public sealed partial class TabView
     internal void ReplaceItemsFromCollection(IReadOnlyList<TabItem> items, Action updateStorage)
     {
         EnsureCollectionAccess();
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         var replacedItems = new HashSet<TabItem>(Items, ReferenceEqualityComparer.Instance);
         ValidateNewItems(items, replacedItems);
         var removed = Items.ToArray();
@@ -164,7 +164,7 @@ public sealed partial class TabView
     internal void MoveItemFromCollection(int oldIndex, int newIndex, Action updateStorage)
     {
         EnsureCollectionAccess();
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if ((uint)oldIndex >= (uint)Items.Count)
             throw new ArgumentOutOfRangeException(nameof(oldIndex));
         if ((uint)newIndex >= (uint)Items.Count)
@@ -190,7 +190,7 @@ public sealed partial class TabView
     internal void ReorderItemsFromCollection(IReadOnlyList<int> permutation, Action updateStorage)
     {
         EnsureCollectionAccess();
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         if (permutation.Count != Items.Count)
             throw new ArgumentException("The reorder permutation must match the item count.", nameof(permutation));
 
@@ -252,7 +252,7 @@ public sealed partial class TabView
             if (target is not null && IsAvailable(target))
                 target.Focus();
             else
-                Screen?.ClearFocus();
+                Scene?.ClearFocus();
         }
 
         var finalSelection = Selection.SelectedItem;
@@ -287,7 +287,7 @@ public sealed partial class TabView
             if (target is not null && IsAvailable(target))
                 target.Focus();
             else
-                Screen?.ClearFocus();
+                Scene?.ClearFocus();
         }
     }
 
@@ -312,10 +312,10 @@ public sealed partial class TabView
             if (item.OwnerView is not null && !ReferenceEquals(item.OwnerView, this))
                 throw new InvalidOperationException("The tab item already belongs to another view.");
 
-            Screen?.VerifyTreeMutationAccess();
-            item.Screen?.VerifyTreeMutationAccess();
-            if (item.Parent is null && item.Screen is not null)
-                throw new InvalidOperationException("A UI screen root must be cleared before it can join a tab view.");
+            Scene?.VerifyTreeMutationAccess();
+            item.Scene?.VerifyTreeMutationAccess();
+            if (item.Parent is null && item.Scene is not null)
+                throw new InvalidOperationException("A UI scene root must be cleared before it can join a tab view.");
             if (IsAncestorOfView(item))
                 throw new InvalidOperationException("Adding the tab item would create a parent cycle.");
 
@@ -330,8 +330,8 @@ public sealed partial class TabView
             return;
         if (IsInternalPartNode(node))
             throw new InvalidOperationException("A tab view internal node cannot be used as a tab slot.");
-        if (node.Parent is null && node.Screen is not null)
-            throw new InvalidOperationException("A UI screen root must be cleared before it can be a tab slot.");
+        if (node.Parent is null && node.Scene is not null)
+            throw new InvalidOperationException("A UI scene root must be cleared before it can be a tab slot.");
         if (IsAncestorOfView(node))
             throw new InvalidOperationException("A tab slot node cannot contain the tab view.");
     }
@@ -357,7 +357,7 @@ public sealed partial class TabView
             return;
 
         EnsureCollectionAccess();
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
         Items.Remove(item);
     }
 

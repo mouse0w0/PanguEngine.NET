@@ -275,7 +275,7 @@ public abstract class RadioButton : Control
 
     private void ValidateContentAssignment(UIElement value)
     {
-        value.Screen?.VerifyTreeMutationAccess();
+        value.Scene?.VerifyTreeMutationAccess();
         for (UIElement? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
         {
             if (ReferenceEquals(ancestor, value))
@@ -288,9 +288,9 @@ public abstract class RadioButton : Control
                 throw new InvalidOperationException("An internal radio button part cannot be used as content.");
         }
 
-        if (value.Parent is null && value.Screen is not null)
+        if (value.Parent is null && value.Scene is not null)
             throw new InvalidOperationException(
-                "A UI screen root must be cleared before it can be radio button content.");
+                "A UI scene root must be cleared before it can be radio button content.");
     }
 
     private static UIElement? CreateContentNode(object? content)
@@ -311,23 +311,23 @@ public abstract class RadioButton : Control
 
     private double GetLayoutSpacing()
     {
-        var screen = Screen;
-        return screen?.UseLayoutRounding ?? true
-            ? LayoutHelper.RoundLayoutValue(Spacing, screen?.Scale ?? 1)
+        var scene = Scene;
+        return scene?.UseLayoutRounding ?? true
+            ? LayoutHelper.RoundLayoutValue(Spacing, scene?.Scale ?? 1)
             : Spacing;
     }
 
-    /// <summary>Determines whether this button can receive user input on its current screen.</summary>
+    /// <summary>Determines whether this button can receive user input on its current scene.</summary>
     private protected bool HasInputQualification()
     {
-        var screen = Screen;
-        if (screen is null || !screen.IsOpen())
+        var scene = Scene;
+        if (scene is null || !scene.IsOpen())
             return false;
         for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;
-            if (ReferenceEquals(node, screen.Root))
+            if (ReferenceEquals(node, scene.Root))
                 return true;
         }
 
@@ -445,7 +445,7 @@ public sealed class RadioButton<T> : RadioButton
         var group = _group;
         if (group is null || _value is null)
             return false;
-        var screen = Screen;
+        var scene = Scene;
         var members = group.GetMembersSnapshot();
         var current = Array.IndexOf(members, this);
         for (var offset = 1; offset < members.Length; offset++)
@@ -453,10 +453,10 @@ public sealed class RadioButton<T> : RadioButton
             var index = (current + direction * offset + members.Length) % members.Length;
             var candidate = members[index];
             if (!ReferenceEquals(candidate.Group, group) || candidate.Value is null ||
-                !ReferenceEquals(candidate.Screen, screen) || !candidate.Focus())
+                !ReferenceEquals(candidate.Scene, scene) || !candidate.Focus())
                 continue;
             if (ReferenceEquals(_group, group) && ReferenceEquals(candidate.Group, group) &&
-                ReferenceEquals(candidate.Screen, screen) && candidate.IsFocused && candidate.Focusable &&
+                ReferenceEquals(candidate.Scene, scene) && candidate.IsFocused && candidate.Focusable &&
                 candidate.Value is not null && candidate.HasInputQualification())
                 group.Select(candidate);
             return true;

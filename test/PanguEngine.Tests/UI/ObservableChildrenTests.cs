@@ -10,7 +10,7 @@ public sealed class ObservableChildrenTests
     public void InterfaceWritesAndRangeRemovalMaintainOwnership()
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
+        var scene = new UIScene(panel);
         IList<UIElement> items = panel.Children;
         var a = new Panel();
         var b = new Panel();
@@ -21,17 +21,17 @@ public sealed class ObservableChildrenTests
         items.Insert(0, b);
         items.Add(c);
         Assert.Same(panel, a.Parent);
-        Assert.Same(screen, b.Screen);
+        Assert.Same(scene, b.Scene);
         panel.Children.RemoveRange(0, 2);
         Assert.Null(a.Parent);
-        Assert.Null(a.Screen);
+        Assert.Null(a.Scene);
         Assert.Null(b.Parent);
         Assert.Equal(new UIElement[] { b, a }, changes[^1].OldItems);
         items.RemoveAt(0);
         Assert.Null(c.Parent);
         items.Add(a);
         items.Clear();
-        Assert.Null(a.Screen);
+        Assert.Null(a.Scene);
         Assert.Equal(7, changes.Count);
     }
 
@@ -47,7 +47,7 @@ public sealed class ObservableChildrenTests
         {
             Assert.Equal(ListChangeKind.Remove, change.Kind);
             Assert.Null(child.Parent);
-            Assert.Null(child.Screen);
+            Assert.Null(child.Scene);
             Assert.Empty(target.Children);
             Assert.Throws<InvalidOperationException>(() => source.Children.Clear());
             Assert.Throws<InvalidOperationException>(() => target.Children.RemoveAt(-1));
@@ -86,20 +86,20 @@ public sealed class ObservableChildrenTests
         var parent = new Panel();
         var child = new Panel();
         parent.Children.Add(child);
-        var screen = new Screen();
+        var scene = new UIScene();
         var notifications = 0;
         parent.Children.Changed += (_, _) =>
         {
             notifications++;
             Assert.Null(child.Parent);
-            Assert.Null(child.Screen);
-            Assert.Null(screen.Root);
+            Assert.Null(child.Scene);
+            Assert.Null(scene.Root);
             Assert.Throws<InvalidOperationException>(() => parent.Children.Add(child));
         };
-        screen.Root = child;
+        scene.Root = child;
         Assert.Equal(1, notifications);
-        Assert.Same(screen, child.Screen);
-        Assert.Same(child, screen.Root);
+        Assert.Same(scene, child.Scene);
+        Assert.Same(child, scene.Root);
     }
 
     [Fact]
@@ -128,16 +128,16 @@ public sealed class ObservableChildrenTests
         var child = new Panel();
         parent.Children.Add(child);
         var oldRoot = new Panel();
-        var screen = new Screen(oldRoot);
+        var scene = new UIScene(oldRoot);
         var expected = new InvalidOperationException("listener");
         parent.Children.Changed += (_, _) => throw expected;
 
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => screen.Root = child));
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() => scene.Root = child));
 
         Assert.Null(child.Parent);
-        Assert.Null(child.Screen);
+        Assert.Null(child.Scene);
         Assert.Empty(parent.Children);
-        Assert.Same(oldRoot, screen.Root);
+        Assert.Same(oldRoot, scene.Root);
     }
 
     [Fact]
@@ -225,7 +225,7 @@ public sealed class ObservableChildrenTests
         source.Children.Changed += handler;
         Assert.Throws<InvalidOperationException>(() => target.Children.Add(child));
         Assert.Null(child.Parent);
-        Assert.Null(child.Screen);
+        Assert.Null(child.Scene);
         Assert.Empty(source.Children);
         Assert.Empty(target.Children);
         source.Children.Changed -= handler;

@@ -72,13 +72,13 @@ public sealed class TabInfrastructureTests
         sourceParent.Add(child);
         sourceParent.Removed.Clear();
 
-        var screen = new Screen();
-        screen.Root = child;
+        var scene = new UIScene();
+        scene.Root = child;
 
         Assert.Equal(new UIElement[] { child }, sourceParent.Removed);
         Assert.Null(sourceParent.RemovedParentAtCallback);
         Assert.Null(child.Parent);
-        Assert.Same(screen, child.Screen);
+        Assert.Same(scene, child.Scene);
     }
 
     [Fact]
@@ -86,9 +86,9 @@ public sealed class TabInfrastructureTests
     {
         var root = new Canvas();
         var node = Place(root, new NoBaseControl { Focusable = true }, 0, 0, 40, 40);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 100), 0);
         manager.ProcessPointerMoved(new Point(5, 5));
         Assert.True(node.Focus());
@@ -98,7 +98,7 @@ public sealed class TabInfrastructureTests
 
         node.Visibility = Visibility.Hidden;
 
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
         Assert.False(node.IsFocused);
         Assert.False(node.IsHovered);
         Assert.False(node.IsPressed);

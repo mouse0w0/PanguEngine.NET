@@ -282,23 +282,23 @@ public sealed class ObservableObjectTests
         var replacement = new EqualValue(7);
         var node = new ReferenceNode();
         var property = useReferenceComparer ? ReferenceNode.ReferenceValueProperty : ReferenceNode.ValueProperty;
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, original)])
             ])
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         var changes = new List<(EqualValue? OldValue, EqualValue? NewValue)>();
         using var subscription = node.Subscribe(property,
             (_, change) => changes.Add((change.OldValue, change.NewValue)));
 
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<ReferenceNode>(), [StyleSetter.Create(property, replacement)])
             ])
         ]);
-        screen.Root.UpdateStyles();
+        scene.Root.UpdateStyles();
 
         Assert.Same(replacement, node.GetValue(property));
         if (useReferenceComparer)
@@ -429,13 +429,13 @@ public sealed class ObservableObjectTests
     {
         var source = new Model { Value = 7 };
         var node = new ValueNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 20)])
             ])
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         var changes = new List<(int Old, int New)>();
         using var subscription = node.Subscribe(ValueNode.ValueProperty,
             (_, args) => changes.Add((args.OldValue, args.NewValue)));
@@ -456,13 +456,13 @@ public sealed class ObservableObjectTests
     public void EqualAssignmentMasksStyleUntilClearedWithoutNotifying(bool bind)
     {
         var node = new ValueNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 7)])
             ])
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         var changes = new List<(int OldValue, int NewValue)>();
         using var subscription = node.Subscribe(ValueNode.ValueProperty,
             (_, change) => changes.Add((change.OldValue, change.NewValue)));
@@ -473,12 +473,12 @@ public sealed class ObservableObjectTests
             node.SetValue(ValueNode.ValueProperty, 7);
 
         Assert.True(Assert.Single(node.GetStyleValueSources(ValueNode.ValueProperty)).IsMaskedByLocalValue);
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<ValueNode>(), [StyleSetter.Create(ValueNode.ValueProperty, 9)])
             ])
         ]);
-        screen.Root.UpdateStyles();
+        scene.Root.UpdateStyles();
         Assert.Equal(7, node.GetValue(ValueNode.ValueProperty));
         Assert.Empty(changes);
 

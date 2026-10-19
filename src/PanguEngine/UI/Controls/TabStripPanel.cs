@@ -140,7 +140,7 @@ internal sealed class TabStripPanel : Control
         if (eventArgs.Handled || !_viewport.HasOverflow)
             return;
 
-        var lines = UiToolkit.WheelScrollLines;
+        var lines = UIToolkit.WheelScrollLines;
         if (lines == 0)
             return;
 
@@ -150,7 +150,7 @@ internal sealed class TabStripPanel : Control
         if (delta == 0)
             return;
 
-        var step = UiToolkit.GetWheelScrollStep(lines, TabView.WheelSmallChange, _viewport.ViewportLength);
+        var step = UIToolkit.GetWheelScrollStep(lines, TabView.WheelSmallChange, _viewport.ViewportLength);
         _viewport.ScrollBy(-delta * step);
         eventArgs.Handled = true;
     }

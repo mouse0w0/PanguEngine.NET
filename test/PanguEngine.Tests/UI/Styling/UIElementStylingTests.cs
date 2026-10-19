@@ -129,7 +129,7 @@ public sealed class UIElementStylingTests
     public void EarlierPropertyHandlerCanLocallyMaskLaterStyleNotification()
     {
         var button = new Button();
-        var screen = new Screen(button);
+        var scene = new UIScene(button);
         var changes = new List<PropertyChangedEventArgs>();
         button.PropertyChanged += (_, e) =>
         {
@@ -147,8 +147,8 @@ public sealed class UIElementStylingTests
             Rule(Selector<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))
         ]);
 
-        screen.SetStyleSheets([sheet]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([sheet]);
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(2, changes.Count);
         Assert.NotSame(changes[0].Property, changes[1].Property);
@@ -225,7 +225,7 @@ public sealed class UIElementStylingTests
         Assert.Equal(Brush(1), button.Background);
         Assert.Equal(Brush(2), button.BorderBrush);
         Assert.False(button.IsUpdatingStyles);
-        Assert.False(button.Screen!.IsUpdatingLayout);
+        Assert.False(button.Scene!.IsUpdatingLayout);
     }
 
     [Fact]
@@ -238,8 +238,8 @@ public sealed class UIElementStylingTests
         root.Children.Add(first);
         root.Children.Add(failing);
         root.Children.Add(last);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             new StyleSheet([
                 Rule(Selector<Panel>(), Setter(UIElement.OpacityProperty, 0.4)),
                 Rule(Selector<GuardedStyleNode>(), Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
@@ -252,7 +252,7 @@ public sealed class UIElementStylingTests
         GuardedValue.ThrowOnCompare = true;
         try
         {
-            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+            Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles);
         }
         finally
         {
@@ -265,9 +265,9 @@ public sealed class UIElementStylingTests
         Assert.False(root.IsStyleSubtreeValid);
         Assert.False(failing.IsStyleSubtreeValid);
         Assert.False(root.IsUpdatingStyles);
-        Assert.False(screen.IsUpdatingLayout);
+        Assert.False(scene.IsUpdatingLayout);
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.5, failing.GetValue(GuardedStyleNode.ValueProperty).Number);
         Assert.Equal(0.4, last.Opacity);
@@ -283,9 +283,9 @@ public sealed class UIElementStylingTests
         var last = new Panel { StyleId = "last" };
         root.Children.Add(first);
         root.Children.Add(last);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("#first.active, #last.active { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("#first.active, #last.active { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         var notifications = 0;
         first.PropertyChanged += (_, args) =>
         {
@@ -296,7 +296,7 @@ public sealed class UIElementStylingTests
         };
 
         first.Classes.Add("active");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, last.Opacity);
         Assert.True(first.IsStyleSubtreeValid);
@@ -304,7 +304,7 @@ public sealed class UIElementStylingTests
         Assert.True(root.IsStyleValid);
         Assert.False(root.IsStyleSubtreeValid);
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.True(root.IsStyleSubtreeValid);
         Assert.Equal(1, notifications);
@@ -318,8 +318,8 @@ public sealed class UIElementStylingTests
         var last = new Panel();
         root.Children.Add(first);
         root.Children.Add(last);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.4; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.4; }")]);
         var expected = new InvalidOperationException("notification failed");
         first.PropertyChanged += (_, args) =>
         {
@@ -327,7 +327,7 @@ public sealed class UIElementStylingTests
                 throw expected;
         };
 
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles));
         Assert.Equal(0.4, first.Opacity);
         Assert.Equal(1d, last.Opacity);
         Assert.False(root.IsStyleSubtreeValid);
@@ -336,7 +336,7 @@ public sealed class UIElementStylingTests
         Assert.False(first.IsUpdatingStyles);
         Assert.False(last.IsUpdatingStyles);
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, last.Opacity);
         Assert.True(root.IsStyleSubtreeValid);
@@ -370,18 +370,18 @@ public sealed class UIElementStylingTests
         var last = new Button();
         root.Children.Add(first);
         root.Children.Add(last);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.4; } Button { background: #010203; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.4; } Button { background: #010203; }")]);
         first.PropertyChanged += (_, args) =>
         {
             if (args.Property == UIElement.OpacityProperty)
                 root.Children.Remove(last);
         };
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Null(last.Parent);
-        Assert.Null(last.Screen);
+        Assert.Null(last.Scene);
         Assert.Null(last.Background);
         Assert.False(last.IsStyleSubtreeValid);
         last.UpdateStyles();
@@ -499,9 +499,9 @@ public sealed class UIElementStylingTests
     public void ClassSetBatchPublishesOneChangeBeforeStylesAreApplied()
     {
         var node = new Canvas();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(".primary.wide { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(".primary.wide { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         IObservableSet<string> classes = node.Classes;
         var order = new List<string>();
         var changes = new List<SetChangedEventArgs<string>>();
@@ -523,7 +523,7 @@ public sealed class UIElementStylingTests
         classes.UnionWith(["primary", "wide", "primary"]);
 
         Assert.Equal(new[] { "set" }, order);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, node.Opacity);
         Assert.Equal(new[] { "set", "style" }, order);
         var change = Assert.Single(changes);
@@ -556,20 +556,20 @@ public sealed class UIElementStylingTests
     public void ClassSetAcceptsNamesWithoutSelectorValidation(string? className)
     {
         var node = new Canvas();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(".valid { opacity: 0.4; }")]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(".valid { opacity: 0.4; }")]);
         node.Classes.Add("kept");
         var changes = new List<SetChangedEventArgs<string>>();
         node.Classes.Changed += (_, change) => changes.Add(change);
 
         node.Classes.UnionWith(["valid", className!]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.True(node.Classes.SetEquals(["kept", "valid", className!]));
         Assert.Equal(0.4, node.Opacity);
         Assert.True(new HashSet<string>(Assert.Single(changes).AddedItems).SetEquals(["valid", className!]));
         node.Classes.SymmetricExceptWith(["kept", "valid", className!, className!]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Empty(node.Classes);
         Assert.Equal(1d, node.Opacity);
         Assert.Equal(2, changes.Count);
@@ -579,15 +579,15 @@ public sealed class UIElementStylingTests
     public void ClassSetCalculationFailureKeepsTheWholeBatchAndAlreadyPublishedChange()
     {
         var node = new GuardedStyleNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 Rule(StyleSelector.For<GuardedStyleNode>(),
                     Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
             ])
         ]);
         node.Classes.Add("kept");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         var previousSource = Assert.Single(node.GetStyleValueSources(GuardedStyleNode.ValueProperty));
         var notifications = 0;
         node.Classes.Changed += (_, _) => notifications++;
@@ -595,7 +595,7 @@ public sealed class UIElementStylingTests
         try
         {
             node.Classes.UnionWith(["first", "second"]);
-            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+            Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles);
         }
         finally
         {
@@ -604,14 +604,14 @@ public sealed class UIElementStylingTests
 
         Assert.True(node.Classes.SetEquals(["kept", "first", "second"]));
         Assert.Equal(1, notifications);
-        Assert.Same(screen, node.Screen);
+        Assert.Same(scene, node.Scene);
         Assert.Same(previousSource, Assert.Single(node.GetStyleValueSources(GuardedStyleNode.ValueProperty)));
         node.Classes.UnionWith(["first", "second"]);
         Assert.Equal(1, notifications);
         Assert.False(node.IsStyleValid);
         Assert.True(node.Classes.Remove("first"));
         Assert.Equal(2, notifications);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.True(node.IsStyleValid);
     }
 
@@ -620,8 +620,8 @@ public sealed class UIElementStylingTests
     {
         var expected = new InvalidOperationException("style notification failed");
         var node = new Canvas();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(".primary { opacity: 0.4; }")]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(".primary { opacity: 0.4; }")]);
         var failNotification = true;
         var collectionNotifications = 0;
         node.PropertyChanged += (_, e) =>
@@ -632,14 +632,14 @@ public sealed class UIElementStylingTests
         node.Classes.Changed += (_, _) => collectionNotifications++;
 
         node.Classes.Add("primary");
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles));
 
         Assert.True(node.Classes.Contains("primary"));
         Assert.Equal(0.4, node.Opacity);
         Assert.Equal(1, collectionNotifications);
         failNotification = false;
         node.Classes.Remove("primary");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, node.Opacity);
         Assert.Equal(2, collectionNotifications);
     }
@@ -649,9 +649,9 @@ public sealed class UIElementStylingTests
     {
         var expected = new InvalidOperationException("class listener failed");
         var node = new Canvas();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(".primary { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(".primary { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         var laterCalls = 0;
         EventHandler<SetChangedEventArgs<string>> failing = (_, _) => throw expected;
         node.Classes.Changed += failing;
@@ -663,11 +663,11 @@ public sealed class UIElementStylingTests
         Assert.Equal(1d, node.Opacity);
         Assert.False(node.IsStyleValid);
         Assert.Equal(0, laterCalls);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, node.Opacity);
         node.Classes.Changed -= failing;
         node.Classes.Remove("primary");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, node.Opacity);
         Assert.Equal(1, laterCalls);
     }
@@ -757,8 +757,8 @@ public sealed class UIElementStylingTests
     public void StyleNotificationSubscriptionChangesAffectSubsequentClassEvents()
     {
         var node = new Canvas();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(".primary { opacity: 0.4; }")]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(".primary { opacity: 0.4; }")]);
         var removedCalls = 0;
         var addedCalls = 0;
         var changedSubscription = false;
@@ -778,7 +778,7 @@ public sealed class UIElementStylingTests
 
         Assert.Equal(1, removedCalls);
         Assert.Equal(0, addedCalls);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         node.Classes.Remove("primary");
         Assert.Equal(1, removedCalls);
         Assert.Equal(1, addedCalls);
@@ -788,8 +788,8 @@ public sealed class UIElementStylingTests
     public void StyleIdNotificationClassChangeLeavesNestedStylesPending()
     {
         var node = new Canvas();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse("#trigger { opacity: 0.4; } #trigger.extra { opacity: 0.9; }")]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse("#trigger { opacity: 0.4; } #trigger.extra { opacity: 0.9; }")]);
         var order = new List<(string Kind, double Opacity)>();
         node.PropertyChanged += (_, e) =>
         {
@@ -802,12 +802,12 @@ public sealed class UIElementStylingTests
         node.Classes.Changed += (_, _) => order.Add(("set", node.Opacity));
 
         node.StyleId = "trigger";
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.True(node.Classes.Contains("extra"));
         Assert.Equal(0.4, node.Opacity);
         Assert.Equal(new[] { ("style", 0.4), ("set", 0.4) }, order);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.9, node.Opacity);
         Assert.Equal(new[] { ("style", 0.4), ("set", 0.4), ("style", 0.9) }, order);
     }
@@ -816,8 +816,8 @@ public sealed class UIElementStylingTests
     public void PseudoClassNotificationClassChangePublishesBeforeTheNextStyleUpdate()
     {
         var node = new PseudoClassHost();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(":loading { opacity: 0.4; } :loading.extra { opacity: 0.9; }")]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(":loading { opacity: 0.4; } :loading.extra { opacity: 0.9; }")]);
         var styleNotifications = 0;
         var collectionNotifications = 0;
         node.PropertyChanged += (_, e) =>
@@ -838,12 +838,12 @@ public sealed class UIElementStylingTests
         };
 
         node.Set(Loading, true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.True(node.Classes.SetEquals(["extra"]));
         Assert.Equal(0.4, node.Opacity);
         Assert.Equal(1, styleNotifications);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.9, node.Opacity);
         Assert.Equal(2, styleNotifications);
         Assert.Equal(1, collectionNotifications);
@@ -854,8 +854,8 @@ public sealed class UIElementStylingTests
     {
         var expected = new InvalidOperationException("nested style notification failed");
         var node = new Canvas();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse("#trigger { opacity: 0.4; } #trigger.extra { opacity: 0.9; }")]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse("#trigger { opacity: 0.4; } #trigger.extra { opacity: 0.9; }")]);
         var reactToNotification = true;
         var collectionNotifications = 0;
         node.PropertyChanged += (_, e) =>
@@ -870,17 +870,17 @@ public sealed class UIElementStylingTests
         node.Classes.Changed += (_, _) => collectionNotifications++;
 
         node.StyleId = "trigger";
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, node.Opacity);
         Assert.Equal(1, collectionNotifications);
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles));
 
         Assert.True(node.Classes.SetEquals(["extra"]));
         Assert.Equal(0.9, node.Opacity);
         Assert.Equal(1, collectionNotifications);
         reactToNotification = false;
         node.Classes.Remove("extra");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, node.Opacity);
         Assert.Equal(2, collectionNotifications);
     }
@@ -940,8 +940,8 @@ public sealed class UIElementStylingTests
     public void SourceReportsWinningBranchFromSelectorList()
     {
         var button = new Button();
-        var screen = new Screen(button);
-        screen.SetStyleSheets([StyleSheet.Parse(".plain, #target { opacity: 0.4; }")]);
+        var scene = new UIScene(button);
+        scene.SetStyleSheets([StyleSheet.Parse(".plain, #target { opacity: 0.4; }")]);
         button.Classes.Add("plain");
         button.GetStyleRoot().UpdateStyles();
         Assert.Equal(".plain", Assert.Single(button.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
@@ -980,9 +980,9 @@ public sealed class UIElementStylingTests
                 StyleSelector.For<GuardedStyleNode>(),
                 Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
         ]);
-        var screen = new Screen(node);
-        screen.SetStyleSheets([sheet]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([sheet]);
+        scene.Root!.UpdateStyles();
         GuardedValue.ThrowOnCompare = true;
         try
         {
@@ -997,7 +997,7 @@ public sealed class UIElementStylingTests
 
         Assert.Equal("new", node.StyleId);
         Assert.Equal("primary", Assert.Single(node.Classes));
-        Assert.Same(screen, node.Screen);
+        Assert.Same(scene, node.Scene);
     }
 
     [Theory]
@@ -1006,8 +1006,8 @@ public sealed class UIElementStylingTests
     public void SelectorChangesDuringNodeCalculationRemainPending(bool changeId)
     {
         var node = new GuardedStyleNode { StyleId = "original" };
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 Rule(
                     StyleSelector.For<GuardedStyleNode>(),
@@ -1052,15 +1052,15 @@ public sealed class UIElementStylingTests
                 StyleSelector.For<EquatableNode>(),
                 Setter(EquatableNode.ValueProperty, new EquatableValue(1)))
         ]);
-        var screen = new Screen(node);
-        screen.SetStyleSheets([firstSheet]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([firstSheet]);
+        scene.Root!.UpdateStyles();
         var notifications = 0;
         node.PropertyChanged += (_, e) =>
             notifications += ReferenceEquals(e.Property, EquatableNode.ValueProperty) ? 1 : 0;
 
-        screen.SetStyleSheets([secondSheet]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([secondSheet]);
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0, notifications);
     }
@@ -1347,11 +1347,11 @@ public sealed class UIElementStylingTests
     }
 
     [Fact]
-    public void OpenScreenStyleIdRejectsWrongThreadButAllowsNoOps()
+    public void OpenSceneStyleIdRejectsWrongThreadButAllowsNoOps()
     {
         var button = new Button { StyleId = "save" };
-        var screen = new Screen(button);
-        screen.Open();
+        var scene = new UIScene(button);
+        scene.Open();
         Exception? styleIdError = null;
         Exception? noOpError = null;
         var thread = new Thread(() =>
@@ -1366,7 +1366,7 @@ public sealed class UIElementStylingTests
         Assert.IsType<InvalidOperationException>(styleIdError);
         Assert.Null(noOpError);
         Assert.Equal("save", button.StyleId);
-        screen.Close();
+        scene.Close();
     }
 
     [Theory]
@@ -1382,10 +1382,10 @@ public sealed class UIElementStylingTests
     {
         var node = new Canvas();
         node.Classes.Add("kept");
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(".next { opacity: 0.4; }")]);
-        screen.Open();
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(".next { opacity: 0.4; }")]);
+        scene.Open();
+        scene.Root!.UpdateStyles();
         Assert.True(node.IsStyleValid);
         IObservableSet<string> classes = node.Classes;
         Action[] mutations =
@@ -1411,19 +1411,19 @@ public sealed class UIElementStylingTests
         Assert.True(classes.SetEquals(expected));
         Assert.Equal(1d, node.Opacity);
         Assert.Equal(1, notifications);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(classes.Contains("next") ? 0.4 : 1d, node.Opacity);
         Assert.True(node.IsStyleValid);
         Assert.True(node.IsStyleSubtreeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
-    public void OpenScreenPseudoClassInputsRejectWrongThreadButAllowNoOps()
+    public void OpenScenePseudoClassInputsRejectWrongThreadButAllowNoOps()
     {
         var host = new PseudoClassHost();
-        var screen = new Screen(host);
-        screen.Open();
+        var scene = new UIScene(host);
+        scene.Open();
         Exception? wrongThreadError = null;
         Exception? noOpError = null;
         var thread = new Thread(() =>
@@ -1438,40 +1438,40 @@ public sealed class UIElementStylingTests
         Assert.IsType<InvalidOperationException>(wrongThreadError);
         Assert.Null(noOpError);
         Assert.False(host.IsActive(Loading));
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
     public void PseudoClassInputsCanChangeDuringLayoutButNotDrawing()
     {
         var node = new StyleMutationNode();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Exception? layoutError = null;
         Exception? drawingError = null;
         node.MeasureAction = () => layoutError = Record.Exception(() => node.Set(Loading, true));
         node.DrawAction = () => drawingError = Record.Exception(() => node.Set(Loading, false));
-        screen.Open();
+        scene.Open();
 
-        screen.PrepareFrame(new Size(20, 20));
-        _ = screen.CreateDrawCommandList();
+        scene.PrepareFrame(new Size(20, 20));
+        _ = scene.CreateDrawCommandList();
 
         Assert.Null(layoutError);
         Assert.IsType<InvalidOperationException>(drawingError);
         Assert.True(node.IsActive(Loading));
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
     public void PseudoClassInputsInvalidateStylesDuringApplicationNotification()
     {
         var host = new PseudoClassHost();
-        var screen = new Screen(host);
-        screen.SetStyleSheets([
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([
             new StyleSheet([
                 Rule(StyleSelector.For<PseudoClassHost>(), Setter(UIElement.OpacityProperty, 0.3))
             ])
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Exception? error = null;
         host.PropertyChanged += (_, e) =>
         {
@@ -1479,12 +1479,12 @@ public sealed class UIElementStylingTests
                 error = Record.Exception(() => host.Set(Loading, true));
         };
 
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             new StyleSheet([
                 Rule(StyleSelector.For<PseudoClassHost>(), Setter(UIElement.OpacityProperty, 0.8))
             ])
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Null(error);
         Assert.True(host.IsActive(Loading));
@@ -1494,8 +1494,8 @@ public sealed class UIElementStylingTests
     public void ClassChangesDuringDrawingApplyStylesOnTheNextFrame()
     {
         var node = new StyleMutationNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse(".layout { opacity: 0.4; } .drawing { opacity: 0.7; }")]);
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse(".layout { opacity: 0.4; } .drawing { opacity: 0.7; }")]);
         var collectionNotifications = 0;
         node.Classes.Changed += (_, _) => collectionNotifications++;
         Exception? layoutStyleIdError = null;
@@ -1512,10 +1512,10 @@ public sealed class UIElementStylingTests
             drawingStyleIdError = Record.Exception(() => node.StyleId = "drawing");
             drawingClassError = Record.Exception(() => node.Classes.Add("drawing"));
         };
-        screen.Open();
+        scene.Open();
 
-        screen.PrepareFrame(new Size(20, 20));
-        _ = screen.CreateDrawCommandList();
+        scene.PrepareFrame(new Size(20, 20));
+        _ = scene.CreateDrawCommandList();
 
         Assert.Null(layoutStyleIdError);
         Assert.Null(layoutClassError);
@@ -1528,13 +1528,13 @@ public sealed class UIElementStylingTests
         Assert.False(node.IsStyleValid);
         Assert.False(node.IsStyleSubtreeValid);
 
-        screen.PrepareFrame(new Size(20, 20));
+        scene.PrepareFrame(new Size(20, 20));
 
         Assert.Equal(0.7, node.Opacity);
         Assert.True(node.IsStyleValid);
         Assert.True(node.IsStyleSubtreeValid);
         Assert.Equal(2, collectionNotifications);
-        screen.Close();
+        scene.Close();
     }
 
     [Theory]
@@ -1547,8 +1547,8 @@ public sealed class UIElementStylingTests
         var second = new StyleMutationNode { StyleId = "target", Height = 10 };
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse("#target { width: 10; } .wide #target { width: 20; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse("#target { width: 10; } .wide #target { width: 20; }")]);
         var measuredWidths = new List<double>();
         var arrangedWidths = new List<double>();
         second.MeasureAction = () => measuredWidths.Add(second.Width);
@@ -1557,10 +1557,10 @@ public sealed class UIElementStylingTests
             first.ArrangeAction = () => root.Classes.Add("wide");
         else
             first.MeasureAction = () => root.Classes.Add("wide");
-        screen.Open();
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
 
             Assert.Equal(new[] { 10d, 20d }, measuredWidths);
             Assert.Equal(duringArrange ? new[] { 10d, 20d } : new[] { 20d }, arrangedWidths);
@@ -1570,7 +1570,7 @@ public sealed class UIElementStylingTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -1591,16 +1591,16 @@ public sealed class UIElementStylingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void LayoutAndStyleApplicationDoNotBlockUnrelatedScreens(bool duringLayout)
+    public void LayoutAndStyleApplicationDoNotBlockUnrelatedScenes(bool duringLayout)
     {
         var node = new StyleMutationNode();
-        var screen = new Screen(node);
-        var other = new Screen(new Panel());
+        var scene = new UIScene(node);
+        var other = new UIScene(new Panel());
         var visited = false;
         Action updateOther = () =>
         {
             visited = true;
-            Assert.True(screen.IsUpdatingLayout);
+            Assert.True(scene.IsUpdatingLayout);
             Assert.Equal(!duringLayout, node.IsUpdatingStyles);
             Assert.False(other.IsUpdatingLayout);
             Assert.False(other.Root!.IsUpdatingStyles);
@@ -1609,7 +1609,7 @@ public sealed class UIElementStylingTests
             other.SetStyleSheets([StyleSheet.Parse("Panel { opacity: 0.6; }")]);
             other.Root!.UpdateStyles();
             Assert.Equal(0.6, other.Root!.Opacity);
-            Assert.True(screen.IsUpdatingLayout);
+            Assert.True(scene.IsUpdatingLayout);
             Assert.Equal(!duringLayout, node.IsUpdatingStyles);
             if (!duringLayout)
             {
@@ -1625,27 +1625,27 @@ public sealed class UIElementStylingTests
                 if (args.Property == UIElement.OpacityProperty)
                     updateOther();
             };
-        screen.SetStyleSheets([StyleSheet.Parse("* { opacity: 0.4; }")]);
-        screen.Open();
+        scene.SetStyleSheets([StyleSheet.Parse("* { opacity: 0.4; }")]);
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
 
             Assert.True(visited);
-            Assert.False(screen.IsUpdatingLayout);
+            Assert.False(scene.IsUpdatingLayout);
             Assert.False(node.IsUpdatingStyles);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     private static void ApplyTheme(UIElement node, params StyleRule[] rules)
     {
-        var screen = new Screen(node);
-        screen.SetStyleSheets([new StyleSheet(rules)]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([new StyleSheet(rules)]);
+        scene.Root!.UpdateStyles();
     }
 
     private static StyleSelector Selector<TNode>(

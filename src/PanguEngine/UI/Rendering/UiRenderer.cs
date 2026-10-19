@@ -56,7 +56,7 @@ internal sealed class UiRenderer
             fontManager,
             _descriptorSetLayout,
             frameSlotCount,
-            UiToolkit.Logger);
+            UIToolkit.Logger);
         _pipeline = CreatePipeline(
             device,
             colorFormat,
@@ -245,6 +245,7 @@ internal sealed class UiRenderer
                 checked((ulong)frame.DrawDataCapacity * GpuDrawData.SizeInBytes),
                 BufferUsage.Storage, MemoryUsage.CpuToGpu));
         }
+
         if (growClipData)
         {
             frame.ClipDataCapacity = DrawBuilder.GrowCapacity(frame.ClipDataCapacity, clipCount);
@@ -252,6 +253,7 @@ internal sealed class UiRenderer
                 checked((ulong)frame.ClipDataCapacity * GpuClipData.SizeInBytes),
                 BufferUsage.Storage, MemoryUsage.CpuToGpu));
         }
+
         var drawBuffer = frame.DrawDataBuffer!;
         var clipBuffer = frame.ClipDataBuffer!;
         frame.DrawDataDescriptorSet = _device.CreateDescriptorSet(new DescriptorSetDescription(

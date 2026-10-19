@@ -46,9 +46,9 @@ public sealed class ScrollViewTests
     public void DefaultBaseStyleSheetStylesScrollViewChrome()
     {
         var view = new ScrollView();
-        var screen = new Screen(view);
+        var scene = new UIScene(view);
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(new Thickness(1), view.BorderThickness);
         Assert.NotNull(view.BorderBrush);
@@ -642,7 +642,7 @@ public sealed class ScrollViewTests
 
         var verticalBar = view.Children.OfType<ScrollBar>()
             .Single(bar => bar.Orientation == Orientation.Vertical);
-        var barPosition = verticalBar.LocalToScreen(new Point(
+        var barPosition = verticalBar.LocalToScene(new Point(
             verticalBar.LayoutBounds.Width / 2,
             verticalBar.LayoutBounds.Height / 2));
         Assert.True(manager.ProcessPointerWheel(barPosition, 0, -1, KeyModifiers.Shift));
@@ -839,10 +839,10 @@ public sealed class ScrollViewTests
         };
         var root = new Canvas { Width = 300, Height = 200 };
         root.Children.Add(scroll);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        screen.SetBaseStyleSheets([]);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        scene.SetBaseStyleSheets([]);
+        manager.Open(scene);
 
         manager.UpdateFrame(new Size(300, 200), 0);
 
@@ -883,7 +883,7 @@ public sealed class ScrollViewTests
         var content = new Panel { Width = 50, Height = 600 };
         var replacement = new Panel { Width = 50, Height = 300 };
         var view = new ScrollView { Content = content };
-        var (manager, screen, _) = OpenScene(view, new Size(200, 200));
+        var (manager, scene, _) = OpenScene(view, new Size(200, 200));
         var notificationRaised = false;
 
         view.PropertyChanged += (_, eventArgs) =>
@@ -893,7 +893,7 @@ public sealed class ScrollViewTests
                 eventArgs.OldValue is not null)
             {
                 notificationRaised = true;
-                screen.Post(() => view.Content = replacement);
+                scene.Post(() => view.Content = replacement);
             }
         };
 
@@ -964,7 +964,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
-    public void LocalAndScreenCoordinatesMatchAfterScrolling()
+    public void LocalAndSceneCoordinatesMatchAfterScrolling()
     {
         var content = new Panel { Width = 100, Height = 600 };
         var view = new ScrollView
@@ -972,15 +972,15 @@ public sealed class ScrollViewTests
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Content = content
         };
-        var (manager, screen, _) = OpenScene(view, new Size(200, 200));
+        var (manager, scene, _) = OpenScene(view, new Size(200, 200));
         view.ScrollTo(0, 100);
         manager.UpdateFrame(new Size(200, 200), 0);
 
         var local = new Point(5, 105);
-        var screenPoint = content.LocalToScreen(local);
+        var scenePoint = content.LocalToScene(local);
 
-        Assert.Equal(local, content.ScreenToLocal(screenPoint));
-        Assert.Same(content, screen.HitTest(screenPoint));
+        Assert.Equal(local, content.SceneToLocal(scenePoint));
+        Assert.Same(content, scene.HitTest(scenePoint));
         manager.Close();
     }
 
@@ -1012,10 +1012,10 @@ public sealed class ScrollViewTests
             VerticalScrollBarVisibility = ScrollBarVisibility.Visible,
             Content = new Panel { Width = 600, Height = 600 }
         };
-        var (manager, screen, _) = OpenScene(view, new Size(200, 200));
-        screen.Scale = scale;
-        screen.UseLayoutRounding = useLayoutRounding;
-        screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { bar-thickness: 16.5px; }")]);
+        var (manager, scene, _) = OpenScene(view, new Size(200, 200));
+        scene.Scale = scale;
+        scene.UseLayoutRounding = useLayoutRounding;
+        scene.SetStyleSheets([StyleSheet.Parse("ScrollBar { bar-thickness: 16.5px; }")]);
         manager.UpdateFrame(new Size(200 * scale, 200 * scale), 0);
         try
         {
@@ -1054,16 +1054,16 @@ public sealed class ScrollViewTests
         return false;
     }
 
-    private static (UiManager Manager, GameScreen Screen, ScrollView View) OpenScene(
+    private static (UIManager Manager, GameUIScene Scene, ScrollView View) OpenScene(
         ScrollView view,
         Size viewport)
     {
-        var manager = new UiManager();
-        var screen = new GameScreen(view);
-        screen.SetBaseStyleSheets([]);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(view);
+        scene.SetBaseStyleSheets([]);
+        manager.Open(scene);
         manager.UpdateFrame(viewport, 0);
-        return (manager, screen, view);
+        return (manager, scene, view);
     }
 
     private sealed class TestNode : UIElement

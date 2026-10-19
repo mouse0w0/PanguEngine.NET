@@ -60,10 +60,10 @@ public sealed class PropertyLayoutCallbackTests
     public void StyledLayoutValueInvokesTheSameInvalidationCallback()
     {
         var node = new TestNode();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         Layout(node);
 
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<TestNode>(), [StyleSetter.Create(UIElement.WidthProperty, 25d)])
             ])
@@ -72,7 +72,7 @@ public sealed class PropertyLayoutCallbackTests
         Assert.True(double.IsNaN(node.Width));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(25, node.Width);
         Assert.False(node.IsMeasureValid);

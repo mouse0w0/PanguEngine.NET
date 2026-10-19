@@ -19,9 +19,9 @@ public sealed class CssKeywordTests
             VerticalAlignment = VerticalAlignment.Top
         };
         panel.Children.Add(new Panel { Width = 120, Height = 40 });
-        var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("#target { width: 32px; height: 16px; }")]);
-        screen.SetStyleSheets([StyleSheet.Parse($"#target {{ width: {keyword}; height: {keyword}; }}")]);
+        var scene = new UIScene(panel);
+        scene.SetBaseStyleSheets([StyleSheet.Parse("#target { width: 32px; height: 16px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse($"#target {{ width: {keyword}; height: {keyword}; }}")]);
         panel.UpdateStyles();
 
         panel.Measure(new Size(500, 500));
@@ -39,9 +39,9 @@ public sealed class CssKeywordTests
     public void MaximumDimensionsNoneOverrideFiniteLimitsAndAllowStretch(string keyword)
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("Panel { max-width: 80px; max-height: 40px; }")]);
-        screen.SetStyleSheets([StyleSheet.Parse($"Panel {{ max-width: {keyword}; max-height: {keyword}; }}")]);
+        var scene = new UIScene(panel);
+        scene.SetBaseStyleSheets([StyleSheet.Parse("Panel { max-width: 80px; max-height: 40px; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse($"Panel {{ max-width: {keyword}; max-height: {keyword}; }}")]);
         panel.UpdateStyles();
 
         panel.Measure(new Size(500, 500));
@@ -63,14 +63,14 @@ public sealed class CssKeywordTests
     {
         var panel = new Panel();
         var property = propertyName == "border-color" ? Region.BorderBrushProperty : Region.BackgroundProperty;
-        var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetBaseStyleSheets([
             StyleSheet.Parse($"Panel {{ {propertyName}: #123456; border-thickness: 4px; }}")
         ]);
         panel.UpdateStyles();
         Assert.Equal(new SolidColorBrush(0x12, 0x34, 0x56), panel.GetValue(property));
 
-        screen.SetStyleSheets([StyleSheet.Parse($"Panel {{ {propertyName}: {keyword}; }}")]);
+        scene.SetStyleSheets([StyleSheet.Parse($"Panel {{ {propertyName}: {keyword}; }}")]);
         panel.UpdateStyles();
 
         Assert.Null(panel.GetValue(property));
@@ -83,13 +83,13 @@ public sealed class CssKeywordTests
     public void ShapeBrushNoneClearsExistingFillAndStroke(string keyword)
     {
         var rectangle = new Rectangle();
-        var screen = new Screen(rectangle);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("Rectangle { fill: #123456; stroke: #654321; }")]);
+        var scene = new UIScene(rectangle);
+        scene.SetBaseStyleSheets([StyleSheet.Parse("Rectangle { fill: #123456; stroke: #654321; }")]);
         rectangle.UpdateStyles();
         Assert.NotNull(rectangle.Fill);
         Assert.NotNull(rectangle.Stroke);
 
-        screen.SetStyleSheets([StyleSheet.Parse($"Rectangle {{ fill: {keyword}; stroke: {keyword}; }}")]);
+        scene.SetStyleSheets([StyleSheet.Parse($"Rectangle {{ fill: {keyword}; stroke: {keyword}; }}")]);
         rectangle.UpdateStyles();
 
         Assert.Null(rectangle.Fill);
@@ -145,8 +145,8 @@ public sealed class CssKeywordTests
     public void ZeroMinimumDimensionsRemoveExistingLowerLimits(string value)
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetBaseStyleSheets([
             StyleSheet.Parse(
                 "Panel { width: 20px; height: 10px; min-width: 100px; min-height: 50px; }")
         ]);
@@ -155,7 +155,7 @@ public sealed class CssKeywordTests
         panel.Arrange(new Rect(0, 0, 500, 500));
         Assert.Equal(new Size(100, 50), panel.DesiredSize);
 
-        screen.SetStyleSheets([StyleSheet.Parse($"Panel {{ min-width: {value}; min-height: {value}; }}")]);
+        scene.SetStyleSheets([StyleSheet.Parse($"Panel {{ min-width: {value}; min-height: {value}; }}")]);
         panel.UpdateStyles();
         panel.Measure(new Size(500, 500));
         panel.Arrange(new Rect(0, 0, 500, 500));
@@ -205,8 +205,8 @@ public sealed class CssKeywordTests
     public void DimensionConvertersPreserveNegativeValueValidation(string propertyName)
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([StyleSheet.Parse($"Panel {{ {propertyName}: -1px; }}")]);
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([StyleSheet.Parse($"Panel {{ {propertyName}: -1px; }}")]);
 
         var error = Assert.Throws<StyleParseException>(panel.UpdateStyles);
 
@@ -220,15 +220,15 @@ public sealed class CssKeywordTests
         var panel = new Panel { StyleId = "target" };
         var rectangle = new Rectangle();
         panel.Children.Add(rectangle);
-        var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetBaseStyleSheets([
             StyleSheet.Parse("""
                              #target { width: 80px; height: 40px; max-width: 100px; max-height: 50px;
                                        background: #123456; border-color: #654321; }
                              Rectangle { fill: #123456; stroke: #654321; }
                              """)
         ]);
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              #target { --size: AuTo; --empty: NoNe;
                                        width: var(--size); height: var(--size);

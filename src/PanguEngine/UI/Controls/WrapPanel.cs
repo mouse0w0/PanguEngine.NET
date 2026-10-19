@@ -213,10 +213,10 @@ public sealed class WrapPanel : Panel
         var itemSpacing = ItemSpacing;
         var lineSpacing = LineSpacing;
 
-        var screen = Screen;
-        if (screen?.UseLayoutRounding ?? true)
+        var scene = Scene;
+        if (scene?.UseLayoutRounding ?? true)
         {
-            var scale = screen?.Scale ?? 1;
+            var scale = scene?.Scale ?? 1;
             itemSpacing = LayoutHelper.RoundLayoutValue(itemSpacing, scale);
             lineSpacing = LayoutHelper.RoundLayoutValue(lineSpacing, scale);
         }

@@ -187,9 +187,9 @@ public sealed class CssColorTests
 
     private static void Apply(UIElement root, string css)
     {
-        var screen = new Screen(root);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([StyleSheet.Parse(css, "colors.css")]);
+        var scene = new UIScene(root);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([StyleSheet.Parse(css, "colors.css")]);
         root.UpdateStyles();
     }
 }

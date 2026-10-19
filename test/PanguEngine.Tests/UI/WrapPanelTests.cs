@@ -238,8 +238,8 @@ public sealed class WrapPanelTests
     public void CssCanConfigureDirectionAndBothSpacingProperties()
     {
         var panel = new WrapPanel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 "WrapPanel { orientation: vertical; item-spacing: 10px; line-spacing: 5px; }")
         ]);
@@ -263,7 +263,7 @@ public sealed class WrapPanelTests
     public void RoundedFractionalItemsFitExactlyAndSpacingFollowsRoundingSetting(Orientation orientation)
     {
         var panel = new WrapPanel { Orientation = orientation, ItemSpacing = 0.6, LineSpacing = 0.6 };
-        var screen = new Screen(panel) { Scale = 1.25 };
+        var scene = new UIScene(panel) { Scale = 1.25 };
         var first = new TestNode(AxisSize(orientation, 6, 10));
         var second = new TestNode(AxisSize(orientation, 6, 12));
         var third = new TestNode(AxisSize(orientation, 6, 8));
@@ -279,7 +279,7 @@ public sealed class WrapPanelTests
         Assert.Equal(0, CrossOrigin(second.LayoutBounds, orientation), 10);
         Assert.Equal(12.8, CrossOrigin(third.LayoutBounds, orientation), 10);
 
-        screen.UseLayoutRounding = false;
+        scene.UseLayoutRounding = false;
         panel.Measure(AxisSize(orientation, 13.6, 100));
         panel.Arrange(AxisRect(orientation, 0, 0, 13.6, 100));
 
@@ -293,7 +293,7 @@ public sealed class WrapPanelTests
     public void RoundedItemsWrapWhenAvailableSpaceIsActuallyTooSmall()
     {
         var panel = new WrapPanel { ItemSpacing = 0.6, LineSpacing = 0.6 };
-        _ = new Screen(panel) { Scale = 1.25 };
+        _ = new UIScene(panel) { Scale = 1.25 };
         panel.Children.Add(new TestNode(new Size(6, 10)));
         panel.Children.Add(new TestNode(new Size(6, 12)));
         panel.Measure(new Size(13.5, 100));
@@ -314,7 +314,7 @@ public sealed class WrapPanelTests
                 ? new Thickness(0.8, 0, 0, 0)
                 : new Thickness(0, 0.8, 0, 0)
         };
-        _ = new Screen(panel) { Scale = 1.25 };
+        _ = new UIScene(panel) { Scale = 1.25 };
         var first = new TestNode(AxisSize(orientation, 6, 8));
         var second = new TestNode(AxisSize(orientation, 6, 8));
         panel.Children.Add(first);
@@ -334,7 +334,7 @@ public sealed class WrapPanelTests
     public void UnroundedFractionalItemsFitExactlyWithoutAcceptingRealOverflow(Orientation orientation)
     {
         var panel = new WrapPanel { Orientation = orientation };
-        _ = new Screen(panel) { UseLayoutRounding = false };
+        _ = new UIScene(panel) { UseLayoutRounding = false };
         var first = new TestNode(AxisSize(orientation, 0.1, 1));
         var second = new TestNode(AxisSize(orientation, 0.2, 1));
         panel.Children.Add(first);
@@ -366,7 +366,7 @@ public sealed class WrapPanelTests
     public void UnroundedOverflowUsesTheFixedTolerance(Orientation orientation, double overflow, bool wraps)
     {
         var panel = new WrapPanel { Orientation = orientation };
-        _ = new Screen(panel) { UseLayoutRounding = false };
+        _ = new UIScene(panel) { UseLayoutRounding = false };
         var first = new TestNode(AxisSize(orientation, 0, 1));
         var second = new TestNode(AxisSize(orientation, overflow, 1));
         panel.Children.Add(first);
@@ -394,7 +394,7 @@ public sealed class WrapPanelTests
         double itemSpacing)
     {
         var panel = new WrapPanel { Orientation = orientation, ItemSpacing = itemSpacing, LineSpacing = 0.8 };
-        _ = new Screen(panel) { Scale = 1.25, UseLayoutRounding = useLayoutRounding };
+        _ = new UIScene(panel) { Scale = 1.25, UseLayoutRounding = useLayoutRounding };
         for (var index = 0; index < 200; index++)
             panel.Children.Add(new TestNode(AxisSize(orientation, 0.8, 0.8)));
         var availableMain = itemSpacing == 0 ? 160 : 319.2;
@@ -425,7 +425,7 @@ public sealed class WrapPanelTests
     public void UnroundedChildSizesWrapWhenOverflowExceedsTolerance(Orientation orientation)
     {
         var panel = new WrapPanel { Orientation = orientation };
-        _ = new Screen(panel) { UseLayoutRounding = false };
+        _ = new UIScene(panel) { UseLayoutRounding = false };
         var first = new TestNode(AxisSize(orientation, 0.1, 1));
         var second = new TestNode(AxisSize(orientation, 0.2 + 1e-8, 1));
         panel.Children.Add(first);
@@ -451,7 +451,7 @@ public sealed class WrapPanelTests
                 ? new Thickness(1e16, 0, 0, 0)
                 : new Thickness(0, 1e16, 0, 0)
         };
-        _ = new Screen(panel) { UseLayoutRounding = false };
+        _ = new UIScene(panel) { UseLayoutRounding = false };
         for (var index = 0; index < 200; index++)
             panel.Children.Add(new TestNode(AxisSize(orientation, 0.1, 1)));
 
@@ -469,7 +469,7 @@ public sealed class WrapPanelTests
     public void SpacingOverflowReflowsForFiniteConstraintsAndFailsForInfiniteConstraints(Orientation orientation)
     {
         var panel = new WrapPanel { Orientation = orientation, ItemSpacing = double.MaxValue };
-        _ = new Screen(panel) { UseLayoutRounding = false };
+        _ = new UIScene(panel) { UseLayoutRounding = false };
         var first = new TestNode(AxisSize(orientation, double.MaxValue, 1));
         var second = new TestNode(AxisSize(orientation, 1, 1));
         panel.Children.Add(first);
@@ -491,7 +491,7 @@ public sealed class WrapPanelTests
     public void NonFiniteLineOrTotalSizeDoesNotCommitMeasurement(Orientation orientation)
     {
         var mainOverflow = new WrapPanel { Orientation = orientation };
-        _ = new Screen(mainOverflow) { UseLayoutRounding = false };
+        _ = new UIScene(mainOverflow) { UseLayoutRounding = false };
         mainOverflow.Children.Add(new TestNode(AxisSize(orientation, double.MaxValue, 0)));
         mainOverflow.Children.Add(new TestNode(AxisSize(orientation, double.MaxValue, 0)));
 
@@ -499,7 +499,7 @@ public sealed class WrapPanelTests
         Assert.False(mainOverflow.IsMeasureValid);
 
         var crossOverflow = new WrapPanel { Orientation = orientation };
-        _ = new Screen(crossOverflow) { UseLayoutRounding = false };
+        _ = new UIScene(crossOverflow) { UseLayoutRounding = false };
         crossOverflow.Children.Add(new TestNode(AxisSize(orientation, 1, double.MaxValue)));
         crossOverflow.Children.Add(new TestNode(AxisSize(orientation, 1, double.MaxValue)));
 
@@ -512,7 +512,7 @@ public sealed class WrapPanelTests
     public void FiniteMainAxisWrapsBeforeLineSizeWouldOverflow()
     {
         var panel = new WrapPanel();
-        _ = new Screen(panel) { UseLayoutRounding = false };
+        _ = new UIScene(panel) { UseLayoutRounding = false };
         panel.Children.Add(new TestNode(new Size(double.MaxValue, 1)));
         panel.Children.Add(new TestNode(new Size(double.MaxValue, 1)));
         panel.Measure(new Size(double.MaxValue, 100));
@@ -526,7 +526,7 @@ public sealed class WrapPanelTests
     public void ArrangementOriginOverflowStopsBeforeArrangingTheAffectedChild(Orientation orientation)
     {
         var panel = new WrapPanel { Orientation = orientation };
-        _ = new Screen(panel) { UseLayoutRounding = false };
+        _ = new UIScene(panel) { UseLayoutRounding = false };
         var first = new TestNode(AxisSize(orientation, 1, double.MaxValue));
         var second = new TestNode(AxisSize(orientation, 1, double.MaxValue));
         var third = new TestNode(AxisSize(orientation, 1, double.MaxValue));

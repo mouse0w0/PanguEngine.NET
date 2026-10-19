@@ -457,7 +457,7 @@ public sealed class ScrollBarTests
         var bar = new ScrollBar { Focusable = false, IsWheelScrollingEnabled = false };
         Assert.False(bar.Focusable);
 
-        var (manager, screen, _) = OpenBarScene(bar, 16, 200);
+        var (manager, scene, _) = OpenBarScene(bar, 16, 200);
         try
         {
             bar.Value = 50;
@@ -469,7 +469,7 @@ public sealed class ScrollBarTests
 
             manager.ProcessPointerPressed(new Point(8, 192), MouseButton.Left, KeyModifiers.None);
             Assert.Equal(66, bar.Value);
-            Assert.Null(screen.FocusedNode);
+            Assert.Null(scene.FocusedNode);
             manager.ProcessPointerReleased(new Point(8, 192), MouseButton.Left, KeyModifiers.None);
         }
         finally
@@ -544,9 +544,9 @@ public sealed class ScrollBarTests
     public void StyleDrivenOrientationUpdatesThePseudoClassWithoutChangingPartClasses()
     {
         var bar = new ScrollBar { Width = 100, Height = 200 };
-        var manager = new UiManager();
-        var screen = new GameScreen(bar);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(bar);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(100, 200), 0);
 
         var before = bar.Children
@@ -554,7 +554,7 @@ public sealed class ScrollBarTests
             .ToArray();
         Assert.True(bar.HasPseudoClass(PseudoClass.Vertical));
 
-        screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
         manager.UpdateFrame(new Size(100, 200), 0);
 
         Assert.Equal(Orientation.Horizontal, bar.Orientation);
@@ -565,19 +565,19 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
-    public void OpenScreenCanChangeOrientationWhileTheThumbIsPressed()
+    public void OpenSceneCanChangeOrientationWhileTheThumbIsPressed()
     {
         var bar = new ScrollBar { Value = 50 };
-        var (manager, screen, _) = OpenBarScene(bar, 100, 200);
+        var (manager, scene, _) = OpenBarScene(bar, 100, 200);
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             manager.ProcessPointerMoved(point);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             Assert.True(thumb.IsPressed);
 
-            screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
+            scene.SetStyleSheets([StyleSheet.Parse("ScrollBar { orientation: horizontal; }")]);
             manager.UpdateFrame(new Size(100, 200), 0);
 
             Assert.Equal(Orientation.Horizontal, bar.Orientation);
@@ -595,15 +595,15 @@ public sealed class ScrollBarTests
     public void StyleHidingAPressedBarCancelsInputWithoutSelectorMutationErrors()
     {
         var bar = new ScrollBar { Value = 50 };
-        var (manager, screen, _) = OpenBarScene(bar, 16, 200);
+        var (manager, scene, _) = OpenBarScene(bar, 16, 200);
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             manager.ProcessPointerMoved(point);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
 
-            screen.SetStyleSheets([StyleSheet.Parse("ScrollBar { visibility: hidden; }")]);
+            scene.SetStyleSheets([StyleSheet.Parse("ScrollBar { visibility: hidden; }")]);
             manager.UpdateFrame(new Size(16, 200), 0);
 
             Assert.False(thumb.IsPressed);
@@ -627,7 +627,7 @@ public sealed class ScrollBarTests
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             manager.ProcessPointerMoved(point);
 
@@ -643,9 +643,9 @@ public sealed class ScrollBarTests
     public void FocusShowsABlueBorderAndPreservesThumbPointerFeedback()
     {
         var bar = new ScrollBar { Width = 16, Height = 200 };
-        var manager = new UiManager();
-        var screen = new GameScreen(bar);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(bar);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(16, 200), 0);
 
         var thumb = FindPart(bar, "thumb");
@@ -661,7 +661,7 @@ public sealed class ScrollBarTests
         Assert.Equal(new Thickness(1), bar.BorderThickness);
         Assert.Equal(new SolidColorBrush(92, 103, 116), thumb.Background);
 
-        var thumbPosition = thumb.LocalToScreen(new Point(2, 2));
+        var thumbPosition = thumb.LocalToScene(new Point(2, 2));
         manager.ProcessPointerMoved(thumbPosition);
         manager.UpdateFrame(new Size(16, 200), 0);
         Assert.Equal(new SolidColorBrush(110, 120, 132), thumb.Background);
@@ -674,7 +674,7 @@ public sealed class ScrollBarTests
         manager.UpdateFrame(new Size(16, 200), 0);
         Assert.Equal(new SolidColorBrush(110, 120, 132), thumb.Background);
 
-        screen.ClearFocus();
+        scene.ClearFocus();
         manager.ProcessPointerMoved(new Point(-1, -1));
         manager.UpdateFrame(new Size(16, 200), 0);
         Assert.False(bar.IsFocused);
@@ -698,13 +698,13 @@ public sealed class ScrollBarTests
             Height = size.Height,
             Value = 40
         };
-        var manager = new UiManager();
-        manager.Open(new GameScreen(bar));
+        var manager = new UIManager();
+        manager.Open(new GameUIScene(bar));
         manager.UpdateFrame(size, 0);
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             Assert.False(bar.IsFocused);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             manager.UpdateFrame(size, 0);
@@ -736,8 +736,8 @@ public sealed class ScrollBarTests
     {
         var vertical = orientation == Orientation.Vertical;
         var bar = new ScrollBar { Orientation = orientation, ViewportSize = 17, Value = 100, Focusable = false };
-        var (manager, screen, _) = OpenBarScene(bar, vertical ? 16 : 200, vertical ? 200 : 16);
-        screen.Scale = scale;
+        var (manager, scene, _) = OpenBarScene(bar, vertical ? 16 : 200, vertical ? 200 : 16);
+        scene.Scale = scale;
         manager.UpdateFrame(new Size(240, 320), 0);
         try
         {
@@ -752,7 +752,7 @@ public sealed class ScrollBarTests
             Assert.Equal(trackEnd, thumbEnd, 8);
 
             bar.Value = 50;
-            var local = thumb.LocalToScreen(new Point(2, 2));
+            var local = thumb.LocalToScene(new Point(2, 2));
             var point = new Point(local.X * scale, local.Y * scale);
             var changes = 0;
             bar.PropertyChanged += (_, eventArgs) =>
@@ -788,8 +788,8 @@ public sealed class ScrollBarTests
         };
         var host = new Panel();
         host.Children.Add(view);
-        var manager = new UiManager();
-        manager.Open(new GameScreen(host));
+        var manager = new UIManager();
+        manager.Open(new GameUIScene(host));
         manager.UpdateFrame(new Size(200, 200), 0);
         try
         {
@@ -1014,7 +1014,7 @@ public sealed class ScrollBarTests
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             manager.ProcessPointerMoved(point);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             var value = bar.Value;
@@ -1042,7 +1042,7 @@ public sealed class ScrollBarTests
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             manager.ProcessPointerMoved(point);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             var value = bar.Value;
@@ -1069,7 +1069,7 @@ public sealed class ScrollBarTests
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             manager.ProcessPointerMoved(point);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
             Assert.Equal(0, bar.Value);
@@ -1095,7 +1095,7 @@ public sealed class ScrollBarTests
         try
         {
             var thumb = FindPart(bar, "thumb");
-            var point = thumb.LocalToScreen(new Point(2, 2));
+            var point = thumb.LocalToScene(new Point(2, 2));
             manager.ProcessPointerMoved(point);
             manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
 
@@ -1141,11 +1141,11 @@ public sealed class ScrollBarTests
     public void FocusedMinimumThumbLengthStyleRefreshesGeometry()
     {
         var bar = new ScrollBar { ShowArrows = false, Value = 0 };
-        var (manager, screen, _) = OpenBarScene(bar, 16, 200);
+        var (manager, scene, _) = OpenBarScene(bar, 16, 200);
         try
         {
             var thumb = FindPart(bar, "thumb");
-            screen.SetStyleSheets([StyleSheet.Parse("ScrollBar:focus { minimum-thumb-length: 60; }")]);
+            scene.SetStyleSheets([StyleSheet.Parse("ScrollBar:focus { minimum-thumb-length: 60; }")]);
             manager.UpdateFrame(new Size(16, 200), 0);
             Assert.Equal(16, thumb.LayoutBounds.Height);
 
@@ -1167,14 +1167,14 @@ public sealed class ScrollBarTests
     public void NegativeStyleLengthsAreRejectedBeforeCommit(string propertyName)
     {
         var bar = new ScrollBar();
-        var manager = new UiManager();
-        var screen = new GameScreen(bar);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(bar);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(16, 200), 0);
 
         var oldThickness = bar.BarThickness;
         var oldThumbLength = bar.MinimumThumbLength;
-        screen.SetStyleSheets([StyleSheet.Parse($"ScrollBar {{ {propertyName}: -4; }}", "scrollbar.css")]);
+        scene.SetStyleSheets([StyleSheet.Parse($"ScrollBar {{ {propertyName}: -4; }}", "scrollbar.css")]);
         var error = Assert.Throws<StyleParseException>(() => manager.UpdateFrame(new Size(16, 200), 0));
 
         Assert.Equal(StyleParseError.InvalidValue, error.Error);
@@ -1187,7 +1187,7 @@ public sealed class ScrollBarTests
         Assert.Equal("value", Assert.IsType<ArgumentException>(error.InnerException).ParamName);
         Assert.Equal(oldThickness, bar.BarThickness);
         Assert.Equal(oldThumbLength, bar.MinimumThumbLength);
-        screen.SetStyleSheets([StyleSheet.Parse($"ScrollBar {{ {propertyName}: 0; }}")]);
+        scene.SetStyleSheets([StyleSheet.Parse($"ScrollBar {{ {propertyName}: 0; }}")]);
         manager.UpdateFrame(new Size(16, 200), 0);
         Assert.Equal(0, propertyName == "bar-thickness" ? bar.BarThickness : bar.MinimumThumbLength);
         manager.Close();
@@ -1212,7 +1212,7 @@ public sealed class ScrollBarTests
         }
     }
 
-    private static (UiManager Manager, GameScreen Screen, ScrollBar Bar) OpenBarScene(
+    private static (UIManager Manager, GameUIScene Scene, ScrollBar Bar) OpenBarScene(
         ScrollBar bar,
         double width,
         double height)
@@ -1221,15 +1221,15 @@ public sealed class ScrollBarTests
         bar.Height = height;
         bar.HorizontalAlignment = HorizontalAlignment.Left;
         bar.VerticalAlignment = VerticalAlignment.Top;
-        var screen = new GameScreen(bar);
-        screen.SetBaseStyleSheets([]);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(bar);
+        scene.SetBaseStyleSheets([]);
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(240, 320), 0);
-        return (manager, screen, bar);
+        return (manager, scene, bar);
     }
 
-    private static (UiManager Manager, GameScreen Screen, Panel Host) OpenHostedBarScene(
+    private static (UIManager Manager, GameUIScene Scene, Panel Host) OpenHostedBarScene(
         ScrollBar bar,
         double width,
         double height)
@@ -1240,12 +1240,12 @@ public sealed class ScrollBarTests
         bar.VerticalAlignment = VerticalAlignment.Top;
         var host = new Panel();
         host.Children.Add(bar);
-        var screen = new GameScreen(host);
-        screen.SetBaseStyleSheets([]);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(host);
+        scene.SetBaseStyleSheets([]);
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(240, 320), 0);
-        return (manager, screen, host);
+        return (manager, scene, host);
     }
 
     private static ScrollBarPart FindPart(ScrollBar bar, string role) =>

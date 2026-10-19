@@ -11,7 +11,7 @@ public sealed class DrawCommandListTests
     [Fact]
     public void SetTranslatePreservesScaleAndRestoresOriginalPosition()
     {
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             using (context.SetTranslate(new Point(20, 30)))
             {
@@ -25,7 +25,7 @@ public sealed class DrawCommandListTests
         }, 2, new Point(3, 4));
         var builder = new DrawBuilder();
 
-        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+        builder.Build(scene.CreateDrawCommandList(), 100, 100, false);
 
         Assert.Equal(4, builder.RectangleCount);
         Assert.Equal(new Vertex(20, 30, 1, 1, 1, 1), builder.Vertices[0]);
@@ -41,7 +41,7 @@ public sealed class DrawCommandListTests
     [Fact]
     public void SetScalePreservesOriginAndRestoresAccumulatedScale()
     {
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             using var transform = context.PushTransform(new Point(1, 2), 3);
             using (context.SetScale(0.5))
@@ -58,7 +58,7 @@ public sealed class DrawCommandListTests
         }, 2, new Point(3, 4));
         var builder = new DrawBuilder();
 
-        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+        builder.Build(scene.CreateDrawCommandList(), 100, 100, false);
 
         Assert.Equal(5, builder.RectangleCount);
         Assert.Equal(new Vertex(8, 12, 1, 1, 1, 1), builder.Vertices[0]);
@@ -77,7 +77,7 @@ public sealed class DrawCommandListTests
     [Fact]
     public void SetTransformReplacesInheritedTransformAndRestoresItAfterNestedScopes()
     {
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             using (context.SetTransform(new Point(20, 30), 3))
             {
@@ -90,7 +90,7 @@ public sealed class DrawCommandListTests
         }, 2, new Point(3, 4));
         var builder = new DrawBuilder();
 
-        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+        builder.Build(scene.CreateDrawCommandList(), 100, 100, false);
 
         Assert.Equal(3, builder.RectangleCount);
         Assert.Equal(new Vertex(23, 36, 1, 1, 1, 1), builder.Vertices[0]);
@@ -103,9 +103,9 @@ public sealed class DrawCommandListTests
     }
 
     [Fact]
-    public void SetIdentityTransformResetsOuterStateAndKeepsScreenBoundariesIsolated()
+    public void SetIdentityTransformResetsOuterStateAndKeepsSceneBoundariesIsolated()
     {
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             using (context.SetTransform(new Point(20, 30), 3))
             {
@@ -116,8 +116,8 @@ public sealed class DrawCommandListTests
 
             DrawRectangle(context);
         }, 2, new Point(3, 4));
-        var commands = screen.CreateDrawCommandList();
-        commands.Append(CreateScreen(DrawRectangle, 0.5));
+        var commands = scene.CreateDrawCommandList();
+        commands.Append(CreateScene(DrawRectangle, 0.5));
         var builder = new DrawBuilder();
 
         builder.Build(commands, 100, 100, false);
@@ -138,7 +138,7 @@ public sealed class DrawCommandListTests
     [InlineData(true)]
     public void AbsoluteTransformsPreserveEstablishedClipAndOpacity(bool separateComponents)
     {
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             using (context.PushClip(new Rect(0, 0, 10, 10)))
             using (context.PushOpacity(0.25))
@@ -163,7 +163,7 @@ public sealed class DrawCommandListTests
         }, 2, new Point(5, 5));
         var builder = new DrawBuilder();
 
-        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+        builder.Build(scene.CreateDrawCommandList(), 100, 100, false);
 
         Assert.Equal(5, builder.RectangleCount);
         Assert.Equal(new Vertex(20, 20, 1, 1, 1, 0.25f), builder.Vertices[0]);
@@ -183,15 +183,15 @@ public sealed class DrawCommandListTests
     }
 
     [Fact]
-    public void ScreensWithDifferentScalesHaveIsolatedTransformsClipsAndOpacity()
+    public void ScenesWithDifferentScalesHaveIsolatedTransformsClipsAndOpacity()
     {
-        var first = CreateScreen(context =>
+        var first = CreateScene(context =>
         {
             using var clip = context.PushClip(new Rect(0, 0, 5, 5));
             using var opacity = context.PushOpacity(0.25);
             context.FillRectangle(new Rect(1, 2, 4, 6), new Color(255, 0, 0));
         }, 2, new Point(3, 4));
-        var second = CreateScreen(context =>
+        var second = CreateScene(context =>
             context.FillRectangle(new Rect(1, 2, 4, 6), new Color(0, 255, 0)), 0.5, new Point(20, 30));
         var commands = new DrawCommandList();
 
@@ -215,14 +215,14 @@ public sealed class DrawCommandListTests
     }
 
     [Fact]
-    public void ScreenBoundariesDoNotSplitCompatibleBatchesOrReorderDraws()
+    public void SceneBoundariesDoNotSplitCompatibleBatchesOrReorderDraws()
     {
         var commands = new DrawCommandList();
-        commands.Append(CreateScreen(context =>
+        commands.Append(CreateScene(context =>
             context.FillRectangle(new Rect(1, 1, 2, 2), new Color(255, 0, 0)), 2));
-        commands.Append(CreateScreen(context =>
+        commands.Append(CreateScene(context =>
             context.FillRectangle(new Rect(1, 1, 2, 2), new Color(0, 255, 0)), 0.5));
-        commands.Append(CreateScreen(context =>
+        commands.Append(CreateScene(context =>
             context.FillRectangle(new Rect(1, 1, 2, 2), new Color(0, 0, 255))));
 
         var builder = new DrawBuilder();
@@ -238,22 +238,22 @@ public sealed class DrawCommandListTests
     public void RecordedCommandsKeepScaleTreeAndDrawingValuesUntilExplicitlyChanged()
     {
         var translation = new Point(2, 3);
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             using var transform = context.PushTransform(translation, 2);
             DrawRectangle(context);
         }, 1.5);
-        var before = screen.CreateDrawCommandList();
+        var before = scene.CreateDrawCommandList();
         var savedCommands = before.ToArray();
         var builder = new DrawBuilder();
         builder.Build(before, 100, 100, false);
         var vertices = builder.Vertices.ToArray();
 
         translation = new Point(10, 20);
-        screen.Scale = 3;
-        screen.Root!.Opacity = 0.5;
-        Arrange(screen.Root, Point.Zero);
-        var after = screen.CreateDrawCommandList();
+        scene.Scale = 3;
+        scene.Root!.Opacity = 0.5;
+        Arrange(scene.Root, Point.Zero);
+        var after = scene.CreateDrawCommandList();
 
         builder.Build(after, 100, 100, false);
         Assert.Equal(new Vertex(30, 60, 1, 1, 1, 0.5f), builder.Vertices[0]);
@@ -268,15 +268,15 @@ public sealed class DrawCommandListTests
     {
         var commands = new DrawCommandList();
         var sameList = commands;
-        var firstScreen = CreateScreen(DrawRectangle, 2);
-        var secondScreen = CreateScreen(DrawRectangle, 0.5);
+        var firstScene = CreateScene(DrawRectangle, 2);
+        var secondScene = CreateScene(DrawRectangle, 0.5);
         var builder = new DrawBuilder();
-        commands.Append(firstScreen);
+        commands.Append(firstScene);
         var firstCommand = Assert.Single(commands.OfType<FillRectangleCommand>());
         builder.Build(commands, 100, 100, false);
         Assert.Equal(4f, builder.Vertices[2].X);
 
-        commands.Append(secondScreen);
+        commands.Append(secondScene);
         builder.Build(commands, 100, 100, false);
         Assert.Equal(2, builder.RectangleCount);
         Assert.Equal(4f, builder.Vertices[2].X);
@@ -285,7 +285,7 @@ public sealed class DrawCommandListTests
         commands.Clear();
         Assert.Empty(sameList);
         Assert.Equal(new Rect(0, 0, 2, 2), firstCommand.Bounds);
-        commands.Append(secondScreen);
+        commands.Append(secondScene);
         builder.Build(sameList, 100, 100, false);
         Assert.Equal(1, builder.RectangleCount);
         Assert.Equal(1f, builder.Vertices[2].X);
@@ -295,10 +295,10 @@ public sealed class DrawCommandListTests
     public void FailedAppendDiscardsWholeCollectionAndAllowsFreshRecording()
     {
         var commands = new DrawCommandList();
-        commands.Append(CreateScreen(DrawRectangle));
+        commands.Append(CreateScene(DrawRectangle));
         var expected = new InvalidOperationException("recording failed");
         DrawingContext? captured = null;
-        var failing = CreateScreen(context =>
+        var failing = CreateScene(context =>
         {
             captured = context;
             _ = context.PushTransform(new Point(5, 6), 2);
@@ -328,7 +328,7 @@ public sealed class DrawCommandListTests
     public void MissingScopeDiscardsCollectionAndInvalidatesContext(bool absoluteTransform)
     {
         DrawingContext? captured = null;
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             captured = context;
             if (absoluteTransform)
@@ -338,9 +338,9 @@ public sealed class DrawCommandListTests
             DrawRectangle(context);
         });
         var commands = new DrawCommandList();
-        commands.Append(CreateScreen(DrawRectangle));
+        commands.Append(CreateScene(DrawRectangle));
 
-        Assert.Throws<InvalidOperationException>(() => commands.Append(screen));
+        Assert.Throws<InvalidOperationException>(() => commands.Append(scene));
         Assert.Empty(commands);
         Assert.Throws<InvalidOperationException>(() => { _ = captured!.PushTransform(Point.Zero); });
         Assert.Throws<InvalidOperationException>(() => { _ = captured!.SetTransform(Point.Zero); });
@@ -349,24 +349,24 @@ public sealed class DrawCommandListTests
         Assert.Throws<InvalidOperationException>(() => { _ = captured!.PushTranslate(Point.Zero); });
         Assert.Throws<InvalidOperationException>(() => { _ = captured!.PushScale(1); });
 
-        Assert.IsType<DrawingNode>(screen.Root).DrawAction = DrawRectangle;
-        commands.Append(screen);
+        Assert.IsType<DrawingNode>(scene.Root).DrawAction = DrawRectangle;
+        commands.Append(scene);
         Assert.Single(commands);
     }
 
     [Fact]
-    public void SharedListRejectsCrossScreenReentryClearAndPartialReads()
+    public void SharedListRejectsCrossSceneReentryClearAndPartialReads()
     {
         var commands = new DrawCommandList();
         var errors = new List<Exception?>();
         var otherCalls = 0;
-        var other = CreateScreen(context =>
+        var other = CreateScene(context =>
         {
             otherCalls++;
             DrawRectangle(context);
         });
-        Screen? screen = null;
-        screen = CreateScreen(context =>
+        UIScene? scene = null;
+        scene = CreateScene(context =>
         {
             using var transform = context.PushTransform(new Point(5, 6), 2);
             errors.Add(Record.Exception(() => commands.Append(other)));
@@ -378,11 +378,11 @@ public sealed class DrawCommandListTests
                 using var enumerator = commands.GetEnumerator();
             }));
             errors.Add(Record.Exception(() => { _ = ((IEnumerable)commands).GetEnumerator(); }));
-            errors.Add(Record.Exception(screen!.CreateDrawCommandList));
+            errors.Add(Record.Exception(scene!.CreateDrawCommandList));
             DrawRectangle(context);
         });
 
-        commands.Append(screen);
+        commands.Append(scene);
         Assert.Equal(7, errors.Count);
         Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
         Assert.Equal(0, otherCalls);
@@ -400,12 +400,12 @@ public sealed class DrawCommandListTests
     public void ListRejectsWrongThreadMutationWithoutChangingCompletedCommands()
     {
         var commands = new DrawCommandList();
-        var screen = CreateScreen(DrawRectangle);
-        commands.Append(screen);
+        var scene = CreateScene(DrawRectangle);
+        commands.Append(scene);
         var errors = new List<Exception?>();
         var thread = new Thread(() =>
         {
-            errors.Add(Record.Exception(() => commands.Append(screen)));
+            errors.Add(Record.Exception(() => commands.Append(scene)));
             errors.Add(Record.Exception(commands.Clear));
         });
 
@@ -421,7 +421,7 @@ public sealed class DrawCommandListTests
     {
         DrawingContext? captured = null;
         Exception? error = null;
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             captured = context;
             var thread = new Thread(() => error = Record.Exception(() => DrawRectangle(context)));
@@ -430,7 +430,7 @@ public sealed class DrawCommandListTests
             DrawRectangle(context);
         });
 
-        Assert.Single(screen.CreateDrawCommandList());
+        Assert.Single(scene.CreateDrawCommandList());
         Assert.IsType<InvalidOperationException>(error);
         Assert.Throws<InvalidOperationException>(() => DrawRectangle(captured!));
     }
@@ -439,7 +439,7 @@ public sealed class DrawCommandListTests
     public void EmptyAndDefaultScopesDoNotLeaveCommandsButStillEnforceLifo()
     {
         Exception? orderError = null;
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             var transform = context.PushTranslate(Point.Zero);
             var scale = context.PushScale(1);
@@ -468,7 +468,7 @@ public sealed class DrawCommandListTests
             DrawRectangle(context);
         });
 
-        Assert.IsType<FillRectangleCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        Assert.IsType<FillRectangleCommand>(Assert.Single(scene.CreateDrawCommandList()));
         Assert.IsType<InvalidOperationException>(orderError);
     }
 
@@ -479,7 +479,7 @@ public sealed class DrawCommandListTests
     [InlineData(double.PositiveInfinity)]
     public void InvalidTransformDoesNotAlterRecordedState(double scale)
     {
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => { _ = context.PushTransform(Point.Zero, scale); });
             Assert.Throws<ArgumentOutOfRangeException>(() => { _ = context.PushScale(scale); });
@@ -488,13 +488,13 @@ public sealed class DrawCommandListTests
             DrawRectangle(context);
         });
 
-        Assert.IsType<FillRectangleCommand>(Assert.Single(screen.CreateDrawCommandList()));
+        Assert.IsType<FillRectangleCommand>(Assert.Single(scene.CreateDrawCommandList()));
     }
 
     [Fact]
     public void RecordedMixedScopesRestoreAllStateBeforeFollowingDraws()
     {
-        var screen = CreateScreen(context =>
+        var scene = CreateScene(context =>
         {
             using (context.PushTransform(new Point(10, 20), 2))
             {
@@ -513,7 +513,7 @@ public sealed class DrawCommandListTests
             DrawRectangle(context);
         });
         var builder = new DrawBuilder();
-        builder.Build(screen.CreateDrawCommandList(), 100, 100, false);
+        builder.Build(scene.CreateDrawCommandList(), 100, 100, false);
 
         Assert.Equal(new Vertex(12, 22, 1, 1, 1, 0.5f, drawDataIndex: builder.Vertices[0].DrawDataIndex),
             builder.Vertices[0]);
@@ -533,12 +533,12 @@ public sealed class DrawCommandListTests
         Assert.Equal(builder.Vertices[0].DrawDataIndex, builder.Vertices[4].DrawDataIndex);
     }
 
-    private static Screen CreateScreen(Action<DrawingContext> draw, double scale = 1, Point origin = default)
+    private static UIScene CreateScene(Action<DrawingContext> draw, double scale = 1, Point origin = default)
     {
         var node = new DrawingNode { DrawAction = draw };
-        var screen = new Screen(node) { Scale = scale, UseLayoutRounding = false };
+        var scene = new UIScene(node) { Scale = scale, UseLayoutRounding = false };
         Arrange(node, origin);
-        return screen;
+        return scene;
     }
 
     private static void Arrange(UIElement node, Point origin)

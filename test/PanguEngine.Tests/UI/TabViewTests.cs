@@ -400,9 +400,9 @@ public sealed class TabViewTests
         var view = new TabView();
         var item = new TabItem();
         view.Items.Add(item);
-        var screen = new Screen(view);
+        var scene = new UIScene(view);
 
-        screen.SetStyleSheets([StyleSheet.Parse("TabItem:selected { background-color: #010203; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("TabItem:selected { background-color: #010203; }")]);
         view.UpdateStyles();
 
         Assert.True(item.HasPseudoClass(PseudoClass.Selected));
@@ -413,10 +413,10 @@ public sealed class TabViewTests
     public void BatchStyleSheetsHideTheSelectedTabWithoutChangingSelection()
     {
         var (view, first, second, _) = CreateViewWithThreeItems();
-        var screen = new Screen(view);
+        var scene = new UIScene(view);
         first.Classes.Add("tab-hidden");
 
-        screen.SetStyleSheets([StyleSheet.Parse(".tab-hidden { visibility: hidden; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse(".tab-hidden { visibility: hidden; }")]);
         view.UpdateStyles();
 
         Assert.Equal(Visibility.Hidden, first.Visibility);
@@ -432,10 +432,10 @@ public sealed class TabViewTests
     {
         var (view, first, second, _) = CreateViewWithThreeItems();
         view.Selection.SelectedItem = second;
-        var screen = new Screen(view);
+        var scene = new UIScene(view);
         first.Classes.Add("tab-hidden");
 
-        screen.SetStyleSheets([StyleSheet.Parse(".tab-hidden { visibility: hidden; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse(".tab-hidden { visibility: hidden; }")]);
         view.UpdateStyles();
 
         Assert.Equal(Visibility.Hidden, first.Visibility);
@@ -448,8 +448,8 @@ public sealed class TabViewTests
     public void AttachingAHiddenItemSelectsIt()
     {
         var view = new TabView();
-        var screen = new Screen(view);
-        screen.SetStyleSheets([StyleSheet.Parse(".tab-hidden { visibility: hidden; }")]);
+        var scene = new UIScene(view);
+        scene.SetStyleSheets([StyleSheet.Parse(".tab-hidden { visibility: hidden; }")]);
         var item = new TabItem();
         item.Classes.Add("tab-hidden");
 
@@ -465,8 +465,8 @@ public sealed class TabViewTests
     public void AttachingACollapsedItemSelectsIt()
     {
         var view = new TabView();
-        var screen = new Screen(view);
-        screen.SetStyleSheets([StyleSheet.Parse(".tab-collapsed { visibility: collapsed; }")]);
+        var scene = new UIScene(view);
+        scene.SetStyleSheets([StyleSheet.Parse(".tab-collapsed { visibility: collapsed; }")]);
         var item = new TabItem();
         item.Classes.Add("tab-collapsed");
 

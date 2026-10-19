@@ -18,7 +18,7 @@ internal sealed class ClientRenderer
 
     private readonly GraphicsDevice _device;
     private readonly Presenter _presenter;
-    private readonly UiManager _uiManager;
+    private readonly UIManager _uiManager;
     private readonly WorldRenderer _worldRenderer;
     private readonly UiRenderer _uiRenderer;
     private readonly DrawCommandList _uiCommands = new();
@@ -33,7 +33,7 @@ internal sealed class ClientRenderer
         GraphicsDevice device,
         Presenter presenter,
         FontManager fontManager,
-        UiManager uiManager,
+        UIManager uiManager,
         ClientWorld world,
         BlockModelManager models)
     {

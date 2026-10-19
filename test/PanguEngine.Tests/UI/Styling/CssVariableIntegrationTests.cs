@@ -17,9 +17,9 @@ public sealed class CssVariableIntegrationTests
     public void VariableAndConsumerImportanceCascadeIndependently(string declarations, double expected)
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([StyleSheet.Parse($"Panel {{ {declarations} }}")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([StyleSheet.Parse($"Panel {{ {declarations} }}")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(expected, panel.Opacity);
     }
 
@@ -27,13 +27,13 @@ public sealed class CssVariableIntegrationTests
     public void BaseImportantVariableBeatsNormalAuthorButNotImportantAuthor()
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 0.4 !important; }")]);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { --n: 0.8; opacity: var(--n); }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(panel);
+        scene.SetBaseStyleSheets([StyleSheet.Parse("Panel { --n: 0.4 !important; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { --n: 0.8; opacity: var(--n); }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, panel.Opacity);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { --n: 0.8 !important; opacity: var(--n); }")]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { --n: 0.8 !important; opacity: var(--n); }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, panel.Opacity);
     }
 
@@ -43,14 +43,14 @@ public sealed class CssVariableIntegrationTests
         var root = new Panel { StyleId = "root" };
         var child = new Panel { StyleId = "child" };
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              #root { --n: 0.4 !important; }
                              #child { --n: 0.8; opacity: var(--n); }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, child.Opacity);
     }
 
@@ -58,13 +58,13 @@ public sealed class CssVariableIntegrationTests
     public void ImportantVariableShorthandPreservesEdgePriorityAndLocalMasking()
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel { --n: 4px 8px; padding: var(--n) !important; padding-left: 12px; padding-right: 16px !important; }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(8, 4, 16, 4), panel.Padding);
         panel.Padding = new Thickness(20);
         Assert.All(panel.GetStyleValueSources(Region.PaddingProperty),
@@ -77,15 +77,15 @@ public sealed class CssVariableIntegrationTests
     {
         var panel = new Panel();
         panel.Classes.Add("target");
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              #missing, Panel { --n: 0.4 !important; }
                              .target { --n: 0.8 !important; }
                              Panel { opacity: var(--n); }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, panel.Opacity);
     }
 
@@ -94,19 +94,19 @@ public sealed class CssVariableIntegrationTests
     {
         var panel = new Panel { StyleId = "target" };
         panel.Classes.Add("target");
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel { --n: 0.4; }
                              #target, Panel { opacity: var(--n) !important; }
                              .target { opacity: 0.8 !important; }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, panel.Opacity);
         Assert.Equal("#target", Assert.Single(panel.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
         panel.StyleId = null;
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, panel.Opacity);
         Assert.Equal(".target", Assert.Single(panel.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
     }
@@ -115,14 +115,14 @@ public sealed class CssVariableIntegrationTests
     public void ListPseudoBranchAllowsVariableLayoutConsumers()
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel { --n: 4px; }
                              Panel, .missing:hover { padding: var(--n) !important; }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), panel.Padding);
     }
 
@@ -130,14 +130,14 @@ public sealed class CssVariableIntegrationTests
     public void ListPseudoVariableDefinitionAllowsLayout()
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel, .missing:hover { --n: 4px !important; }
                              Panel { padding: var(--n); }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), panel.Padding);
     }
 
@@ -148,11 +148,11 @@ public sealed class CssVariableIntegrationTests
     public void MalformedVariableImportanceRetainsInvalidValueDiagnostic(string declarations)
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
+        var scene = new UIScene(panel);
         var error = Assert.Throws<StyleParseException>(() =>
         {
-            screen.SetStyleSheets([StyleSheet.Parse($"Panel {{ {declarations} }}", "important-variables.css")]);
-            screen.Root!.UpdateStyles();
+            scene.SetStyleSheets([StyleSheet.Parse($"Panel {{ {declarations} }}", "important-variables.css")]);
+            scene.Root!.UpdateStyles();
         });
         Assert.Equal(StyleParseError.InvalidValue, error.Error);
         Assert.Equal("important-variables.css", error.SourceName);
@@ -167,9 +167,9 @@ public sealed class CssVariableIntegrationTests
     public void ImportanceIsParsedOutsideStringsAndBeforeSubstitution(string declarations, string expected)
     {
         var node = new CountingNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse($"CountingNode {{ {declarations} }}")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse($"CountingNode {{ {declarations} }}")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(expected, node.GetValue(CountingNode.ValueProperty));
     }
 
@@ -194,14 +194,14 @@ public sealed class CssVariableIntegrationTests
     public void ImportantVariableAliasStripsTrailingCommentsAndUsesFallback()
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel { --n: var(--missing, 4px) !important /* tail */; }
                              Panel { --n: 8px; padding: var(--n); }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(new Thickness(4), panel.Padding);
     }
 
@@ -209,14 +209,14 @@ public sealed class CssVariableIntegrationTests
     public void ImportantVariableAndConsumerBeatMoreSpecificNormalRules()
     {
         var panel = new Panel { StyleId = "target" };
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel { --alpha: 0.4 !important; opacity: var(--alpha) !important; }
                              #target { --alpha: 0.8; opacity: 0.9; }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, panel.Opacity);
         Assert.Equal("Panel", Assert.Single(panel.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
     }
@@ -227,18 +227,18 @@ public sealed class CssVariableIntegrationTests
         var panel = new Panel();
         panel.Classes.Add("first");
         panel.Classes.Add("second");
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel { --alpha: 0.4; }
                              .first, .second { opacity: var(--alpha) !important; }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, panel.Opacity);
         Assert.Equal(".first", Assert.Single(panel.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
         panel.Classes.Remove("first");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(".second", Assert.Single(panel.GetStyleValueSources(UIElement.OpacityProperty)).SelectorText);
     }
 
@@ -246,8 +246,8 @@ public sealed class CssVariableIntegrationTests
     public void MatchedMalformedImportantVariableKeepsClassAndOldStyleOnFailure()
     {
         var panel = new Panel();
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .inactive { --n: 0.4 !important !important; }
                              Panel { opacity: var(--n, 1); }
@@ -255,12 +255,12 @@ public sealed class CssVariableIntegrationTests
         ]);
         Assert.Equal(1d, panel.Opacity);
         panel.Classes.Add("inactive");
-        var error = Assert.Throws<StyleParseException>(screen.Root!.UpdateStyles);
+        var error = Assert.Throws<StyleParseException>(scene.Root!.UpdateStyles);
         Assert.Equal(StyleParseError.InvalidValue, error.Error);
         Assert.Contains("inactive", (IReadOnlySet<string>)panel.Classes);
         Assert.Equal(1d, panel.Opacity);
         Assert.True(panel.Classes.Remove("inactive"));
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, panel.Opacity);
     }
 
@@ -268,21 +268,21 @@ public sealed class CssVariableIntegrationTests
     public void PseudoConsumerCanUseImportantVariableForPaint()
     {
         var panel = new Panel { StyleId = "target" };
-        var screen = new Screen(panel);
-        screen.SetStyleSheets([
+        var scene = new UIScene(panel);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              Panel { --alpha: 0.4 !important; }
                              Panel:hover { opacity: var(--alpha) !important; }
                              #target { opacity: 0.8; }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, panel.Opacity);
         panel.SetHovered(true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, panel.Opacity);
         panel.SetHovered(false);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.8, panel.Opacity);
     }
 
@@ -290,9 +290,9 @@ public sealed class CssVariableIntegrationTests
     public void FunctionInternalMarkerDoesNotMakeTheDeclarationImportant()
     {
         var node = new CountingNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse("CountingNode { raw: fn(!important); raw: later; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse("CountingNode { raw: fn(!important); raw: later; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal("later", node.GetValue(CountingNode.ValueProperty));
     }
 

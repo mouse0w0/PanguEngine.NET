@@ -3,7 +3,7 @@ using System.Collections;
 namespace PanguEngine.UI.Drawing;
 
 /// <summary>
-/// Collects ordered drawing commands and balanced state scopes from UI screens.
+/// Collects ordered drawing commands and balanced state scopes from UI scenes.
 /// </summary>
 /// <remarks>
 /// Coordinates on drawing commands are local to their enclosing transform scopes.
@@ -18,7 +18,7 @@ public sealed class DrawCommandList : IReadOnlyList<DrawCommand>
     private bool _isAppending;
 
     /// <summary>
-    /// Creates an empty command list that can collect complete screen drawing scopes.
+    /// Creates an empty command list that can collect complete scene drawing scopes.
     /// </summary>
     public DrawCommandList()
         : this([])
@@ -31,22 +31,22 @@ public sealed class DrawCommandList : IReadOnlyList<DrawCommand>
     }
 
     /// <summary>
-    /// Appends a screen in an isolated drawing scope.
+    /// Appends a scene in an isolated drawing scope.
     /// </summary>
-    /// <param name="screen">The screen whose current root subtree is recorded.</param>
-    /// <remarks>If screen recording fails, all commands currently in this list are discarded.</remarks>
-    /// <exception cref="ArgumentNullException">Thrown when the screen is null.</exception>
+    /// <param name="scene">The scene whose current root subtree is recorded.</param>
+    /// <remarks>If scene recording fails, all commands currently in this list are discarded.</remarks>
+    /// <exception cref="ArgumentNullException">Thrown when the scene is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown on the wrong thread, during another append, or when the screen cannot draw.
+    /// Thrown on the wrong thread, during another append, or when the scene cannot draw.
     /// </exception>
-    public void Append(Screen screen)
+    public void Append(UIScene scene)
     {
         VerifyMutationAccess();
-        ArgumentNullException.ThrowIfNull(screen);
+        ArgumentNullException.ThrowIfNull(scene);
         _isAppending = true;
         try
         {
-            screen.AppendDrawCommands(_commands);
+            scene.AppendDrawCommands(_commands);
         }
         catch
         {
@@ -121,6 +121,6 @@ public sealed class DrawCommandList : IReadOnlyList<DrawCommand>
     private void VerifyNotAppending()
     {
         if (_isAppending)
-            throw new InvalidOperationException("The UI command list is recording a screen.");
+            throw new InvalidOperationException("The UI command list is recording a scene.");
     }
 }

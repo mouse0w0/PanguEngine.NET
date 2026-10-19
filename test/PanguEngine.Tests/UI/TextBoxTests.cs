@@ -23,19 +23,19 @@ public sealed class TextBoxTests
         var root = new Panel();
         var textBox = new TextBox { Text = "Hello" };
         root.Children.Add(textBox);
-        var screen = new GameScreen(root) { UseLayoutRounding = false };
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(root) { UseLayoutRounding = false };
+        var manager = new UIManager();
+        manager.Open(scene);
         manager.UpdateFrame(new Size(400, 200), 0);
         Assert.True(textBox.Focus());
         textBox.Select(0, 1);
-        var initial = Assert.Single(screen.CreateDrawCommandList().OfType<DrawTextCommand>());
+        var initial = Assert.Single(scene.CreateDrawCommandList().OfType<DrawTextCommand>());
 
         root.LineHeight = 1.5;
 
         Assert.False(textBox.IsMeasureValid);
         manager.UpdateFrame(new Size(400, 200), 0);
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var text = Assert.Single(commands.OfType<DrawTextCommand>());
         var selection = Assert.Single(commands.OfType<FillRectangleCommand>()
             .Where(command => command.Color == textBox.SelectionBackgroundColor));
@@ -85,8 +85,8 @@ public sealed class TextBoxTests
     public void BaseStylesSupplyDefaultsAndClearingThemRestoresDescriptorValues()
     {
         var node = new TextBox();
-        var screen = new Screen(node);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.Root!.UpdateStyles();
         var properties = new Property[]
         {
             UIElement.MinWidthProperty, Region.PaddingProperty, Region.BackgroundProperty,
@@ -108,8 +108,8 @@ public sealed class TextBoxTests
         Assert.Empty(node.GetStyleValueSources(UIElement.FontSizeProperty));
         Assert.Equal(16d, node.FontSize);
 
-        screen.SetBaseStyleSheets([]);
-        screen.Root!.UpdateStyles();
+        scene.SetBaseStyleSheets([]);
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(UIElement.MinWidthProperty.DefaultValue, node.MinWidth);
         Assert.Equal(Region.PaddingProperty.DefaultValue, node.Padding);
@@ -149,8 +149,8 @@ public sealed class TextBoxTests
     public void AuthorStylesOverrideDefaultsAndLocalValuesRestoreAfterClear()
     {
         var node = new TextBox();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              TextBox {
                                  min-width: 90px;
@@ -169,7 +169,7 @@ public sealed class TextBoxTests
         node.SetHovered(true);
         node.SetFocused(true);
         node.IsEnabled = false;
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(90d, node.MinWidth);
         Assert.Equal(new Thickness(2), node.Padding);
@@ -193,12 +193,12 @@ public sealed class TextBoxTests
     public void FocusDoesNotDrawASeparateFrameWhenBorderIsLocallyDisabled()
     {
         using var context = new TextTestContext();
-        var (manager, screen, node) = OpenTextBox();
+        var (manager, scene, node) = OpenTextBox();
         node.BorderThickness = Thickness.Zero;
         manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(node.Focus());
 
-        Assert.DoesNotContain(screen.CreateDrawCommandList().OfType<FillRectangleCommand>(),
+        Assert.DoesNotContain(scene.CreateDrawCommandList().OfType<FillRectangleCommand>(),
             command => command.Color == new Color(84, 169, 255));
     }
 
@@ -265,10 +265,10 @@ public sealed class TextBoxTests
     public void KeyboardCommandsEditNavigateAndLeaveEnterUnhandled()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("one two");
+        var (manager, scene, textBox) = OpenTextBox("one two");
         Assert.True(textBox.Focus());
         var rootKeys = new List<Key>();
-        screen.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
+        scene.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
 
         manager.ProcessKeyDown(Key.Home, KeyModifiers.Shift);
         Assert.Equal(0, textBox.CaretIndex);
@@ -300,11 +300,11 @@ public sealed class TextBoxTests
     public void TextBoxBuiltInBindingRunsAfterItsKeyDownHandlerMarksHandled()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("value");
+        var (manager, scene, textBox) = OpenTextBox("value");
         Assert.True(textBox.Focus());
         var rootKeys = new List<Key>();
         textBox.KeyDown += (_, args) => args.Handled = true;
-        screen.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
+        scene.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
 
         manager.ProcessKeyDown(Key.Home, KeyModifiers.None);
 
@@ -316,10 +316,10 @@ public sealed class TextBoxTests
     public void ExtendedKeyboardBindingsNavigateDeleteAndRedo()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("one two");
+        var (manager, scene, textBox) = OpenTextBox("one two");
         Assert.True(textBox.Focus());
         var rootKeys = new List<Key>();
-        screen.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
+        scene.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
 
         manager.ProcessKeyDown(Key.Backspace, KeyModifiers.Shift);
         Assert.Equal("one two", textBox.Text);
@@ -361,10 +361,10 @@ public sealed class TextBoxTests
     public void AltAndSuperDoNotInvokeEditingShortcuts()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("value");
+        var (manager, scene, textBox) = OpenTextBox("value");
         Assert.True(textBox.Focus());
         var rootKeys = new List<Key>();
-        screen.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
+        scene.Root!.KeyDown += (_, args) => rootKeys.Add(args.Key);
 
         manager.ProcessKeyDown(Key.A, KeyModifiers.Control | KeyModifiers.Alt);
         manager.ProcessKeyDown(Key.A, KeyModifiers.Control | KeyModifiers.Super);
@@ -539,11 +539,11 @@ public sealed class TextBoxTests
     public void MeasureAndDrawKeepProgrammaticTextOnOneLine()
     {
         using var context = new TextTestContext();
-        var (_, screen, textBox) = OpenTextBox("a\r\nb\tc");
+        var (_, scene, textBox) = OpenTextBox("a\r\nb\tc");
         Assert.True(textBox.Focus());
         textBox.Select(0, 1);
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var text = Assert.Single(commands.OfType<DrawTextCommand>());
         var selection = Assert.Single(commands
             .OfType<FillRectangleCommand>()
@@ -562,8 +562,8 @@ public sealed class TextBoxTests
     public void PointerClickAndDragRespectTextElementStopsAndFocus()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("A\U0001F600B");
-        var text = Assert.Single(screen.CreateDrawCommandList().OfType<DrawTextCommand>());
+        var (manager, scene, textBox) = OpenTextBox("A\U0001F600B");
+        var text = Assert.Single(scene.CreateDrawCommandList().OfType<DrawTextCommand>());
 
         manager.ProcessPointerPressed(text.Origin, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(new Point(text.Origin.X + text.Layout.Width + 20, text.Origin.Y));
@@ -574,7 +574,7 @@ public sealed class TextBoxTests
         Assert.Equal(textBox.Text.Length, textBox.SelectionLength);
 
         textBox.Focusable = false;
-        screen.ClearFocus();
+        scene.ClearFocus();
         textBox.ClearSelection();
         manager.ProcessPointerPressed(text.Origin, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(new Point(text.Origin.X + text.Layout.Width, text.Origin.Y));
@@ -587,10 +587,10 @@ public sealed class TextBoxTests
     public void ShiftClickAcrossProjectedCrLfUsesSourceTextElementStops()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("a\r\nb");
+        var (manager, scene, textBox) = OpenTextBox("a\r\nb");
         Assert.True(textBox.Focus());
         textBox.Select(1, 0);
-        var text = Assert.Single(screen.CreateDrawCommandList().OfType<DrawTextCommand>());
+        var text = Assert.Single(scene.CreateDrawCommandList().OfType<DrawTextCommand>());
         var secondProjectedSpace = text.Layout.Lines
             .SelectMany(line => line.GlyphRuns)
             .SelectMany(run => run.Glyphs)
@@ -630,12 +630,12 @@ public sealed class TextBoxTests
     public void LongTextScrollsCaretIntoTheContentClip()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox("A long value that exceeds the viewport");
+        var (manager, scene, textBox) = OpenTextBox("A long value that exceeds the viewport");
         textBox.Width = 80;
         manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
 
-        var commands = screen.CreateDrawCommandList();
+        var commands = scene.CreateDrawCommandList();
         var text = Assert.Single(commands.OfType<DrawTextCommand>());
         var caret = Assert.Single(commands
             .OfType<FillRectangleCommand>()
@@ -652,7 +652,7 @@ public sealed class TextBoxTests
         manager.ProcessPointerPressed(leftOfContent, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerReleased(leftOfContent, MouseButton.Left, KeyModifiers.None);
         Assert.Equal(0, textBox.CaretIndex);
-        text = Assert.Single(screen.CreateDrawCommandList().OfType<DrawTextCommand>());
+        text = Assert.Single(scene.CreateDrawCommandList().OfType<DrawTextCommand>());
         Assert.Equal(textBox.ContentBounds.X, text.Origin.X, 12);
     }
 
@@ -660,13 +660,13 @@ public sealed class TextBoxTests
     public void PlaceholderAndStateStylesUseStableDrawingOrder()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox();
+        var (manager, scene, textBox) = OpenTextBox();
         textBox.Placeholder = "hint";
         manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
-        var commands = screen.CreateDrawCommandList().ToArray();
+        var commands = scene.CreateDrawCommandList().ToArray();
         var placeholderIndex = Array.FindIndex(commands, command =>
             command is DrawTextCommand text && text.Color == textBox.PlaceholderColor);
         var caretIndex = Array.FindIndex(commands, command =>
@@ -680,8 +680,8 @@ public sealed class TextBoxTests
         Assert.True(focusIndex < placeholderIndex);
 
         textBox.IsEnabled = false;
-        screen.Root!.UpdateStyles();
-        commands = screen.CreateDrawCommandList().ToArray();
+        scene.Root!.UpdateStyles();
+        commands = scene.CreateDrawCommandList().ToArray();
         var overlayIndex = Array.FindLastIndex(commands, command =>
             command is FillRectangleCommand fill && fill.Color == new Color(0, 0, 0, 112));
         Assert.Equal(-1, overlayIndex);
@@ -697,10 +697,10 @@ public sealed class TextBoxTests
     public void LostFocusEndsTypingGroupAndHidesTheSelection()
     {
         using var context = new TextTestContext();
-        var (manager, screen, textBox) = OpenTextBox();
+        var (manager, scene, textBox) = OpenTextBox();
         Assert.True(textBox.Focus());
         manager.ProcessTextInput("a");
-        screen.ClearFocus();
+        scene.ClearFocus();
         manager.UpdateFrame(new Size(240, 80), 0);
         Assert.True(textBox.Focus());
         manager.ProcessTextInput("b");
@@ -711,28 +711,28 @@ public sealed class TextBoxTests
         manager.UpdateFrame(new Size(240, 80), 0);
         textBox.SelectAll();
         Assert.Contains(
-            screen.CreateDrawCommandList().OfType<FillRectangleCommand>(),
+            scene.CreateDrawCommandList().OfType<FillRectangleCommand>(),
             command => command.Color == textBox.SelectionBackgroundColor);
-        screen.ClearFocus();
+        scene.ClearFocus();
         Assert.DoesNotContain(
-            screen.CreateDrawCommandList().OfType<FillRectangleCommand>(),
+            scene.CreateDrawCommandList().OfType<FillRectangleCommand>(),
             command => command.Color == textBox.SelectionBackgroundColor);
     }
 
-    private static (UiManager Manager, GameScreen Screen, TextBox TextBox) OpenTextBox(
+    private static (UIManager Manager, GameUIScene Scene, TextBox TextBox) OpenTextBox(
         string text = "",
         TextBox? textBox = null)
     {
-        var manager = new UiManager();
+        var manager = new UIManager();
         var root = new Canvas();
         textBox ??= new TextBox { Text = text };
         textBox.Width = 200;
         textBox.Height = 40;
         root.Children.Add(textBox);
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(240, 80), 0);
-        return (manager, screen, textBox);
+        return (manager, scene, textBox);
     }
 
     private static void AssertProperty<T>(

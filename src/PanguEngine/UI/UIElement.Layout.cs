@@ -114,7 +114,7 @@ public abstract partial class UIElement
             {
                 node.InvalidateMeasure();
                 if (newValue != Visibility.Visible)
-                    node.Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
+                    node.Scene?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
             });
 
     private Size _lastMeasureConstraint;
@@ -261,9 +261,9 @@ public abstract partial class UIElement
     {
         VerifyLayoutMutationAccess();
         VerifyNotUpdatingStyles();
-        var screen = Screen;
-        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var useLayoutRounding = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         if (IsMeasureValid && _lastMeasureConstraint == availableSize)
             return;
 
@@ -343,9 +343,9 @@ public abstract partial class UIElement
     {
         VerifyLayoutMutationAccess();
         VerifyNotUpdatingStyles();
-        var screen = Screen;
-        var useLayoutRounding = screen?.UseLayoutRounding ?? true;
-        var scale = screen?.Scale ?? 1;
+        var scene = Scene;
+        var useLayoutRounding = scene?.UseLayoutRounding ?? true;
+        var scale = scene?.Scale ?? 1;
         if (!IsMeasureValid)
             throw new InvalidOperationException("A UI node must have a valid measure before it can be arranged.");
         if (IsArrangeValid && _lastArrangeRect == finalRect)
@@ -429,7 +429,7 @@ public abstract partial class UIElement
     /// Invalidates measurement and arrangement for this element and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open screen is accessed from another thread.
+    /// Thrown when the open scene is accessed from another thread.
     /// </exception>
     public void InvalidateMeasure()
     {
@@ -441,7 +441,7 @@ public abstract partial class UIElement
     /// Invalidates arrangement for this element and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open screen is accessed from another thread.
+    /// Thrown when the open scene is accessed from another thread.
     /// </exception>
     public void InvalidateArrange()
     {
@@ -466,7 +466,7 @@ public abstract partial class UIElement
     }
 
     private void VerifyLayoutMutationAccess() =>
-        Screen?.VerifyTreeMutationAccess();
+        Scene?.VerifyTreeMutationAccess();
 
     private void VerifyNotUpdatingStyles()
     {

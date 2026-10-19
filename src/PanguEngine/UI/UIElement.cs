@@ -9,7 +9,7 @@ namespace PanguEngine.UI;
 /// Provides the base property host for retained-mode UI elements.
 /// </summary>
 /// <remarks>
-/// Properties cannot be modified while the owning screen is generating drawing commands.
+/// Properties cannot be modified while the owning scene is generating drawing commands.
 /// </remarks>
 public abstract partial class UIElement : StyledObject
 {
@@ -18,8 +18,8 @@ public abstract partial class UIElement : StyledObject
             nameof(Parent),
             onChanged: static (node, oldParent, _) => node.OnInheritanceParentChanged(oldParent));
 
-    private static readonly PropertyKey<Screen?> ScreenPropertyKey =
-        Property.RegisterReadOnly<UIElement, Screen?>(nameof(Screen));
+    private static readonly PropertyKey<UIScene?> ScenePropertyKey =
+        Property.RegisterReadOnly<UIElement, UIScene?>(nameof(Scene));
 
     /// <summary>
     /// Identifies the <see cref="Parent"/> property.
@@ -27,9 +27,9 @@ public abstract partial class UIElement : StyledObject
     public static readonly Property<Container?> ParentProperty = ParentPropertyKey.Property;
 
     /// <summary>
-    /// Identifies the <see cref="Screen"/> property.
+    /// Identifies the <see cref="Scene"/> property.
     /// </summary>
-    public static readonly Property<Screen?> ScreenProperty = ScreenPropertyKey.Property;
+    public static readonly Property<UIScene?> SceneProperty = ScenePropertyKey.Property;
 
     /// <summary>Identifies the inherited <see cref="FontFamily"/> property.</summary>
     public static readonly Property<string> FontFamilyProperty =
@@ -92,18 +92,18 @@ public abstract partial class UIElement : StyledObject
     /// </summary>
     /// <remarks>
     /// The value is null when this element has no parent. Property change notifications occur after
-    /// this value changes, before any resulting screen ownership change.
+    /// this value changes, before any resulting scene ownership change.
     /// </remarks>
     public Container? Parent => GetValue(ParentProperty);
 
     /// <summary>
-    /// Gets the UI screen that owns this element.
+    /// Gets the UI scene that owns this element.
     /// </summary>
     /// <remarks>
-    /// The value is null when this element has no owning screen. Property change notifications occur
+    /// The value is null when this element has no owning scene. Property change notifications occur
     /// after this element's value changes and before its descendants are updated.
     /// </remarks>
-    public Screen? Screen => GetValue(ScreenProperty);
+    public UIScene? Scene => GetValue(SceneProperty);
 
     /// <summary>
     /// Gets or sets the preferred font family, inherited from the parent when no local or styled value applies.
@@ -174,7 +174,7 @@ public abstract partial class UIElement : StyledObject
     /// while already at the front has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a tree owned by an open screen is modified from the wrong thread.
+    /// Thrown when a tree owned by an open scene is modified from the wrong thread.
     /// </exception>
     public void MoveToFront() =>
         Parent?.MoveChildToFront(this);
@@ -187,7 +187,7 @@ public abstract partial class UIElement : StyledObject
     /// while already at the back has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a tree owned by an open screen is modified from the wrong thread.
+    /// Thrown when a tree owned by an open scene is modified from the wrong thread.
     /// </exception>
     public void MoveToBack() =>
         Parent?.MoveChildToBack(this);
@@ -197,16 +197,16 @@ public abstract partial class UIElement : StyledObject
     internal void SetParent(Container? parent) =>
         SetValue(ParentPropertyKey, parent);
 
-    internal void SetScreenRecursive(Screen? screen)
+    internal void SetSceneRecursive(UIScene? scene)
     {
-        if (!ReferenceEquals(Screen, screen))
+        if (!ReferenceEquals(Scene, scene))
             StopActiveTickers();
-        SetValue(ScreenPropertyKey, screen);
+        SetValue(ScenePropertyKey, scene);
         if (this is not Container parent)
             return;
 
         foreach (var child in parent.ReadOnlyChildren)
-            child.SetScreenRecursive(screen);
+            child.SetSceneRecursive(scene);
     }
 
     internal void InvalidateTreeStructure()

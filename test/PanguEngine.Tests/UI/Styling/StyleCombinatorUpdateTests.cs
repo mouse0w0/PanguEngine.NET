@@ -23,17 +23,17 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel();
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(selector + " { opacity: 0.4; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(selector + " { opacity: 0.4; }")]);
 
         Assert.Equal(1d, target.Opacity);
 
         host.Classes.Add("host");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         host.Classes.Remove("host");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
     }
 
@@ -45,14 +45,14 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 ".unused, .leader + .target { opacity: 0.4; }")
         ]);
 
         first.Classes.Add("leader");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, second.Opacity);
     }
@@ -65,17 +65,17 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
 
         Assert.Equal(1d, second.Opacity);
 
         first.Classes.Add("leader");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, second.Opacity);
 
         first.Classes.Remove("leader");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, second.Opacity);
     }
 
@@ -87,13 +87,13 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel();
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(selector + " { opacity: 0.4; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(selector + " { opacity: 0.4; }")]);
 
         Assert.Equal(1d, target.Opacity);
 
         host.StyleId = "menu";
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
     }
 
@@ -105,24 +105,24 @@ public sealed class StyleCombinatorUpdateTests
         var host = new PseudoPanel("host");
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(selector + " { opacity: 0.4; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(selector + " { opacity: 0.4; }")]);
 
         Assert.Equal(1d, target.Opacity);
 
         host.Set("loading", true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         host.Set("loading", false);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(".unused, ")]
-    public void SameScreenReparentRefreshesBothParents(string prefix)
+    public void SameSceneReparentRefreshesBothParents(string prefix)
     {
         var source = MakePanel("source");
         var destination = MakePanel("destination");
@@ -131,66 +131,66 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(source);
         root.Children.Add(destination);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse(
                 prefix + ".source > .target { opacity: 0.4; }" +
                 prefix + ".destination > .target { opacity: 0.7; }")
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
 
         destination.Children.Add(target);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Same(destination, target.Parent);
         Assert.Equal(0.7, target.Opacity);
     }
 
     [Fact]
-    public void CrossScreenMoveUsesTheFinalScreenResolver()
+    public void CrossSceneMoveUsesTheFinalSceneResolver()
     {
         var host = MakePanel("host");
         var target = MakePanel("target");
         host.Children.Add(target);
-        var first = new Screen(host);
+        var first = new UIScene(host);
         first.SetStyleSheets([StyleSheet.Parse(".host .target { opacity: 0.4; }")]);
         first.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         var secondHost = MakePanel();
-        var second = new Screen(secondHost);
+        var second = new UIScene(secondHost);
         second.SetStyleSheets([StyleSheet.Parse(".target { opacity: 0.7; }")]);
 
         secondHost.Children.Add(target);
         second.Root!.UpdateStyles();
 
-        Assert.Same(second, target.Screen);
+        Assert.Same(second, target.Scene);
         Assert.Equal(0.7, target.Opacity);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData(".unused, ")]
-    public void PromotingAChildToAnotherScreenRootRefreshesTheOldParent(string prefix)
+    public void PromotingAChildToAnotherSceneRootRefreshesTheOldParent(string prefix)
     {
         var leader = MakePanel("leader");
         var target = MakePanel("target");
         var root = MakePanel();
         root.Children.Add(leader);
         root.Children.Add(target);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
-        var other = new Screen();
+        var other = new UIScene();
         other.Root = leader;
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         other.Root!.UpdateStyles();
 
-        Assert.Same(other, leader.Screen);
+        Assert.Same(other, leader.Scene);
         Assert.DoesNotContain(leader, root.Children);
         Assert.Equal(1d, target.Opacity);
     }
@@ -203,13 +203,13 @@ public sealed class StyleCombinatorUpdateTests
         var target = MakePanel("target");
         var root = MakePanel();
         root.Children.Add(target);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
         Assert.Equal(1d, target.Opacity);
 
         var leader = MakePanel("leader");
         root.Children.Insert(0, leader);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
     }
@@ -224,13 +224,13 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(leader);
         root.Children.Add(target);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         root.Children.Remove(leader);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(1d, target.Opacity);
     }
@@ -245,12 +245,12 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(old);
         root.Children.Add(target);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
         Assert.Equal(1d, target.Opacity);
 
         root.Children[0] = MakePanel("leader");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
     }
@@ -265,16 +265,16 @@ public sealed class StyleCombinatorUpdateTests
         host.Children.Add(child);
         var root = MakePanel();
         root.Children.Add(host);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(prefix + ".host .target { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(prefix + ".host .target { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, child.Opacity);
 
         host.Children.Clear();
         child.UpdateStyles();
 
         Assert.Null(child.Parent);
-        Assert.Null(child.Screen);
+        Assert.Null(child.Scene);
         Assert.Equal(1d, child.Opacity);
     }
 
@@ -288,13 +288,13 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(leader);
         root.Children.Add(target);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(prefix + ".leader + .target { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         root.Children.Move(1, 0);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(1d, target.Opacity);
     }
@@ -307,19 +307,19 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(leader);
         root.Children.Add(target);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
 
         target.MoveToFront();
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         leader.MoveToFront();
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
 
         leader.MoveToBack();
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
     }
 
@@ -331,8 +331,8 @@ public sealed class StyleCombinatorUpdateTests
         a.Children.Add(target);
         var root = MakePanel();
         root.Children.Add(a);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".a + .target { opacity: 0.4; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".a + .target { opacity: 0.4; }")]);
 
         var notifications = 0;
         target.PropertyChanged += (_, e) =>
@@ -340,7 +340,7 @@ public sealed class StyleCombinatorUpdateTests
 
         root.Children.Add(target);
 
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
         Assert.Equal(1, notifications);
 
@@ -355,19 +355,19 @@ public sealed class StyleCombinatorUpdateTests
         var second = MakePanel("second");
         host.Children.Add(first);
         host.Children.Add(second);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .host .first { opacity: 0.4; }
                              .host .second { opacity: 0.7; }
                              """)
         ]);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, first.Opacity);
         Assert.Equal(0.7, second.Opacity);
 
         host.Classes.Remove("host");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, first.Opacity);
         Assert.Equal(1d, second.Opacity);
 
@@ -379,7 +379,7 @@ public sealed class StyleCombinatorUpdateTests
         };
 
         host.Classes.Add("host");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(1d, observed);
         Assert.Equal(0.7, second.Opacity);
@@ -391,8 +391,8 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel();
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .host .target { opacity: 0.4; }
                              .host.extra .target { opacity: 0.9; }
@@ -410,11 +410,11 @@ public sealed class StyleCombinatorUpdateTests
         };
 
         host.Classes.Add("host");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
         Assert.Equal(1, notifications);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.9, target.Opacity);
         Assert.True(host.Classes.SetEquals(["host", "extra"]));
@@ -427,8 +427,8 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel();
         var guard = new GuardedNode();
         host.Children.Add(guard);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host .guard { guarded: risky; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host .guard { guarded: risky; }")]);
 
         Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
 
@@ -436,7 +436,7 @@ public sealed class StyleCombinatorUpdateTests
         try
         {
             host.Classes.Add("host");
-            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+            Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles);
         }
         finally
         {
@@ -455,8 +455,8 @@ public sealed class StyleCombinatorUpdateTests
         var host = new PseudoPanel();
         var guard = new GuardedNode();
         host.Children.Add(guard);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(":loading .guard { guarded: risky; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(":loading .guard { guarded: risky; }")]);
 
         Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
 
@@ -464,7 +464,7 @@ public sealed class StyleCombinatorUpdateTests
         try
         {
             host.Set("loading", true);
-            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+            Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles);
         }
         finally
         {
@@ -481,17 +481,17 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel("host");
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host .target { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
-        var resolver = screen.StyleResolver;
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
+        var resolver = scene.StyleResolver;
         Assert.Equal(0.4, target.Opacity);
 
-        screen.SetStyleSheets([StyleSheet.Parse(".host .target { padding: nope; }")]);
-        var error = Assert.Throws<StyleParseException>(screen.Root!.UpdateStyles);
+        scene.SetStyleSheets([StyleSheet.Parse(".host .target { padding: nope; }")]);
+        var error = Assert.Throws<StyleParseException>(scene.Root!.UpdateStyles);
 
         Assert.Equal(StyleParseError.InvalidValue, error.Error);
-        Assert.NotSame(resolver, screen.StyleResolver);
+        Assert.NotSame(resolver, scene.StyleResolver);
         Assert.Equal(0.4, target.Opacity);
     }
 
@@ -501,9 +501,9 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel("host");
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host .target { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         target.Opacity = 0.9;
@@ -527,18 +527,18 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(target);
         root.Children.Add(leader);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".leader + .target { padding: 4px; }")]);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".leader + .target { padding: 4px; }")]);
+        scene.Open();
         try
         {
-            screen.PrepareFrame(new Size(100, 100));
+            scene.PrepareFrame(new Size(100, 100));
             Assert.True(target.IsMeasureValid);
             Assert.True(target.IsArrangeValid);
             Assert.Equal(Thickness.Zero, target.Padding);
 
             root.Children.Move(1, 0);
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
 
             Assert.Equal(new Thickness(4), target.Padding);
             Assert.False(target.IsMeasureValid);
@@ -546,12 +546,12 @@ public sealed class StyleCombinatorUpdateTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
     [Fact]
-    public void SameScreenMoveRefreshesRemainingSiblingsInOldParent()
+    public void SameSceneMoveRefreshesRemainingSiblingsInOldParent()
     {
         var target = MakePanel("target");
         var remainder = MakePanel("remainder");
@@ -562,13 +562,13 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(source);
         root.Children.Add(destination);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".target + .remainder { opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".target + .remainder { opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, remainder.Opacity);
 
         destination.Children.Add(target);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(1d, remainder.Opacity);
     }
@@ -585,8 +585,8 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(host);
         root.Children.Add(otherHost);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([
             StyleSheet.Parse("""
                              .host .target { opacity: 0.4; }
                              .other-host .other { opacity: 0.9; }
@@ -603,7 +603,7 @@ public sealed class StyleCombinatorUpdateTests
         };
 
         host.Classes.Add("host");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0.4, target.Opacity);
         Assert.Equal(1d, observed);
@@ -616,8 +616,8 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel();
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host .target { opacity: 0.4; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host .target { opacity: 0.4; }")]);
         Assert.Equal(1d, target.Opacity);
 
         var expected = new InvalidOperationException("style notification failed");
@@ -631,14 +631,14 @@ public sealed class StyleCombinatorUpdateTests
         };
 
         host.Classes.Add("host");
-        Assert.Same(expected, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles));
 
         Assert.Contains("host", (IReadOnlySet<string>)host.Classes);
         Assert.Equal(0.4, target.Opacity);
         Assert.Single(target.GetStyleValueSources(UIElement.OpacityProperty));
 
         host.Classes.Add("host");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1, notifications);
     }
 
@@ -648,10 +648,10 @@ public sealed class StyleCombinatorUpdateTests
         var host = new PseudoPanel("host");
         var target = MakePanel("target");
         host.Children.Add(target);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host:loading .target { opacity: 0.4; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host:loading .target { opacity: 0.4; }")]);
         host.Set("loading", true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         var notifications = 0;
@@ -662,7 +662,7 @@ public sealed class StyleCombinatorUpdateTests
         host.Classes.Add("host");
         host.StyleId = null;
         host.Classes.Remove("absent");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(0, notifications);
     }
@@ -673,8 +673,8 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel();
         var guard = new GuardedNode();
         host.Children.Add(guard);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse("#menu .guard { guarded: risky; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse("#menu .guard { guarded: risky; }")]);
 
         Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
 
@@ -682,7 +682,7 @@ public sealed class StyleCombinatorUpdateTests
         try
         {
             host.StyleId = "menu";
-            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+            Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles);
         }
         finally
         {
@@ -697,8 +697,8 @@ public sealed class StyleCombinatorUpdateTests
     public void ConverterCanInvalidateRelationshipsAndAddChildren()
     {
         var host = MakePanel("host");
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
         var node = new MutationCallbackNode();
         Exception? moveError = null;
         Exception? classError = null;
@@ -710,7 +710,7 @@ public sealed class StyleCombinatorUpdateTests
         try
         {
             host.Children.Add(node);
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
         }
         finally
         {
@@ -723,7 +723,7 @@ public sealed class StyleCombinatorUpdateTests
         Assert.Same(node, host.Children[0]);
         Assert.Contains("blocked", (IReadOnlySet<string>)host.Classes);
         Assert.False(host.IsStyleSubtreeValid);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.True(host.IsStyleSubtreeValid);
     }
 
@@ -733,10 +733,10 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel("host");
         var node = new MutationCallbackNode();
         host.Children.Add(node);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
         var otherRoot = MakePanel("other");
-        var otherScreen = new Screen(otherRoot);
+        var otherScene = new UIScene(otherRoot);
         var otherChild = MakePanel("target");
         Exception? unrelatedError = null;
         Exception? reentryError = null;
@@ -745,14 +745,14 @@ public sealed class StyleCombinatorUpdateTests
             unrelatedError = Record.Exception(() =>
             {
                 otherRoot.Children.Add(otherChild);
-                otherScreen.SetStyleSheets([StyleSheet.Parse(".other > .target { opacity: 0.7; }")]);
-                otherScreen.Root!.UpdateStyles();
+                otherScene.SetStyleSheets([StyleSheet.Parse(".other > .target { opacity: 0.7; }")]);
+                otherScene.Root!.UpdateStyles();
             });
             reentryError = Record.Exception(node.UpdateStyles);
         };
         try
         {
-            screen.Root!.UpdateStyles();
+            scene.Root!.UpdateStyles();
         }
         finally
         {
@@ -764,7 +764,7 @@ public sealed class StyleCombinatorUpdateTests
         Assert.Equal(0.7, otherChild.Opacity);
         Assert.Equal(1d, node.GetValue(MutationCallbackNode.ValueProperty));
         Assert.False(host.IsUpdatingStyles);
-        Assert.False(screen.IsUpdatingLayout);
+        Assert.False(scene.IsUpdatingLayout);
     }
 
     [Fact]
@@ -773,13 +773,13 @@ public sealed class StyleCombinatorUpdateTests
         var host = MakePanel("host");
         var node = new MutationCallbackNode();
         host.Children.Add(node);
-        var screen = new Screen(host);
-        screen.SetStyleSheets([StyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
+        var scene = new UIScene(host);
+        scene.SetStyleSheets([StyleSheet.Parse(".host MutationCallbackNode { mutation-value: 1; }")]);
         var expected = new InvalidOperationException("conversion failed");
         MutationCallbackNode.OnConvert = () => throw expected;
         try
         {
-            var error = Assert.Throws<StyleParseException>(screen.Root!.UpdateStyles);
+            var error = Assert.Throws<StyleParseException>(scene.Root!.UpdateStyles);
             Assert.Same(expected, error.InnerException);
         }
         finally
@@ -789,7 +789,7 @@ public sealed class StyleCombinatorUpdateTests
 
         Assert.False(node.IsStyleSubtreeValid);
         Assert.False(host.IsUpdatingStyles);
-        Assert.False(screen.IsUpdatingLayout);
+        Assert.False(scene.IsUpdatingLayout);
         Assert.True(host.Classes.Add("after-failure"));
         var otherRoot = new Panel();
         otherRoot.Children.Add(node);
@@ -798,20 +798,20 @@ public sealed class StyleCombinatorUpdateTests
     }
 
     [Fact]
-    public void CrossScreenMoveRefreshesSiblingRulesInBothScreens()
+    public void CrossSceneMoveRefreshesSiblingRulesInBothScenes()
     {
         var leader = MakePanel("leader");
         var sourceTarget = MakePanel("target");
         var sourceRoot = MakePanel();
         sourceRoot.Children.Add(leader);
         sourceRoot.Children.Add(sourceTarget);
-        var source = new Screen(sourceRoot);
+        var source = new UIScene(sourceRoot);
         source.SetStyleSheets([StyleSheet.Parse(".leader + .target { opacity: 0.4; }")]);
 
         var destinationTarget = MakePanel("target");
         var destinationRoot = MakePanel();
         destinationRoot.Children.Add(destinationTarget);
-        var destination = new Screen(destinationRoot);
+        var destination = new UIScene(destinationRoot);
         destination.SetStyleSheets([StyleSheet.Parse(".leader ~ .target { opacity: 0.7; }")]);
         source.Root!.UpdateStyles();
         destination.Root!.UpdateStyles();
@@ -822,7 +822,7 @@ public sealed class StyleCombinatorUpdateTests
         source.Root!.UpdateStyles();
         destination.Root!.UpdateStyles();
 
-        Assert.Same(destination, leader.Screen);
+        Assert.Same(destination, leader.Scene);
         Assert.Equal(1d, sourceTarget.Opacity);
         Assert.Equal(0.7, destinationTarget.Opacity);
     }
@@ -837,16 +837,16 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(leader);
         root.Children.Add(following);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".leader:hover + * .target { opacity: 0.4; }")]);
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".leader:hover + * .target { opacity: 0.4; }")]);
         Assert.Equal(1d, target.Opacity);
 
         leader.SetHovered(true);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, target.Opacity);
 
         leader.SetHovered(false);
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         Assert.Equal(1d, target.Opacity);
     }
 
@@ -860,9 +860,9 @@ public sealed class StyleCombinatorUpdateTests
         var root = MakePanel();
         root.Children.Add(source);
         root.Children.Add(destination);
-        var screen = new Screen(root);
-        screen.SetStyleSheets([StyleSheet.Parse(".host .guard { guarded: risky; opacity: 0.4; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(root);
+        scene.SetStyleSheets([StyleSheet.Parse(".host .guard { guarded: risky; opacity: 0.4; }")]);
+        scene.Root!.UpdateStyles();
         Assert.Equal(0.4, guard.Opacity);
         Assert.Single(guard.GetStyleValueSources(GuardedNode.ValueProperty));
 
@@ -870,7 +870,7 @@ public sealed class StyleCombinatorUpdateTests
         try
         {
             destination.Children.Add(guard);
-            Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles);
+            Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles);
         }
         finally
         {
@@ -878,7 +878,7 @@ public sealed class StyleCombinatorUpdateTests
         }
 
         Assert.Same(destination, guard.Parent);
-        Assert.Same(screen, guard.Screen);
+        Assert.Same(scene, guard.Scene);
         Assert.Same(guard, Assert.Single(destination.Children));
         Assert.DoesNotContain(guard, source.Children);
         Assert.Equal(0.4, guard.Opacity);

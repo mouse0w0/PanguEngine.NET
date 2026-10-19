@@ -20,7 +20,7 @@ public abstract partial class UIElement
     /// </summary>
     /// <exception cref="ArgumentException">Thrown when the value is not finite or is outside the range from zero to one.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this property is modified while the owning screen is generating drawing commands.
+    /// Thrown when this property is modified while the owning scene is generating drawing commands.
     /// </exception>
     public double Opacity
     {

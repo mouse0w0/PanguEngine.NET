@@ -160,12 +160,12 @@ public sealed class CheckBox : Control
     /// <inheritdoc />
     protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
-        var screen = Screen;
+        var scene = Scene;
         base.OnPointerClicked(eventArgs);
         if (eventArgs.Button != MouseButton.Left)
             return;
         eventArgs.Handled = true;
-        if (CanActivate(screen))
+        if (CanActivate(scene))
             Activate();
     }
 
@@ -194,12 +194,12 @@ public sealed class CheckBox : Control
         }
 
         var activate = _spaceKeyDown;
-        var screen = Screen;
+        var scene = Scene;
         var focusVersion = _focusVersion;
         SetSpaceKeyDown(false);
         base.OnKeyUp(eventArgs);
         eventArgs.Handled = true;
-        if (activate && IsFocused && focusVersion == _focusVersion && CanActivate(screen))
+        if (activate && IsFocused && focusVersion == _focusVersion && CanActivate(scene))
             Activate();
     }
 
@@ -243,8 +243,8 @@ public sealed class CheckBox : Control
             return;
         if (node.Parent is { } source)
             source.Children.Remove(node);
-        else if (node.Screen is { } screen)
-            screen.Root = null;
+        else if (node.Scene is { } scene)
+            scene.Root = null;
         if (!ReferenceEquals(Content, expectedValue))
             return;
         if (node.Parent is not null)
@@ -271,9 +271,9 @@ public sealed class CheckBox : Control
         if (ContentNode is not { Visibility: not Visibility.Collapsed })
             return 0;
         var spacing = Spacing;
-        var screen = Screen;
-        return screen?.UseLayoutRounding ?? true
-            ? LayoutHelper.RoundLayoutValue(spacing, screen?.Scale ?? 1)
+        var scene = Scene;
+        return scene?.UseLayoutRounding ?? true
+            ? LayoutHelper.RoundLayoutValue(spacing, scene?.Scale ?? 1)
             : spacing;
     }
 
@@ -296,15 +296,15 @@ public sealed class CheckBox : Control
         Click?.Invoke(this, EventArgs.Empty);
     }
 
-    private bool CanActivate(Screen? screen)
+    private bool CanActivate(UIScene? scene)
     {
-        if (screen is null || !screen.IsOpen() || !ReferenceEquals(Screen, screen))
+        if (scene is null || !scene.IsOpen() || !ReferenceEquals(Scene, scene))
             return false;
         for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (!node.IsEnabled || node.Visibility != Visibility.Visible)
                 return false;
-            if (ReferenceEquals(node, screen.Root))
+            if (ReferenceEquals(node, scene.Root))
                 return true;
         }
 

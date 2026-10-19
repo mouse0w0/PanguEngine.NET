@@ -115,7 +115,7 @@ public sealed partial class ScrollBar
         if (!IsWheelScrollingEnabled || !IsEnabled || eventArgs.Handled)
             return;
 
-        var lines = UiToolkit.WheelScrollLines;
+        var lines = UIToolkit.WheelScrollLines;
         if (lines == 0)
             return;
 
@@ -124,7 +124,7 @@ public sealed partial class ScrollBar
             return;
 
         var previous = Value;
-        Step(-delta * UiToolkit.GetWheelScrollStep(lines, SmallChange, LargeChange));
+        Step(-delta * UIToolkit.GetWheelScrollStep(lines, SmallChange, LargeChange));
         eventArgs.Handled = Value != previous;
     }
 
@@ -298,7 +298,7 @@ public sealed partial class ScrollBar
 
     private bool IsInteractionAvailable()
     {
-        if (Screen is null)
+        if (Scene is null)
             return false;
 
         return _interaction switch
@@ -339,9 +339,9 @@ public sealed partial class ScrollBar
 
         var bounds = part.LayoutBounds;
         return _lastPointerPosition.X >= bounds.X &&
-            _lastPointerPosition.Y >= bounds.Y &&
-            _lastPointerPosition.X < bounds.X + bounds.Width &&
-            _lastPointerPosition.Y < bounds.Y + bounds.Height;
+               _lastPointerPosition.Y >= bounds.Y &&
+               _lastPointerPosition.X < bounds.X + bounds.Width &&
+               _lastPointerPosition.Y < bounds.Y + bounds.Height;
     }
 
     private bool CanRepeatTrack()

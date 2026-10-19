@@ -146,9 +146,9 @@ public sealed class StyleComponentsTests
     public void LocalAndBindingOverrideWholeThicknessAndClearRestoresStyle()
     {
         var node = new Panel();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { padding: 4px 8px; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { padding: 4px 8px; }")]);
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(new Thickness(8, 4, 8, 4), node.Padding);
         Assert.All(node.GetStyleValueSources(Region.PaddingProperty),
@@ -219,19 +219,19 @@ public sealed class StyleComponentsTests
     public void StyleApplicationNotifiesOnceAndFailedReplacementKeepsValue()
     {
         var node = new Panel();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         var notifications = 0;
         node.PropertyChanged += (_, eventArgs) =>
             notifications += ReferenceEquals(eventArgs.Property, Region.PaddingProperty) ? 1 : 0;
 
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { padding: 4px; }")]);
-        screen.Root!.UpdateStyles();
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { padding: 4px; }")]);
+        scene.Root!.UpdateStyles();
 
         Assert.Equal(1, notifications);
         Assert.Equal(new Thickness(4), node.Padding);
 
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { padding: nope; }")]);
-        Assert.Throws<StyleParseException>(screen.Root!.UpdateStyles);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { padding: nope; }")]);
+        Assert.Throws<StyleParseException>(scene.Root!.UpdateStyles);
 
         Assert.Equal(1, notifications);
         Assert.Equal(new Thickness(4), node.Padding);
@@ -350,9 +350,9 @@ public sealed class StyleComponentsTests
     public void SourceCollectionIsReadOnly()
     {
         var node = new Panel();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([StyleSheet.Parse("Panel { padding: 4px; }")]);
-        screen.Root!.UpdateStyles();
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([StyleSheet.Parse("Panel { padding: 4px; }")]);
+        scene.Root!.UpdateStyles();
 
         var sources = node.GetStyleValueSources(Region.PaddingProperty);
         var list = Assert.IsAssignableFrom<IList<StyleValueSource>>(sources);

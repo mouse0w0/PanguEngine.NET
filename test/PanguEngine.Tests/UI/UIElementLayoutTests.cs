@@ -88,11 +88,11 @@ public sealed class UIElementLayoutTests
     public void ScaleChangeRecomputesLayoutAfterRecursiveInvalidation()
     {
         var node = new TestNode { CoreDesiredSize = new Size(10.1, 5.1) };
-        var screen = new Screen(node) { Scale = 1 };
+        var scene = new UIScene(node) { Scale = 1 };
 
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
-        screen.Scale = 2;
+        scene.Scale = 2;
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
 
@@ -107,11 +107,11 @@ public sealed class UIElementLayoutTests
         {
             CoreDesiredSize = new Size(10.1, 5.1)
         };
-        var screen = new Screen(node) { Scale = 1, UseLayoutRounding = false };
+        var scene = new UIScene(node) { Scale = 1, UseLayoutRounding = false };
 
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
-        screen.Scale = 2;
+        scene.Scale = 2;
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
 
@@ -145,7 +145,7 @@ public sealed class UIElementLayoutTests
             VerticalAlignment = VerticalAlignment.Top,
             CoreDesiredSize = new Size(10.25, 5.25)
         };
-        _ = new Screen(node) { UseLayoutRounding = false };
+        _ = new UIScene(node) { UseLayoutRounding = false };
 
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0.5, 1.5, 100, 100));
@@ -164,7 +164,7 @@ public sealed class UIElementLayoutTests
             VerticalAlignment = VerticalAlignment.Top,
             CoreDesiredSize = new Size(10.1, 5.1)
         };
-        _ = new Screen(node) { Scale = 1.25 };
+        _ = new UIScene(node) { Scale = 1.25 };
 
         node.Measure(new Size(20, 20));
         node.Arrange(new Rect(0, 0, 20, 20));
@@ -187,7 +187,7 @@ public sealed class UIElementLayoutTests
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Top
         };
-        _ = new Screen(node) { Scale = 2 };
+        _ = new UIScene(node) { Scale = 2 };
         node.Measure(new Size(10, 10));
 
         node.Arrange(new Rect(0.25, -0.25, 10, 10));
@@ -200,9 +200,9 @@ public sealed class UIElementLayoutTests
     public void ArrangeRejectsMeasureInvalidatedByScaleChange()
     {
         var node = new TestNode { CoreDesiredSize = new Size(10.1, 5.1) };
-        var screen = new Screen(node) { Scale = 1 };
+        var scene = new UIScene(node) { Scale = 1 };
         node.Measure(new Size(100, 100));
-        screen.Scale = 2;
+        scene.Scale = 2;
 
         Assert.Throws<InvalidOperationException>(() =>
             node.Arrange(new Rect(0, 0, 100, 100)));
@@ -218,11 +218,11 @@ public sealed class UIElementLayoutTests
     public void CollapsedLayoutRevalidatesAfterScaleChangeWithoutCallingCore()
     {
         var node = new TestNode { Visibility = Visibility.Collapsed };
-        var screen = new Screen(node) { Scale = 1 };
+        var scene = new UIScene(node) { Scale = 1 };
 
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
-        screen.Scale = 2;
+        scene.Scale = 2;
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
         node.Measure(new Size(100, 100));
@@ -724,9 +724,9 @@ public sealed class UIElementLayoutTests
     public void ActiveVisibilityMutationRejectsWrongThreadWithoutPartialState()
     {
         var node = new TestNode { CoreDesiredSize = new Size(10, 10) };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         ValidateLayout(node);
-        screen.Open();
+        scene.Open();
 
         var setterError = RunOnBackgroundThread(() =>
             Record.Exception(() => node.Visibility = Visibility.Hidden));
@@ -741,7 +741,7 @@ public sealed class UIElementLayoutTests
         Assert.False(node.IsBound(UIElement.VisibilityProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
@@ -796,9 +796,9 @@ public sealed class UIElementLayoutTests
     public void ActiveNodesRejectWrongThreadLayoutMutationWithoutPartialState()
     {
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         ValidateLayout(node);
-        screen.Open();
+        scene.Open();
 
         var setError = RunOnBackgroundThread(() =>
             Record.Exception(() => node.Width = 20));
@@ -848,16 +848,16 @@ public sealed class UIElementLayoutTests
         Assert.True(node.IsBound(UIElement.WidthProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
-        screen.Close();
+        scene.Close();
     }
 
     [Fact]
     public void BindingRechecksLayoutAccessAfterInitialSourceEvaluation()
     {
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         ValidateLayout(node);
-        screen.Open();
+        scene.Open();
         var reopened = new ManualResetEventSlim();
         var release = new ManualResetEventSlim();
         Thread? background = null;
@@ -866,13 +866,13 @@ public sealed class UIElementLayoutTests
             Width = 20,
             WidthReadAction = () =>
             {
-                screen.Close();
+                scene.Close();
                 background = new Thread(() =>
                 {
-                    screen.Open();
+                    scene.Open();
                     reopened.Set();
                     release.Wait();
-                    screen.Close();
+                    scene.Close();
                 });
                 background.Start();
                 reopened.Wait();
@@ -889,7 +889,7 @@ public sealed class UIElementLayoutTests
         Assert.False(node.IsBound(UIElement.WidthProperty));
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
-        Assert.Same(screen, node.Screen);
+        Assert.Same(scene, node.Scene);
     }
 
     private static void ValidateLayout(UIElement node)

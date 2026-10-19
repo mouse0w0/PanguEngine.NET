@@ -14,19 +14,19 @@ public sealed class FocusTargetTests
         var root = new Canvas();
         var child = new Canvas { Focusable = true };
         root.Children.Add(child);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(child.Focus());
-            Assert.Same(child, screen.FocusedNode);
+            Assert.Same(child, scene.FocusedNode);
             Assert.True(child.IsFocused);
             Assert.True(child.IsFocusWithin);
             Assert.True(root.IsFocusWithin);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -44,14 +44,14 @@ public sealed class FocusTargetTests
         root.Children.Add(targetGroup);
         requestedGroup.Children.Add(proxy);
         targetGroup.Children.Add(target);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(old.Focus());
             Assert.True(proxy.Focus());
             Assert.Equal(1, proxy.ResolveCalls);
-            Assert.Same(target, screen.FocusedNode);
+            Assert.Same(target, scene.FocusedNode);
             Assert.True(target.IsFocused);
             Assert.False(proxy.IsFocused);
             Assert.False(old.IsFocused);
@@ -65,7 +65,7 @@ public sealed class FocusTargetTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -88,8 +88,8 @@ public sealed class FocusTargetTests
         root.Children.Add(targetGroup);
         targetGroup.Children.Add(target);
         var otherRoot = new Canvas();
-        var screen = new Screen(root);
-        var otherScreen = new Screen(otherRoot);
+        var scene = new UIScene(root);
+        var otherScene = new UIScene(otherRoot);
         switch (state)
         {
             case "hidden": target.Visibility = Visibility.Hidden; break;
@@ -100,24 +100,24 @@ public sealed class FocusTargetTests
             case "foreign": otherRoot.Children.Add(targetGroup); break;
         }
 
-        screen.Open();
-        otherScreen.Open();
+        scene.Open();
+        otherScene.Open();
         try
         {
             Assert.True(old.Focus());
             Assert.False(proxy.Focus());
             Assert.Equal(1, proxy.ResolveCalls);
-            Assert.Same(old, screen.FocusedNode);
+            Assert.Same(old, scene.FocusedNode);
             Assert.True(old.IsFocused);
             Assert.True(old.IsFocusWithin);
             Assert.False(target.IsFocused);
             Assert.False(target.IsFocusWithin);
-            Assert.Null(otherScreen.FocusedNode);
+            Assert.Null(otherScene.FocusedNode);
         }
         finally
         {
-            screen.Close();
-            otherScreen.Close();
+            scene.Close();
+            otherScene.Close();
         }
     }
 
@@ -145,18 +145,18 @@ public sealed class FocusTargetTests
             case "ancestor-hidden": group.Visibility = Visibility.Hidden; break;
         }
 
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(old.Focus());
             Assert.False(proxy.Focus());
             Assert.Equal(0, proxy.ResolveCalls);
-            Assert.Same(old, screen.FocusedNode);
+            Assert.Same(old, scene.FocusedNode);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -170,12 +170,12 @@ public sealed class FocusTargetTests
         root.Children.Add(outer);
         root.Children.Add(inner);
         root.Children.Add(leaf);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(outer.Focus());
-            Assert.Same(inner, screen.FocusedNode);
+            Assert.Same(inner, scene.FocusedNode);
             Assert.Equal(1, outer.ResolveCalls);
             Assert.Equal(0, inner.ResolveCalls);
             Assert.True(inner.IsFocused);
@@ -183,7 +183,7 @@ public sealed class FocusTargetTests
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 
@@ -200,9 +200,9 @@ public sealed class FocusTargetTests
         root.Children.Add(old);
         root.Children.Add(proxy);
         proxy.Children.Add(target);
-        var screen = new GameScreen(root);
-        var manager = new UiManager();
-        manager.Open(screen);
+        var scene = new GameUIScene(root);
+        var manager = new UIManager();
+        manager.Open(scene);
         try
         {
             manager.UpdateFrame(new Size(100, 100), 0, TimeSpan.Zero);
@@ -214,9 +214,9 @@ public sealed class FocusTargetTests
             Assert.False(proxy.IsFocusWithin);
             Assert.Equal(ancestorFocusable, root.IsFocusWithin);
             if (ancestorFocusable)
-                Assert.Same(root, screen.FocusedNode);
+                Assert.Same(root, scene.FocusedNode);
             else
-                Assert.Null(screen.FocusedNode);
+                Assert.Null(scene.FocusedNode);
         }
         finally
         {
@@ -233,20 +233,20 @@ public sealed class FocusTargetTests
         var proxy = new ThrowingFocusProxy(failure) { Focusable = true };
         root.Children.Add(old);
         root.Children.Add(proxy);
-        var screen = new Screen(root);
-        screen.Open();
+        var scene = new UIScene(root);
+        scene.Open();
         try
         {
             Assert.True(old.Focus());
             Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => proxy.Focus()));
-            Assert.Same(old, screen.FocusedNode);
+            Assert.Same(old, scene.FocusedNode);
             Assert.True(old.IsFocused);
             Assert.True(old.IsFocusWithin);
             Assert.False(proxy.IsFocusWithin);
         }
         finally
         {
-            screen.Close();
+            scene.Close();
         }
     }
 

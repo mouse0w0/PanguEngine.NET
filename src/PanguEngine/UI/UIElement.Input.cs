@@ -47,7 +47,7 @@ public abstract partial class UIElement
             {
                 node.SetPseudoClass(PseudoClass.Disabled, !node.IsEnabled);
                 if (!newValue)
-                    node.Screen?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
+                    node.Scene?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
             });
 
     /// <summary>
@@ -139,7 +139,7 @@ public abstract partial class UIElement
     /// This event bubbles from the original pressed target after input state has been cleared.
     /// Each canceled button reports the last known pointer position and no key modifiers.
     /// Cancellation does not produce a release or click and does not require reverting interaction results.
-    /// Screen closure and element unavailability use lifecycle cleanup without raising this event.
+    /// Scene closure and element unavailability use lifecycle cleanup without raising this event.
     /// </remarks>
     public event EventHandler<PointerButtonEventArgs>? PointerCanceled;
 
@@ -184,38 +184,38 @@ public abstract partial class UIElement
     /// <returns>Whether the focus request was accepted.</returns>
     /// <remarks>Notification callbacks may make the resolved target unavailable before this method returns.</remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open screen is accessed from the wrong thread or a focus transition is already notifying.
+    /// Thrown when the open scene is accessed from the wrong thread or a focus transition is already notifying.
     /// </exception>
     public bool Focus() =>
-        Screen is not null && Screen.TryFocus(this);
+        Scene is not null && Scene.TryFocus(this);
 
     /// <summary>Gets the element that receives a direct or pointer focus request for this element.</summary>
     /// <returns>The desired keyboard focus target.</returns>
     /// <remarks>
-    /// The target is resolved once and must satisfy the current screen's focus eligibility rules.
+    /// The target is resolved once and must satisfy the current scene's focus eligibility rules.
     /// Overrides must not request focus, dispatch input, or modify the element tree.
     /// </remarks>
     protected internal virtual UIElement GetFocusTarget() => this;
 
     /// <summary>
-    /// Converts a point from screen coordinates to this element's local coordinates.
+    /// Converts a point from scene coordinates to this element's local coordinates.
     /// </summary>
-    /// <param name="screenPoint">The point in screen coordinates.</param>
+    /// <param name="scenePoint">The point in scene coordinates.</param>
     /// <returns>The point in this element's local coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this element does not belong to a UI screen or its open screen is accessed from the wrong thread.
+    /// Thrown when this element does not belong to a UI scene or its open scene is accessed from the wrong thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
     /// </exception>
-    public Point ScreenToLocal(Point screenPoint)
+    public Point SceneToLocal(Point scenePoint)
     {
-        var screen = Screen;
-        screen?.VerifyTreeAccess();
-        if (screen is null)
-            throw new InvalidOperationException("The UI node does not belong to a UI screen.");
+        var scene = Scene;
+        scene?.VerifyTreeAccess();
+        if (scene is null)
+            throw new InvalidOperationException("The UI node does not belong to a UI scene.");
 
-        var point = screenPoint;
+        var point = scenePoint;
         for (var current = this; current is not null; current = current.Parent)
         {
             point = new Point(
@@ -227,22 +227,22 @@ public abstract partial class UIElement
     }
 
     /// <summary>
-    /// Converts a point from this element's local coordinates to screen coordinates.
+    /// Converts a point from this element's local coordinates to scene coordinates.
     /// </summary>
     /// <param name="localPoint">The point in this element's local coordinates.</param>
-    /// <returns>The point in screen coordinates.</returns>
+    /// <returns>The point in scene coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this element does not belong to a UI screen or its open screen is accessed from the wrong thread.
+    /// Thrown when this element does not belong to a UI scene or its open scene is accessed from the wrong thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
     /// </exception>
-    public Point LocalToScreen(Point localPoint)
+    public Point LocalToScene(Point localPoint)
     {
-        var screen = Screen;
-        screen?.VerifyTreeAccess();
-        if (screen is null)
-            throw new InvalidOperationException("The UI node does not belong to a UI screen.");
+        var scene = Scene;
+        scene?.VerifyTreeAccess();
+        if (scene is null)
+            throw new InvalidOperationException("The UI node does not belong to a UI scene.");
 
         var point = localPoint;
         for (var current = this; current is not null; current = current.Parent)
@@ -390,11 +390,11 @@ public abstract partial class UIElement
     /// <param name="localPoint">The point in local coordinates.</param>
     /// <returns>Whether the point lies within this element's local geometry.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an element owned by an open screen is queried from the wrong thread.
+    /// Thrown when an element owned by an open scene is queried from the wrong thread.
     /// </exception>
     public bool Contains(Point localPoint)
     {
-        Screen?.VerifyTreeAccess();
+        Scene?.VerifyTreeAccess();
         return ContainsWithoutAccessCheck(localPoint);
     }
 
@@ -404,11 +404,11 @@ public abstract partial class UIElement
     /// <param name="localPoint">The point in local coordinates.</param>
     /// <returns>The deepest hit element, or null when the subtree is not hit.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a tree owned by an open screen is queried from the wrong thread.
+    /// Thrown when a tree owned by an open scene is queried from the wrong thread.
     /// </exception>
     public UIElement? HitTest(Point localPoint)
     {
-        Screen?.VerifyTreeAccess();
+        Scene?.VerifyTreeAccess();
         var path = new List<HitPathEntry>();
         return TryBuildHitPath(localPoint, path) ? path[^1].Node : null;
     }

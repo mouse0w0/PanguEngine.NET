@@ -8,19 +8,19 @@ public abstract partial class UIElement
     /// Creates an inactive frame ticker associated with this element.
     /// </summary>
     /// <param name="onTick">The callback receiving the absolute monotonic frame time.</param>
-    /// <returns>An independent ticker that can be started while this element's screen is open.</returns>
+    /// <returns>An independent ticker that can be started while this element's scene is open.</returns>
     /// <remarks>
-    /// Tickers may be created before mounting. When the element's screen is open, creation and use require its UI thread.
+    /// Tickers may be created before mounting. When the element's scene is open, creation and use require its UI thread.
     /// Keep a reference to reuse the ticker. Only active tickers are registered with this element.
     /// Frame time uses the monotonic clock's origin, not the start of a ticker run.
     /// Consumers establish a baseline on the first callback of each new run and calculate subsequent differences.
     /// </remarks>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="onTick"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when an open screen is accessed from the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when an open scene is accessed from the wrong thread.</exception>
     protected Ticker CreateTicker(Action<TimeSpan> onTick)
     {
         ArgumentNullException.ThrowIfNull(onTick);
-        Screen?.VerifyTreeAccess();
+        Scene?.VerifyTreeAccess();
         return new Ticker(this, onTick);
     }
 

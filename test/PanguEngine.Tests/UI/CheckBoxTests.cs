@@ -240,13 +240,13 @@ public sealed class CheckBoxTests
     public void LosingFocusOrDisablingCancelsPendingSpace(bool disable)
     {
         var box = new CheckBox();
-        var (manager, screen) = OpenScene(box);
+        var (manager, scene) = OpenScene(box);
         Assert.True(box.Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
         if (disable)
             box.IsEnabled = false;
         else
-            screen.ClearFocus();
+            scene.ClearFocus();
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
         Assert.Equal(false, box.IsChecked);
         Assert.False(box.HasPseudoClass(PseudoClass.Pressed));
@@ -259,7 +259,7 @@ public sealed class CheckBoxTests
     public void RepeatedSpaceDoesNotRestartAnActivationCancelledByFocusLossOrDisabling(bool disable)
     {
         var box = new CheckBox();
-        var (manager, screen) = OpenScene(box);
+        var (manager, scene) = OpenScene(box);
         var clicks = 0;
         box.Click += (_, _) => clicks++;
         Assert.True(box.Focus());
@@ -270,7 +270,7 @@ public sealed class CheckBoxTests
             box.IsEnabled = true;
         }
         else
-            screen.ClearFocus();
+            scene.ClearFocus();
 
         Assert.True(box.Focus());
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None, isRepeat: true);
@@ -302,11 +302,11 @@ public sealed class CheckBoxTests
     public void LosingAndRegainingFocusInsideKeyUpStillCancelsActivation()
     {
         var box = new CheckBox();
-        var (manager, screen) = OpenScene(box);
+        var (manager, scene) = OpenScene(box);
         Assert.True(box.Focus());
         box.KeyUp += (_, _) =>
         {
-            screen.ClearFocus();
+            scene.ClearFocus();
             Assert.True(box.Focus());
         };
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
@@ -332,10 +332,10 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
-    public void ContentCanMoveFromAScreenRoot()
+    public void ContentCanMoveFromASceneRoot()
     {
         var content = new Panel();
-        var source = new Screen(content);
+        var source = new UIScene(content);
         var box = new CheckBox { Content = content };
         Assert.Null(source.Root);
         Assert.Same(content, box.Content);
@@ -346,8 +346,8 @@ public sealed class CheckBoxTests
     public void AuthorStylesControlGeneratedTextWithoutLocalValueMasks()
     {
         var box = new CheckBox { Content = "label" };
-        var screen = new Screen(box);
-        screen.SetStyleSheets([StyleSheet.Parse("CheckBox Text.checkbox-text { font-size: 23px; color: #123456; }")]);
+        var scene = new UIScene(box);
+        scene.SetStyleSheets([StyleSheet.Parse("CheckBox Text.checkbox-text { font-size: 23px; color: #123456; }")]);
         box.UpdateStyles();
         var text = AutomaticText(box);
         Assert.Equal(23, text.FontSize);
@@ -389,20 +389,20 @@ public sealed class CheckBoxTests
         Assert.Equal(withContent, box.DesiredSize);
     }
 
-    private static (UiManager Manager, GameScreen Screen) OpenScene(CheckBox box)
+    private static (UIManager Manager, GameUIScene Scene) OpenScene(CheckBox box)
     {
         box.Width = 120;
         box.Height = 32;
         var root = new Canvas();
         root.Children.Add(box);
-        var manager = new UiManager();
-        var screen = new GameScreen(root) { UseLayoutRounding = false };
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root) { UseLayoutRounding = false };
+        manager.Open(scene);
         manager.UpdateFrame(new Size(200, 100), 0);
-        return (manager, screen);
+        return (manager, scene);
     }
 
-    private static void Click(UiManager manager, Point? position = null)
+    private static void Click(UIManager manager, Point? position = null)
     {
         var point = position ?? new Point(5, 5);
         manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);

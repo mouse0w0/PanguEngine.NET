@@ -369,10 +369,10 @@ public sealed class CanvasTests
     {
         var node = new TestNode();
         Canvas.SetLeft(node, 4);
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         node.Measure(new Size(100, 100));
         node.Arrange(new Rect(0, 0, 100, 100));
-        screen.Open();
+        scene.Open();
 
         var setterError = RunOnBackgroundThread(() =>
             Record.Exception(() => Canvas.SetLeft(node, 8)));
@@ -400,7 +400,7 @@ public sealed class CanvasTests
         Assert.IsType<InvalidOperationException>(updateError);
         Assert.Equal(8, Canvas.GetLeft(node));
         Assert.True(node.IsBound(Canvas.LeftProperty));
-        screen.Close();
+        scene.Close();
     }
 
     private sealed class TestPanel : Panel

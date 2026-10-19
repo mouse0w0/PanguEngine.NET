@@ -40,6 +40,7 @@ public sealed class RadioGroupTests
             current.Clear();
             Assert.Null(current.SelectedButton);
         }
+
         Assert.Null(numberGroup.SelectedValue);
         Assert.Null(textGroup.SelectedValue);
         Assert.Null(projection.Button);
@@ -344,6 +345,7 @@ public sealed class RadioGroupTests
         var selected = new RadioButton<int?> { Group = group, Value = 1, IsChecked = true };
         var other = new RadioButton<int?> { Group = group, Value = 3 };
         var changes = 0;
+
         void Observe(object? sender, PropertyChangedEventArgs change)
         {
             Assert.Equal(2, selected.Value);
@@ -352,6 +354,7 @@ public sealed class RadioGroupTests
             Assert.True(selected.IsChecked);
             changes++;
         }
+
         using (selected.Subscribe(RadioButton<int?>.ValueProperty, Observe))
         using (group.Subscribe(RadioGroup<int?>.SelectedValueProperty, Observe))
             selected.Value = 2;
@@ -433,14 +436,14 @@ public sealed class RadioGroupTests
         var moving = new RadioButton<int?> { Group = oldGroup, Value = 1, IsChecked = true };
         var existing = new RadioButton<int?> { Group = newGroup, Value = 2 };
         using (newGroup.Subscribe(RadioGroup<int?>.SelectedButtonProperty, (_, _) =>
-        {
-            Assert.Throws<InvalidOperationException>(() => moving.Group = newGroup);
-            Assert.Same(oldGroup, moving.Group);
-            Assert.Same(moving, oldGroup.SelectedButton);
-            Assert.Throws<InvalidOperationException>(() => newGroup.Clear());
-            oldGroup.Clear();
-            Assert.Null(oldGroup.SelectedButton);
-        }))
+               {
+                   Assert.Throws<InvalidOperationException>(() => moving.Group = newGroup);
+                   Assert.Same(oldGroup, moving.Group);
+                   Assert.Same(moving, oldGroup.SelectedButton);
+                   Assert.Throws<InvalidOperationException>(() => newGroup.Clear());
+                   oldGroup.Clear();
+                   Assert.Null(oldGroup.SelectedButton);
+               }))
             newGroup.Select(existing);
 
         moving.Group = newGroup;
@@ -491,6 +494,7 @@ public sealed class RadioGroupTests
         var second = new RadioButton<int?> { Group = group, Value = 2 };
         group.Select(first);
         var observed = 0;
+
         void Observe(object? sender, PropertyChangedEventArgs change)
         {
             Assert.Same(second, group.SelectedButton);
@@ -499,6 +503,7 @@ public sealed class RadioGroupTests
             Assert.True(second.IsChecked);
             observed++;
         }
+
         first.PropertyChanged += Observe;
         second.PropertyChanged += Observe;
         group.PropertyChanged += Observe;
@@ -672,17 +677,23 @@ public sealed class RadioGroupTests
     }
 
     [Fact]
-    public void GroupWritesHonorTheThreadOfItsScreenOwnedMembers()
+    public void GroupWritesHonorTheThreadOfItsSceneOwnedMembers()
     {
         var group = new RadioGroup<int?>();
         var button = new RadioButton<int?> { Group = group, Value = 1 };
-        var manager = new UiManager();
-        manager.Open(new GameScreen(button));
+        var manager = new UIManager();
+        manager.Open(new GameUIScene(button));
         Exception? failure = null;
         var thread = new Thread(() =>
         {
-            try { group.SelectedValue = 1; }
-            catch (Exception error) { failure = error; }
+            try
+            {
+                group.SelectedValue = 1;
+            }
+            catch (Exception error)
+            {
+                failure = error;
+            }
         });
         thread.Start();
         thread.Join();
@@ -735,7 +746,9 @@ public sealed class RadioGroupTests
         internal static readonly DirectProperty<ValueSource, int?> ValueProperty =
             Property.RegisterDirect<ValueSource, int?>(nameof(Value),
                 static source => source.Value, static (source, value) => source.Value = value);
+
         private int? _value;
+
         internal int? Value
         {
             get => _value;

@@ -74,14 +74,14 @@ public sealed class UIElementParentTests
     }
 
     [Fact]
-    public void BecomingScreenRootNotifiesParentLossWithoutChangingDescendantParents()
+    public void BecomingSceneRootNotifiesParentLossWithoutChangingDescendantParents()
     {
         var parent = new Panel();
         var node = new Panel();
         var descendant = new Panel();
         node.Children.Add(descendant);
         parent.Children.Add(node);
-        var screen = new Screen(parent);
+        var scene = new UIScene(parent);
         var changes = new List<(Container? OldValue, Container? NewValue)>();
         var descendantNotifications = 0;
         using var subscription = node.Subscribe(UIElement.ParentProperty,
@@ -89,13 +89,13 @@ public sealed class UIElementParentTests
         using var descendantSubscription = descendant.Subscribe(UIElement.ParentProperty,
             (_, _) => descendantNotifications++);
 
-        screen.Root = node;
+        scene.Root = node;
 
         Assert.Equal([(parent, null)], changes);
         Assert.Equal(0, descendantNotifications);
         Assert.Null(node.Parent);
         Assert.Same(node, descendant.Parent);
-        Assert.Same(screen, node.Screen);
+        Assert.Same(scene, node.Scene);
     }
 
     [Fact]
@@ -123,38 +123,38 @@ public sealed class UIElementParentTests
     }
 
     [Fact]
-    public void ParentNotifiesBeforeScreenChangesDuringTransfer()
+    public void ParentNotifiesBeforeSceneChangesDuringTransfer()
     {
         var node = new Panel();
         var firstParent = new Panel();
         var secondParent = new Panel();
         firstParent.Children.Add(node);
-        var firstScreen = new Screen(firstParent);
-        var secondScreen = new Screen(secondParent);
-        var changes = new List<(string Property, Container? Parent, Screen? Screen)>();
+        var firstScene = new UIScene(firstParent);
+        var secondScene = new UIScene(secondParent);
+        var changes = new List<(string Property, Container? Parent, UIScene? Scene)>();
         node.PropertyChanged += (_, args) =>
         {
             if (args.Property.Name == nameof(UIElement.Parent))
             {
                 var change = Assert.IsType<PropertyChangedEventArgs<Container?>>(args);
                 Assert.Same(change.NewValue, node.Parent);
-                changes.Add(("parent", node.Parent, node.Screen));
+                changes.Add(("parent", node.Parent, node.Scene));
             }
-            else if (ReferenceEquals(args.Property, UIElement.ScreenProperty))
+            else if (ReferenceEquals(args.Property, UIElement.SceneProperty))
             {
-                var change = Assert.IsType<PropertyChangedEventArgs<Screen?>>(args);
-                Assert.Same(change.NewValue, node.Screen);
-                changes.Add(("screen", node.Parent, node.Screen));
+                var change = Assert.IsType<PropertyChangedEventArgs<UIScene?>>(args);
+                Assert.Same(change.NewValue, node.Scene);
+                changes.Add(("scene", node.Parent, node.Scene));
             }
         };
 
         secondParent.Children.Add(node);
 
         Assert.Equal([
-            ("parent", null, firstScreen),
-            ("screen", null, null),
+            ("parent", null, firstScene),
+            ("scene", null, null),
             ("parent", secondParent, null),
-            ("screen", secondParent, secondScreen)
+            ("scene", secondParent, secondScene)
         ], changes);
     }
 }

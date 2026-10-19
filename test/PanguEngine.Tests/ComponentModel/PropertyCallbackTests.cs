@@ -106,7 +106,7 @@ public sealed class PropertyCallbackTests
     {
         var error = new InvalidOperationException("internal");
         var node = new CallbackNode();
-        var screen = new Screen(node);
+        var scene = new UIScene(node);
         node.Trace.Clear();
         node.Changed = (_, _) =>
         {
@@ -116,7 +116,7 @@ public sealed class PropertyCallbackTests
         var notified = new List<Property>();
         node.PropertyChanged += (_, args) => notified.Add(args.Property);
 
-        screen.SetStyleSheets([
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<CallbackNode>(), [
                     StyleSetter.Create(CallbackNode.ValueProperty, 7),
@@ -124,7 +124,7 @@ public sealed class PropertyCallbackTests
                 ])
             ])
         ]);
-        Assert.Same(error, Assert.Throws<InvalidOperationException>(screen.Root!.UpdateStyles));
+        Assert.Same(error, Assert.Throws<InvalidOperationException>(scene.Root!.UpdateStyles));
 
         Assert.Equal(7, node.GetValue(CallbackNode.ValueProperty));
         if (notified.Count == 0)
@@ -140,8 +140,8 @@ public sealed class PropertyCallbackTests
     public void ClassRecomputeAndClearLocalValueInvokeCallbacks()
     {
         var node = new CallbackNode();
-        var screen = new Screen(node);
-        screen.SetStyleSheets([
+        var scene = new UIScene(node);
+        scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(StyleSelector.For<CallbackNode>(classes: ["active"]), [
                     StyleSetter.Create(CallbackNode.ValueProperty, 7)
@@ -151,11 +151,11 @@ public sealed class PropertyCallbackTests
         node.Changed = (oldValue, newValue) => node.Changes.Add((oldValue, newValue));
 
         node.Classes.Add("active");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
         node.SetValue(CallbackNode.ValueProperty, 9);
         node.ClearValue(CallbackNode.ValueProperty);
         node.Classes.Remove("active");
-        screen.Root!.UpdateStyles();
+        scene.Root!.UpdateStyles();
 
         Assert.Equal([(0, 7), (7, 9), (9, 7), (7, 0)], node.Changes);
     }

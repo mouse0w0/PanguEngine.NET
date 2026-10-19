@@ -13,13 +13,13 @@ public sealed class StructuralPseudoClassUpdateTests
         return panel;
     }
 
-    private static Screen Style(Panel root, string css)
+    private static UIScene Style(Panel root, string css)
     {
-        var screen = new Screen(root);
-        screen.SetBaseStyleSheets([]);
-        screen.SetStyleSheets([StyleSheet.Parse(css)]);
+        var scene = new UIScene(root);
+        scene.SetBaseStyleSheets([]);
+        scene.SetStyleSheets([StyleSheet.Parse(css)]);
         root.UpdateStyles();
-        return screen;
+        return scene;
     }
 
     [Theory]
@@ -182,7 +182,7 @@ public sealed class StructuralPseudoClassUpdateTests
     }
 
     [Fact]
-    public void ReparentingWithinScreenRefreshesBothSiblingSets()
+    public void ReparentingWithinSceneRefreshesBothSiblingSets()
     {
         var remaining = Item();
         var moving = Item();
@@ -208,7 +208,7 @@ public sealed class StructuralPseudoClassUpdateTests
     }
 
     [Fact]
-    public void CrossScreenMoveUsesFinalRulesAndRefreshesSourcePositions()
+    public void CrossSceneMoveUsesFinalRulesAndRefreshesSourcePositions()
     {
         var moving = Item();
         var remaining = Item();
@@ -219,14 +219,14 @@ public sealed class StructuralPseudoClassUpdateTests
         var existing = Item();
         var destination = new Panel();
         destination.Children.Add(existing);
-        var finalScreen = Style(destination, ".item:first-child { opacity: 0.7; }");
+        var finalScene = Style(destination, ".item:first-child { opacity: 0.7; }");
         Assert.Equal(0.4, remaining.Opacity);
         Assert.Equal(0.7, existing.Opacity);
 
         destination.Children.Insert(0, moving);
         source.UpdateStyles();
         destination.UpdateStyles();
-        Assert.Same(finalScreen, moving.Screen);
+        Assert.Same(finalScene, moving.Scene);
         Assert.Equal(1d, remaining.Opacity);
         Assert.Equal(0.7, moving.Opacity);
         Assert.Equal(1d, existing.Opacity);
@@ -247,14 +247,14 @@ public sealed class StructuralPseudoClassUpdateTests
         root.UpdateStyles();
         detached.UpdateStyles();
         Assert.Null(detached.Parent);
-        Assert.Null(detached.Screen);
+        Assert.Null(detached.Scene);
         Assert.Equal(1d, detached.Opacity);
         var selector = Assert.Single(StyleSheet.Parse(":nth-child(1):only-child { }").Rules).Selectors[0];
         Assert.True(selector.Matches(detached));
     }
 
     [Fact]
-    public void PromotingAChildToScreenRootRefreshesItsFormerSiblings()
+    public void PromotingAChildToSceneRootRefreshesItsFormerSiblings()
     {
         var moving = Item();
         var remaining = Item();
@@ -262,7 +262,7 @@ public sealed class StructuralPseudoClassUpdateTests
         source.Children.Add(moving);
         source.Children.Add(remaining);
         Style(source, ".item:nth-child(even) { opacity: 0.4; }");
-        var destination = new Screen();
+        var destination = new UIScene();
         destination.SetBaseStyleSheets([]);
         destination.SetStyleSheets([StyleSheet.Parse(".item:nth-child(1) { opacity: 0.7; }")]);
         Assert.Equal(0.4, remaining.Opacity);
@@ -283,8 +283,8 @@ public sealed class StructuralPseudoClassUpdateTests
         var root = new Panel();
         root.Children.Add(first);
         root.Children.Add(second);
-        var screen = Style(root, ".item { opacity: 0.8; }");
-        screen.SetStyleSheets([StyleSheet.Parse(".item:first-child { opacity: 0.4; }")]);
+        var scene = Style(root, ".item { opacity: 0.8; }");
+        scene.SetStyleSheets([StyleSheet.Parse(".item:first-child { opacity: 0.4; }")]);
         root.UpdateStyles();
         Assert.Equal(0.4, first.Opacity);
         Assert.Equal(1d, second.Opacity);

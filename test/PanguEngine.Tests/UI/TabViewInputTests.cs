@@ -11,22 +11,22 @@ public sealed class TabViewInputTests
     [Fact]
     public void ArrowKeysMoveFocusWithoutChangingSelection()
     {
-        var (manager, screen, view, items) = OpenScene(3);
+        var (manager, scene, view, items) = OpenScene(3);
         Assert.True(items[0].Focus());
 
         manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
 
-        Assert.Same(items[1], screen.FocusedNode);
+        Assert.Same(items[1], scene.FocusedNode);
         Assert.Same(items[0], view.Selection.SelectedItem);
 
         manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
-        Assert.Same(items[2], screen.FocusedNode);
+        Assert.Same(items[2], scene.FocusedNode);
 
         manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
-        Assert.Same(items[2], screen.FocusedNode);
+        Assert.Same(items[2], scene.FocusedNode);
 
         manager.ProcessKeyDown(Key.Left, KeyModifiers.None);
-        Assert.Same(items[1], screen.FocusedNode);
+        Assert.Same(items[1], scene.FocusedNode);
         Assert.Same(items[0], view.Selection.SelectedItem);
         manager.Close();
     }
@@ -34,27 +34,27 @@ public sealed class TabViewInputTests
     [Fact]
     public void HomeAndEndFocusTheFirstAndLastAvailableItem()
     {
-        var (manager, screen, _, items) = OpenScene(3);
+        var (manager, scene, _, items) = OpenScene(3);
         Assert.True(items[1].Focus());
 
         manager.ProcessKeyDown(Key.End, KeyModifiers.None);
-        Assert.Same(items[2], screen.FocusedNode);
+        Assert.Same(items[2], scene.FocusedNode);
 
         manager.ProcessKeyDown(Key.Home, KeyModifiers.None);
-        Assert.Same(items[0], screen.FocusedNode);
+        Assert.Same(items[0], scene.FocusedNode);
         manager.Close();
     }
 
     [Fact]
     public void EnterAndSpaceActivateTheFocusedTab()
     {
-        var (manager, screen, view, items) = OpenScene(3);
+        var (manager, scene, view, items) = OpenScene(3);
         Assert.True(items[1].Focus());
 
         manager.ProcessKeyDown(Key.Enter, KeyModifiers.None);
 
         Assert.Same(items[1], view.Selection.SelectedItem);
-        Assert.Same(items[1], screen.FocusedNode);
+        Assert.Same(items[1], scene.FocusedNode);
 
         view.Selection.SelectedItem = items[0];
         Assert.True(items[2].Focus());
@@ -68,18 +68,18 @@ public sealed class TabViewInputTests
     [Fact]
     public void ControlTabCyclesSelectionAndFocus()
     {
-        var (manager, screen, view, items) = OpenScene(3);
+        var (manager, scene, view, items) = OpenScene(3);
         Assert.True(items[0].Focus());
 
         manager.ProcessKeyDown(Key.Tab, KeyModifiers.Control);
 
         Assert.Same(items[1], view.Selection.SelectedItem);
-        Assert.Same(items[1], screen.FocusedNode);
+        Assert.Same(items[1], scene.FocusedNode);
 
         manager.ProcessKeyDown(Key.Tab, KeyModifiers.Control | KeyModifiers.Shift);
 
         Assert.Same(items[0], view.Selection.SelectedItem);
-        Assert.Same(items[0], screen.FocusedNode);
+        Assert.Same(items[0], scene.FocusedNode);
         manager.Close();
     }
 
@@ -120,30 +120,30 @@ public sealed class TabViewInputTests
     [Fact]
     public void VerticalPlacementUsesUpAndDownKeys()
     {
-        var (manager, screen, _, items) = OpenScene(3, placement: TabStripPlacement.Left, width: 400, height: 300);
+        var (manager, scene, _, items) = OpenScene(3, placement: TabStripPlacement.Left, width: 400, height: 300);
         Assert.True(items[0].Focus());
 
         manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
-        Assert.Same(items[0], screen.FocusedNode);
+        Assert.Same(items[0], scene.FocusedNode);
 
         manager.ProcessKeyDown(Key.Down, KeyModifiers.None);
-        Assert.Same(items[1], screen.FocusedNode);
+        Assert.Same(items[1], scene.FocusedNode);
 
         manager.ProcessKeyDown(Key.Up, KeyModifiers.None);
-        Assert.Same(items[0], screen.FocusedNode);
+        Assert.Same(items[0], scene.FocusedNode);
         manager.Close();
     }
 
     [Fact]
     public void HandledChildKeyStopsViewShortcuts()
     {
-        var (manager, screen, _, items) = OpenScene(3);
+        var (manager, scene, _, items) = OpenScene(3);
         Assert.True(items[0].Focus());
         items[0].KeyDown += (_, args) => args.Handled = true;
 
         manager.ProcessKeyDown(Key.Right, KeyModifiers.None);
 
-        Assert.Same(items[0], screen.FocusedNode);
+        Assert.Same(items[0], scene.FocusedNode);
         manager.Close();
     }
 
@@ -163,9 +163,9 @@ public sealed class TabViewInputTests
         Canvas.SetLeft(other, 0);
         Canvas.SetTop(other, 200);
         root.Children.Add(other);
-        var manager = new UiManager();
-        var screen = new GameScreen(root);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(root);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(600, 300), 0);
         Assert.True(other.Focus());
         var selected = view.Selection.SelectedItem;
@@ -173,14 +173,14 @@ public sealed class TabViewInputTests
         manager.ProcessKeyDown(Key.Tab, KeyModifiers.Control);
 
         Assert.Same(selected, view.Selection.SelectedItem);
-        Assert.Same(other, screen.FocusedNode);
+        Assert.Same(other, scene.FocusedNode);
         manager.Close();
     }
 
     [Fact]
     public void RemovingTheFocusedSelectedItemMovesFocusToTheNextSelection()
     {
-        var (manager, screen, view, items) = OpenScene(3);
+        var (manager, scene, view, items) = OpenScene(3);
         view.Selection.SelectedItem = items[1];
         Assert.True(items[1].Focus());
 
@@ -188,7 +188,7 @@ public sealed class TabViewInputTests
         manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(items[2], view.Selection.SelectedItem);
-        Assert.Same(items[2], screen.FocusedNode);
+        Assert.Same(items[2], scene.FocusedNode);
         manager.Close();
     }
 
@@ -213,7 +213,7 @@ public sealed class TabViewInputTests
         manager.UpdateFrame(new Size(600, 100), 0);
         var close = Assert.Single(items[0].Children.OfType<TabCloseButton>());
         var target = CloseCenter(close);
-        Assert.Same(close, manager.CurrentScreen!.HitTest(target));
+        Assert.Same(close, manager.CurrentScene!.HitTest(target));
         TabItem? requested = null;
         view.TabCloseRequested += (_, args) => requested = args.Item;
 
@@ -296,7 +296,7 @@ public sealed class TabViewInputTests
     [Fact]
     public void FocusLossCommitsTheDragWithoutClickOrDuplicateReorder()
     {
-        var (manager, screen, view, items) = OpenScene(3, canReorder: true);
+        var (manager, scene, view, items) = OpenScene(3, canReorder: true);
         var reorderCount = 0;
         var clickCount = 0;
         view.TabReordered += (_, _) => reorderCount++;
@@ -313,7 +313,7 @@ public sealed class TabViewInputTests
         Assert.Same(items[0], view.Items[2]);
         Assert.Equal(1, reorderCount);
         Assert.Equal(0, clickCount);
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
 
         manager.ProcessFocusChanged(true);
         manager.ProcessPointerReleased(end, MouseButton.Left, KeyModifiers.None);
@@ -321,14 +321,14 @@ public sealed class TabViewInputTests
 
         Assert.Equal(1, reorderCount);
         Assert.Equal(0, clickCount);
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
         manager.Close();
     }
 
     [Fact]
-    public void ClosingScreenCommitsDragWithoutClickOrDuplicateReorder()
+    public void ClosingSceneCommitsDragWithoutClickOrDuplicateReorder()
     {
-        var (manager, screen, view, items) = OpenScene(3, canReorder: true);
+        var (manager, scene, view, items) = OpenScene(3, canReorder: true);
         var reorderCount = 0;
         var clickCount = 0;
         view.TabReordered += (_, _) => reorderCount++;
@@ -345,7 +345,7 @@ public sealed class TabViewInputTests
         Assert.Equal(1, reorderCount);
         Assert.Equal(0, clickCount);
 
-        manager.Open(screen);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(600, 100), 0);
         Assert.False(items[0].IsDragging);
         Assert.Equal(1, reorderCount);
@@ -357,9 +357,9 @@ public sealed class TabViewInputTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void InputLossClearsReplacementFocusWithoutRestoringItAfterLayout(bool closeScreen)
+    public void InputLossClearsReplacementFocusWithoutRestoringItAfterLayout(bool closeScene)
     {
-        var (manager, screen, view, items) = OpenScene(2);
+        var (manager, scene, view, items) = OpenScene(2);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[0].Content = content;
         manager.UpdateFrame(new Size(600, 100), 0);
@@ -367,22 +367,23 @@ public sealed class TabViewInputTests
         var replacement = new TabItem { Header = new Panel { Width = 40, Height = 20 } };
         view.Items[0] = replacement;
         Assert.False(replacement.IsArrangeValid);
-        Assert.Same(replacement, screen.FocusedNode);
+        Assert.Same(replacement, scene.FocusedNode);
 
-        if (closeScreen)
+        if (closeScene)
         {
             manager.Close();
-            manager.Open(screen);
+            manager.Open(scene);
         }
         else
         {
             manager.ProcessFocusChanged(false);
             manager.ProcessFocusChanged(true);
         }
+
         manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(replacement, view.Selection.SelectedItem);
-        Assert.Null(screen.FocusedNode);
+        Assert.Null(scene.FocusedNode);
         manager.Close();
     }
 
@@ -427,18 +428,18 @@ public sealed class TabViewInputTests
     [Fact]
     public void FocusTransfersToTheNewItemWhenTheOldContentWasFocused()
     {
-        var (manager, screen, view, items) = OpenScene(2);
+        var (manager, scene, view, items) = OpenScene(2);
         var content = new Panel();
         var child = new TestControl { Focusable = true, Width = 20, Height = 20 };
         content.Children.Add(child);
         items[0].Content = content;
         manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(child.Focus());
-        Assert.Same(child, screen.FocusedNode);
+        Assert.Same(child, scene.FocusedNode);
 
         view.Selection.SelectedItem = items[1];
 
-        Assert.Same(items[1], screen.FocusedNode);
+        Assert.Same(items[1], scene.FocusedNode);
         manager.Close();
     }
 
@@ -449,7 +450,7 @@ public sealed class TabViewInputTests
         var strip = Assert.IsType<TabStripPanel>(view.Children[0]);
         var viewport = strip.Viewport;
         var start = ItemCenter(items[0]);
-        var edge = viewport.LocalToScreen(new Point(viewport.LayoutBounds.Width - 2, viewport.LayoutBounds.Height / 2));
+        var edge = viewport.LocalToScene(new Point(viewport.LayoutBounds.Width - 2, viewport.LayoutBounds.Height / 2));
         manager.ProcessPointerPressed(start, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerMoved(edge);
         var before = viewport.ScrollOffset;
@@ -509,16 +510,16 @@ public sealed class TabViewInputTests
     [Fact]
     public void InteractiveHeaderDoesNotActivateItsTabWithoutHandlingClick()
     {
-        var (manager, screen, view, items) = OpenScene(2, canReorder: true);
+        var (manager, scene, view, items) = OpenScene(2, canReorder: true);
         var header = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[1].Header = header;
         manager.UpdateFrame(new Size(600, 100), 0);
-        var point = header.LocalToScreen(new Point(10, 10));
+        var point = header.LocalToScene(new Point(10, 10));
 
         manager.ProcessPointerPressed(point, MouseButton.Left, KeyModifiers.None);
         manager.ProcessPointerReleased(point, MouseButton.Left, KeyModifiers.None);
 
-        Assert.Same(header, screen.FocusedNode);
+        Assert.Same(header, scene.FocusedNode);
         Assert.Same(items[0], view.Selection.SelectedItem);
         Assert.False(items[1].IsDragging);
         manager.Close();
@@ -569,7 +570,7 @@ public sealed class TabViewInputTests
     [Fact]
     public void ReplacingItemWithFocusedContentTransfersFocusToTheNewSelection()
     {
-        var (manager, screen, view, items) = OpenScene(2);
+        var (manager, scene, view, items) = OpenScene(2);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[0].Content = content;
         manager.UpdateFrame(new Size(600, 100), 0);
@@ -578,18 +579,18 @@ public sealed class TabViewInputTests
 
         view.Items[0] = replacement;
         Assert.False(replacement.IsArrangeValid);
-        Assert.Same(replacement, screen.FocusedNode);
+        Assert.Same(replacement, scene.FocusedNode);
         manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(replacement, view.Selection.SelectedItem);
-        Assert.Same(replacement, screen.FocusedNode);
+        Assert.Same(replacement, scene.FocusedNode);
         manager.Close();
     }
 
     [Fact]
     public void ReplacementFocusDoesNotOverrideLaterFocusWhenLayoutCompletes()
     {
-        var (manager, screen, view, items) = OpenScene(2);
+        var (manager, scene, view, items) = OpenScene(2);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[0].Content = content;
         manager.UpdateFrame(new Size(600, 100), 0);
@@ -598,54 +599,54 @@ public sealed class TabViewInputTests
 
         view.Items[0] = replacement;
         Assert.False(replacement.IsArrangeValid);
-        Assert.Same(replacement, screen.FocusedNode);
+        Assert.Same(replacement, scene.FocusedNode);
         Assert.True(items[1].Focus());
         manager.UpdateFrame(new Size(600, 100), 0);
 
-        Assert.Same(items[1], screen.FocusedNode);
+        Assert.Same(items[1], scene.FocusedNode);
         manager.Close();
     }
 
     [Fact]
     public void RemovingItemWithFocusedContentMovesFocusToTheNextSelection()
     {
-        var (manager, screen, view, items) = OpenScene(3);
+        var (manager, scene, view, items) = OpenScene(3);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         items[1].Content = content;
         view.Selection.SelectedItem = items[1];
         manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(content.Focus());
-        Assert.Same(content, screen.FocusedNode);
+        Assert.Same(content, scene.FocusedNode);
 
         view.Items.Remove(items[1]);
         manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(items[2], view.Selection.SelectedItem);
-        Assert.Same(items[2], screen.FocusedNode);
+        Assert.Same(items[2], scene.FocusedNode);
         manager.Close();
     }
 
     [Fact]
     public void MigratingItemWithFocusedContentMovesFocusToTheNextSelection()
     {
-        var (manager, screen, view, items) = OpenScene(3);
+        var (manager, scene, view, items) = OpenScene(3);
         var content = new TestControl { Focusable = true, Width = 40, Height = 20 };
         var destination = new Panel();
         items[1].Content = content;
         view.Selection.SelectedItem = items[1];
         manager.UpdateFrame(new Size(600, 100), 0);
         Assert.True(content.Focus());
-        Assert.Same(content, screen.FocusedNode);
+        Assert.Same(content, scene.FocusedNode);
 
         destination.Children.Add(items[1]);
         manager.UpdateFrame(new Size(600, 100), 0);
 
         Assert.Same(items[2], view.Selection.SelectedItem);
-        Assert.Same(items[2], screen.FocusedNode);
+        Assert.Same(items[2], scene.FocusedNode);
         manager.Close();
     }
 
-    private static (UiManager Manager, GameScreen Screen, TabView View, List<TabItem> Items) OpenScene(
+    private static (UIManager Manager, GameUIScene Scene, TabView View, List<TabItem> Items) OpenScene(
         int itemCount,
         bool closable = false,
         bool canReorder = false,
@@ -670,23 +671,23 @@ public sealed class TabViewInputTests
             items.Add(item);
         }
 
-        var manager = new UiManager();
-        var screen = new GameScreen(view);
-        manager.Open(screen);
+        var manager = new UIManager();
+        var scene = new GameUIScene(view);
+        manager.Open(scene);
         manager.UpdateFrame(new Size(width, height), 0);
-        return (manager, screen, view, items);
+        return (manager, scene, view, items);
     }
 
     private static Point ItemCenter(TabItem item)
     {
         var bounds = item.LayoutBounds;
-        return item.LocalToScreen(new Point(bounds.Width / 2, bounds.Height / 2));
+        return item.LocalToScene(new Point(bounds.Width / 2, bounds.Height / 2));
     }
 
     private static Point CloseCenter(TabCloseButton close)
     {
         var bounds = close.LayoutBounds;
-        return close.LocalToScreen(new Point(bounds.Width / 2, bounds.Height / 2));
+        return close.LocalToScene(new Point(bounds.Width / 2, bounds.Height / 2));
     }
 
     private sealed class TestControl : Control
