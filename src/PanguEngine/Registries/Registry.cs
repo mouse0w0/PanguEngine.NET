@@ -43,7 +43,7 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     public IReadOnlyList<RegistryEntry<T>> Entries => _readOnlyEntries;
 
     /// <inheritdoc/>
-    public RegistryEntry<T> Register(ResourceKey key, T value)
+    public virtual RegistryEntry<T> Register(ResourceKey key, T value)
     {
         if (IsFrozen)
             throw new InvalidOperationException("Registry is frozen.");

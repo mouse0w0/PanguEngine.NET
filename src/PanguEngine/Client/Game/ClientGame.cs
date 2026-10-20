@@ -4,6 +4,8 @@ using PanguEngine.Client.Input;
 using PanguEngine.Input;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
+using PanguEngine.World.Entities;
+using PanguEngine.World.Entities.Components;
 using PanguEngine.World.Interaction;
 using Silk.NET.Maths;
 
@@ -15,8 +17,10 @@ namespace PanguEngine.Client.Game;
 public sealed class ClientGame
 {
     private readonly ClientEngine _engine;
-    private readonly CameraController _cameraController;
     private readonly InputManager _input;
+    private readonly PlayerEntity _player;
+    private readonly PlayerInputController _playerInput;
+    private readonly PlayerFreeFlightUpdater _playerUpdater;
     private readonly AudioSystem _audio;
     private readonly IDisposable _gameContextActivation;
     private bool _leftClickRequested;
@@ -25,12 +29,20 @@ public sealed class ClientGame
     internal ClientGame(ClientEngine engine)
     {
         _engine = engine;
-        Camera = new Camera(new Vector3D<double>(8, 22, 24), -90, -20);
-        _cameraController = new CameraController(Camera);
         _input = engine.Input;
         _audio = engine.Audio;
         World = new ClientWorld();
         FlatWorldGenerator.Generate(World);
+        var initialPosition = new Vector3D<double>(8, 22, 24);
+        _player = World.Entities.Spawn(
+            BuiltinEntityTypes.Player,
+            new EntitySpawnBuilder()
+                .Add(BuiltinEntityComponents.Position, new PositionComponent(initialPosition, initialPosition))
+                .Add(BuiltinEntityComponents.Rotation, new RotationComponent(-90, -20))
+                .Add(BuiltinEntityComponents.MoveIntent, default));
+        _playerInput = new PlayerInputController(_player);
+        _playerUpdater = new PlayerFreeFlightUpdater();
+        Camera = new Camera(_player);
 
         _gameContextActivation = _input.ActivateContext(BuiltinInputContexts.Game);
         _input.StateInvalidated += ClearInteractionRequests;
@@ -62,13 +74,16 @@ public sealed class ClientGame
             return;
 
         var movement = _input.GetValue(BuiltinInputActions.Move).Axis2D;
-        _cameraController.Move(movement.Y, movement.X);
+        _playerInput.SetMoveIntent(movement.Y, movement.X);
+        _playerUpdater.Update(World.Entities);
+        var position = _player.Position.Current;
+        var forwardDirection = EntityPoseMath.GetForward(_player.Rotation);
         _audio.SetListener(new AudioListenerState(
-            Camera.CurrentPosition,
-            Camera.Forward,
+            position,
+            forwardDirection,
             Vector3D<double>.UnitY));
 
-        SelectedBlock = RaycastSelection(Camera.CurrentPosition);
+        SelectedBlock = RaycastSelection(position, forwardDirection);
         var breakSelection = SelectedBlock;
         if (_leftClickRequested
             && TryBreakBlock(World, breakSelection))
@@ -77,7 +92,7 @@ public sealed class ClientGame
             _audio.PlayAt(
                 BuiltinSoundEvents.BlockBreak,
                 GetBlockCenter(breakSelection!.Value.BlockPosition));
-            SelectedBlock = RaycastSelection(Camera.CurrentPosition);
+            SelectedBlock = RaycastSelection(position, forwardDirection);
         }
         else
         {
@@ -92,7 +107,7 @@ public sealed class ClientGame
             _audio.PlayAt(
                 BuiltinSoundEvents.BlockPlace,
                 GetBlockCenter(placeSelection!.Value.BlockPosition.Offset(placeSelection.Value.Face)));
-            SelectedBlock = RaycastSelection(Camera.CurrentPosition);
+            SelectedBlock = RaycastSelection(position, forwardDirection);
         }
         else
         {
@@ -154,7 +169,7 @@ public sealed class ClientGame
             return InputHandling.Pass;
 
         var delta = args.Value.Axis2D;
-        _cameraController.ApplyMouseDelta(new Vector2D<float>((float)delta.X, (float)delta.Y));
+        _playerInput.ApplyMouseDelta(new Vector2D<float>((float)delta.X, (float)delta.Y));
         return InputHandling.Handled;
     }
 
@@ -193,9 +208,9 @@ public sealed class ClientGame
             : InputHandling.Pass;
     }
 
-    private BlockHit? RaycastSelection(Vector3D<double> position)
+    private BlockHit? RaycastSelection(Vector3D<double> position, Vector3D<double> direction)
     {
-        var ray = new Ray3D<double>(position, Camera.Forward);
+        var ray = new Ray3D<double>(position, direction);
         return BlockRaycaster.TryRaycast(
             World,
             ray,
@@ -216,5 +231,7 @@ public sealed class ClientGame
         _input.StateInvalidated -= ClearInteractionRequests;
         _gameContextActivation.Dispose();
         ClearInteractionRequests();
+        _player.Destroy();
+        World.Destroy();
     }
 }

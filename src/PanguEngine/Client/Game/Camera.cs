@@ -1,42 +1,32 @@
+using PanguEngine.World.Entities;
 using Silk.NET.Maths;
 
 namespace PanguEngine.Client.Game;
 
 /// <summary>
-/// Represents a client camera with fixed-update position state.
+/// Creates client view state from a player entity and projection settings.
 /// </summary>
 public sealed class Camera
 {
-    private const double DirectionComponentEpsilon = 0.000001d;
+    private readonly PlayerEntity _player;
 
     /// <summary>
-    /// Creates a camera with the specified initial transform.
+    /// Creates a camera that observes a player entity.
     /// </summary>
-    /// <param name="position">The initial camera position.</param>
-    /// <param name="yaw">The initial horizontal angle in degrees.</param>
-    /// <param name="pitch">The initial vertical angle in degrees.</param>
-    internal Camera(
-        Vector3D<double> position = default,
-        double yaw = 0,
-        double pitch = 0)
+    /// <param name="player">The observed player.</param>
+    internal Camera(PlayerEntity player)
     {
-        PreviousPosition = position;
-        CurrentPosition = position;
-        Yaw = yaw;
-        Pitch = pitch;
+        _player = player ?? throw new ArgumentNullException(nameof(player));
     }
 
-    /// <summary>The position from the previous fixed update.</summary>
-    internal Vector3D<double> PreviousPosition { get; private set; }
-
     /// <summary>The position from the current fixed update.</summary>
-    public Vector3D<double> CurrentPosition { get; private set; }
+    public Vector3D<double> CurrentPosition => _player.Position.Current;
 
     /// <summary>The horizontal camera angle in degrees.</summary>
-    public double Yaw { get; internal set; }
+    public double Yaw => _player.Rotation.Yaw;
 
     /// <summary>The vertical camera angle in degrees.</summary>
-    public double Pitch { get; internal set; }
+    public double Pitch => _player.Rotation.Pitch;
 
     /// <summary>The presentation width divided by height.</summary>
     internal double AspectRatio { get; set; } = 1;
@@ -51,73 +41,18 @@ public sealed class Camera
     internal double FarPlane { get; set; } = 1000d;
 
     /// <summary>The current normalized camera forward direction.</summary>
-    internal Vector3D<double> Forward
-    {
-        get
-        {
-            var yaw = double.DegreesToRadians(Yaw);
-            var pitch = double.DegreesToRadians(Pitch);
-            var direction = Vector3D.Normalize(new Vector3D<double>(
-                Math.Cos(pitch) * Math.Cos(yaw),
-                Math.Sin(pitch),
-                Math.Cos(pitch) * Math.Sin(yaw)));
-            return Vector3D.Normalize(new Vector3D<double>(
-                SnapDirectionComponent(direction.X),
-                SnapDirectionComponent(direction.Y),
-                SnapDirectionComponent(direction.Z)));
-        }
-    }
-
-    /// <summary>
-    /// Teleports the camera without preserving position interpolation.
-    /// </summary>
-    /// <param name="position">The new camera position.</param>
-    internal void Teleport(Vector3D<double> position)
-    {
-        PreviousPosition = position;
-        CurrentPosition = position;
-    }
-
-    /// <summary>
-    /// Moves the camera by a relative offset and preserves position interpolation.
-    /// </summary>
-    /// <param name="delta">The relative position offset.</param>
-    internal void MoveBy(Vector3D<double> delta)
-    {
-        PreviousPosition = CurrentPosition;
-        CurrentPosition += delta;
-    }
-
-    /// <summary>
-    /// Moves the camera to an absolute position and preserves position interpolation.
-    /// </summary>
-    /// <param name="position">The new camera position.</param>
-    internal void MoveTo(Vector3D<double> position)
-    {
-        PreviousPosition = CurrentPosition;
-        CurrentPosition = position;
-    }
-
-    /// <summary>
-    /// Sets the current camera orientation.
-    /// </summary>
-    /// <param name="yaw">The horizontal angle in degrees.</param>
-    /// <param name="pitch">The vertical angle in degrees.</param>
-    internal void SetOrientation(double yaw, double pitch)
-    {
-        Yaw = yaw;
-        Pitch = pitch;
-    }
+    internal Vector3D<double> Forward => EntityPoseMath.GetForward(_player.Rotation);
 
     /// <summary>
     /// Gets the camera position interpolated between fixed updates.
     /// </summary>
-    /// <param name="alpha">The interpolation factor.</param>
+    /// <param name="alpha">The fixed-update interpolation factor.</param>
     /// <returns>The interpolated position.</returns>
     internal Vector3D<double> GetInterpolatedPosition(double alpha)
     {
+        var position = _player.Position;
         var amount = Math.Clamp(alpha, 0, 1);
-        return PreviousPosition + (CurrentPosition - PreviousPosition) * amount;
+        return position.Previous + (position.Current - position.Previous) * amount;
     }
 
     /// <summary>
@@ -167,10 +102,5 @@ public sealed class Camera
         var view = Matrix4X4.CreateLookAt(Vector3D<double>.Zero, Forward, Vector3D<double>.UnitY);
         var viewProjection = (Matrix4X4<float>)(view * CreateProjectionMatrix());
         return new WorldRenderState(position, viewProjection);
-    }
-
-    private static double SnapDirectionComponent(double value)
-    {
-        return Math.Abs(value) < DirectionComponentEpsilon ? 0 : value;
     }
 }

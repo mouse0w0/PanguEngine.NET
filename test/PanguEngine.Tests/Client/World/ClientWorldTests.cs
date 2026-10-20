@@ -1,6 +1,8 @@
 using PanguEngine.Client.World;
+using PanguEngine.Tests.World.Entities;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
+using PanguEngine.World.Entities;
 
 namespace PanguEngine.Tests.Client.World;
 
@@ -44,5 +46,19 @@ public sealed class ClientWorldTests
 
         Assert.Equal([position], notifications);
         Assert.Same(BuiltinBlocks.Stone.DefaultState, observedState);
+    }
+
+    [Fact]
+    public void DestroyInvalidatesWorldEntities()
+    {
+        var world = new ClientWorld();
+        var player = world.Entities.Spawn(
+            BuiltinEntityTypes.Player,
+            EntityTestContext.CreatePlayerValues(default));
+
+        world.Destroy();
+
+        Assert.False(player.IsAlive);
+        world.Destroy();
     }
 }

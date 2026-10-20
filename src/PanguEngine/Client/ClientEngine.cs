@@ -314,8 +314,8 @@ public sealed class ClientEngine
         Ui.CurrentSceneChanged -= OnCurrentSceneChanged;
         Ui.Destroy();
         Input.Destroy();
-        Game.Destroy();
         Renderer.Destroy();
+        Game.Destroy();
         UIToolkit.Shutdown();
         Audio.Destroy();
         TextServices.Shutdown();

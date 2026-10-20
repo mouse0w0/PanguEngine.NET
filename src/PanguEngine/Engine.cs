@@ -7,6 +7,7 @@ using PanguEngine.Modding;
 using PanguEngine.Registries;
 using PanguEngine.Resources;
 using PanguEngine.World.Blocks;
+using PanguEngine.World.Entities;
 
 namespace PanguEngine;
 
@@ -67,6 +68,8 @@ public static class Engine
         BuiltinSoundEvents.Register(BuiltinRegistries.SoundEvent);
         BuiltinInputActions.Register(BuiltinRegistries.InputAction);
         BuiltinInputContexts.Register(BuiltinRegistries.InputContext);
+        BuiltinEntityComponents.Register(BuiltinRegistries.EntityComponentType);
+        BuiltinEntityTypes.Register(BuiltinRegistries.EntityType);
         ModManager = new ModManager(Path.Combine(AppContext.BaseDirectory, "mods"), Log.CreateLogger("Mods"),
             options.ModPaths);
         ModManager.Load();

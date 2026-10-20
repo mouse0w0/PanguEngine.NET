@@ -2,6 +2,7 @@ using PanguEngine.Audio;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
 using PanguEngine.World.Blocks;
+using PanguEngine.World.Entities;
 
 namespace PanguEngine.Registries;
 
@@ -28,6 +29,13 @@ public static class BuiltinRegistries
 
     /// <summary>The built-in input context registry.</summary>
     public static readonly Registry<InputContext> InputContext = new(RegistryKeys.InputContext);
+    /// <summary>The built-in entity component type registry.</summary>
+    public static readonly Registry<ComponentType> EntityComponentType =
+        new EntityComponentTypeRegistry(RegistryKeys.EntityComponentType);
+
+    /// <summary>The built-in entity type registry.</summary>
+    public static readonly Registry<EntityType> EntityType =
+        new EntityTypeRegistry(RegistryKeys.EntityType, EntityComponentType);
 
     /// <summary>
     /// Registers the built-in registries in the specified registry manager.
@@ -41,5 +49,7 @@ public static class BuiltinRegistries
         manager.Register(Hud);
         manager.Register(InputAction);
         manager.Register(InputContext);
+        manager.Register(EntityComponentType);
+        manager.Register(EntityType);
     }
 }

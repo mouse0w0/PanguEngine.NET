@@ -1,6 +1,7 @@
 using PanguEngine.World;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
+using PanguEngine.World.Entities;
 
 namespace PanguEngine.Client.World;
 
@@ -9,16 +10,22 @@ namespace PanguEngine.Client.World;
 /// </summary>
 public sealed class ClientWorld : IReadOnlyBlockAccessor
 {
+    private bool _isDestroyed;
+
     /// <summary>
-    /// Creates a client world.
+    /// Creates a client world using the frozen process-level entity definitions.
     /// </summary>
     public ClientWorld()
     {
         Chunks = new ChunkManager();
+        Entities = new EntityManager();
     }
 
     /// <summary>The chunks that store this world's block state.</summary>
     public ChunkManager Chunks { get; }
+
+    /// <summary>The entities that belong to this world.</summary>
+    public EntityManager Entities { get; }
 
     /// <summary>Raised after a block state is stored.</summary>
     internal event Action<BlockPos>? BlockChanged;
@@ -52,5 +59,18 @@ public sealed class ClientWorld : IReadOnlyBlockAccessor
     public bool IsAir(BlockPos position)
     {
         return GetBlock(position).IsAir;
+    }
+
+    /// <summary>
+    /// Destroys the entity state owned by this world.
+    /// </summary>
+    public void Destroy()
+    {
+        if (_isDestroyed)
+            return;
+
+        _isDestroyed = true;
+        BlockChanged = null;
+        Entities.Destroy();
     }
 }
