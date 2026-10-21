@@ -13,18 +13,28 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     private readonly Dictionary<T, RegistryEntry<T>> _valueToEntry = new(ReferenceEqualityComparer.Instance);
     private readonly List<RegistryEntry<T>> _entries = [];
     private readonly ReadOnlyCollection<RegistryEntry<T>> _readOnlyEntries;
+    private readonly Action<IRegistry<T>, ResourceKey, T>? _validate;
 
     /// <summary>
     /// Creates a registry with the specified key.
     /// </summary>
     /// <param name="key">The key that identifies this registry.</param>
-    public Registry(ResourceKey key)
+    /// <param name="validate">The optional synchronous callback that throws to reject a candidate.</param>
+    /// <remarks>
+    /// Validation runs after basic registration checks and before the candidate is registered.
+    /// The callback must not mutate or freeze the registry or reenter registration.
+    /// Validation exceptions propagate unchanged.
+    /// </remarks>
+    public Registry(
+        ResourceKey key,
+        Action<IRegistry<T>, ResourceKey, T>? validate = null)
     {
         if (!ResourceKey.IsValid(key))
             throw new ArgumentException("Invalid registry key.", nameof(key));
 
         Key = key;
         _readOnlyEntries = _entries.AsReadOnly();
+        _validate = validate;
     }
 
     /// <inheritdoc/>
@@ -55,6 +65,8 @@ public class Registry<T> : IWritableRegistry<T> where T : class
             throw new InvalidOperationException($"Resource key '{key}' is already registered.");
         if (_valueToEntry.ContainsKey(value))
             throw new InvalidOperationException("Value instance is already registered.");
+
+        _validate?.Invoke(this, key, value);
 
         var entry = new RegistryEntry<T>(_entries.Count, key, value);
         _entries.Add(entry);

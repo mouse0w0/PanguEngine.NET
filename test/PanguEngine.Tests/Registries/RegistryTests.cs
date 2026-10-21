@@ -5,6 +5,66 @@ namespace PanguEngine.Tests.Registries;
 public sealed class RegistryTests
 {
     [Fact]
+    public void RegisterValidatesCandidateBeforeWriting()
+    {
+        var key = ResourceKey.Parse("pangu:candidate");
+        var value = new object();
+        IRegistry<object>? observedRegistry = null;
+        var calls = 0;
+        var registry = new Registry<object>(ResourceKey.Parse("pangu:test"), (current, candidateKey, candidate) =>
+        {
+            observedRegistry = current;
+            calls++;
+            Assert.Equal(key, candidateKey);
+            Assert.Same(value, candidate);
+            Assert.Empty(current.Entries);
+            Assert.False(current.ContainsKey(candidateKey));
+            Assert.False(current.TryGetId(candidate, out _));
+        });
+
+        registry.Register(key, value);
+
+        Assert.Same(registry, observedRegistry);
+        Assert.Equal(1, calls);
+        Assert.Same(value, registry.Get(key));
+    }
+
+    [Fact]
+    public void RegisterRejectsInvalidKeyBeforeCallingValidation()
+    {
+        var calls = 0;
+        var registry = new Registry<object>(ResourceKey.Parse("pangu:test"), (_, _, _) => calls++);
+
+        Assert.Throws<ArgumentException>(() => registry.Register(default!, new object()));
+
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
+    public void RegisterPropagatesValidationFailureWithoutReservingIdentity()
+    {
+        var failure = new InvalidOperationException("Rejected candidate.");
+        var reject = true;
+        var registry = new Registry<object>(ResourceKey.Parse("pangu:test"), (_, _, _) =>
+        {
+            if (reject)
+                throw failure;
+        });
+        var key = ResourceKey.Parse("pangu:candidate");
+        var value = new object();
+
+        Assert.Same(failure, Assert.Throws<InvalidOperationException>(() => registry.Register(key, value)));
+        Assert.Empty(registry.Entries);
+
+        reject = false;
+        var entry = registry.Register(key, value);
+
+        Assert.Equal(0, entry.Id);
+        Assert.Same(value, registry.Get(key));
+        Assert.Equal(entry.Id, registry.GetId(value));
+    }
+
+    [Fact]
     public void RegisterAssignsIncrementingIds()
     {
         var registry = CreateRegistry();

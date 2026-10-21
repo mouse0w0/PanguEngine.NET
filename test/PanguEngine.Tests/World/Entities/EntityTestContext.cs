@@ -17,12 +17,14 @@ internal sealed class EntityTestContext : IDisposable
     internal static EntityTestContext Create() => new(new EntityManager());
 
     internal static (
-        EntityComponentTypeRegistry ComponentTypes,
-        EntityTypeRegistry EntityTypes) CreateMutableRegistries()
+        Registry<ComponentType> ComponentTypes,
+        Registry<EntityType> EntityTypes) CreateMutableRegistries()
     {
-        var componentTypes = new EntityComponentTypeRegistry(ResourceKey.Parse("test:component_type"));
+        var componentTypes = new Registry<ComponentType>(
+            ResourceKey.Parse("test:component_type"), (current, _, value) => value.ValidateRegistration(current));
         BuiltinEntityComponents.Register(componentTypes);
-        var entityTypes = new EntityTypeRegistry(ResourceKey.Parse("test:entity_type"), componentTypes);
+        var entityTypes = new Registry<EntityType>(
+            ResourceKey.Parse("test:entity_type"), (_, _, value) => value.ValidateRegistration(componentTypes));
         BuiltinEntityTypes.Register(entityTypes);
         return (componentTypes, entityTypes);
     }

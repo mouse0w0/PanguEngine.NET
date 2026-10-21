@@ -31,9 +31,10 @@ public sealed class EntityRegistryTests
     }
 
     [Fact]
-    public void ComponentTypeRegistryRollsBackClrValueTypeAfterBaseRegistrationFailure()
+    public void ComponentTypeCanBeRegisteredAfterBaseRegistrationFailure()
     {
-        var registry = new EntityComponentTypeRegistry(ResourceKey.Parse("test:component_type"));
+        var registry = new Registry<ComponentType>(
+            ResourceKey.Parse("test:component_type"), (current, _, value) => value.ValidateRegistration(current));
         registry.Register(ResourceKey.Parse("test:first"), new ComponentType<FirstComponent>());
         var second = new ComponentType<SecondComponent>();
 
@@ -48,7 +49,8 @@ public sealed class EntityRegistryTests
     public void RegistryManagerWritableAccessUsesComponentTypeValidation()
     {
         var manager = new RegistryManager();
-        var registry = new EntityComponentTypeRegistry(ResourceKey.Parse("test:component_type"));
+        var registry = new Registry<ComponentType>(
+            ResourceKey.Parse("test:component_type"), (current, _, value) => value.ValidateRegistration(current));
         manager.Register(registry);
         var writable = manager.GetWritable<ComponentType>(registry.Key);
         writable.Register(ResourceKey.Parse("test:first"), new ComponentType<TestComponent>());
@@ -73,7 +75,7 @@ public sealed class EntityRegistryTests
     }
 
     [Fact]
-    public void EntityTypeRegistryRejectsUnregisteredComponents()
+    public void EntityTypeValidationRejectsUnregisteredComponents()
     {
         var (_, entityTypes, _, _) = CreateRegistries();
         var type = new EntityType<TestEntity>(
@@ -85,21 +87,24 @@ public sealed class EntityRegistryTests
     }
 
     [Fact]
-    public void EntityTypeRegistryRejectsComponentsOutsideRegistryIdOrder()
+    public void EntityTypeValidationAcceptsComponentsInAnyRegistryIdOrder()
     {
         var (_, entityTypes, first, second) = CreateRegistries();
         var type = new EntityType<TestEntity>(
             [second, first],
             static (entities, handle) => new TestEntity(entities, handle));
+        var key = ResourceKey.Parse("test:unordered");
 
-        Assert.Throws<InvalidOperationException>(() =>
-            entityTypes.Register(ResourceKey.Parse("test:unordered"), type));
+        entityTypes.Register(key, type);
+
+        Assert.Same(type, entityTypes.Get(key));
     }
 
     [Fact]
     public void FrozenComponentTypeRegistryRejectsFurtherRegistration()
     {
-        var registry = new EntityComponentTypeRegistry(ResourceKey.Parse("test:component_type"));
+        var registry = new Registry<ComponentType>(
+            ResourceKey.Parse("test:component_type"), (current, _, value) => value.ValidateRegistration(current));
         registry.Freeze();
 
         Assert.Throws<InvalidOperationException>(() =>
@@ -107,19 +112,21 @@ public sealed class EntityRegistryTests
     }
 
     private static (
-        EntityComponentTypeRegistry ComponentTypes,
-        EntityTypeRegistry EntityTypes,
+        Registry<ComponentType> ComponentTypes,
+        Registry<EntityType> EntityTypes,
         ComponentType<FirstComponent> First,
         ComponentType<SecondComponent> Second) CreateRegistries()
     {
-        var componentTypes = new EntityComponentTypeRegistry(ResourceKey.Parse("test:component_type"));
+        var componentTypes = new Registry<ComponentType>(
+            ResourceKey.Parse("test:component_type"), (current, _, value) => value.ValidateRegistration(current));
         var first = new ComponentType<FirstComponent>();
         var second = new ComponentType<SecondComponent>();
         componentTypes.Register(ResourceKey.Parse("test:first"), first);
         componentTypes.Register(ResourceKey.Parse("test:second"), second);
         return (
             componentTypes,
-            new EntityTypeRegistry(ResourceKey.Parse("test:entity_type"), componentTypes),
+            new Registry<EntityType>(ResourceKey.Parse("test:entity_type"),
+                (_, _, value) => value.ValidateRegistration(componentTypes)),
             first,
             second);
     }

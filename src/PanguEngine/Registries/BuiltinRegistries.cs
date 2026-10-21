@@ -31,11 +31,11 @@ public static class BuiltinRegistries
     public static readonly Registry<InputContext> InputContext = new(RegistryKeys.InputContext);
     /// <summary>The built-in entity component type registry.</summary>
     public static readonly Registry<ComponentType> EntityComponentType =
-        new EntityComponentTypeRegistry(RegistryKeys.EntityComponentType);
+        new(RegistryKeys.EntityComponentType, (current, _, value) => value.ValidateRegistration(current));
 
     /// <summary>The built-in entity type registry.</summary>
     public static readonly Registry<EntityType> EntityType =
-        new EntityTypeRegistry(RegistryKeys.EntityType, EntityComponentType);
+        new(RegistryKeys.EntityType, (_, _, value) => value.ValidateRegistration(EntityComponentType));
 
     /// <summary>
     /// Registers the built-in registries in the specified registry manager.

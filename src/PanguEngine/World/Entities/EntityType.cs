@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using PanguEngine.Registries;
 
 namespace PanguEngine.World.Entities;
 
@@ -26,6 +27,18 @@ public abstract class EntityType
     public IReadOnlyList<ComponentType> RequiredSignature => _requiredSignature;
 
     internal Func<EntityManager, EntityHandle, Entity> Factory { get; }
+
+    internal void ValidateRegistration(IRegistry<ComponentType> componentTypeRegistry)
+    {
+        var seen = new HashSet<ComponentType>(ReferenceEqualityComparer.Instance);
+        foreach (var componentType in RequiredSignature)
+        {
+            if (!seen.Add(componentType))
+                throw new InvalidOperationException("Entity required signature contains a duplicate component type.");
+            if (!componentTypeRegistry.TryGetId(componentType, out _))
+                throw new InvalidOperationException("Entity required signature contains an unregistered component type.");
+        }
+    }
 }
 
 /// <summary>

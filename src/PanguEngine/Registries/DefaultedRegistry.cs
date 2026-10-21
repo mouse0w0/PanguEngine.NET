@@ -13,7 +13,16 @@ public class DefaultedRegistry<T> : Registry<T> where T : class
     /// </summary>
     /// <param name="key">The key that identifies this registry.</param>
     /// <param name="defaultKey">The key of the default entry.</param>
-    public DefaultedRegistry(ResourceKey key, ResourceKey defaultKey) : base(key)
+    /// <param name="validate">The optional synchronous callback that throws to reject a candidate, including the default entry.</param>
+    /// <remarks>
+    /// Validation runs after basic registration checks and before the candidate is registered.
+    /// The callback must not mutate or freeze the registry or reenter registration.
+    /// Validation exceptions propagate unchanged.
+    /// </remarks>
+    public DefaultedRegistry(
+        ResourceKey key,
+        ResourceKey defaultKey,
+        Action<IRegistry<T>, ResourceKey, T>? validate = null) : base(key, validate)
     {
         if (!ResourceKey.IsValid(defaultKey))
             throw new ArgumentException("Invalid registry key.", nameof(defaultKey));

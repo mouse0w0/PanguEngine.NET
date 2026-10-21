@@ -1,3 +1,5 @@
+using PanguEngine.Registries;
+
 namespace PanguEngine.World.Entities;
 
 /// <summary>
@@ -14,6 +16,15 @@ public abstract class ComponentType
     public Type ValueType { get; }
 
     internal abstract IComponentColumn CreateColumn();
+
+    internal void ValidateRegistration(IRegistry<ComponentType> registry)
+    {
+        foreach (var entry in registry.Entries)
+        {
+            if (entry.Value.ValueType == ValueType)
+                throw new InvalidOperationException($"Component value type '{ValueType}' is already registered.");
+        }
+    }
 }
 
 /// <summary>

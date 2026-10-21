@@ -5,6 +5,27 @@ namespace PanguEngine.Tests.Registries;
 public sealed class DefaultedRegistryTests
 {
     [Fact]
+    public void DefaultEntryUsesValidationBeforeItCanBeFrozen()
+    {
+        var defaultKey = ResourceKey.Parse("pangu:air");
+        var rejected = new object();
+        var registry = new DefaultedRegistry<object>(
+            ResourceKey.Parse("pangu:test"), defaultKey, (_, _, candidate) =>
+            {
+                if (ReferenceEquals(candidate, rejected))
+                    throw new InvalidOperationException("Rejected default.");
+            });
+
+        Assert.Throws<InvalidOperationException>(() => registry.Register(defaultKey, rejected));
+
+        var accepted = new object();
+        registry.Register(defaultKey, accepted);
+        registry.Freeze();
+
+        Assert.Same(accepted, registry.DefaultValue);
+    }
+
+    [Fact]
     public void ConstructorStoresDefaultKey()
     {
         var defaultKey = ResourceKey.Parse("pangu:air");
