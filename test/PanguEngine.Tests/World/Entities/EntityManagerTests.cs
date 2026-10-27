@@ -174,12 +174,15 @@ public sealed class EntityManagerTests
     }
 
     [Fact]
-    public async Task AccessFromAnotherThreadIsRejected()
+    public void AccessFromAnotherThreadIsRejected()
     {
         using var context = EntityTestContext.Create();
         var player = context.SpawnPlayer(default);
 
-        var exception = await Record.ExceptionAsync(() => Task.Run(() => player.IsAlive));
+        Exception? exception = null;
+        var thread = new Thread(() => exception = Record.Exception(() => _ = player.IsAlive));
+        thread.Start();
+        thread.Join();
 
         Assert.IsType<InvalidOperationException>(exception);
     }

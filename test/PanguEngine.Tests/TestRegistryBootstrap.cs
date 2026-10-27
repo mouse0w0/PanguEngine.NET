@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using PanguEngine.Audio;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
@@ -15,6 +16,9 @@ internal static class TestRegistryBootstrap
     [ModuleInitializer]
     internal static void Initialize()
     {
+        if (AssemblyLoadContext.GetLoadContext(typeof(TestRegistryBootstrap).Assembly) != AssemblyLoadContext.Default)
+            return;
+
         Manager = new RegistryManager();
         BuiltinRegistries.Register(Manager);
         BuiltinHuds.Register(BuiltinRegistries.Hud);
