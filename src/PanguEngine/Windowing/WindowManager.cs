@@ -142,29 +142,28 @@ public abstract class WindowManager
 
     private void PruneDeadWindows()
     {
-        foreach (var entry in _windows.ToArray())
+        List<WindowEntry>? windowsToRemove = null;
+        foreach (var entry in _windows)
         {
-            if (!entry.Reference.TryGetTarget(out var window))
+            if (!entry.Reference.TryGetTarget(out var window) || window.IsDestroyed)
             {
-                _windows.Remove(entry);
-                continue;
+                windowsToRemove ??= [];
+                windowsToRemove.Add(entry);
+            }
+        }
+
+        if (windowsToRemove is null)
+            return;
+
+        foreach (var entry in windowsToRemove)
+        {
+            if (entry.Reference.TryGetTarget(out var window))
+            {
+                RemoveVisibleWindow(window);
+                window.VisibilityChanged -= OnWindowVisibilityChanged;
             }
 
-            if (!window.IsDestroyed)
-                continue;
-
-            RemoveWindow(window);
-        }
-    }
-
-    private void RemoveWindow(Window window)
-    {
-        RemoveVisibleWindow(window);
-        window.VisibilityChanged -= OnWindowVisibilityChanged;
-        for (var i = _windows.Count - 1; i >= 0; i--)
-        {
-            if (_windows[i].Reference.TryGetTarget(out var candidate) && ReferenceEquals(candidate, window))
-                _windows.RemoveAt(i);
+            _windows.Remove(entry);
         }
     }
 

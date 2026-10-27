@@ -317,6 +317,60 @@ public sealed class WindowManagerTests
         Assert.Equal(1, renderCount);
     }
 
+    [Fact]
+    public void RepeatedPruningDoesNotAllocateForAnUnchangedWindowSet()
+    {
+        var primary = new TestWindow(true);
+        var manager = new TestWindowManager(primary, _ => new TestWindow());
+        for (var index = 0; index < 100; index++)
+        {
+            manager.DoEvents();
+            manager.PreRenderWindows(0);
+        }
+
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        for (var index = 0; index < 100; index++)
+        {
+            manager.DoEvents();
+            manager.PreRenderWindows(0);
+        }
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+
+        Assert.Equal(0L, allocated);
+    }
+
+    [Fact]
+    public void PruningRemovesDestroyedWindowsAndPreservesLiveWindows()
+    {
+        var primary = new TestWindow(true);
+        var manager = new TestWindowManager(primary, _ => new TestWindow());
+        var first = (TestWindow)manager.CreateWindow(default);
+        var second = (TestWindow)manager.CreateWindow(default);
+        var survivor = manager.CreateWindow(default);
+        var rendered = new List<Window>();
+        primary.Render += (window, _) => rendered.Add(window);
+        first.Render += (window, _) => rendered.Add(window);
+        second.Render += (window, _) => rendered.Add(window);
+        survivor.Render += (window, _) => rendered.Add(window);
+        first.Destroy();
+        second.Destroy();
+
+        manager.DoEvents();
+        Assert.Equal<Window>([primary, survivor], manager.VisibleWindows);
+
+        manager.PreRenderWindows(0);
+        manager.RenderWindows(0);
+
+        Assert.Equal<Window>([primary, survivor], rendered);
+
+        first.Hide();
+        first.Show();
+        second.Hide();
+        second.Show();
+
+        Assert.Equal<Window>([primary, survivor], manager.VisibleWindows);
+    }
+
     private static WindowManager CreateManager(
         TestWindow primary,
         TestWindow secondary,
