@@ -112,30 +112,15 @@ public sealed class PseudoClassTests
     }
 
     [Fact]
-    public void SelectorDeduplicatesSortsAndExposesReadOnlyIdentifiers()
+    public void SelectorDeduplicatesAndSortsPseudoClassConditions()
     {
         var loading = PseudoClass.Get("Loading");
-        var selector = StyleSelector.For<Button>(
-            pseudoClasses: [PseudoClass.Hover, loading, PseudoClass.Get("hover")]);
+        var selector = StyleSelector.For<Button>([
+            StyleSelectorCondition.Pseudo(PseudoClass.Hover), StyleSelectorCondition.Pseudo(loading),
+            StyleSelectorCondition.Pseudo(PseudoClass.Get("hover"))
+        ]);
 
-        Assert.Equal(2, selector.PseudoClasses.Count);
-        Assert.Same(PseudoClass.Hover, selector.PseudoClasses[0]);
-        Assert.Same(loading, selector.PseudoClasses[1]);
-        Assert.Equal(new[] { "hover", "loading" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
         Assert.Equal("Button:hover:loading", selector.SelectorText);
         Assert.Equal(2, selector.ClassAndPseudoCount);
-        Assert.Throws<NotSupportedException>(() =>
-            ((IList<PseudoClass>)selector.PseudoClasses).Add(PseudoClass.Get("focus")));
-    }
-
-    [Fact]
-    public void CssParsingUsesTheSameIdentifiersAsTheFactory()
-    {
-        var selector = Assert.Single(StyleSheet.Parse("Button:LOADING:Hover { }").Rules).Selectors[0];
-
-        Assert.Equal(2, selector.PseudoClasses.Count);
-        Assert.Same(PseudoClass.Hover, selector.PseudoClasses[0]);
-        Assert.Same(PseudoClass.Get("loading"), selector.PseudoClasses[1]);
-        Assert.Equal("Button:hover:loading", selector.SelectorText);
     }
 }

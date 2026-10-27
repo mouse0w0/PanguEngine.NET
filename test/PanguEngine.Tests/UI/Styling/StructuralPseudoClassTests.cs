@@ -83,7 +83,7 @@ public sealed class StructuralPseudoClassTests
     {
         var node = new StatePanel();
         var pseudo = PseudoClass.Get(name);
-        var selector = StyleSelector.For<Panel>(pseudoClasses: [pseudo]);
+        var selector = StyleSelector.For<Panel>([StyleSelectorCondition.Pseudo(pseudo)]);
         Assert.True(selector.Matches(node));
         node.Set(pseudo, false);
         Assert.True(selector.Matches(node));
@@ -156,7 +156,6 @@ public sealed class StructuralPseudoClassTests
         var selector = Parse(source);
         Assert.Equal(expected, selector.SelectorText);
         Assert.Equal(expected, Parse(selector.SelectorText).SelectorText);
-        Assert.Empty(selector.PseudoClasses);
         Assert.Equal(1, selector.ClassAndPseudoCount);
     }
 
@@ -249,6 +248,9 @@ public sealed class StructuralPseudoClassTests
         var equivalent = Parse(":nth-child(odd):nth-child(2n+1):nth-last-child(odd)");
         Assert.Equal(2, equivalent.ClassAndPseudoCount);
         Assert.Equal(":nth-child(2n+1):nth-last-child(2n+1)", equivalent.SelectorText);
+        Assert.Equal(
+            ":nth-child(n+4):nth-child(2n+1):nth-child(2n+3)",
+            Parse(":nth-child(2n+3):nth-child(n+4):nth-child(2n+1)").SelectorText);
     }
 
     [Theory]
@@ -275,12 +277,16 @@ public sealed class StructuralPseudoClassTests
         Assert.False(selector.Matches(target));
     }
 
-    [Fact]
-    public void StructuralConditionsComposeWithNamedStateClassAndId()
+    [Theory]
+    [InlineData("Panel.row#target:loading:first-child:nth-last-child(1)")]
+    [InlineData("Panel:nth-last-child(1):loading.row:first-child#target.row:loading:nth-last-child(1)")]
+    public void StructuralConditionsComposeWithNamedStateClassAndId(string source)
     {
         var node = new StatePanel { StyleId = "target" };
         node.Classes.Add("row");
-        var selector = Parse("Panel.row#target:loading:first-child:nth-last-child(1)");
+        var selector = Parse(source);
+        Assert.Equal("Panel.row#target:first-child:loading:nth-last-child(1)", selector.SelectorText);
+        Assert.Equal((1, 4), (selector.IdCount, selector.ClassAndPseudoCount));
         Assert.False(selector.Matches(node));
         node.Set(PseudoClass.Get("loading"), true);
         Assert.True(selector.Matches(node));

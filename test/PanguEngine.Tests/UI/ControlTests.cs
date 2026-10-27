@@ -497,7 +497,7 @@ public sealed class ControlTests
         var scene = new GameUIScene(root);
         scene.SetStyleSheets([
             new StyleSheet([
-                new StyleRule(StyleSelector.For<TestControl>(pseudoClasses: [PseudoClass.Disabled]), [
+                new StyleRule(StyleSelector.For<TestControl>([StyleSelectorCondition.Pseudo(PseudoClass.Disabled)]), [
                     StyleSetter.Create(UIElement.OpacityProperty, 0.5)
                 ])
             ])

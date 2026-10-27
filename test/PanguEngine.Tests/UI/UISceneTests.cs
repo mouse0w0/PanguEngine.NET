@@ -1370,7 +1370,7 @@ public sealed class UISceneTests
                     StyleSelector.For<FailOnceStyleNode>(),
                     [StyleSetter.Create(FailOnceStyleNode.ValueProperty, new GuardedValue(2))]),
                 new StyleRule(
-                    StyleSelector.For<FailOnceStyleNode>(pseudoClasses: [PseudoClass.Disabled]),
+                    StyleSelector.For<FailOnceStyleNode>([StyleSelectorCondition.Pseudo(PseudoClass.Disabled)]),
                     [StyleSetter.Create(UIElement.OpacityProperty, 0.5)])
             ])
         };

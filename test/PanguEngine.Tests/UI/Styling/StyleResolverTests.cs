@@ -13,7 +13,7 @@ public sealed class StyleResolverTests
     public void EarlierSpecificRuleWinsOverLaterSheet(StyleOrigin origin)
     {
         var defaultSheet = Sheet(
-            Rule(StyleSelector.For<Button>(classes: ["primary"]),
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("primary")]),
                 StyleSetter.Create(Region.BackgroundProperty, Brush(1))));
         var overrideSheet = Sheet(
             Rule(StyleSelector.For<Button>(),
@@ -32,7 +32,7 @@ public sealed class StyleResolverTests
     {
         var sheet = Sheet(
             Rule(StyleSelector.For<Control>(), StyleSetter.Create(Region.BackgroundProperty, Brush(1))),
-            Rule(StyleSelector.For<Button>(classes: ["primary"]),
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("primary")]),
                 StyleSetter.Create(Region.BackgroundProperty, Brush(2))));
         var button = new Button();
         button.Classes.Add("primary");
@@ -66,7 +66,7 @@ public sealed class StyleResolverTests
     public void ResolveReturnsDescriptorDefaultWhenNoRuleMatches()
     {
         var sheet = Sheet(Rule(
-            StyleSelector.For<Button>(classes: ["absent"]),
+            StyleSelector.For<Button>([StyleSelectorCondition.Class("absent")]),
             StyleSetter.Create(UIElement.OpacityProperty, 0.5)));
         var result = new StyleResolver([], [sheet]).Resolve(new Button());
 
@@ -99,7 +99,7 @@ public sealed class StyleResolverTests
     public void AuthorRulesOverrideMoreSpecificBaseRules()
     {
         var baseSheet = Sheet(Rule(
-            StyleSelector.For<Button>(classes: ["primary"]),
+            StyleSelector.For<Button>([StyleSelectorCondition.Class("primary")]),
             StyleSetter.Create(Region.BackgroundProperty, Brush(1))));
         var authorSheet = Sheet(Rule(
             StyleSelector.For<Button>(),
@@ -369,7 +369,7 @@ public sealed class StyleResolverTests
     public void StronglyTypedSelectorBeatsWildcardRegardlessOfOrder(bool csharpFirst)
     {
         var csharp = Sheet(Rule(
-            StyleSelector.For<UIElement>(classes: ["danger"]),
+            StyleSelector.For<UIElement>([StyleSelectorCondition.Class("danger")]),
             StyleSetter.Create(UIElement.OpacityProperty, 0.4)));
         var wildcard = StyleSheet.Parse("*.danger { opacity: 0.1; }");
         var resolver = csharpFirst
@@ -659,7 +659,7 @@ public sealed class StyleResolverTests
     {
         var css = StyleSheet.Parse("Button { opacity: 0.8 !important; }");
         var code = Sheet(
-            Rule(StyleSelector.For<Button>(id: "save"), StyleSetter.Create(UIElement.OpacityProperty, 0.1)));
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Id("save")]), StyleSetter.Create(UIElement.OpacityProperty, 0.1)));
         var resolver = new StyleResolver([], [css, code]);
 
         Assert.Equal(0.8, resolver.Resolve(new Button { StyleId = "save" }).GetValue(UIElement.OpacityProperty));

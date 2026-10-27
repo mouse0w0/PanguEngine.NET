@@ -143,7 +143,7 @@ public sealed class PropertyCallbackTests
         var scene = new UIScene(node);
         scene.SetStyleSheets([
             new StyleSheet([
-                new StyleRule(StyleSelector.For<CallbackNode>(classes: ["active"]), [
+                new StyleRule(StyleSelector.For<CallbackNode>([StyleSelectorCondition.Class("active")]), [
                     StyleSetter.Create(CallbackNode.ValueProperty, 7)
                 ])
             ])

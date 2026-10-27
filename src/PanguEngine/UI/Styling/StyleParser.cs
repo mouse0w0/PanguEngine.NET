@@ -170,10 +170,8 @@ internal static class StyleParser
                 hasType = true;
             }
 
-            var classes = new List<string>();
-            string? id = null;
-            var pseudoClasses = new List<PseudoClass>();
-            var nthConditions = new List<StyleNthCondition>();
+            var conditions = new List<StyleSelectorCondition>();
+            var hasId = false;
             var end = GetMark();
 
             while (true)
@@ -186,16 +184,17 @@ internal static class StyleParser
                 if (c == '.')
                 {
                     Advance();
-                    classes.Add(ReadIdentifier());
+                    conditions.Add(StyleSelectorCondition.Class(ReadIdentifier()));
                 }
                 else if (c == '#')
                 {
                     Advance();
                     var idStart = GetMark();
                     var idValue = ReadIdentifier();
-                    if (id is not null)
+                    if (hasId)
                         throw Error(StyleParseError.DuplicateId, idStart, idValue.Length);
-                    id = idValue;
+                    hasId = true;
+                    conditions.Add(StyleSelectorCondition.Id(idValue));
                 }
                 else if (c == ':')
                 {
@@ -207,13 +206,14 @@ internal static class StyleParser
                         if (_pos >= text.Length || text[_pos] != '(')
                             throw Error(StyleParseError.InvalidSyntax, pseudoStart, name.Length);
                         Advance();
-                        nthConditions.Add(new StyleNthCondition(name == "nth-last-child", ParseNthExpression()));
+                        var expression = ParseNthExpression();
+                        conditions.Add(StyleSelectorCondition.Nth(name == "nth-last-child", expression.A, expression.B));
                     }
                     else
                     {
                         if (_pos < text.Length && text[_pos] == '(')
                             throw Error(StyleParseError.InvalidSyntax, pseudoStart, name.Length);
-                        pseudoClasses.Add(PseudoClass.Get(name));
+                        conditions.Add(StyleSelectorCondition.Pseudo(PseudoClass.Get(name)));
                     }
                 }
                 else
@@ -224,14 +224,14 @@ internal static class StyleParser
                 end = GetMark();
             }
 
-            if (!hasType && classes.Count == 0 && id is null && pseudoClasses.Count == 0 && nthConditions.Count == 0)
+            if (!hasType && conditions.Count == 0)
                 throw Error(StyleParseError.InvalidSyntax, start, 1);
 
-            segments.Add(StyleSelectorSegment.Create(null, typeName, classes, id, pseudoClasses, nthConditions));
+            segments.Add(StyleSelectorSegment.Create(null, typeName, conditions));
             return end;
         }
 
-        private NthExpression ParseNthExpression()
+        private (int A, int B) ParseNthExpression()
         {
             SkipTrivia();
             var start = GetMark();
@@ -240,8 +240,8 @@ internal static class StyleParser
                 var keyword = ReadIdentifier().ToLowerInvariant();
                 var expression = keyword switch
                 {
-                    "odd" => new NthExpression(2, 1),
-                    "even" => new NthExpression(2, 0),
+                    "odd" => (2, 1),
+                    "even" => (2, 0),
                     _ => throw Error(StyleParseError.InvalidSyntax, start, keyword.Length)
                 };
                 return FinishNthExpression(expression);
@@ -270,20 +270,20 @@ internal static class StyleParser
                     throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
                 coefficient = ReadNthInteger(negative);
                 if (_pos >= text.Length || text[_pos] is not ('n' or 'N'))
-                    return FinishNthExpression(new NthExpression(0, coefficient));
+                    return FinishNthExpression((0, coefficient));
             }
 
             Advance();
             SkipTrivia();
             if (_pos < text.Length && text[_pos] == ')')
-                return FinishNthExpression(new NthExpression(coefficient, 0));
+                return FinishNthExpression((coefficient, 0));
             if (_pos >= text.Length || text[_pos] is not ('+' or '-'))
                 throw Error(StyleParseError.InvalidSyntax, GetMark(), 1);
             negative = text[_pos] == '-';
             Advance();
             SkipTrivia();
             var offset = ReadNthInteger(negative);
-            return FinishNthExpression(new NthExpression(coefficient, offset));
+            return FinishNthExpression((coefficient, offset));
         }
 
         private int ReadNthInteger(bool negative)
@@ -304,7 +304,7 @@ internal static class StyleParser
             return (int)(negative ? -magnitude : magnitude);
         }
 
-        private NthExpression FinishNthExpression(NthExpression expression)
+        private (int A, int B) FinishNthExpression((int A, int B) expression)
         {
             SkipTrivia();
             if (_pos >= text.Length || text[_pos] != ')')

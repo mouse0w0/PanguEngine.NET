@@ -16,7 +16,7 @@ public sealed class UIElementStylingTests
     public void LocalValueMasksStyleAndClearRestoresStyle()
     {
         var button = new Button();
-        ApplyTheme(button, Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1, 2, 3))));
+        ApplyTheme(button, Rule(StyleSelector.For<Button>(), Setter(Region.BackgroundProperty, Brush(1, 2, 3))));
 
         button.Background = new SolidColorBrush(4, 5, 6);
         Assert.Equal(new SolidColorBrush(4, 5, 6), button.Background);
@@ -30,7 +30,7 @@ public sealed class UIElementStylingTests
     {
         var source = new Button { Background = Brush(7) };
         var target = new Button();
-        ApplyTheme(target, Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1))));
+        ApplyTheme(target, Rule(StyleSelector.For<Button>(), Setter(Region.BackgroundProperty, Brush(1))));
         target.Bind(Region.BackgroundProperty, source, Region.BackgroundProperty);
 
         source.Background = Brush(8);
@@ -51,7 +51,7 @@ public sealed class UIElementStylingTests
     public void LocalValueMasksStyleChangeWithoutNotification()
     {
         var button = new Button();
-        ApplyTheme(button, Rule(Selector<Button>(classes: ["primary"]), Setter(Region.BackgroundProperty, Brush(1))));
+        ApplyTheme(button, Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("primary")]), Setter(Region.BackgroundProperty, Brush(1))));
         button.Background = new SolidColorBrush(7, 7, 7);
 
         var changes = 0;
@@ -70,7 +70,7 @@ public sealed class UIElementStylingTests
     public void ClassMutationRecomputesOnlyOnRealChange()
     {
         var button = new Button();
-        ApplyTheme(button, Rule(Selector<Button>(classes: ["primary"]), Setter(Region.BackgroundProperty, Brush(1))));
+        ApplyTheme(button, Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("primary")]), Setter(Region.BackgroundProperty, Brush(1))));
 
         var changes = 0;
         button.PropertyChanged += (_, e) =>
@@ -87,7 +87,7 @@ public sealed class UIElementStylingTests
     public void StyleIdChangeRecomputesOnlyOnRealChange()
     {
         var button = new Button();
-        ApplyTheme(button, Rule(Selector<Button>(id: "save"), Setter(Region.BackgroundProperty, Brush(1))));
+        ApplyTheme(button, Rule(StyleSelector.For<Button>([StyleSelectorCondition.Id("save")]), Setter(Region.BackgroundProperty, Brush(1))));
 
         var changes = 0;
         button.PropertyChanged += (_, e) =>
@@ -111,7 +111,7 @@ public sealed class UIElementStylingTests
     {
         var button = new Button();
         ApplyTheme(button, Rule(
-            StyleSelector.For<Button>(pseudoClasses: [PseudoClass.Hover]),
+            StyleSelector.For<Button>([StyleSelectorCondition.Pseudo(PseudoClass.Hover)]),
             Setter(Region.BackgroundProperty, Brush(9))));
 
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
@@ -143,8 +143,8 @@ public sealed class UIElementStylingTests
                     : Region.BackgroundProperty, Brush(9));
         };
         var sheet = new StyleSheet([
-            Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
-            Rule(Selector<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))
+            Rule(StyleSelector.For<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
+            Rule(StyleSelector.For<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))
         ]);
 
         scene.SetStyleSheets([sheet]);
@@ -166,11 +166,11 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             button,
             Rule(
-                Selector<Button>(),
+                StyleSelector.For<Button>(),
                 Setter(Region.BackgroundProperty, Brush(1)),
                 Setter(Region.BorderBrushProperty, Brush(2))),
             Rule(
-                Selector<Button>(classes: ["primary"]),
+                StyleSelector.For<Button>([StyleSelectorCondition.Class("primary")]),
                 Setter(Region.BackgroundProperty, Brush(5)),
                 Setter(Region.BorderBrushProperty, Brush(6))));
 
@@ -217,8 +217,8 @@ public sealed class UIElementStylingTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => ApplyTheme(
             button,
-            Rule(Selector<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
-            Rule(Selector<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))));
+            Rule(StyleSelector.For<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
+            Rule(StyleSelector.For<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))));
 
         Assert.Same(failure, exception);
         Assert.Single(notified);
@@ -241,8 +241,8 @@ public sealed class UIElementStylingTests
         var scene = new UIScene(root);
         scene.SetStyleSheets([
             new StyleSheet([
-                Rule(Selector<Panel>(), Setter(UIElement.OpacityProperty, 0.4)),
-                Rule(Selector<GuardedStyleNode>(), Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
+                Rule(StyleSelector.For<Panel>(), Setter(UIElement.OpacityProperty, 0.4)),
+                Rule(StyleSelector.For<GuardedStyleNode>(), Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
             ])
         ]);
         var firstNotifications = 0;
@@ -394,8 +394,8 @@ public sealed class UIElementStylingTests
         var button = new Button();
         ApplyTheme(
             button,
-            Rule(Selector<Button>(classes: ["x"]), Setter(Region.BackgroundProperty, Brush(5))),
-            Rule(Selector<Button>(classes: ["extra"]), Setter(Region.BackgroundProperty, Brush(9))));
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("x")]), Setter(Region.BackgroundProperty, Brush(5))),
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("extra")]), Setter(Region.BackgroundProperty, Brush(9))));
 
         var backgroundNotifications = 0;
         var collectionNotifications = 0;
@@ -428,8 +428,8 @@ public sealed class UIElementStylingTests
         var button = new Button();
         ApplyTheme(
             button,
-            Rule(Selector<Button>(classes: ["x"]), Setter(Region.BackgroundProperty, Brush(5))),
-            Rule(Selector<Button>(classes: ["extra"]), Setter(Region.BackgroundProperty, Brush(9))));
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("x")]), Setter(Region.BackgroundProperty, Brush(5))),
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("extra")]), Setter(Region.BackgroundProperty, Brush(9))));
         var notifications = 0;
         var collectionNotifications = 0;
         var attemptReentrancy = true;
@@ -471,8 +471,8 @@ public sealed class UIElementStylingTests
         var button = new Button();
         ApplyTheme(
             button,
-            Rule(Selector<Button>(classes: ["x"]), Setter(Region.BackgroundProperty, Brush(5))),
-            Rule(Selector<Button>(classes: ["extra"]), Setter(Region.BackgroundProperty, Brush(9))));
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("x")]), Setter(Region.BackgroundProperty, Brush(5))),
+            Rule(StyleSelector.For<Button>([StyleSelectorCondition.Class("extra")]), Setter(Region.BackgroundProperty, Brush(9))));
         var notifications = 0;
         button.PropertyChanged += (_, e) =>
         {
@@ -922,7 +922,7 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             button,
             Rule(
-                Selector<Button>(classes: ["primary"]),
+                StyleSelector.For<Button>([StyleSelectorCondition.Class("primary")]),
                 Setter(Region.BackgroundProperty, Brush(1, 2, 3))));
         button.Classes.Add("primary");
         button.Background = new SolidColorBrush(9, 9, 9);
@@ -1070,7 +1070,7 @@ public sealed class UIElementStylingTests
     {
         var button = new Button();
         ApplyTheme(button, Rule(
-            StyleSelector.For<Button>(pseudoClasses: [PseudoClass.Hover]),
+            StyleSelector.For<Button>([StyleSelectorCondition.Pseudo(PseudoClass.Hover)]),
             Setter(Region.BackgroundProperty, Brush(9))));
         button.PropertyChanged += (_, e) =>
         {
@@ -1099,7 +1099,7 @@ public sealed class UIElementStylingTests
                 StyleSelector.For<GuardedStyleNode>(),
                 Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5))),
             Rule(
-                StyleSelector.For<GuardedStyleNode>(pseudoClasses: [PseudoClass.Hover]),
+                StyleSelector.For<GuardedStyleNode>([StyleSelectorCondition.Pseudo(PseudoClass.Hover)]),
                 Setter(UIElement.OpacityProperty, 0.75)));
 
         Assert.Equal(0.25, node.Opacity);
@@ -1147,7 +1147,7 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             control,
             Rule(
-                StyleSelector.For<CustomStateControl>(pseudoClasses: [Loading]),
+                StyleSelector.For<CustomStateControl>([StyleSelectorCondition.Pseudo(Loading)]),
                 Setter(Region.BackgroundProperty, Brush(6))));
 
         control.SetLoading(true);
@@ -1170,7 +1170,7 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             host,
             Rule(
-                StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(Loading)]),
                 Setter(UIElement.OpacityProperty, 0.4)));
 
         Assert.Equal(1d, host.Opacity);
@@ -1191,7 +1191,7 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             host,
             Rule(
-                StyleSelector.For<PseudoClassHost>(pseudoClasses: [PseudoClass.Hover, Loading]),
+                StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(PseudoClass.Hover), StyleSelectorCondition.Pseudo(Loading)]),
                 Setter(UIElement.OpacityProperty, 0.4)));
 
         host.Set(PseudoClass.Hover, true);
@@ -1212,7 +1212,7 @@ public sealed class UIElementStylingTests
     {
         var host = new PseudoClassHost();
         ApplyTheme(host, Rule(
-            StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+            StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(Loading)]),
             Setter(UIElement.OpacityProperty, 0.4)));
         var expected = new InvalidOperationException("style notification failed");
         var notifications = 0;
@@ -1242,7 +1242,7 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             host,
             Rule(
-                StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(Loading)]),
                 Setter(UIElement.OpacityProperty, 0.4)));
 
         var refreshes = 0;
@@ -1265,7 +1265,7 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             host,
             Rule(
-                StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(Loading)]),
                 Setter(UIElement.OpacityProperty, 0.4)));
 
         var refreshes = 0;
@@ -1292,10 +1292,10 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             host,
             Rule(
-                StyleSelector.For<PseudoClassHost>(pseudoClasses: [Loading]),
+                StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(Loading)]),
                 Setter(UIElement.OpacityProperty, 0.4)),
             Rule(
-                StyleSelector.For<PseudoClassHost>(pseudoClasses: [Phantom]),
+                StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(Phantom)]),
                 Setter(UIElement.OpacityProperty, 0.7)));
         var notifications = 0;
         host.PropertyChanged += (_, e) =>
@@ -1336,7 +1336,7 @@ public sealed class UIElementStylingTests
         ApplyTheme(
             host,
             Rule(
-                StyleSelector.For<PseudoClassHost>(pseudoClasses: [Phantom]),
+                StyleSelector.For<PseudoClassHost>([StyleSelectorCondition.Pseudo(Phantom)]),
                 Setter(UIElement.OpacityProperty, 0.4)));
 
         Assert.Equal(1d, host.Opacity);
@@ -1647,12 +1647,6 @@ public sealed class UIElementStylingTests
         scene.SetStyleSheets([new StyleSheet(rules)]);
         scene.Root!.UpdateStyles();
     }
-
-    private static StyleSelector Selector<TNode>(
-        string? id = null,
-        params string[] classes)
-        where TNode : UIElement =>
-        StyleSelector.For<TNode>(classes, id);
 
     private static StyleRule Rule(StyleSelector selector, params StyleSetter[] setters) =>
         new(selector, setters);

@@ -42,12 +42,6 @@ public sealed class StyleParserTests
         var rule = Assert.Single(sheet.Rules);
         var selector = rule.Selectors[0];
         Assert.Null(selector.TargetType);
-        Assert.Equal("Button", selector.TypeName);
-        Assert.Equal(new[] { "primary" }, selector.Classes);
-        Assert.Equal("save", selector.Id);
-        Assert.Equal(new[] { "focus", "hover" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Same(PseudoClass.Focus, selector.PseudoClasses[0]);
-        Assert.Same(PseudoClass.Hover, selector.PseudoClasses[1]);
         Assert.Equal("Button.primary#save:focus:hover", selector.SelectorText);
         Assert.Equal("menu.css", sheet.SourceName);
 
@@ -58,21 +52,20 @@ public sealed class StyleParserTests
     }
 
     [Theory]
-    [InlineData("*", "*", "*")]
-    [InlineData(".danger", "*", ".danger")]
-    [InlineData("*.danger", "*", ".danger")]
-    [InlineData("*#save", "*", "#save")]
-    [InlineData("#save.danger", "*", ".danger#save")]
-    [InlineData(":disabled", "*", ":disabled")]
-    [InlineData("*:hover", "*", ":hover")]
-    [InlineData(".primary.large", "*", ".primary.large")]
-    [InlineData("Button.danger:hover#save", "Button", "Button.danger#save:hover")]
-    public void ParsesUnqualifiedSelector(string text, string typeName, string normalized)
+    [InlineData("*", "*")]
+    [InlineData(".danger", ".danger")]
+    [InlineData("*.danger", ".danger")]
+    [InlineData("*#save", "#save")]
+    [InlineData("#save.danger", ".danger#save")]
+    [InlineData(":disabled", ":disabled")]
+    [InlineData("*:hover", ":hover")]
+    [InlineData(".primary.large", ".primary.large")]
+    [InlineData("Button.danger:hover#save", "Button.danger#save:hover")]
+    public void ParsesUnqualifiedSelector(string text, string normalized)
     {
         var selector = Assert.Single(ParseCss(text + " { }").Rules).Selectors[0];
 
         Assert.Null(selector.TargetType);
-        Assert.Equal(typeName, selector.TypeName);
         Assert.Equal(normalized, selector.SelectorText);
     }
 
@@ -86,8 +79,6 @@ public sealed class StyleParserTests
         var omitted = SingleRule(conditions + " { }").Selectors[0];
         var explicitWildcard = SingleRule("*" + conditions + " { }").Selectors[0];
 
-        Assert.Equal("*", omitted.TypeName);
-        Assert.Equal(omitted.TypeName, explicitWildcard.TypeName);
         Assert.Equal(conditions, omitted.SelectorText);
         Assert.Equal(omitted.SelectorText, explicitWildcard.SelectorText);
     }
@@ -98,9 +89,6 @@ public sealed class StyleParserTests
         var selector = SingleRule(".danger.danger:hover:hover { }").Selectors[0];
 
         Assert.Equal(".danger:hover", selector.SelectorText);
-        Assert.Equal(new[] { "danger" }, selector.Classes);
-        Assert.Equal(new[] { "hover" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Same(PseudoClass.Hover, Assert.Single(selector.PseudoClasses));
         Assert.Equal(2, selector.ClassAndPseudoCount);
     }
 
@@ -174,7 +162,7 @@ public sealed class StyleParserTests
     {
         var css = "Button {\r\n\twidth: 1;\r\n}\r\nCanvas {\r\n\theight: bad;\r\n}\r\n";
 
-        var rule = Assert.Single(ParseCss(css, "crlf.css").Rules.Where(r => r.Selectors[0].TypeName == "Canvas"));
+        var rule = Assert.Single(ParseCss(css, "crlf.css").Rules.Where(r => r.Selectors[0].SelectorText == "Canvas"));
         var node = new Canvas();
         var error = Assert.Throws<StyleParseException>(() => rule.Bind(node.GetType()));
 
@@ -200,10 +188,7 @@ public sealed class StyleParserTests
     {
         var rule = SingleRule("Button.a.b.c:hover:focus:disabled { }");
 
-        Assert.Equal(new[] { "a", "b", "c" }, rule.Selectors[0].Classes);
-        Assert.Equal(new[] { "disabled", "focus", "hover" },
-            rule.Selectors[0].PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Null(rule.Selectors[0].Id);
+        Assert.Equal("Button.a.b.c:disabled:focus:hover", rule.Selectors[0].SelectorText);
         Assert.Empty(rule.Setters);
     }
 
@@ -212,8 +197,6 @@ public sealed class StyleParserTests
     {
         var selector = SingleRule("Button .primary { }").Selectors[0];
 
-        Assert.Equal("*", selector.TypeName);
-        Assert.Equal(new[] { "primary" }, selector.Classes);
         Assert.Equal(1, selector.ClassAndPseudoCount);
         Assert.Equal("Button .primary", selector.SelectorText);
     }
@@ -374,7 +357,7 @@ public sealed class StyleParserTests
     {
         var rule = SingleRule("Ghost { }");
 
-        Assert.Equal("Ghost", rule.Selectors[0].TypeName);
+        Assert.Equal("Ghost", rule.Selectors[0].SelectorText);
         Assert.Null(rule.Selectors[0].TargetType);
     }
 
@@ -383,21 +366,16 @@ public sealed class StyleParserTests
     {
         var selector = SingleRule("Button:phantom { }").Selectors[0];
 
-        Assert.Equal(new[] { "phantom" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Same(PseudoClass.Get("phantom"), Assert.Single(selector.PseudoClasses));
         Assert.Equal("Button:phantom", selector.SelectorText);
     }
 
     [Fact]
     public void PseudoClassNamesAreNormalizedDeduplicatedAndSortedByOrdinal()
     {
-        var selector = SingleRule("Button:LOADING:Hover:loading:hover { }").Selectors[0];
+        var selector = SingleRule("Button:LOADING:Hover:loading:hover:aa:a-b { }").Selectors[0];
 
-        Assert.Equal(new[] { "hover", "loading" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Same(PseudoClass.Hover, selector.PseudoClasses[0]);
-        Assert.Same(PseudoClass.Get("loading"), selector.PseudoClasses[1]);
-        Assert.Equal("Button:hover:loading", selector.SelectorText);
-        Assert.Equal(2, selector.ClassAndPseudoCount);
+        Assert.Equal("Button:a-b:aa:hover:loading", selector.SelectorText);
+        Assert.Equal(4, selector.ClassAndPseudoCount);
     }
 
     [Theory]
@@ -493,8 +471,6 @@ public sealed class StyleParserTests
     [Fact]
     public void BindingUsesAttachedPropertiesRegisteredByCanvas()
     {
-        Assert.Equal("Panel", SingleRule("Panel { }").Selectors[0].TypeName);
-
         var expected = Canvas.LeftProperty;
         var setter = Assert.Single(BoundSetters("Button { left: 4; }", new Button()));
         Assert.Same(expected, setter.Property);

@@ -69,31 +69,6 @@ public sealed class StyleCombinatorTests
         Assert.Equal(classAndPseudoCount, selector.ClassAndPseudoCount);
     }
 
-    [Fact]
-    public void PublicPropertiesDescribeTheTargetSegmentOnly()
-    {
-        var selector = Selector("#outer.outer > .target:hover");
-
-        Assert.Equal("*", selector.TypeName);
-        Assert.Null(selector.Id);
-        Assert.Equal(new[] { "target" }, selector.Classes);
-        Assert.Equal(new[] { "hover" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Equal(1, selector.IdCount);
-        Assert.Equal(3, selector.ClassAndPseudoCount);
-        Assert.Equal(0, selector.TargetTypeDepth);
-        Assert.Equal(".outer#outer > .target:hover", selector.SelectorText);
-    }
-
-    [Fact]
-    public void PseudoClassesAreCountedAcrossSegmentsButExposedForTheTargetOnly()
-    {
-        var selector = Selector("Panel:hover .target:focus:disabled");
-
-        Assert.Equal(new[] { "disabled", "focus" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Equal(4, selector.ClassAndPseudoCount);
-        Assert.True(selector.HasPseudoClasses);
-    }
-
     [Theory]
     [InlineData("Button", false, false)]
     [InlineData("Panel Button", true, false)]
@@ -108,14 +83,6 @@ public sealed class StyleCombinatorTests
         Assert.Equal(hasRelationships, selector.HasRelationships);
         Assert.Equal(hasSiblings, selector.HasSiblingRelationships);
     }
-
-    [Theory]
-    [InlineData("Button", false)]
-    [InlineData("Button:hover", true)]
-    [InlineData("Panel:hover Button", true)]
-    [InlineData("Panel > Button:disabled", true)]
-    public void HasPseudoClassesCoversAnySegment(string css, bool expected) =>
-        Assert.Equal(expected, Selector(css).HasPseudoClasses);
 
     [Fact]
     public void SelectorSourceLocationCoversTheWholeChainWithoutTrailingTrivia()
@@ -386,8 +353,8 @@ public sealed class StyleCombinatorTests
         var root = MakePanel("frame");
         var button = new Button();
         root.Children.Add(button);
-        var panelDepth = StyleSelector.For<Panel>().TargetTypeDepth;
-        var buttonDepth = StyleSelector.For<Button>().TargetTypeDepth;
+        Assert.True(StyleSelector.For<Panel>().TryMatch(root, out var panelDepth));
+        Assert.True(StyleSelector.For<Button>().TryMatch(button, out var buttonDepth));
 
         Assert.True(Selector("Panel > Button").TryMatch(button, out var childDepth));
         Assert.Equal(panelDepth + buttonDepth, childDepth);
@@ -438,9 +405,9 @@ public sealed class StyleCombinatorTests
         root.Children.Add(far);
         far.Children.Add(near);
         near.Children.Add(target);
-        var sharedDepth = StyleSelector.For<SharedDerived>().TargetTypeDepth;
-        var panelDepth = StyleSelector.For<Panel>().TargetTypeDepth;
-        var shallowDepth = StyleSelector.For<SharedBase>().TargetTypeDepth;
+        Assert.True(StyleSelector.For<SharedDerived>().TryMatch(far, out var sharedDepth));
+        Assert.True(StyleSelector.For<Panel>().TryMatch(target, out var panelDepth));
+        Assert.True(StyleSelector.For<SharedBase>().TryMatch(near, out var shallowDepth));
 
         Assert.True(Selector("shared Panel").TryMatch(target, out var depth));
         Assert.Equal(sharedDepth + panelDepth, depth);
@@ -473,8 +440,9 @@ public sealed class StyleCombinatorTests
         root.Children.Add(low);
         root.Children.Add(high);
         root.Children.Add(target);
-        var expected = StyleSelector.For<SharedDerived>().TargetTypeDepth
-                       + StyleSelector.For<Panel>().TargetTypeDepth;
+        Assert.True(StyleSelector.For<SharedDerived>().TryMatch(high, out var sharedDepth));
+        Assert.True(StyleSelector.For<Panel>().TryMatch(target, out var panelDepth));
+        var expected = sharedDepth + panelDepth;
 
         Assert.True(Selector("shared ~ Panel").TryMatch(target, out var depth));
         Assert.Equal(expected, depth);

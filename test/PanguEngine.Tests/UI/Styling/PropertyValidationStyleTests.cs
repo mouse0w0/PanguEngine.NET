@@ -54,7 +54,7 @@ public sealed class PropertyValidationStyleTests
         using var subscription = first.Subscribe(StyleNode.ValueProperty, (_, _) => notifications++);
         var candidate = new StyleSheet([
             new StyleRule(StyleSelector.For<StyleNode>(), [StyleSetter.Create(StyleNode.ValueProperty, 30)]),
-            new StyleRule(StyleSelector.For<StyleNode>(classes: ["invalid"]),
+            new StyleRule(StyleSelector.For<StyleNode>([StyleSelectorCondition.Class("invalid")]),
                 [StyleSetter.Create(StyleNode.ValueProperty, -1)])
         ]);
 

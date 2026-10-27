@@ -8,39 +8,69 @@ namespace PanguEngine.Tests.UI.Styling;
 public sealed class StyleRuleTests
 {
     [Fact]
-    public void SelectorCopiesClassesAndComputesSpecificity()
+    public void SelectorCopiesConditionsAndComputesSpecificity()
     {
-        var classes = new[] { "primary", "wide", "primary" };
-        var selector = StyleSelector.For<Button>(
-            classes,
-            "save",
-            new[] { PseudoClass.Get("Hover"), PseudoClass.Focus, PseudoClass.Get("hover") });
+        var conditions = new[]
+        {
+            StyleSelectorCondition.Class("wide"), StyleSelectorCondition.Class("primary"), StyleSelectorCondition.Class("wide"),
+            StyleSelectorCondition.Id("save"), StyleSelectorCondition.Nth(false, 0, 1)
+        };
+        var selector = StyleSelector.For<Panel>(conditions);
+        conditions[3] = StyleSelectorCondition.Id("other");
 
-        Assert.Equal(new[] { "primary", "wide" }, selector.Classes);
-        Assert.Equal("save", selector.Id);
-        Assert.Equal(new[] { "focus", "hover" }, selector.PseudoClasses.Select(pseudoClass => pseudoClass.Name));
-        Assert.Same(PseudoClass.Focus, selector.PseudoClasses[0]);
-        Assert.Same(PseudoClass.Hover, selector.PseudoClasses[1]);
-        Assert.Equal((1, 4), (selector.IdCount, selector.ClassAndPseudoCount));
+        var node = new Panel { StyleId = "save" };
+        node.Classes.Add("primary");
+        node.Classes.Add("wide");
+        Assert.Equal("Panel.wide.primary#save:nth-child(1)", selector.SelectorText);
+        Assert.Equal((1, 3), (selector.IdCount, selector.ClassAndPseudoCount));
+        Assert.True(selector.Matches(node));
+        node.Classes.Remove("wide");
+        Assert.False(selector.Matches(node));
     }
 
     [Fact]
-    public void SelectorCopiesPseudoClassesAndDoesNotExposeCallerCollection()
+    public void EmptyConditionsDoNotChangeSelectorBehavior()
     {
-        var pseudoClasses = new List<PseudoClass> { PseudoClass.Get("Hover") };
-        var selector = StyleSelector.For<Button>(pseudoClasses: pseudoClasses);
+        var empty = default(StyleSelectorCondition);
+        var node = new Panel();
+        Assert.True(empty.Matches(node));
+        Assert.Equal((string.Empty, 0, 0, StyleSelectorDependencies.None),
+            (empty.Text, empty.IdCount, empty.ClassAndPseudoCount, empty.Dependencies));
 
-        pseudoClasses.Add(PseudoClass.Focus);
+        var wildcard = StyleSelectorSegment.Create(null, "*", [empty, empty]);
+        Assert.Equal("*", wildcard.Text);
+        Assert.True(wildcard.TryMatch(node, out _));
 
-        Assert.Same(PseudoClass.Hover, Assert.Single(selector.PseudoClasses));
-        Assert.Throws<NotSupportedException>(() =>
-            ((IList<PseudoClass>)selector.PseudoClasses).Add(PseudoClass.Get("loading")));
+        var selector = StyleSelector.For<Panel>([empty, StyleSelectorCondition.Class("target"), empty]);
+        Assert.Equal("Panel.target", selector.SelectorText);
+        Assert.Equal((0, 1), (selector.IdCount, selector.ClassAndPseudoCount));
+        Assert.False(selector.Matches(node));
+        node.Classes.Add("target");
+        Assert.True(selector.Matches(node));
+    }
+
+    [Fact]
+    public void IdConditionsDeduplicateButDifferentIdsMustAllMatch()
+    {
+        var repeated = StyleSelector.For<Panel>([
+            StyleSelectorCondition.Id("a"), StyleSelectorCondition.Id("a"), StyleSelectorCondition.Class("a")
+        ]);
+        Assert.Equal((1, 1), (repeated.IdCount, repeated.ClassAndPseudoCount));
+        var node = new Panel { StyleId = "a" };
+        Assert.False(repeated.Matches(node));
+        node.Classes.Add("a");
+        Assert.True(repeated.Matches(node));
+
+        var conflicting = StyleSelector.For<Panel>([StyleSelectorCondition.Id("a"), StyleSelectorCondition.Id("b")]);
+        Assert.Equal(2, conflicting.IdCount);
+        Assert.False(conflicting.Matches(new Panel { StyleId = "a" }));
+        Assert.False(conflicting.Matches(new Panel { StyleId = "b" }));
     }
 
     [Fact]
     public void StatefulRuleAcceptsLayoutSetter()
     {
-        var selector = StyleSelector.For<Button>(pseudoClasses: [PseudoClass.Hover]);
+        var selector = StyleSelector.For<Button>([StyleSelectorCondition.Pseudo(PseudoClass.Hover)]);
         var setter = StyleSetter.Create(Region.PaddingProperty, new Thickness(8));
 
         Assert.Same(setter, Assert.Single(new StyleRule(selector, [setter]).Setters));
@@ -94,10 +124,10 @@ public sealed class StyleRuleTests
     }
 
     [Fact]
-    public void SelectorRejectsInvalidIdentifier()
+    public void ConditionsRejectInvalidIdentifiers()
     {
-        Assert.Throws<ArgumentException>(() => StyleSelector.For<Button>(classes: ["1bad"]));
-        Assert.Throws<ArgumentException>(() => StyleSelector.For<Button>(id: "bad id"));
+        Assert.Throws<ArgumentException>(() => StyleSelectorCondition.Class("1bad"));
+        Assert.Throws<ArgumentException>(() => StyleSelectorCondition.Id("bad id"));
     }
 
     [Fact]
@@ -116,22 +146,11 @@ public sealed class StyleRuleTests
     }
 
     [Fact]
-    public void ForSelectorKeepsClrTargetTypeAndExposesTypeName()
-    {
-        var selector = StyleSelector.For<Button>(classes: ["primary"]);
-
-        Assert.Equal(typeof(Button), selector.TargetType);
-        Assert.Equal("Button", selector.TypeName);
-    }
-
-    [Fact]
-    public void ParsedSelectorExposesTypeNameWithoutTargetType()
+    public void ParsedRuleKeepsItsSelectorTextAndDefersSetters()
     {
         var rule = Assert.Single(StyleSheet.Parse("Button.primary { }").Rules);
 
         Assert.Single(rule.Selectors);
-        Assert.Null(rule.Selectors[0].TargetType);
-        Assert.Equal("Button", rule.Selectors[0].TypeName);
         Assert.Equal("Button.primary", rule.Selectors[0].SelectorText);
         Assert.Empty(rule.Setters);
     }
@@ -178,7 +197,7 @@ public sealed class StyleRuleTests
         var selectors = new[]
         {
             StyleSelector.For<Button>(),
-            StyleSelector.For<Button>(pseudoClasses: [PseudoClass.Hover]),
+            StyleSelector.For<Button>([StyleSelectorCondition.Pseudo(PseudoClass.Hover)]),
         };
         var setter = StyleSetter.Create(Region.PaddingProperty, new Thickness(8));
 
@@ -216,11 +235,14 @@ public sealed class StyleRuleTests
     }
 
     [Fact]
-    public void TargetTypeDepthStartsAtOneForUIElementAndGrowsWithInheritance()
+    public void MatchingTypeDepthStartsAtOneForUIElementAndGrowsWithInheritance()
     {
-        Assert.Equal(1, StyleSelector.For<UIElement>().TargetTypeDepth);
-        Assert.True(StyleSelector.For<Control>().TargetTypeDepth > StyleSelector.For<UIElement>().TargetTypeDepth);
-        Assert.True(StyleSelector.For<Button>().TargetTypeDepth > StyleSelector.For<Control>().TargetTypeDepth);
+        Assert.True(StyleSelector.For<UIElement>().TryMatch(new Panel(), out var elementDepth));
+        Assert.Equal(1, elementDepth);
+        Assert.True(StyleSelector.For<Control>().TryMatch(new Button(), out var controlDepth));
+        Assert.True(StyleSelector.For<Button>().TryMatch(new Button(), out var buttonDepth));
+        Assert.True(buttonDepth > controlDepth);
+        Assert.True(controlDepth > elementDepth);
     }
 
     [Theory]
@@ -229,11 +251,10 @@ public sealed class StyleRuleTests
     [InlineData("#save")]
     [InlineData(":disabled")]
     [InlineData("Button")]
-    public void ParsedSelectorHasNoClrTargetAndZeroDepth(string text)
+    public void ParsedSelectorHasNoClrTarget(string text)
     {
         var selector = Assert.Single(StyleSheet.Parse(text + " { }").Rules).Selectors[0];
 
         Assert.Null(selector.TargetType);
-        Assert.Equal(0, selector.TargetTypeDepth);
     }
 }

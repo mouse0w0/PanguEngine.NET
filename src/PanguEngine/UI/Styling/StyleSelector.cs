@@ -19,24 +19,27 @@ internal enum StyleCombinator
 }
 
 /// <summary>
-/// Provides an immutable compound selector segment that constrains a single element's type, classes, id and pseudo classes.
+/// Provides an immutable compound selector segment with a type constraint and additional element conditions.
 /// </summary>
 internal sealed class StyleSelectorSegment
 {
+    private readonly StyleSelectorCondition[] _conditions;
+
     private StyleSelectorSegment(
         Type? targetType,
         string typeName,
-        IReadOnlyList<string> classes,
-        string? id,
-        IReadOnlyList<PseudoClass> pseudoClasses,
-        IReadOnlyList<StyleNthCondition> nthConditions)
+        StyleSelectorCondition[] conditions)
     {
         TargetType = targetType;
         TypeName = typeName;
-        Classes = classes;
-        Id = id;
-        PseudoClasses = pseudoClasses;
-        NthConditions = nthConditions;
+        _conditions = conditions;
+        foreach (var condition in conditions)
+        {
+            IdCount += condition.IdCount;
+            ClassAndPseudoCount += condition.ClassAndPseudoCount;
+            Dependencies |= condition.Dependencies;
+        }
+
         Text = BuildText();
     }
 
@@ -46,36 +49,17 @@ internal sealed class StyleSelectorSegment
     /// <summary>Gets the CSS element name, or <c>*</c> when the element type is unrestricted.</summary>
     internal string TypeName { get; }
 
-    /// <summary>Gets the required classes, deduplicated and kept in first-seen order.</summary>
-    internal IReadOnlyList<string> Classes { get; }
-
-    /// <summary>Gets the required id, or null when no id is required.</summary>
-    internal string? Id { get; }
-
-    /// <summary>Gets the required pseudo-class identifiers, deduplicated and sorted by ordinal name.</summary>
-    internal IReadOnlyList<PseudoClass> PseudoClasses { get; }
-
-    /// <summary>Gets the immutable sibling-position conditions in normalized order.</summary>
-    internal IReadOnlyList<StyleNthCondition> NthConditions { get; }
+    /// <summary>Gets the combined structural dependencies of this segment's conditions.</summary>
+    internal StyleSelectorDependencies Dependencies { get; }
 
     /// <summary>Gets the normalized text of this single segment.</summary>
     internal string Text { get; }
 
-    /// <summary>Gets this segment's id contribution to specificity: 0 or 1.</summary>
-    internal int IdCount => Id is null ? 0 : 1;
+    /// <summary>Gets this segment's combined id contribution to specificity.</summary>
+    internal int IdCount { get; }
 
     /// <summary>Gets this segment's combined class and pseudo-class contribution to specificity.</summary>
-    internal int ClassAndPseudoCount => Classes.Count + PseudoClasses.Count + NthConditions.Count;
-
-    /// <summary>Gets a value indicating whether this segment requires any pseudo class.</summary>
-    internal bool HasPseudoClasses => PseudoClasses.Count != 0 || NthConditions.Count != 0;
-
-    /// <summary>Gets whether sibling positions or counts affect this segment's match.</summary>
-    internal bool HasChildIndexedPseudoClasses =>
-        NthConditions.Count != 0 || PseudoClasses.Any(static pseudo => pseudo.IsChildIndexed);
-
-    /// <summary>Gets whether the presence of children affects this segment's match.</summary>
-    internal bool HasEmptyPseudoClass => PseudoClasses.Contains(PseudoClass.Empty);
+    internal int ClassAndPseudoCount { get; }
 
     /// <summary>Gets a value indicating whether this segment constrains the element type.</summary>
     internal bool HasTypeConstraint => TargetType is not null || TypeName != "*";
@@ -84,52 +68,18 @@ internal sealed class StyleSelectorSegment
     internal static StyleSelectorSegment Create(
         Type? targetType,
         string typeName,
-        IEnumerable<string>? classes,
-        string? id,
-        IEnumerable<PseudoClass>? pseudoClasses,
-        IEnumerable<StyleNthCondition>? nthConditions = null)
+        IEnumerable<StyleSelectorCondition> conditions)
     {
-        if (id is not null)
-            StyleIdentifier.ThrowIfInvalid(id, nameof(id));
-
-        var normalizedClasses = new List<string>();
-        if (classes is not null)
+        var seen = new HashSet<StyleSelectorCondition>();
+        var distinct = new List<StyleSelectorCondition>();
+        foreach (var condition in conditions)
         {
-            foreach (var className in classes)
-            {
-                StyleIdentifier.ThrowIfInvalid(className, nameof(classes));
-                if (!normalizedClasses.Contains(className))
-                    normalizedClasses.Add(className);
-            }
+            if (!condition.IsEmpty && seen.Add(condition))
+                distinct.Add(condition);
         }
 
-        var orderedPseudoClasses = new List<PseudoClass>();
-        if (pseudoClasses is not null)
-        {
-            foreach (var pseudoClass in pseudoClasses)
-            {
-                if (!orderedPseudoClasses.Contains(pseudoClass))
-                    orderedPseudoClasses.Add(pseudoClass);
-            }
-        }
-
-        orderedPseudoClasses.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Name, right.Name));
-        var orderedNthConditions = nthConditions?.Distinct().ToList() ?? [];
-        orderedNthConditions.Sort(static (left, right) =>
-        {
-            var comparison = StringComparer.Ordinal.Compare(left.Name, right.Name);
-            if (comparison != 0)
-                return comparison;
-            comparison = left.Expression.A.CompareTo(right.Expression.A);
-            return comparison != 0 ? comparison : left.Expression.B.CompareTo(right.Expression.B);
-        });
-        return new StyleSelectorSegment(
-            targetType,
-            typeName,
-            normalizedClasses.AsReadOnly(),
-            id,
-            orderedPseudoClasses.AsReadOnly(),
-            orderedNthConditions.AsReadOnly());
+        var normalized = distinct.OrderBy(static condition => condition, StyleSelectorCondition.NormalizationComparer).ToArray();
+        return new StyleSelectorSegment(targetType, typeName, normalized);
     }
 
     /// <summary>Resolves the CLR type matched by this segment for the supplied element type, or null when unmatched.</summary>
@@ -142,24 +92,10 @@ internal sealed class StyleSelectorSegment
         return CssRegistry.MatchElement(nodeType, TypeName);
     }
 
-    /// <summary>Determines whether the supplied element satisfies this segment's id, class and pseudo-class conditions.</summary>
+    /// <summary>Determines whether the supplied element satisfies every additional condition in this segment.</summary>
     internal bool MatchesConditions(UIElement node)
     {
-        if (Id is not null && !string.Equals(Id, node.StyleId, StringComparison.Ordinal))
-            return false;
-        foreach (var className in Classes)
-        {
-            if (!node.Classes.Contains(className))
-                return false;
-        }
-
-        foreach (var pseudoClass in PseudoClasses)
-        {
-            if (!node.HasPseudoClass(pseudoClass))
-                return false;
-        }
-
-        foreach (var condition in NthConditions)
+        foreach (var condition in _conditions)
         {
             if (!condition.Matches(node))
                 return false;
@@ -185,16 +121,10 @@ internal sealed class StyleSelectorSegment
     private string BuildText()
     {
         var builder = new StringBuilder();
-        if (HasTypeConstraint || (Classes.Count == 0 && Id is null && !HasPseudoClasses))
+        if (HasTypeConstraint || _conditions.Length == 0)
             builder.Append(TypeName);
-        foreach (var className in Classes)
-            builder.Append('.').Append(className);
-        if (Id is not null)
-            builder.Append('#').Append(Id);
-        foreach (var pseudoClass in PseudoClasses)
-            builder.Append(':').Append(pseudoClass.Name);
-        foreach (var condition in NthConditions)
-            builder.Append(':').Append(condition);
+        foreach (var condition in _conditions)
+            builder.Append(condition.Text);
 
         return builder.ToString();
     }
@@ -211,33 +141,24 @@ public sealed class StyleSelector
 
     private StyleSelector(
         IReadOnlyList<StyleSelectorSegment> segments,
-        IReadOnlyList<StyleCombinator> combinators,
-        int targetTypeDepth)
+        IReadOnlyList<StyleCombinator> combinators)
     {
         _segments = segments;
         _combinators = combinators;
-        TargetTypeDepth = targetTypeDepth;
-
-        var target = segments[^1];
-        TargetType = target.TargetType;
-        TypeName = target.TypeName;
-        Classes = target.Classes;
-        Id = target.Id;
-        PseudoClasses = target.PseudoClasses;
 
         var idCount = 0;
         var classAndPseudoCount = 0;
-        var hasPseudoClasses = false;
+        var dependencies = StyleSelectorDependencies.None;
         foreach (var segment in segments)
         {
             idCount += segment.IdCount;
             classAndPseudoCount += segment.ClassAndPseudoCount;
-            hasPseudoClasses |= segment.HasPseudoClasses;
+            dependencies |= segment.Dependencies;
         }
 
         IdCount = idCount;
         ClassAndPseudoCount = classAndPseudoCount;
-        HasPseudoClasses = hasPseudoClasses;
+        Dependencies = dependencies;
         HasRelationships = segments.Count > 1;
 
         var hasSiblingRelationships = false;
@@ -255,37 +176,13 @@ public sealed class StyleSelector
     }
 
     /// <summary>Gets the CLR target type of the rightmost segment, or null for a CSS selector.</summary>
-    public Type? TargetType { get; }
+    internal Type? TargetType => _segments[^1].TargetType;
 
-    /// <summary>
-    /// Gets the CSS element name of the rightmost segment, <c>*</c> when the element type is unrestricted,
-    /// or the simple name of the CLR target type.
-    /// </summary>
-    public string TypeName { get; }
-
-    /// <summary>Gets the rightmost segment's required classes, deduplicated and kept in first-seen order.</summary>
-    public IReadOnlyList<string> Classes { get; }
-
-    /// <summary>Gets the rightmost segment's required id, or null when no id is required.</summary>
-    public string? Id { get; }
-
-    /// <summary>
-    /// Gets the rightmost segment's required pseudo-class identifiers, deduplicated and sorted by ordinal name;
-    /// every identifier must match the target element's state or structure. Function arguments are represented in <see cref="SelectorText"/>.
-    /// </summary>
-    public IReadOnlyList<PseudoClass> PseudoClasses { get; }
-
-    /// <summary>Gets the id contribution to specificity summed across the whole chain, one per segment that requires an id.</summary>
+    /// <summary>Gets the combined id contribution to specificity summed across the whole chain.</summary>
     public int IdCount { get; }
 
     /// <summary>Gets the combined class and pseudo-class contribution to specificity summed across the whole chain.</summary>
     public int ClassAndPseudoCount { get; }
-
-    /// <summary>
-    /// Gets the inheritance distance from the rightmost CLR target type to <see cref="UIElement"/> plus one,
-    /// or zero for a CSS selector. A CSS chain's element specificity is determined during matching.
-    /// </summary>
-    public int TargetTypeDepth { get; }
 
     /// <summary>Gets the normalized text of the whole chain, omitting an unrestricted wildcard when other conditions exist.</summary>
     public string SelectorText { get; }
@@ -296,36 +193,26 @@ public sealed class StyleSelector
     /// <summary>Gets a value indicating whether the chain contains an adjacent or subsequent sibling combinator.</summary>
     internal bool HasSiblingRelationships { get; }
 
-    /// <summary>Gets a value indicating whether any segment in the chain requires a pseudo class.</summary>
-    internal bool HasPseudoClasses { get; }
+    /// <summary>Gets the combined structural dependencies of all conditions in the chain.</summary>
+    internal StyleSelectorDependencies Dependencies { get; }
 
     /// <summary>Gets whether any segment in the chain requires the root pseudo class.</summary>
-    internal bool HasRootPseudoClass =>
-        _segments.Any(static segment => segment.PseudoClasses.Contains(PseudoClass.Root));
+    internal bool HasRootPseudoClass => (Dependencies & StyleSelectorDependencies.Root) != 0;
 
     /// <summary>Gets whether any segment depends on sibling positions or counts.</summary>
-    internal bool HasChildIndexedPseudoClasses =>
-        _segments.Any(static segment => segment.HasChildIndexedPseudoClasses);
+    internal bool HasChildIndexedPseudoClasses => (Dependencies & StyleSelectorDependencies.ChildPosition) != 0;
 
     /// <summary>Gets whether any segment depends on the presence of child nodes.</summary>
-    internal bool HasEmptyPseudoClass => _segments.Any(static segment => segment.HasEmptyPseudoClass);
+    internal bool HasEmptyPseudoClass => (Dependencies & StyleSelectorDependencies.Children) != 0;
 
     /// <summary>Creates a selector for a target element type as a single-segment chain.</summary>
     /// <typeparam name="TNode">The target element type.</typeparam>
-    /// <param name="classes">The optional required classes; duplicates are removed and invalid identifiers rejected.</param>
-    /// <param name="id">The optional required id; must be an ASCII identifier.</param>
-    /// <param name="pseudoClasses">
-    /// The optional required pseudo-class identifiers; the input is copied, deduplicated and sorted by name.
-    /// </param>
+    /// <param name="conditions">The optional element conditions; the input is copied, deduplicated and ordered by normalization key.</param>
     /// <returns>A new immutable selector.</returns>
-    /// <exception cref="ArgumentException">Thrown when a class or id is not a valid ASCII identifier.</exception>
-    public static StyleSelector For<TNode>(
-        IEnumerable<string>? classes = null,
-        string? id = null,
-        IEnumerable<PseudoClass>? pseudoClasses = null)
+    public static StyleSelector For<TNode>(IEnumerable<StyleSelectorCondition>? conditions = null)
         where TNode : UIElement
     {
-        var segment = StyleSelectorSegment.Create(typeof(TNode), typeof(TNode).Name, classes, id, pseudoClasses);
+        var segment = StyleSelectorSegment.Create(typeof(TNode), typeof(TNode).Name, conditions ?? []);
         return Create([segment], []);
     }
 
@@ -336,9 +223,7 @@ public sealed class StyleSelector
     {
         var normalizedSegments = Array.AsReadOnly(segments.ToArray());
         var normalizedCombinators = Array.AsReadOnly(combinators.ToArray());
-        var singleTargetType = normalizedSegments.Count == 1 ? normalizedSegments[0].TargetType : null;
-        var targetTypeDepth = singleTargetType is not null ? ComputeTargetTypeDepth(singleTargetType) : 0;
-        return new StyleSelector(normalizedSegments, normalizedCombinators, targetTypeDepth);
+        return new StyleSelector(normalizedSegments, normalizedCombinators);
     }
 
     /// <summary>Determines whether the supplied element matches this whole selector chain.</summary>
