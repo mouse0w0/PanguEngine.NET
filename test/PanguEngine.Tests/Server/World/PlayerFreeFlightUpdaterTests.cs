@@ -1,9 +1,9 @@
-using PanguEngine.Client.Game;
+using PanguEngine.Server.World;
 using PanguEngine.Tests.World.Entities;
 using PanguEngine.World.Entities.Components;
 using Silk.NET.Maths;
 
-namespace PanguEngine.Tests.Client.Game;
+namespace PanguEngine.Tests.Server.World;
 
 public sealed class PlayerFreeFlightUpdaterTests
 {

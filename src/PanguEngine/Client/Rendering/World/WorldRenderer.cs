@@ -97,10 +97,9 @@ internal sealed class WorldRenderer
             frameSlotCount);
     }
 
-    internal void PrepareFrame(Camera camera, double alpha)
+    internal void PrepareFrame(Camera camera)
     {
-        var cameraPosition = camera.GetInterpolatedPosition(alpha);
-        var uploadHandles = _chunkRenderer.UpdateMeshes(cameraPosition);
+        var uploadHandles = _chunkRenderer.UpdateMeshes(camera.Position);
         _preparedUploadHandles = uploadHandles;
     }
 
@@ -108,14 +107,13 @@ internal sealed class WorldRenderer
         Frame frame,
         Camera camera,
         BlockHit? selection,
-        double alpha,
         out WorldRenderState worldRenderState)
     {
         ArgumentNullException.ThrowIfNull(camera);
 
         var uploadFailure = GetUploadReadinessFailure(_preparedUploadHandles);
         camera.AspectRatio = (double)frame.Width / frame.Height;
-        worldRenderState = camera.CreateWorldRenderState(alpha);
+        worldRenderState = camera.CreateWorldRenderState();
         var worldUniform = new WorldUniform(
             worldRenderState.ViewProjection,
             LightDirection,

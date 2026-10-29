@@ -10,6 +10,16 @@ public sealed class BootstrapTests
         var options = Bootstrap.ParseOptions([]);
 
         Assert.False(options.GpuValidation);
+        Assert.False(options.Server);
+    }
+
+    [Fact]
+    public void ParseOptionsSelectsDedicatedServerAndPreservesModPaths()
+    {
+        var options = Bootstrap.ParseOptions(["--server", "--mod", "A"]);
+
+        Assert.True(options.Server);
+        Assert.Equal(["A"], options.ModPaths);
     }
 
     [Fact]

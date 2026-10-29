@@ -3,12 +3,17 @@ using PanguEngine.Client.Input;
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Client.UI.Scenes;
+using PanguEngine.Client.World;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.Tests.Windowing;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.Windowing;
+using PanguEngine.Network;
+using PanguEngine.Network.Packets;
+using PanguEngine.Network.Packets.Clientbound;
+using PanguEngine.Network.Packets.Serverbound;
 using Silk.NET.Maths;
 using KeyEventArgs = PanguEngine.Windowing.KeyEventArgs;
 using UiKeyEventArgs = PanguEngine.UI.Input.KeyEventArgs;
@@ -728,6 +733,92 @@ public sealed class InputManagerTests
         ui.Destroy();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SessionRefreshUsesMovementRemainingAfterInputInvalidation(bool loseFocus)
+    {
+        var action = BuiltinInputActions.Move;
+        var (input, window, ui) = CreateManager(("test:move", action));
+        using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
+        var connection = new LocalConnection();
+        var session = new ClientSession(connection, new ClientWorld(), new InitialWorldStatePacket(0, Guid.NewGuid(), default, 0.05, []), 0);
+        input.RegisterHandler(action, _ =>
+        {
+            session.RefreshInput(input, 0, 0);
+            return InputHandling.Handled;
+        });
+        input.StateInvalidated += () => session.RefreshInput(input, 0, 0);
+        input.Start();
+        window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
+        List<ServerboundPacket> packets = [];
+        connection.DrainServerboundPackets(packets);
+        packets.Clear();
+
+        if (loseFocus)
+            window.RaiseFocusChanged(false);
+        else
+            ui.Open(new GameUIScene { PausesGame = false, InputContext = new InputContext(InputScope.Ui) });
+
+        connection.DrainServerboundPackets(packets);
+        Assert.NotEmpty(packets);
+        var submitted = Assert.IsType<InputStatePacket>(packets[^1]);
+        Assert.Equal(loseFocus ? 0d : 1d, submitted.Forward);
+        input.Destroy();
+        ui.Destroy();
+    }
+
+    [Fact]
+    public void InstantMovementSampleDoesNotBecomePersistentIntent()
+    {
+        var action = BuiltinInputActions.Move;
+        var (input, window, ui) = CreateManager(("test:move", action));
+        using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
+        input.Bindings.SetBinding(ResourceKey.Parse("test:move/forward"), InputSource.MouseWheel, KeyModifiers.None);
+        var connection = new LocalConnection();
+        var session = new ClientSession(connection, new ClientWorld(), new InitialWorldStatePacket(0, Guid.NewGuid(), default, 0.05, []), 0);
+        input.RegisterHandler(action, _ =>
+        {
+            session.RefreshInput(input, 0, 0);
+            return InputHandling.Handled;
+        });
+        input.Start();
+
+        window.RaiseScroll(new ScrollEventArgs(0, 1));
+
+        List<ServerboundPacket> packets = [];
+        connection.DrainServerboundPackets(packets);
+        var packet = Assert.Single(packets);
+        var submitted = Assert.IsType<InputStatePacket>(packet);
+        Assert.Equal((0d, 0d), (submitted.Forward, submitted.Right));
+        input.Destroy();
+        ui.Destroy();
+    }
+
+    [Fact]
+    public void UnobservedPauseResumeRefreshesEffectiveHeldInput()
+    {
+        var action = BuiltinInputActions.Move;
+        var (input, window, ui) = CreateManager(("test:move", action));
+        using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
+        var connection = new LocalConnection();
+        var session = new ClientSession(connection, new ClientWorld(), new InitialWorldStatePacket(0, Guid.NewGuid(), default, 0.05, []), 0);
+        input.Start();
+        window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
+        connection.SetAcceptingRequests(false, clearPending: true);
+        connection.SetAcceptingRequests(true, clearPending: false);
+
+        session.RefreshInputAfterResume(input, 0, 0);
+        session.RefreshInputAfterResume(input, 0, 0);
+
+        List<ServerboundPacket> packets = [];
+        connection.DrainServerboundPackets(packets);
+        var packet = Assert.Single(packets);
+        Assert.Equal(1d, Assert.IsType<InputStatePacket>(packet).Forward);
+        input.Destroy();
+        ui.Destroy();
+    }
+
     [Fact]
     public void ReplacingSceneWithSameContextCancelsOnlySceneState()
     {
@@ -800,33 +891,6 @@ public sealed class InputManagerTests
         Assert.Equal(InputActionValue.Zero, input.GetValue(action));
         input.Destroy();
         Assert.Equal(CursorState.Normal, window.CursorState);
-        ui.Destroy();
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void ReleasedInteractionIsInvalidatedBeforeNextTick(bool changeScene)
-    {
-        var action = BuiltinInputActions.BreakBlock;
-        var (input, window, ui) = CreateManager(("test:action", action));
-        using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
-        var requested = false;
-        input.RegisterHandler(action, args => ClientGame.HandleInteractionRequest(ref requested, args));
-        input.StateInvalidated += () => requested = false;
-        input.Start();
-        window.RaiseMouseDown(new MouseClickEventArgs(MouseButton.Left, 5, 5));
-        window.RaiseMouseUp(new MouseClickEventArgs(MouseButton.Left, 5, 5));
-        Assert.True(requested);
-        Assert.Equal(InputActionValue.Zero, input.GetValue(action));
-
-        if (changeScene)
-            ui.Open(new GameUIScene { PausesGame = false });
-        else
-            window.RaiseFocusChanged(false);
-
-        Assert.False(requested);
-        input.Destroy();
         ui.Destroy();
     }
 

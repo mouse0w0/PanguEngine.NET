@@ -17,6 +17,9 @@ public sealed class LaunchOptions
     /// </summary>
     public bool GpuValidation { get; init; }
 
+    /// <summary>Whether to start a dedicated server instead of the client.</summary>
+    public bool Server { get; init; }
+
     /// <summary>
     /// Additional mod paths to load during startup.
     /// </summary>

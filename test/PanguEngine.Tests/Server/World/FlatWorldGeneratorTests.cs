@@ -1,15 +1,15 @@
-using PanguEngine.Client.World;
+using PanguEngine.Server.World;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
 
-namespace PanguEngine.Tests.Client.World;
+namespace PanguEngine.Tests.Server.World;
 
 public sealed class FlatWorldGeneratorTests
 {
     [Fact]
     public void GenerateCreatesCenteredNineByNineChunkRegion()
     {
-        var world = new ClientWorld();
+        var world = new ServerWorld();
 
         FlatWorldGenerator.Generate(world);
 
@@ -22,12 +22,13 @@ public sealed class FlatWorldGeneratorTests
             for (var x = -4; x <= 4; x++)
                 Assert.Contains(new ChunkPos(x, 0, z), positions);
         }
+        world.Destroy();
     }
 
     [Fact]
     public void GenerateFillsFixedLayersAndLeavesOutsideAir()
     {
-        var world = new ClientWorld();
+        var world = new ServerWorld();
 
         FlatWorldGenerator.Generate(world);
 
@@ -42,5 +43,6 @@ public sealed class FlatWorldGeneratorTests
         Assert.Same(BuiltinBlocks.Air.DefaultState, world.GetBlock(new BlockPos(0, 15, 80)));
         Assert.Same(BuiltinBlocks.Air.DefaultState, world.GetBlock(new BlockPos(0, -1, 0)));
         Assert.Same(BuiltinBlocks.Air.DefaultState, world.GetBlock(new BlockPos(0, 16, 0)));
+        world.Destroy();
     }
 }

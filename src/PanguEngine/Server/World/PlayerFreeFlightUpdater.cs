@@ -2,7 +2,7 @@ using PanguEngine.World.Entities;
 using PanguEngine.World.Entities.Components;
 using Silk.NET.Maths;
 
-namespace PanguEngine.Client.Game;
+namespace PanguEngine.Server.World;
 
 /// <summary>
 /// Applies free-flight movement to player entity component columns.
@@ -20,7 +20,7 @@ internal sealed class PlayerFreeFlightUpdater
     {
         entities.BeginUpdate();
         try
-        {
+        {   
             if (!entities.TryGetArchetype(BuiltinEntityTypes.Player, out var archetype))
                 return;
 
@@ -31,7 +31,7 @@ internal sealed class PlayerFreeFlightUpdater
             {
                 var position = positions[index];
                 var intent = intents[index];
-                var forward = EntityPoseMath.GetForward(rotations[index]);
+                var forward = EntityPoseMath.GetForward(rotations[index].Yaw, rotations[index].Pitch);
                 var right = EntityPoseMath.GetRight(forward);
                 var movement = forward * intent.Forward + right * intent.Right;
                 var lengthSquared = Vector3D.Dot(movement, movement);

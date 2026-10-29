@@ -1,6 +1,4 @@
 using PanguEngine.Client.Game;
-using PanguEngine.Tests.World.Entities;
-using PanguEngine.World.Entities.Components;
 using Silk.NET.Maths;
 
 namespace PanguEngine.Tests.Client.Game;
@@ -8,41 +6,21 @@ namespace PanguEngine.Tests.Client.Game;
 public sealed class CameraTests
 {
     [Fact]
-    public void ConstructorReadsPlayerTransform()
+    public void ConstructorInitializesPositionAndViewDirection()
     {
-        using var context = EntityTestContext.Create();
-        var player = context.SpawnPlayer(new Vector3D<double>(8, 6, 24), -90, -20);
-        var camera = new Camera(player);
+        var position = new Vector3D<double>(8, 6, 24);
+        var camera = new Camera(position, -90, -20);
 
-        Assert.Equal(player.Position.Current, camera.GetInterpolatedPosition(1));
+        Assert.Equal(position, camera.Position);
         Assert.Equal(0, camera.Forward.X);
         Assert.True(camera.Forward.Y < 0);
         Assert.True(camera.Forward.Z < 0);
     }
 
-    [Theory]
-    [InlineData(-1, 0)]
-    [InlineData(0, 0)]
-    [InlineData(0.5, 0.5)]
-    [InlineData(1, 1)]
-    [InlineData(2, 1)]
-    public void InterpolatedPositionClampsAlpha(double alpha, double expectedFraction)
-    {
-        using var context = EntityTestContext.Create();
-        var player = context.SpawnPlayer(default);
-        var position = new PositionComponent(Vector3D<double>.Zero, new Vector3D<double>(1, 0, 0));
-        context.SetPosition(player, position);
-        var camera = new Camera(player);
-        var expected = position.Previous + (position.Current - position.Previous) * expectedFraction;
-
-        Assert.Equal(expected, camera.GetInterpolatedPosition(alpha));
-    }
-
     [Fact]
     public void ProjectionMapsNearAndFarPlanesToVulkanDepthRange()
     {
-        using var context = EntityTestContext.Create();
-        var camera = new Camera(context.SpawnPlayer(default)) { AspectRatio = 16d / 9d };
+        var camera = new Camera(default, -90, -20) { AspectRatio = 16d / 9d };
         var projection = camera.CreateProjectionMatrix();
 
         var nearClip = new Vector4D<double>(0, 0, -camera.NearPlane, 1) * projection;
@@ -55,8 +33,7 @@ public sealed class CameraTests
     [Fact]
     public void ProjectionUsesAspectRatioProperty()
     {
-        using var context = EntityTestContext.Create();
-        var camera = new Camera(context.SpawnPlayer(default)) { AspectRatio = 1 };
+        var camera = new Camera(default, -90, -20) { AspectRatio = 1 };
 
         var square = camera.CreateProjectionMatrix();
         camera.AspectRatio = 2;
@@ -69,8 +46,7 @@ public sealed class CameraTests
     [Fact]
     public void ProjectionUsesFieldOfViewProperty()
     {
-        using var context = EntityTestContext.Create();
-        var camera = new Camera(context.SpawnPlayer(default)) { FieldOfView = 70 };
+        var camera = new Camera(default, -90, -20) { FieldOfView = 70 };
 
         var defaultProjection = camera.CreateProjectionMatrix();
         camera.FieldOfView = 35;
@@ -82,8 +58,7 @@ public sealed class CameraTests
     [Fact]
     public void ProjectionMapsPositiveViewYTowardTopOfVulkanViewport()
     {
-        using var context = EntityTestContext.Create();
-        var camera = new Camera(context.SpawnPlayer(default)) { AspectRatio = 1 };
+        var camera = new Camera(default, -90, -20) { AspectRatio = 1 };
         var projection = camera.CreateProjectionMatrix();
 
         var clip = new Vector4D<double>(0, 1, -1, 1) * projection;
@@ -92,15 +67,13 @@ public sealed class CameraTests
     }
 
     [Fact]
-    public void ViewTransformsPlayerToOriginAndForwardToNegativeZ()
+    public void ViewTransformsCameraToOriginAndForwardToNegativeZ()
     {
-        using var context = EntityTestContext.Create();
-        var player = context.SpawnPlayer(default, -90, 0);
-        var camera = new Camera(player);
-        var view = camera.CreateViewMatrix(1);
+        var camera = new Camera(new Vector3D<double>(8, 6, 24), -90, 0);
+        var view = camera.CreateViewMatrix();
 
-        var cameraInView = new Vector4D<double>(player.Position.Current, 1) * view;
-        var pointInView = new Vector4D<double>(player.Position.Current + camera.Forward, 1) * view;
+        var cameraInView = new Vector4D<double>(camera.Position, 1) * view;
+        var pointInView = new Vector4D<double>(camera.Position + camera.Forward, 1) * view;
 
         Assert.Equal(0, cameraInView.X, 4);
         Assert.Equal(0, cameraInView.Y, 4);
@@ -111,31 +84,26 @@ public sealed class CameraTests
     }
 
     [Fact]
-    public void WorldRenderStateUsesInterpolatedPlayerPosition()
+    public void WorldRenderStateUsesCameraPosition()
     {
-        using var context = EntityTestContext.Create();
-        var start = new Vector3D<double>(1_000_000_000_000, -32.5, -1_000_000_000_000);
-        var end = new Vector3D<double>(1_000_000_000_001, -30.5, -999_999_999_997);
-        var player = context.SpawnPlayer(start, -90, -20);
-        context.SetPosition(player, new PositionComponent(start, end));
-        var camera = new Camera(player);
+        var camera = new Camera(new Vector3D<double>(1_000_000_000_000, -32.5, -1_000_000_000_000), -90, -20);
+        var position = new Vector3D<double>(1_000_000_000_001, -30.5, -999_999_999_997);
+        camera.Position = position;
 
-        var state = camera.CreateWorldRenderState(0.25);
+        var state = camera.CreateWorldRenderState();
 
-        Assert.Equal(camera.GetInterpolatedPosition(0.25), state.WorldOrigin);
+        Assert.Equal(position, state.WorldOrigin);
     }
 
     [Fact]
     public void WorldRenderStateViewProjectionDoesNotDependOnWorldOrigin()
     {
-        using var originContext = EntityTestContext.Create();
-        using var distantContext = EntityTestContext.Create();
-        var originCamera = new Camera(originContext.SpawnPlayer(default, -90, -20));
-        var distantCamera = new Camera(distantContext.SpawnPlayer(
-            new Vector3D<double>(1_000_000_000, -500, -1_000_000_000), -90, -20));
+        var originCamera = new Camera(default, -90, -20);
+        var distantCamera = new Camera(
+            new Vector3D<double>(1_000_000_000, -500, -1_000_000_000), -90, -20);
 
-        var originState = originCamera.CreateWorldRenderState(1);
-        var distantState = distantCamera.CreateWorldRenderState(1);
+        var originState = originCamera.CreateWorldRenderState();
+        var distantState = distantCamera.CreateWorldRenderState();
 
         Assert.Equal(originState.ViewProjection, distantState.ViewProjection);
     }
@@ -143,14 +111,12 @@ public sealed class CameraTests
     [Fact]
     public void ViewProjectionUsesLatestRotationWithoutInterpolation()
     {
-        using var context = EntityTestContext.Create();
-        var player = context.SpawnPlayer(default, -90, -20);
-        var camera = new Camera(player) { AspectRatio = 1 };
-        var controller = new PlayerInputController(player);
-        var before = camera.CreateViewProjection(0.5);
+        var camera = new Camera(default, -90, -20) { AspectRatio = 1 };
+        var controller = new PlayerInputController(camera);
+        var before = camera.CreateViewProjection();
 
         controller.ApplyMouseDelta(new Vector2D<float>(10, 0));
-        var after = camera.CreateViewProjection(0.5);
+        var after = camera.CreateViewProjection();
 
         Assert.NotEqual(before, after);
     }

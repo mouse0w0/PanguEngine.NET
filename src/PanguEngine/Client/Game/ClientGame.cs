@@ -1,13 +1,15 @@
+using System.Diagnostics;
 using PanguEngine.Audio;
 using PanguEngine.Client.World;
 using PanguEngine.Client.Input;
 using PanguEngine.Input;
-using PanguEngine.World.Blocks;
+using PanguEngine.Server;
 using PanguEngine.World.Chunking;
-using PanguEngine.World.Entities;
-using PanguEngine.World.Entities.Components;
 using PanguEngine.World.Interaction;
+using PanguEngine.Network.Packets;
+using PanguEngine.Network.Packets.Clientbound;
 using Silk.NET.Maths;
+using static PanguEngine.Network.Packets.Clientbound.WorldUpdatePacket;
 
 namespace PanguEngine.Client.Game;
 
@@ -18,13 +20,11 @@ public sealed class ClientGame
 {
     private readonly ClientEngine _engine;
     private readonly InputManager _input;
-    private readonly PlayerEntity _player;
     private readonly PlayerInputController _playerInput;
-    private readonly PlayerFreeFlightUpdater _playerUpdater;
+    private readonly ClientSession _session;
+    private readonly Stopwatch _displayClock = Stopwatch.StartNew();
     private readonly AudioSystem _audio;
     private readonly IDisposable _gameContextActivation;
-    private bool _leftClickRequested;
-    private bool _rightClickRequested;
 
     internal ClientGame(ClientEngine engine)
     {
@@ -32,20 +32,16 @@ public sealed class ClientGame
         _input = engine.Input;
         _audio = engine.Audio;
         World = new ClientWorld();
-        FlatWorldGenerator.Generate(World);
-        var initialPosition = new Vector3D<double>(8, 22, 24);
-        _player = World.Entities.Spawn(
-            BuiltinEntityTypes.Player,
-            new EntitySpawnBuilder()
-                .Add(BuiltinEntityComponents.Position, new PositionComponent(initialPosition, initialPosition))
-                .Add(BuiltinEntityComponents.Rotation, new RotationComponent(-90, -20))
-                .Add(BuiltinEntityComponents.MoveIntent, default));
-        _playerInput = new PlayerInputController(_player);
-        _playerUpdater = new PlayerFreeFlightUpdater();
-        Camera = new Camera(_player);
+        var connection = ServerEngine.Current.ConnectLocal();
+        var initial = (InitialWorldStatePacket)connection.WaitForPacket();
+        _session = new ClientSession(connection, World, initial, _displayClock.Elapsed.TotalSeconds);
+        _session.OperationCompleted += OnOperationCompleted;
+        Camera = new Camera(initial.Player.Position, initial.Player.Yaw, initial.Player.Pitch);
+        _playerInput = new PlayerInputController(Camera);
 
         _gameContextActivation = _input.ActivateContext(BuiltinInputContexts.Game);
-        _input.StateInvalidated += ClearInteractionRequests;
+        _input.StateInvalidated += ClearInput;
+        _input.RegisterHandler(BuiltinInputActions.Move, HandleMove);
         _input.RegisterHandler(BuiltinInputActions.Look, HandleLook);
         _input.RegisterHandler(BuiltinInputActions.BreakBlock, HandleBreakBlock);
         _input.RegisterHandler(BuiltinInputActions.PlaceBlock, HandlePlaceBlock);
@@ -54,149 +50,91 @@ public sealed class ClientGame
             HandleCapturePointer);
     }
 
-    internal bool IsPaused { get; private set; }
-
     /// <summary>The local client world state.</summary>
     public ClientWorld World { get; }
 
     /// <summary>The local client camera.</summary>
     public Camera Camera { get; }
 
-    /// <summary>The block selected by the latest fixed update, or null when the camera ray misses.</summary>
+    /// <summary>The display block selected by the current camera ray, or null when it misses.</summary>
     public BlockHit? SelectedBlock { get; private set; }
 
-    /// <summary>
-    /// Updates the client game state for the current tick.
-    /// </summary>
-    internal void Update()
+    internal void ReceivePending()
     {
-        if (IsPaused)
-            return;
-
-        var movement = _input.GetValue(BuiltinInputActions.Move).Axis2D;
-        _playerInput.SetMoveIntent(movement.Y, movement.X);
-        _playerUpdater.Update(World.Entities);
-        var position = _player.Position.Current;
-        var forwardDirection = EntityPoseMath.GetForward(_player.Rotation);
-        _audio.SetListener(new AudioListenerState(
-            position,
-            forwardDirection,
-            Vector3D<double>.UnitY));
-
-        SelectedBlock = RaycastSelection(position, forwardDirection);
-        var breakSelection = SelectedBlock;
-        if (_leftClickRequested
-            && TryBreakBlock(World, breakSelection))
-        {
-            _leftClickRequested = false;
-            _audio.PlayAt(
-                BuiltinSoundEvents.BlockBreak,
-                GetBlockCenter(breakSelection!.Value.BlockPosition));
-            SelectedBlock = RaycastSelection(position, forwardDirection);
-        }
-        else
-        {
-            _leftClickRequested = false;
-        }
-
-        var placeSelection = SelectedBlock;
-        if (_rightClickRequested
-            && TryPlaceBlock(World, placeSelection))
-        {
-            _rightClickRequested = false;
-            _audio.PlayAt(
-                BuiltinSoundEvents.BlockPlace,
-                GetBlockCenter(placeSelection!.Value.BlockPosition.Offset(placeSelection.Value.Face)));
-            SelectedBlock = RaycastSelection(position, forwardDirection);
-        }
-        else
-        {
-            _rightClickRequested = false;
-        }
+        _session.ReceivePending(_displayClock.Elapsed.TotalSeconds);
+        _session.RefreshInputAfterResume(_input, Camera.Yaw, Camera.Pitch);
     }
-
-    internal void Pause()
-    {
-        IsPaused = true;
-        ClearInteractionRequests();
-    }
-
-    internal void Resume() => IsPaused = false;
 
     /// <summary>
     /// Prepares resources for the next client frame.
     /// </summary>
-    /// <param name="alpha">The interpolation factor between fixed updates.</param>
-    internal void PrepareFrame(double alpha)
+    /// <param name="clientAlpha">The client update interpolation factor for UI presentation.</param>
+    internal void PrepareFrame(double clientAlpha)
     {
-        _engine.Renderer.PrepareFrame(Camera, alpha);
+        var alpha = _session.GetInterpolationAlpha(_displayClock.Elapsed.TotalSeconds);
+        var position = World.Player.Position;
+        Camera.Position = position.Previous + (position.Current - position.Previous) * alpha;
+        SelectedBlock = RaycastSelection(Camera.Position, Camera.Forward);
+        _audio.SetListener(new AudioListenerState(Camera.Position, Camera.Forward, Vector3D<double>.UnitY));
+        _engine.Renderer.PrepareFrame(Camera, clientAlpha);
     }
 
     /// <summary>
     /// Draws a frame for the client game.
     /// </summary>
-    /// <param name="alpha">The interpolation factor between fixed updates.</param>
-    internal void DrawFrame(double alpha)
+    internal void DrawFrame()
     {
-        _engine.Renderer.DrawFrame(Camera, SelectedBlock, alpha);
+        _engine.Renderer.DrawFrame(Camera, SelectedBlock);
     }
 
-    internal static bool TryBreakBlock(ClientWorld world, BlockHit? selection)
+    private void OnOperationCompleted(InteractionResult result)
     {
-        if (selection is not { } hit)
-            return false;
-
-        world.SetBlock(hit.BlockPosition, BuiltinBlocks.Air.DefaultState);
-        return true;
+        _audio.PlayAt(result.Operation == BlockOperation.Break
+            ? BuiltinSoundEvents.BlockBreak
+            : BuiltinSoundEvents.BlockPlace, GetBlockCenter(result.Position));
     }
 
-    internal static bool TryPlaceBlock(ClientWorld world, BlockHit? selection)
+    private InputHandling HandleMove(InputActionEvent args)
     {
-        if (selection is not { } hit)
-            return false;
-
-        var targetPosition = hit.BlockPosition.Offset(hit.Face);
-        if (!world.IsAir(targetPosition))
-            return false;
-
-        world.SetBlock(targetPosition, BuiltinBlocks.Stone.DefaultState);
-        return true;
+        if (!_session.CanSubmitInput)
+            return InputHandling.Pass;
+        SubmitCurrentInput();
+        return InputHandling.Handled;
     }
 
     private InputHandling HandleLook(InputActionEvent args)
     {
-        if (args.Phase != InputActionPhase.Updated || !_input.IsPointerCaptured)
+        if (args.Phase != InputActionPhase.Updated || !_input.IsPointerCaptured || !_session.CanSubmitInput)
             return InputHandling.Pass;
 
         var delta = args.Value.Axis2D;
         _playerInput.ApplyMouseDelta(new Vector2D<float>((float)delta.X, (float)delta.Y));
+        SubmitCurrentInput();
         return InputHandling.Handled;
     }
 
     private InputHandling HandleBreakBlock(InputActionEvent args) =>
-        HandleInteractionRequest(ref _leftClickRequested, args);
+        HandleInteractionRequest(BlockOperation.Break, args);
 
     private InputHandling HandlePlaceBlock(InputActionEvent args) =>
-        HandleInteractionRequest(ref _rightClickRequested, args);
+        HandleInteractionRequest(BlockOperation.Place, args);
 
-    internal static InputHandling HandleInteractionRequest(ref bool requested, InputActionEvent args)
+    private InputHandling HandleInteractionRequest(BlockOperation operation, InputActionEvent args)
     {
-        if (args.Phase == InputActionPhase.Started)
+        if (args.Phase == InputActionPhase.Started && _session.CanSubmitInput)
         {
-            requested = true;
+            _session.RequestInteraction(operation, Camera.Yaw, Camera.Pitch);
             return InputHandling.Handled;
         }
-
-        if (args.Phase == InputActionPhase.Stopped && args.Source is null)
-            requested = false;
         return InputHandling.Pass;
     }
 
-    private void ClearInteractionRequests()
+    private void SubmitCurrentInput()
     {
-        _leftClickRequested = false;
-        _rightClickRequested = false;
+        _session.RefreshInput(_input, Camera.Yaw, Camera.Pitch);
     }
+
+    private void ClearInput() => SubmitCurrentInput();
 
     private InputHandling HandleCapturePointer(InputActionEvent args)
     {
@@ -223,15 +161,16 @@ public sealed class ClientGame
     private static Vector3D<double> GetBlockCenter(BlockPos position) =>
         new(position.X + 0.5, position.Y + 0.5, position.Z + 0.5);
 
+    internal void BeginClose() => _session.BeginClose();
+
     /// <summary>
     /// Releases resources owned by the client game.
     /// </summary>
     internal void Destroy()
     {
-        _input.StateInvalidated -= ClearInteractionRequests;
+        _session.BeginClose();
+        _input.StateInvalidated -= ClearInput;
         _gameContextActivation.Dispose();
-        ClearInteractionRequests();
-        _player.Destroy();
         World.Destroy();
     }
 }

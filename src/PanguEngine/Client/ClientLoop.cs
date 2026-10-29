@@ -7,8 +7,6 @@ namespace PanguEngine.Client;
 /// </summary>
 public sealed class ClientLoop(Func<bool> shouldContinue, Action pumpEvents, Action update, Action<double> render)
 {
-    private bool _stopRequested;
-
     private double _updatesPerSecond = 20;
     private double _updateInterval = 1d / 20;
 
@@ -26,21 +24,20 @@ public sealed class ClientLoop(Func<bool> shouldContinue, Action pumpEvents, Act
     /// <summary>Whether the loop is running.</summary>
     public bool IsRunning { get; private set; }
 
-    /// <summary>Runs the client loop until stopped or all windows close.</summary>
+    /// <summary>Runs the client loop while the continuation predicate returns true.</summary>
     public void Run()
     {
         if (IsRunning)
             throw new InvalidOperationException("Client loop is already running.");
 
         IsRunning = true;
-        _stopRequested = false;
         var stopwatch = Stopwatch.StartNew();
         var previous = stopwatch.Elapsed.TotalSeconds;
         var lag = 0d;
 
         try
         {
-            while (!_stopRequested && shouldContinue())
+            while (shouldContinue())
             {
                 pumpEvents();
 
@@ -69,11 +66,5 @@ public sealed class ClientLoop(Func<bool> shouldContinue, Action pumpEvents, Act
         {
             IsRunning = false;
         }
-    }
-
-    /// <summary>Requests the client loop to stop after the current iteration.</summary>
-    internal void RequestStop()
-    {
-        _stopRequested = true;
     }
 }

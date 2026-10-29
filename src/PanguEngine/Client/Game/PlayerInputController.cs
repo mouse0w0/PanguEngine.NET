@@ -1,16 +1,12 @@
-using PanguEngine.World.Entities;
-using PanguEngine.World.Entities.Components;
 using Silk.NET.Maths;
 
 namespace PanguEngine.Client.Game;
 
 /// <summary>
-/// Applies local client input to a player entity.
+/// Applies local mouse input to the displayed player view.
 /// </summary>
-internal sealed class PlayerInputController(PlayerEntity player)
+internal sealed class PlayerInputController(Camera camera)
 {
-    private readonly PlayerEntity _player = player;
-
     /// <summary>The mouse rotation sensitivity.</summary>
     internal double MouseSensitivity { get; set; } = 0.08d;
 
@@ -21,24 +17,12 @@ internal sealed class PlayerInputController(PlayerEntity player)
     internal double MaxPitch { get; set; } = 89d;
 
     /// <summary>
-    /// Applies a relative mouse movement to the player orientation.
+    /// Applies a relative mouse movement to the local camera orientation.
     /// </summary>
     /// <param name="delta">The relative movement in screen coordinates.</param>
     internal void ApplyMouseDelta(Vector2D<float> delta)
     {
-        var rotation = _player.Rotation;
-        _player.SetRotation(new RotationComponent(
-            rotation.Yaw + delta.X * MouseSensitivity,
-            Math.Clamp(rotation.Pitch - delta.Y * MouseSensitivity, MinPitch, MaxPitch)));
-    }
-
-    /// <summary>
-    /// Replaces the local movement intent for the next fixed update.
-    /// </summary>
-    /// <param name="forward">The signed forward input.</param>
-    /// <param name="right">The signed right input.</param>
-    internal void SetMoveIntent(double forward, double right)
-    {
-        _player.SetMoveIntent(new MoveIntentComponent(forward, right));
+        camera.Yaw += delta.X * MouseSensitivity;
+        camera.Pitch = Math.Clamp(camera.Pitch - delta.Y * MouseSensitivity, MinPitch, MaxPitch);
     }
 }

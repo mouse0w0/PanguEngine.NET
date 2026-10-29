@@ -14,6 +14,7 @@ using PanguEngine.Graphics.Text;
 using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Input;
 using PanguEngine.Registries;
+using PanguEngine.Server;
 using PanguEngine.Threading;
 using PanguEngine.UI;
 using PanguEngine.Windowing;
@@ -205,6 +206,7 @@ public sealed class ClientEngine
             PumpClientEvents,
             OnUpdate,
             GraphicsBackend.Render);
+        ServerEngine.StartIntegrated();
         Game = new ClientGame(this);
         Input.RegisterHandler(BuiltinInputActions.TogglePause, HandleTogglePause);
         Input.RegisterHandler(BuiltinInputActions.ToggleDebugInfo, HandleToggleDebugInfo);
@@ -245,28 +247,25 @@ public sealed class ClientEngine
     {
         WindowManager.DoEvents();
         _workQueue.RunPending();
+        Game.ReceivePending();
     }
 
     private void OnRunning()
     {
         PrimaryWindow.PreRender += (_, alpha) => Game.PrepareFrame(alpha);
-        PrimaryWindow.Render += (_, alpha) => Game.DrawFrame(alpha);
+        PrimaryWindow.Render += (_, _) => Game.DrawFrame();
         Loop.Run();
     }
 
     private void OnUpdate()
     {
-        Game.Update();
         Audio.Update();
         Ui.Update();
     }
 
     private void OnCurrentSceneChanged(GameUIScene? oldScene, GameUIScene? newScene)
     {
-        if (newScene?.PausesGame == true)
-            Game.Pause();
-        else
-            Game.Resume();
+        ServerEngine.Current.IsPaused = newScene?.PausesGame == true;
     }
 
     private InputHandling HandleTogglePause(InputActionEvent args)
@@ -300,6 +299,7 @@ public sealed class ClientEngine
 
     private void OnShutdown()
     {
+        Game.BeginClose();
         _workQueue.Destroy();
 
         FileDialogs.Destroy();
@@ -315,6 +315,7 @@ public sealed class ClientEngine
         Ui.Destroy();
         Input.Destroy();
         Renderer.Destroy();
+        ServerEngine.Current.Destroy();
         Game.Destroy();
         UIToolkit.Shutdown();
         Audio.Destroy();

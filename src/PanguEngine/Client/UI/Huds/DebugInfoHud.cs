@@ -49,7 +49,7 @@ public sealed class DebugInfoHud : Hud
         var engine = ClientEngine.Current;
         var game = engine.Game;
         var camera = game.Camera;
-        var position = camera.CurrentPosition;
+        var position = game.World.Player.Position.Current;
         var block = new BlockPos(
             (int)Math.Floor(position.X),
             (int)Math.Floor(position.Y),

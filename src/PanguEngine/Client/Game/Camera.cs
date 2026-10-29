@@ -4,29 +4,31 @@ using Silk.NET.Maths;
 namespace PanguEngine.Client.Game;
 
 /// <summary>
-/// Creates client view state from a player entity and projection settings.
+/// Stores camera view state and projection settings.
 /// </summary>
 public sealed class Camera
 {
-    private readonly PlayerEntity _player;
-
     /// <summary>
-    /// Creates a camera that observes a player entity.
+    /// Creates a camera with an initial position and orientation.
     /// </summary>
-    /// <param name="player">The observed player.</param>
-    internal Camera(PlayerEntity player)
+    /// <param name="position">The initial camera position.</param>
+    /// <param name="yaw">The horizontal angle in degrees.</param>
+    /// <param name="pitch">The vertical angle in degrees.</param>
+    internal Camera(Vector3D<double> position, double yaw, double pitch)
     {
-        _player = player ?? throw new ArgumentNullException(nameof(player));
+        Position = position;
+        Yaw = yaw;
+        Pitch = pitch;
     }
 
-    /// <summary>The position from the current fixed update.</summary>
-    public Vector3D<double> CurrentPosition => _player.Position.Current;
+    /// <summary>The camera presentation position for the current frame.</summary>
+    public Vector3D<double> Position { get; internal set; }
 
     /// <summary>The horizontal camera angle in degrees.</summary>
-    public double Yaw => _player.Rotation.Yaw;
+    public double Yaw { get; internal set; }
 
     /// <summary>The vertical camera angle in degrees.</summary>
-    public double Pitch => _player.Rotation.Pitch;
+    public double Pitch { get; internal set; }
 
     /// <summary>The presentation width divided by height.</summary>
     internal double AspectRatio { get; set; } = 1;
@@ -41,19 +43,7 @@ public sealed class Camera
     internal double FarPlane { get; set; } = 1000d;
 
     /// <summary>The current normalized camera forward direction.</summary>
-    internal Vector3D<double> Forward => EntityPoseMath.GetForward(_player.Rotation);
-
-    /// <summary>
-    /// Gets the camera position interpolated between fixed updates.
-    /// </summary>
-    /// <param name="alpha">The fixed-update interpolation factor.</param>
-    /// <returns>The interpolated position.</returns>
-    internal Vector3D<double> GetInterpolatedPosition(double alpha)
-    {
-        var position = _player.Position;
-        var amount = Math.Clamp(alpha, 0, 1);
-        return position.Previous + (position.Current - position.Previous) * amount;
-    }
+    internal Vector3D<double> Forward => EntityPoseMath.GetForward(Yaw, Pitch);
 
     /// <summary>
     /// Creates a right-handed perspective matrix with Vulkan depth range.
@@ -71,36 +61,31 @@ public sealed class Camera
     }
 
     /// <summary>
-    /// Creates the interpolated right-handed view matrix.
+    /// Creates the right-handed view matrix.
     /// </summary>
-    /// <param name="alpha">The fixed-update interpolation factor.</param>
     /// <returns>The view matrix.</returns>
-    internal Matrix4X4<double> CreateViewMatrix(double alpha)
+    internal Matrix4X4<double> CreateViewMatrix()
     {
-        var position = GetInterpolatedPosition(alpha);
-        return Matrix4X4.CreateLookAt(position, position + Forward, Vector3D<double>.UnitY);
+        return Matrix4X4.CreateLookAt(Position, Position + Forward, Vector3D<double>.UnitY);
     }
 
     /// <summary>
-    /// Creates the interpolated view-projection matrix.
+    /// Creates the view-projection matrix.
     /// </summary>
-    /// <param name="alpha">The fixed-update interpolation factor.</param>
     /// <returns>The view-projection matrix.</returns>
-    internal Matrix4X4<float> CreateViewProjection(double alpha)
+    internal Matrix4X4<float> CreateViewProjection()
     {
-        return (Matrix4X4<float>)(CreateViewMatrix(alpha) * CreateProjectionMatrix());
+        return (Matrix4X4<float>)(CreateViewMatrix() * CreateProjectionMatrix());
     }
 
     /// <summary>
     /// Creates the state used by camera-relative world rendering.
     /// </summary>
-    /// <param name="alpha">The fixed-update interpolation factor.</param>
     /// <returns>The world rendering state.</returns>
-    internal WorldRenderState CreateWorldRenderState(double alpha)
+    internal WorldRenderState CreateWorldRenderState()
     {
-        var position = GetInterpolatedPosition(alpha);
         var view = Matrix4X4.CreateLookAt(Vector3D<double>.Zero, Forward, Vector3D<double>.UnitY);
         var viewProjection = (Matrix4X4<float>)(view * CreateProjectionMatrix());
-        return new WorldRenderState(position, viewProjection);
+        return new WorldRenderState(Position, viewProjection);
     }
 }

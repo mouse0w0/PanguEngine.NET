@@ -1,28 +1,28 @@
-using PanguEngine.World.Entities.Components;
 using Silk.NET.Maths;
 
 namespace PanguEngine.World.Entities;
 
 /// <summary>
-/// Provides shared direction calculations for entity rotations.
+/// Provides shared direction calculations for yaw and pitch angles.
 /// </summary>
 public static class EntityPoseMath
 {
     private const double DirectionComponentEpsilon = 0.000001d;
 
     /// <summary>
-    /// Gets the normalized forward direction for a rotation.
+    /// Gets the normalized forward direction for yaw and pitch angles.
     /// </summary>
-    /// <param name="rotation">The entity rotation.</param>
+    /// <param name="yaw">The horizontal angle in degrees.</param>
+    /// <param name="pitch">The vertical angle in degrees.</param>
     /// <returns>The normalized forward direction.</returns>
-    public static Vector3D<double> GetForward(RotationComponent rotation)
+    public static Vector3D<double> GetForward(double yaw, double pitch)
     {
-        var yaw = double.DegreesToRadians(rotation.Yaw);
-        var pitch = double.DegreesToRadians(rotation.Pitch);
+        var yawRadians = double.DegreesToRadians(yaw);
+        var pitchRadians = double.DegreesToRadians(pitch);
         var direction = Vector3D.Normalize(new Vector3D<double>(
-            Math.Cos(pitch) * Math.Cos(yaw),
-            Math.Sin(pitch),
-            Math.Cos(pitch) * Math.Sin(yaw)));
+            Math.Cos(pitchRadians) * Math.Cos(yawRadians),
+            Math.Sin(pitchRadians),
+            Math.Cos(pitchRadians) * Math.Sin(yawRadians)));
         return Vector3D.Normalize(new Vector3D<double>(
             SnapDirectionComponent(direction.X),
             SnapDirectionComponent(direction.Y),

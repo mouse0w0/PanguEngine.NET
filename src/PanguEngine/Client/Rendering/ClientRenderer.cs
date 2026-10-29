@@ -63,14 +63,14 @@ internal sealed class ClientRenderer
     /// </summary>
     internal ClientFrameStatistics FrameStatistics => _frameTimeTracker.CreateSnapshot();
 
-    internal void PrepareFrame(Camera camera, double alpha)
+    internal void PrepareFrame(Camera camera, double clientAlpha)
     {
-        _uiManager.UpdateFrame(new Size(_presenter.Width, _presenter.Height), alpha);
-        _worldRenderer.PrepareFrame(camera, alpha);
+        _uiManager.UpdateFrame(new Size(_presenter.Width, _presenter.Height), clientAlpha);
+        _worldRenderer.PrepareFrame(camera);
         EnsureDepthStencilAttachmentSize();
     }
 
-    internal void DrawFrame(Camera camera, BlockHit? selection, double alpha)
+    internal void DrawFrame(Camera camera, BlockHit? selection)
     {
         _uiCommands.Clear();
         _uiManager.AppendDrawCommands(_uiCommands);
@@ -97,7 +97,6 @@ internal sealed class ClientRenderer
                 frame,
                 camera,
                 selection,
-                alpha,
                 out var worldRenderState);
 
             commandList.BeginRecording();

@@ -1,7 +1,7 @@
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
 
-namespace PanguEngine.Client.World;
+namespace PanguEngine.Server.World;
 
 internal static class FlatWorldGenerator
 {
@@ -10,7 +10,7 @@ internal static class FlatWorldGenerator
     private const int StoneLayerTop = 11;
     private const int DirtLayerTop = 14;
 
-    internal static void Generate(ClientWorld world)
+    internal static void Generate(ServerWorld world)
     {
         for (var chunkZ = MinChunkCoordinate; chunkZ <= MaxChunkCoordinate; chunkZ++)
         {

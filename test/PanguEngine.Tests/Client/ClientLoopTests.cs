@@ -5,32 +5,20 @@ namespace PanguEngine.Tests.Client;
 public sealed class ClientLoopTests
 {
     [Fact]
-    public void RequestStopCompletesCurrentIterationBeforeReturning()
+    public void ContinuationPredicateStopsAfterCurrentIteration()
     {
-        ClientLoop loop = null!;
-        var events = new List<string>();
-        loop = new ClientLoop(
-            () =>
-            {
-                events.Add("shouldContinue");
-                return true;
-            },
-            () =>
-            {
-                events.Add("pumpEvents");
-                loop.RequestStop();
-            },
-            () => events.Add("update"),
-            alpha =>
-            {
-                Assert.Equal(0, alpha);
-                events.Add("render");
-            });
+        var shouldContinue = true;
+        var renderCount = 0;
+        var loop = new ClientLoop(
+            () => shouldContinue,
+            () => shouldContinue = false,
+            () => { },
+            _ => renderCount++);
         loop.UpdatesPerSecond = 0;
 
         loop.Run();
 
-        Assert.Equal(["shouldContinue", "pumpEvents", "render"], events);
+        Assert.Equal(1, renderCount);
         Assert.False(loop.IsRunning);
     }
 }

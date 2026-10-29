@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using PanguEngine.Client;
+using PanguEngine.Server;
 using Silk.NET.Maths;
 
 namespace PanguEngine;
@@ -10,13 +11,16 @@ namespace PanguEngine;
 public static class Bootstrap
 {
     /// <summary>
-    /// Launches the client application.
+    /// Launches the client or dedicated server application.
     /// </summary>
     /// <param name="args">Command-line arguments.</param>
     public static void Launch(string[] args)
     {
         var options = ParseOptions(args);
-        ClientEngine.Start(options);
+        if (options.Server)
+            ServerEngine.StartDedicated(options);
+        else
+            ClientEngine.Start(options);
     }
 
     /// <summary>
@@ -28,6 +32,7 @@ public static class Bootstrap
     {
         var modPaths = new List<string>();
         var gpuValidation = false;
+        var server = false;
         string? windowTitle = null;
         Vector2D<int>? windowSize = null;
         WindowMode? windowMode = null;
@@ -48,6 +53,9 @@ public static class Bootstrap
                     break;
                 case "--gpu-validation":
                     gpuValidation = true;
+                    break;
+                case "--server":
+                    server = true;
                     break;
                 case "--window-title":
                     if (i + 1 >= args.Length)
@@ -97,6 +105,7 @@ public static class Bootstrap
         return new LaunchOptions
         {
             GpuValidation = gpuValidation,
+            Server = server,
             ModPaths = modPaths.ToArray(),
             WindowTitle = windowTitle,
             WindowSize = windowSize,
