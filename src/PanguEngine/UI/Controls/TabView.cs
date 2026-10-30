@@ -96,7 +96,7 @@ public sealed partial class TabView : Control
         Selection.PropertyChanged += OnSelectionPropertyChanged;
         Items.Changed += OnItemsChanged;
         _strip = new TabStripPanel(this);
-        _contentArea = new TabContentArea(this);
+        _contentArea = new TabContentArea();
         Children.Add(_strip);
         Children.Add(_contentArea);
         Subscribe(IsEnabledProperty, (_, _) =>
@@ -168,14 +168,6 @@ public sealed partial class TabView : Control
 
     internal bool IsHorizontalPlacement =>
         TabStripPlacement is TabStripPlacement.Top or TabStripPlacement.Bottom;
-
-    /// <summary>
-    /// Determines whether an element is an internal layout part owned by a tab view.
-    /// </summary>
-    internal static bool IsInternalPartNode(UIElement node) =>
-        node.Parent is TabView ||
-        node is TabStripPanel or TabStripViewport or TabScrollButton or TabContentArea or TabContentHost
-            or TabHeaderHost or TabCloseButton;
 
     internal (double Min, double Max) GetTabWidthBounds()
     {

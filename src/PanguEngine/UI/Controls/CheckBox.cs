@@ -96,9 +96,6 @@ public sealed class CheckBox : Control
                 for (UIElement? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
                     if (ReferenceEquals(node, ancestor))
                         throw new ArgumentException("Content cannot be this check box or an ancestor.", nameof(value));
-                if (ReferenceEquals(node, _box) || ReferenceEquals(node, _mark) || ReferenceEquals(node, _contentPanel))
-                    throw new ArgumentException("An internal check box node cannot be assigned as content.",
-                        nameof(value));
             }
 
             SetField(ContentProperty, ref _content, value);

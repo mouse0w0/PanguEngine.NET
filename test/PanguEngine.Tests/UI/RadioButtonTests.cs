@@ -252,8 +252,6 @@ public sealed class RadioButtonTests
         root.Children.Add(button);
         Assert.Throws<InvalidOperationException>(() => button.Content = button);
         Assert.Throws<InvalidOperationException>(() => button.Content = root);
-        var indicator = Descendants(button).Single(node => node.Classes.Contains("radio-button-indicator"));
-        Assert.Throws<InvalidOperationException>(() => button.Content = indicator);
         Assert.Same(content, button.Content);
         Assert.Contains(content, Descendants(button));
     }

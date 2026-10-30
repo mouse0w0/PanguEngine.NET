@@ -69,8 +69,7 @@ public sealed partial class TabView
             {
                 if (ReferenceEquals(item.Parent, _strip.Viewport))
                     _strip.Viewport.RemoveTab(item);
-                if (ReferenceEquals(item.ContentHost.Parent, _contentArea))
-                    _contentArea.RemoveHost(item.ContentHost);
+                _contentArea.RemoveHost(item.ContentHost);
                 item.OwnerView = null;
                 CancelPendingBringIntoViewFor(item);
             }
@@ -107,8 +106,7 @@ public sealed partial class TabView
             updateStorage();
             if (ReferenceEquals(oldItem.Parent, _strip.Viewport))
                 _strip.Viewport.RemoveTab(oldItem);
-            if (ReferenceEquals(oldItem.ContentHost.Parent, _contentArea))
-                _contentArea.RemoveHost(oldItem.ContentHost);
+            _contentArea.RemoveHost(oldItem.ContentHost);
             oldItem.OwnerView = null;
             CancelPendingBringIntoViewFor(oldItem);
             item.ContentHost.Visibility = Visibility.Collapsed;
@@ -141,8 +139,7 @@ public sealed partial class TabView
             {
                 if (ReferenceEquals(item.Parent, _strip.Viewport))
                     _strip.Viewport.RemoveTab(item);
-                if (ReferenceEquals(item.ContentHost.Parent, _contentArea))
-                    _contentArea.RemoveHost(item.ContentHost);
+                _contentArea.RemoveHost(item.ContentHost);
                 item.OwnerView = null;
                 CancelPendingBringIntoViewFor(item);
             }
@@ -328,8 +325,6 @@ public sealed partial class TabView
     {
         if (node is null)
             return;
-        if (IsInternalPartNode(node))
-            throw new InvalidOperationException("A tab view internal node cannot be used as a tab slot.");
         if (node.Parent is null && node.Scene is not null)
             throw new InvalidOperationException("A UI scene root must be cleared before it can be a tab slot.");
         if (IsAncestorOfView(node))
@@ -359,13 +354,6 @@ public sealed partial class TabView
         EnsureCollectionAccess();
         Scene?.VerifyTreeMutationAccess();
         Items.Remove(item);
-    }
-
-    internal void OnContentHostRemoved(TabContentHost host)
-    {
-        var item = Items.FirstOrDefault(candidate => ReferenceEquals(candidate.ContentHost, host));
-        if (item is not null)
-            Items.Remove(item);
     }
 
     private void CommitDragMove(int oldIndex, int newIndex)

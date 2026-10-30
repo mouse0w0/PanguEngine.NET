@@ -69,9 +69,9 @@ public sealed class TabItem : Control
 
     /// <summary>Gets or sets the element displayed in the tab header, or null for an empty header.</summary>
     /// <remarks>
-    /// The header cannot be this item, the content element, the internal content host, an ancestor, or
-    /// another child of this item. Moving the header element out of this item through the tree API
-    /// clears this slot.
+    /// The header cannot be this item, the content element, or an ancestor. Moving the header element
+    /// out through the tree API clears this slot. Moving or reusing internal control parts is unsupported;
+    /// no rejection, synchronization, or recovery is guaranteed for those operations.
     /// </remarks>
     public UIElement? Header
     {
@@ -89,9 +89,9 @@ public sealed class TabItem : Control
 
     /// <summary>Gets or sets the element displayed as the tab page content, or null for no content.</summary>
     /// <remarks>
-    /// The content cannot be this item, the header element, the internal content host, or an ancestor
-    /// of this item or its owning view. Moving the content element out of the host through the tree API
-    /// clears this slot.
+    /// The content cannot be this item, the header element, or an ancestor of this item or its owning view.
+    /// Moving the content element out through the tree API clears this slot. Moving or reusing internal
+    /// control parts is unsupported; no rejection, synchronization, or recovery is guaranteed for those operations.
     /// </remarks>
     public UIElement? Content
     {
@@ -202,21 +202,14 @@ public sealed class TabItem : Control
             throw new InvalidOperationException("A tab item cannot use itself as its header.");
         if (ReferenceEquals(value, _content))
             throw new InvalidOperationException("The header and content cannot reference the same node.");
-        if (ReferenceEquals(value, _contentHost) || ReferenceEquals(value, _closeButton))
-            throw new InvalidOperationException("An internal tab item node cannot be used as a header.");
         if (value.Parent is null && value.Scene is not null)
             throw new InvalidOperationException("A UI scene root must be cleared before it can be a tab header.");
-        if (TabView.IsInternalPartNode(value))
-            throw new InvalidOperationException("A tab view internal node cannot be used as a header.");
 
         for (UIElement? node = this; node is not null; node = node.Parent)
         {
             if (ReferenceEquals(node, value))
                 throw new InvalidOperationException("Adding the node would create a parent cycle.");
         }
-
-        if (ReferenceEquals(value.Parent, this))
-            throw new InvalidOperationException("The node is already a child of this tab item.");
     }
 
     private void ValidateContentAssignment(UIElement? value)
@@ -229,12 +222,8 @@ public sealed class TabItem : Control
             throw new InvalidOperationException("A tab item cannot use itself as its content.");
         if (ReferenceEquals(value, _header))
             throw new InvalidOperationException("The content and header cannot reference the same node.");
-        if (ReferenceEquals(value, _contentHost) || ReferenceEquals(value, _closeButton))
-            throw new InvalidOperationException("An internal tab item node cannot be used as content.");
         if (value.Parent is null && value.Scene is not null)
             throw new InvalidOperationException("A UI scene root must be cleared before it can be tab content.");
-        if (TabView.IsInternalPartNode(value))
-            throw new InvalidOperationException("A tab view internal node cannot be used as content.");
 
         for (UIElement? node = this; node is not null; node = node.Parent)
         {

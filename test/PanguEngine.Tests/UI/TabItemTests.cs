@@ -175,23 +175,6 @@ public sealed class TabItemTests
     }
 
     [Fact]
-    public void UnownedItemCannotAdoptViewInternalParts()
-    {
-        var view = new TabView();
-        var item = new TabItem();
-        var strip = view.Children[0];
-        var contentArea = view.Children[1];
-
-        Assert.Throws<InvalidOperationException>(() => item.Header = strip);
-        Assert.Throws<InvalidOperationException>(() => item.Content = contentArea);
-
-        Assert.Same(view, strip.Parent);
-        Assert.Same(view, contentArea.Parent);
-        Assert.Null(item.Header);
-        Assert.Null(item.Content);
-    }
-
-    [Fact]
     public void MovingATabOutOfItsStripUpdatesTheItemsAndSelection()
     {
         var view = new TabView();

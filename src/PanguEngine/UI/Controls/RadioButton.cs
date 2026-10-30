@@ -282,12 +282,6 @@ public abstract class RadioButton : Control
                 throw new InvalidOperationException("Radio button content cannot create a parent cycle.");
         }
 
-        for (var part = value; part is not null; part = part.Parent)
-        {
-            if (part is RadioButtonIndicator || value is RadioButtonContentHost)
-                throw new InvalidOperationException("An internal radio button part cannot be used as content.");
-        }
-
         if (value.Parent is null && value.Scene is not null)
             throw new InvalidOperationException(
                 "A UI scene root must be cleared before it can be radio button content.");
