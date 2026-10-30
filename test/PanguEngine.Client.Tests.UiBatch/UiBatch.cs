@@ -532,15 +532,18 @@ internal sealed class UiBatchScene : IClientTestScene
 
             internal ButtonPanel(Image image)
             {
+                var mixed = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+                mixed.Children.Add(new ImageView { Source = image, Width = 16, Height = 16 });
+                mixed.Children.Add(new Text { Content = "Mix" });
                 var buttons = new Button[]
                 {
-                    new() { Text = "Normal" },
-                    new() { Text = "Hover" },
-                    new() { Text = "Pressed" },
-                    new() { Text = "Focused" },
-                    new() { Text = "Disabled", IsEnabled = false },
-                    new() { Text = "Mix", Icon = image },
-                    new() { Icon = image },
+                    new() { Content = "Normal" },
+                    new() { Content = "Hover" },
+                    new() { Content = "Pressed" },
+                    new() { Content = "Focused" },
+                    new() { Content = "Disabled", IsEnabled = false },
+                    new() { Content = mixed },
+                    new() { Content = new ImageView { Source = image, Width = 16, Height = 16 } },
                     new()
                 };
                 _hoverButton = buttons[1];

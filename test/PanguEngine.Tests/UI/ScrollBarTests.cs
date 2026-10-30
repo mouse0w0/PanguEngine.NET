@@ -337,9 +337,13 @@ public sealed class ScrollBarTests
     public void ArrowPressStepsOnceAndPointerClickedDoesNotRepeatIt()
     {
         var bar = new ScrollBar { Value = 50 };
-        var (manager, _, _) = OpenBarScene(bar, 16, 200);
+        var (manager, _, host) = OpenHostedBarScene(bar, 16, 200);
         try
         {
+            var innerClicks = 0;
+            var ancestorClicks = 0;
+            bar.PointerClicked += (_, _) => innerClicks++;
+            host.PointerClicked += (_, _) => ancestorClicks++;
             manager.ProcessPointerMoved(new Point(8, 192));
             manager.ProcessPointerPressed(new Point(8, 192), MouseButton.Left, KeyModifiers.None);
             Assert.Equal(66, bar.Value);
@@ -351,6 +355,8 @@ public sealed class ScrollBarTests
             manager.ProcessPointerPressed(new Point(8, 8), MouseButton.Left, KeyModifiers.None);
             Assert.Equal(50, bar.Value);
             manager.ProcessPointerReleased(new Point(8, 8), MouseButton.Left, KeyModifiers.None);
+            Assert.Equal(2, innerClicks);
+            Assert.Equal(0, ancestorClicks);
         }
         finally
         {

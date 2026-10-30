@@ -56,8 +56,8 @@ public sealed class UISceneTests
         var buttons = panel.Children.OfType<Button>().ToArray();
 
         Assert.Equal(3, buttons.Length);
-        Assert.DoesNotContain("danger", (IReadOnlySet<string>)buttons.Single(button => button.Text == "回到游戏").Classes);
-        var exit = buttons.Single(button => button.Text == "退出游戏");
+        Assert.DoesNotContain("danger", (IReadOnlySet<string>)buttons.Single(button => button.Content is "回到游戏").Classes);
+        var exit = buttons.Single(button => button.Content is "退出游戏");
         Assert.Contains("danger", (IReadOnlySet<string>)exit.Classes);
         Assert.Equal(new SolidColorBrush(104, 43, 45), exit.Background);
         Assert.Equal(new SolidColorBrush(157, 73, 77), exit.BorderBrush);
@@ -76,8 +76,8 @@ public sealed class UISceneTests
 
         Assert.Equal(
             new[] { "回到游戏", "UI 展示", "退出游戏" },
-            buttons.Select(button => button.Text).ToArray());
-        var showcase = buttons.Single(button => button.Text == "UI 展示");
+            buttons.Select(button => Assert.IsType<string>(button.Content)).ToArray());
+        var showcase = buttons.Single(button => button.Content is "UI 展示");
         Assert.DoesNotContain("danger", (IReadOnlySet<string>)showcase.Classes);
     }
 

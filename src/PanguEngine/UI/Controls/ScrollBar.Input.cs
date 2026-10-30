@@ -98,6 +98,14 @@ public sealed partial class ScrollBar
     }
 
     /// <inheritdoc />
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
+    {
+        base.OnPointerClicked(eventArgs);
+        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left)
+            eventArgs.Handled = true;
+    }
+
+    /// <inheritdoc />
     protected override void OnPointerCanceled(PointerButtonEventArgs eventArgs)
     {
         base.OnPointerCanceled(eventArgs);

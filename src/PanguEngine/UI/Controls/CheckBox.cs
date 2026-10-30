@@ -1,4 +1,3 @@
-using PanguEngine.Collections;
 using PanguEngine.ComponentModel;
 using PanguEngine.Input;
 using PanguEngine.UI.Input;
@@ -9,7 +8,7 @@ namespace PanguEngine.UI.Controls;
 /// <summary>
 /// Provides a checkable control with optional text or element content and an indeterminate state.
 /// </summary>
-public sealed class CheckBox : Control
+public sealed class CheckBox : ContentControl
 {
     /// <summary>Identifies the <see cref="IsChecked"/> property.</summary>
     public static readonly Property<bool?> IsCheckedProperty =
@@ -20,13 +19,6 @@ public sealed class CheckBox : Control
     public static readonly Property<bool> IsThreeStateProperty =
         Property.Register<CheckBox, bool>(nameof(IsThreeState));
 
-    /// <summary>Identifies the <see cref="Content"/> property.</summary>
-    public static readonly DirectProperty<CheckBox, object?> ContentProperty =
-        Property.RegisterDirect<CheckBox, object?>(nameof(Content),
-            static box => box.Content,
-            static (box, value) => box.Content = value,
-            onChanged: static (box, _, value) => box.SynchronizeContent(value));
-
     /// <summary>Identifies the <see cref="Spacing"/> property.</summary>
     public static readonly Property<double> SpacingProperty =
         Property.Register<CheckBox, double>(nameof(Spacing), 8,
@@ -36,12 +28,7 @@ public sealed class CheckBox : Control
 
     private readonly Panel _box;
     private readonly Path _mark;
-    private readonly Panel _contentPanel;
-    private object? _content;
     private bool _spaceKeyDown;
-    private int _focusVersion;
-
-    private UIElement? ContentNode => _contentPanel.Children.Count == 0 ? null : _contentPanel.Children[0];
 
     static CheckBox()
     {
@@ -58,11 +45,8 @@ public sealed class CheckBox : Control
         _mark = new Path { IsHitTestVisible = false };
         _mark.Classes.Add("checkbox-mark");
         _box.Children.Add(_mark);
-        _contentPanel = new Panel { IsHitTestVisible = false };
-        _contentPanel.Classes.Add("checkbox-content");
-        _contentPanel.Children.Changed += OnContentChildrenChanged;
-        Children.Add(_box);
-        Children.Add(_contentPanel);
+        ContentSlot.DefaultTextClass = "checkbox-text";
+        Children.Insert(0, _box);
         SynchronizeCheckState();
     }
 
@@ -79,27 +63,6 @@ public sealed class CheckBox : Control
     {
         get => GetValue(IsThreeStateProperty);
         set => SetValue(IsThreeStateProperty, value);
-    }
-
-    /// <summary>Gets or sets the label as an element, text, another object's text representation, or null.</summary>
-    /// <remarks>
-    /// An element moves from its previous owner and clears this slot when moved elsewhere.
-    /// Assignments of the same content instance do not refresh text, and changes inside an ordinary object are not observed.
-    /// </remarks>
-    public object? Content
-    {
-        get => _content;
-        set
-        {
-            if (value is UIElement node)
-            {
-                for (UIElement? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
-                    if (ReferenceEquals(node, ancestor))
-                        throw new ArgumentException("Content cannot be this check box or an ancestor.", nameof(value));
-            }
-
-            SetField(ContentProperty, ref _content, value);
-        }
     }
 
     /// <summary>Gets or sets the logical-pixel gap between the box and a label that participates in layout.</summary>
@@ -120,10 +83,11 @@ public sealed class CheckBox : Control
         var remainingWidth = double.IsPositiveInfinity(availableSize.Width)
             ? double.PositiveInfinity
             : Math.Max(0, availableSize.Width - _box.DesiredSize.Width - spacing);
-        _contentPanel.Measure(new Size(remainingWidth, availableSize.Height));
+        ContentRoot?.Measure(new Size(remainingWidth, availableSize.Height));
+        var contentSize = ContentRoot?.DesiredSize ?? Size.Zero;
         return new Size(
-            _box.DesiredSize.Width + spacing + _contentPanel.DesiredSize.Width,
-            Math.Max(_box.DesiredSize.Height, _contentPanel.DesiredSize.Height));
+            _box.DesiredSize.Width + spacing + contentSize.Width,
+            Math.Max(_box.DesiredSize.Height, contentSize.Height));
     }
 
     /// <inheritdoc />
@@ -133,24 +97,28 @@ public sealed class CheckBox : Control
         _box.Arrange(new Rect(contentBounds.X,
             contentBounds.Y + (contentBounds.Height - boxSize.Height) / 2, boxSize));
         var x = contentBounds.X + boxSize.Width + GetLayoutSpacing();
-        var contentHeight = _contentPanel.DesiredSize.Height;
-        _contentPanel.Arrange(new Rect(x, contentBounds.Y + (contentBounds.Height - contentHeight) / 2,
+        var contentHeight = ContentRoot?.DesiredSize.Height ?? 0;
+        ContentRoot?.Arrange(new Rect(x, contentBounds.Y + (contentBounds.Height - contentHeight) / 2,
             Math.Max(0, contentBounds.X + contentBounds.Width - x), contentHeight));
     }
 
     /// <inheritdoc />
     protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
+        var scene = Scene;
         base.OnPointerPressed(eventArgs);
-        if (eventArgs.Button == MouseButton.Left)
+        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left &&
+            ReferenceEquals(Scene, scene))
             eventArgs.Handled = true;
     }
 
     /// <inheritdoc />
     protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
+        var scene = Scene;
         base.OnPointerReleased(eventArgs);
-        if (eventArgs.Button == MouseButton.Left)
+        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left &&
+            ReferenceEquals(Scene, scene))
             eventArgs.Handled = true;
     }
 
@@ -159,17 +127,17 @@ public sealed class CheckBox : Control
     {
         var scene = Scene;
         base.OnPointerClicked(eventArgs);
-        if (eventArgs.Button != MouseButton.Left)
+        if (eventArgs.Handled || eventArgs.Button != MouseButton.Left || !ReferenceEquals(Scene, scene))
             return;
         eventArgs.Handled = true;
-        if (CanActivate(scene))
-            Activate();
+        Activate();
     }
 
     /// <inheritdoc />
     protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
-        if (eventArgs.Key != Key.Space)
+        if (eventArgs.Key != Key.Space || !ReferenceEquals(eventArgs.Source, this) || !IsFocused ||
+            !Focusable)
         {
             base.OnKeyDown(eventArgs);
             return;
@@ -178,83 +146,52 @@ public sealed class CheckBox : Control
         if (!eventArgs.IsRepeat)
             SetSpaceKeyDown(IsEnabled && IsFocused);
         base.OnKeyDown(eventArgs);
+        if (eventArgs.Handled || !IsFocused || !Focusable)
+        {
+            SetSpaceKeyDown(false);
+            return;
+        }
         eventArgs.Handled = true;
     }
 
     /// <inheritdoc />
     protected override void OnKeyUp(KeyEventArgs eventArgs)
     {
-        if (eventArgs.Key != Key.Space)
+        if (eventArgs.Key != Key.Space || !ReferenceEquals(eventArgs.Source, this) || !IsFocused ||
+            !Focusable)
         {
             base.OnKeyUp(eventArgs);
             return;
         }
 
-        var activate = _spaceKeyDown;
+        var activate = false;
         var scene = Scene;
-        var focusVersion = _focusVersion;
-        SetSpaceKeyDown(false);
-        base.OnKeyUp(eventArgs);
-        eventArgs.Handled = true;
-        if (activate && IsFocused && focusVersion == _focusVersion && CanActivate(scene))
+        try
+        {
+            base.OnKeyUp(eventArgs);
+            if (!eventArgs.Handled && IsFocused && Focusable && ReferenceEquals(Scene, scene))
+            {
+                eventArgs.Handled = true;
+                activate = _spaceKeyDown;
+            }
+        }
+        finally
+        {
+            SetSpaceKeyDown(false);
+        }
+        if (activate && IsFocused && Focusable && ReferenceEquals(Scene, scene))
             Activate();
     }
 
     /// <inheritdoc />
     protected override void OnLostFocus(FocusChangedEventArgs eventArgs)
     {
-        _focusVersion++;
         SetSpaceKeyDown(false);
         base.OnLostFocus(eventArgs);
     }
 
     /// <inheritdoc />
-    protected override bool IsPressedPseudoClassActive => IsPressed || _spaceKeyDown;
-
-    private void SynchronizeContent(object? value)
-    {
-        UIElement? node = value as UIElement;
-        if (node is null && value is not null)
-        {
-            var text = value is string content ? content : value.ToString();
-            if (!string.IsNullOrEmpty(text))
-            {
-                node = new Text { Content = text };
-                node.Classes.Add("checkbox-text");
-            }
-        }
-
-        if (ReferenceEquals(Content, value))
-            SetContentNode(node, value);
-    }
-
-    private void SetContentNode(UIElement? node, object? expectedValue)
-    {
-        if (ReferenceEquals(ContentNode, node))
-            return;
-        if (ContentNode is { } previous)
-            _contentPanel.Children.Remove(previous);
-        if (!ReferenceEquals(Content, expectedValue))
-            return;
-        if (node is null)
-            return;
-        if (node.Parent is { } source)
-            source.Children.Remove(node);
-        else if (node.Scene is { } scene)
-            scene.Root = null;
-        if (!ReferenceEquals(Content, expectedValue))
-            return;
-        if (node.Parent is not null)
-            throw new InvalidOperationException("The content node was reparented during removal notification.");
-        _contentPanel.Children.Add(node);
-    }
-
-    private void OnContentChildrenChanged(object? sender, ListChangedEventArgs<UIElement> change)
-    {
-        foreach (var node in change.OldItems)
-            if (!ReferenceEquals(node.Parent, _contentPanel) && ReferenceEquals(Content, node))
-                Content = null;
-    }
+    protected override bool IsPressedPseudoClassActive => base.IsPressedPseudoClassActive || _spaceKeyDown;
 
     private void SynchronizeCheckState()
     {
@@ -265,7 +202,7 @@ public sealed class CheckBox : Control
 
     private double GetLayoutSpacing()
     {
-        if (ContentNode is not { Visibility: not Visibility.Collapsed })
+        if (ContentRoot is not { Visibility: not Visibility.Collapsed })
             return 0;
         var spacing = Spacing;
         var scene = Scene;
@@ -291,20 +228,5 @@ public sealed class CheckBox : Control
             _ => false
         };
         Click?.Invoke(this, EventArgs.Empty);
-    }
-
-    private bool CanActivate(UIScene? scene)
-    {
-        if (scene is null || !scene.IsOpen() || !ReferenceEquals(Scene, scene))
-            return false;
-        for (UIElement? node = this; node is not null; node = node.Parent)
-        {
-            if (!node.IsEnabled || node.Visibility != Visibility.Visible)
-                return false;
-            if (ReferenceEquals(node, scene.Root))
-                return true;
-        }
-
-        return false;
     }
 }

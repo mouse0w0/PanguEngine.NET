@@ -316,8 +316,8 @@ public sealed partial class TabView
             if (IsAncestorOfView(item))
                 throw new InvalidOperationException("Adding the tab item would create a parent cycle.");
 
-            ValidateSlotNode(item.Header);
-            ValidateSlotNode(item.Content);
+            ValidateSlotNode(item.HeaderRoot);
+            ValidateSlotNode(item.ContentRoot);
         }
     }
 

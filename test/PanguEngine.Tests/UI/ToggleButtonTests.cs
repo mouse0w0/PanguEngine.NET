@@ -28,12 +28,6 @@ public sealed class ToggleButtonTests
         Assert.True(button.Focusable);
         Assert.False(button.HasPseudoClass(PseudoClass.Checked));
         Assert.Equal("Button", BackgroundSelector(button));
-
-        var scene = new UIScene(button);
-        scene.SetStyleSheets([StyleSheet.Parse("ToggleButton { spacing: 11px; }")]);
-        button.UpdateStyles();
-
-        Assert.Equal(11d, button.Spacing);
     }
 
     [Fact]
@@ -279,25 +273,25 @@ public sealed class ToggleButtonTests
     [Fact]
     public void CheckedStylesCombineWithInputStatesAndInheritFocusAndDisabledColors()
     {
-        var button = new ToggleButton { IsChecked = true };
+        var (manager, _, button) = OpenScene();
+        button.IsChecked = true;
         var ordinary = new Button();
-        button.UpdateStyles();
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal("ToggleButton:checked", BackgroundSelector(button));
 
-        button.SetHovered(true);
-        button.UpdateStyles();
+        manager.ProcessPointerMoved(new Point(5, 5));
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal("ToggleButton:checked:hover", BackgroundSelector(button));
-        button.SetPressed(true);
-        button.SetFocused(true);
+        manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
         ordinary.SetFocused(true);
-        button.UpdateStyles();
+        button.GetStyleRoot().UpdateStyles();
         ordinary.UpdateStyles();
         Assert.Equal("ToggleButton:checked:pressed", BackgroundSelector(button));
         Assert.Equal(ordinary.BorderBrush, button.BorderBrush);
 
         button.IsEnabled = false;
         ordinary.IsEnabled = false;
-        button.UpdateStyles();
+        button.GetStyleRoot().UpdateStyles();
         ordinary.UpdateStyles();
         Assert.Equal("ToggleButton:checked:disabled", BackgroundSelector(button));
         Assert.Equal(ordinary.Color, button.Color);
@@ -307,10 +301,11 @@ public sealed class ToggleButtonTests
         var local = new SolidColorBrush(13, 27, 39);
         button.Background = local;
         button.IsChecked = false;
-        button.UpdateStyles();
+        button.GetStyleRoot().UpdateStyles();
         Assert.Equal(local, button.Background);
         button.ClearValue(Region.BackgroundProperty);
         Assert.Equal(ordinary.Background, button.Background);
+        manager.Close();
     }
 
     private static (UIManager Manager, GameUIScene Scene, ToggleButton Button) OpenScene()

@@ -152,7 +152,7 @@ CheckBox {
     color: #f2f4f7;
 }
 
-CheckBox Text.checkbox-text {
+CheckBox > Text.checkbox-text {
     font-size: 16px;
 }
 
@@ -215,7 +215,7 @@ RadioButton > .radio-button-indicator > .radio-button-dot {
     fill: none;
 }
 
-RadioButton > .radio-button-content > .radio-button-text {
+RadioButton > .radio-button-text {
     font-size: 16px;
 }
 

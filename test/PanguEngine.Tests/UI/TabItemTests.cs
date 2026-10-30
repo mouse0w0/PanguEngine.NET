@@ -1,11 +1,53 @@
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Styling;
+using PanguEngine.UI.Templates;
 
 namespace PanguEngine.Tests.UI;
 
 public sealed class TabItemTests
 {
+    [Fact]
+    public void SharedDataUsesIndependentTemplatesAndKeepsItsPageAcrossSelectionAndReattachment()
+    {
+        var data = new object();
+        var headerCalls = 0;
+        var contentCalls = 0;
+        var item = new TabItem
+        {
+            HeaderTemplate = new FuncDataTemplate<object>(_ =>
+            {
+                headerCalls++;
+                return new Panel();
+            }),
+            ContentTemplate = new FuncDataTemplate<object>(_ =>
+            {
+                contentCalls++;
+                return new Panel();
+            }),
+            Header = data,
+            Content = data
+        };
+        var header = item.HeaderRoot;
+        var content = item.ContentRoot;
+        var other = new TabItem();
+        var view = new TabView();
+        view.Items.Add(item);
+        view.Items.Add(other);
+        view.Selection.SelectedItem = other;
+        view.Selection.SelectedItem = item;
+        view.Items.Remove(item);
+        view.Items.Add(item);
+
+        Assert.Same(data, item.Header);
+        Assert.Same(data, item.Content);
+        Assert.NotSame(header, content);
+        Assert.Same(header, item.HeaderRoot);
+        Assert.Same(content, item.ContentRoot);
+        Assert.Equal(1, headerCalls);
+        Assert.Equal(1, contentCalls);
+    }
+
     [Fact]
     public void IsClosableTogglesAnIndependentNonFocusableCloseButton()
     {
@@ -34,66 +76,14 @@ public sealed class TabItemTests
 
         Assert.Same(header, item.Header);
         Assert.Same(content, item.Content);
-        var headerHost = Assert.IsType<TabHeaderHost>(header.Parent);
-        Assert.Same(item, headerHost.Parent);
+        Assert.Same(item, header.GetStyleRoot());
 
         var view = new TabView();
         view.Items.Add(item);
 
         Assert.NotNull(item.ContentHost);
-        Assert.Same(item.ContentHost, content.Parent);
+        Assert.Same(content, item.ContentRoot);
         Assert.Same(content, item.ContentHost!.Content);
-    }
-
-    [Fact]
-    public void HeaderAndContentCannotReferenceTheSameNode()
-    {
-        var node = new Panel();
-        var item = new TabItem();
-        item.Header = node;
-
-        Assert.Throws<InvalidOperationException>(() => item.Content = node);
-        Assert.Null(item.Content);
-        Assert.Same(node, item.Header);
-
-        var otherNode = new Panel();
-        var otherItem = new TabItem();
-        otherItem.Content = otherNode;
-
-        Assert.Throws<InvalidOperationException>(() => otherItem.Header = otherNode);
-        Assert.Null(otherItem.Header);
-    }
-
-    [Fact]
-    public void MovingTheHeaderOutOfTheItemClearsTheHeaderSlot()
-    {
-        var item = new TabItem();
-        var header = new Panel();
-        item.Header = header;
-        var other = new Panel();
-
-        other.Children.Add(header);
-
-        Assert.Null(item.Header);
-        Assert.Empty(Assert.IsType<TabHeaderHost>(Assert.Single(item.Children)).Children);
-        Assert.Same(other, header.Parent);
-    }
-
-    [Fact]
-    public void MovingTheContentOutOfItsHostClearsTheContentSlot()
-    {
-        var item = new TabItem();
-        var content = new Panel();
-        item.Content = content;
-        var view = new TabView();
-        view.Items.Add(item);
-        var other = new Panel();
-
-        other.Children.Add(content);
-
-        Assert.Null(item.Content);
-        Assert.Null(item.ContentHost!.Content);
-        Assert.Same(other, content.Parent);
     }
 
     [Fact]
@@ -112,7 +102,7 @@ public sealed class TabItemTests
         view.Items.Add(item);
 
         Assert.Same(content, item.Content);
-        Assert.Same(item.ContentHost, content.Parent);
+        Assert.Same(content, item.ContentRoot);
         Assert.Same(content, item.ContentHost!.Content);
     }
 
@@ -136,28 +126,6 @@ public sealed class TabItemTests
         view.Selection.SelectedItem = null;
 
         Assert.False(second.HasPseudoClass(PseudoClass.Selected));
-    }
-
-    [Fact]
-    public void AHeaderCannotReferenceTheOwningItem()
-    {
-        var item = new TabItem();
-
-        Assert.Throws<InvalidOperationException>(() => item.Header = item);
-        Assert.Null(item.Header);
-    }
-
-    [Fact]
-    public void ContentCannotReferenceTheOwningItem()
-    {
-        var view = new TabView();
-        var item = new TabItem();
-        view.Items.Add(item);
-
-        Assert.Throws<InvalidOperationException>(() => item.Content = item);
-
-        Assert.Null(item.Content);
-        Assert.Same(item, view.Items[0]);
     }
 
     [Fact]
@@ -200,7 +168,7 @@ public sealed class TabItemTests
         var item = new TabItem { Header = header, IsClosable = true };
         item.Measure(new Size(96, 30));
         item.Arrange(new Rect(0, 0, 96, 30));
-        var host = Assert.IsType<TabHeaderHost>(header.Parent);
+        var host = Assert.Single(item.Children.OfType<TabHeaderHost>());
         var close = Assert.Single(item.Children.OfType<TabCloseButton>());
 
         Assert.True(host.ClipToBounds);

@@ -21,11 +21,11 @@ internal sealed class PauseMenu : GameUIScene
             FontSize = 24,
             HorizontalAlignment = HorizontalAlignment.Center
         };
-        var resumeButton = new Button { Text = "回到游戏", MinWidth = 220, MinHeight = 42 };
-        var showcaseButton = new Button { Text = "UI 展示", MinWidth = 220, MinHeight = 42 };
+        var resumeButton = new Button { Content = "回到游戏", MinWidth = 220, MinHeight = 42 };
+        var showcaseButton = new Button { Content = "UI 展示", MinWidth = 220, MinHeight = 42 };
         var exitButton = new Button
         {
-            Text = "退出游戏",
+            Content = "退出游戏",
             MinWidth = 220,
             MinHeight = 42
         };

@@ -22,20 +22,12 @@ public sealed class ButtonTests
         button.GetStyleRoot().UpdateStyles();
 
         Assert.False(typeof(Button).IsSealed);
-        Assert.Equal(typeof(Control), typeof(Button).BaseType);
-        AssertProperty(
-            Button.TextProperty,
-            string.Empty);
+        Assert.Equal(typeof(ContentControl), typeof(Button).BaseType);
+        AssertProperty(Button.ContentProperty, (object?)null);
+        Assert.Null(button.ContentTemplate);
         Assert.Equal(typeof(UIElement), Button.FontFamilyProperty.OwnerType);
         Assert.Equal(typeof(UIElement), Button.ColorProperty.OwnerType);
         Assert.Equal(new Color(242, 244, 247), button.Color);
-        AssertProperty(
-            Button.IconProperty,
-            (Image?)null);
-        AssertProperty(
-            Button.IconSizeProperty,
-            16d);
-        AssertProperty(Button.SpacingProperty, 6d);
         Assert.True(button.Focusable);
         Assert.Equal(new Thickness(12, 7), button.Padding);
         Assert.Equal(new SolidColorBrush(48, 54, 62), button.Background);
@@ -44,12 +36,11 @@ public sealed class ButtonTests
         Assert.Equal("Button", StyleSource(button, Region.BackgroundProperty)?.SelectorText);
         Assert.False(StyleSource(button, Region.BackgroundProperty)!.IsMaskedByLocalValue);
         Assert.False(button.ClipToBounds);
-        Assert.Empty(button.ReadOnlyChildren);
         Assert.NotNull(typeof(Button).GetEvent(
             nameof(Button.Click),
             BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly));
 
-        foreach (var propertyName in new[] { "Content", "Graphic", "Command", "ClickMode" })
+        foreach (var propertyName in new[] { "Graphic", "Command", "ClickMode" })
         {
             Assert.Null(typeof(Button).GetProperty(
                 propertyName,
@@ -63,45 +54,25 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void TextAndIconCreateOnlyRequiredChildrenInStableOrder()
+    public void TextContentChangesReplaceTheDisplayedTextAndEmptyContentRemovesIt()
     {
-        var firstIcon = CreateImage(8, 4);
-        var secondIcon = CreateImage(4, 8);
-        var button = new Button { Text = "Open", Icon = firstIcon };
-
-        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
-        var text = Assert.IsType<Text>(button.ReadOnlyChildren[1]);
-        Assert.Same(firstIcon, image.Source);
+        var button = new Button { Content = "Open" };
+        var text = FindDescendant<Text>(button);
         Assert.Equal("Open", text.Content);
-        Assert.False(image.IsHitTestVisible);
         Assert.False(text.IsHitTestVisible);
-        Assert.Equal(ImageStretch.Uniform, image.Stretch);
         Assert.Equal(TextWrapping.NoWrap, text.Wrapping);
 
-        button.Icon = secondIcon;
-        button.Text = string.Empty;
-
-        Assert.Single(button.ReadOnlyChildren);
-        Assert.Same(image, button.ReadOnlyChildren[0]);
-        Assert.Same(secondIcon, image.Source);
+        button.Content = "Save";
+        Assert.Equal("Save", FindDescendant<Text>(button).Content);
         Assert.Null(text.Parent);
 
-        button.Text = "Save";
-
-        Assert.Equal(2, button.ReadOnlyChildren.Count);
-        Assert.Same(image, button.ReadOnlyChildren[0]);
-        Assert.NotSame(text, button.ReadOnlyChildren[1]);
-
-        button.Icon = null;
-
-        Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
-        Assert.Null(image.Parent);
+        button.Content = string.Empty;
+        Assert.Empty(Descendants(button).OfType<Text>());
     }
 
     [Fact]
     public void ContentPropertiesSynchronizeExistingAndFutureChildren()
     {
-        var icon = CreateImage(4, 4);
         var font = new Font("Requested Family");
         var button = new Button
         {
@@ -109,41 +80,31 @@ public sealed class ButtonTests
             FontWeight = font.Weight,
             FontStyle = font.Style,
             FontSize = 19,
-            Color = new Color(10, 20, 30),
-            IconSize = 23
+            Color = new Color(10, 20, 30)
         };
 
-        Assert.Empty(button.ReadOnlyChildren);
-
-        button.Text = "Value";
-        button.Icon = icon;
-        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
-        var text = Assert.IsType<Text>(button.ReadOnlyChildren[1]);
+        button.Content = "Value";
+        var text = FindDescendant<Text>(button);
 
         Assert.Equal(font.FamilyName, text.FontFamily);
         Assert.Equal(font.Weight, text.FontWeight);
         Assert.Equal(font.Style, text.FontStyle);
         Assert.Equal(19, text.FontSize);
         Assert.Equal(new Color(10, 20, 30), text.Color);
-        Assert.Equal(23, image.Width);
-        Assert.Equal(23, image.Height);
 
         button.FontFamily = "Replacement Family";
         button.FontSize = 21;
         button.Color = new Color(40, 50, 60);
-        button.IconSize = 17;
 
         Assert.Equal(button.FontFamily, text.FontFamily);
         Assert.Equal(button.FontWeight, text.FontWeight);
         Assert.Equal(button.FontStyle, text.FontStyle);
         Assert.Equal(21, text.FontSize);
         Assert.Equal(new Color(40, 50, 60), text.Color);
-        Assert.Equal(17, image.Width);
-        Assert.Equal(17, image.Height);
     }
 
     [Fact]
-    public void EmptyButtonMeasuresFromPaddingAndBorderWithoutChildren()
+    public void EmptyButtonMeasuresFromPaddingAndBorder()
     {
         var button = new Button();
         button.GetStyleRoot().UpdateStyles();
@@ -152,33 +113,14 @@ public sealed class ButtonTests
         button.Arrange(new Rect(0, 0, button.DesiredSize));
 
         Assert.Equal(new Size(26, 16), button.DesiredSize);
-        Assert.Empty(button.ReadOnlyChildren);
+        Assert.Empty(Descendants(button).OfType<Text>());
         Assert.Equal(new Rect(13, 8, 0, 0), button.ContentBounds);
-    }
-
-    [Fact]
-    public void IconUsesAStableSquareSlotWithoutToolkitServices()
-    {
-        var button = new Button
-        {
-            Icon = CreateImage(20, 10),
-            IconSize = 16
-        };
-        button.GetStyleRoot().UpdateStyles();
-
-        button.Measure(Size.Infinite);
-        button.Arrange(new Rect(0, 0, button.DesiredSize));
-
-        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
-        Assert.Equal(new Size(42, 32), button.DesiredSize);
-        Assert.Equal(new Size(16, 16), image.DesiredSize);
-        Assert.Equal(new Rect(13, 8, 16, 16), image.LayoutBounds);
     }
 
     [Fact]
     public void TextMeasurementRequiresInitializedToolkitServices()
     {
-        var button = new Button { Text = "Text" };
+        var button = new Button { Content = "Text" };
 
         Assert.Throws<InvalidOperationException>(() => button.Measure(Size.Infinite));
 
@@ -187,111 +129,60 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void IconAndTextAreCenteredWithRoundedSpacing()
+    public void ContentIsCenteredWithLayoutRounding()
     {
         const double scale = 1.25;
-        using var context = new TextTestContext();
-        var button = new Button
+        var content = new Panel
         {
-            Icon = CreateImage(20, 10),
-            IconSize = 16,
-            Text = "Play",
-            Spacing = 5.3
+            Width = 30,
+            Height = 10,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top
         };
+        var button = new Button { Content = content };
         _ = new UIScene(button) { Scale = scale };
         button.GetStyleRoot().UpdateStyles();
 
         button.Measure(new Size(200, 80));
         button.Arrange(new Rect(0, 0, 200, 80));
 
-        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
-        var text = Assert.IsType<Text>(button.ReadOnlyChildren[1]);
-        Assert.Equal(16, image.DesiredSize.Width, 12);
-        Assert.Equal(
-            image.LayoutBounds.X + image.LayoutBounds.Width + 5.6,
-            text.LayoutBounds.X,
-            12);
-        Assert.Equal(
+        var origin = content.LocalToScene(Point.Zero);
+        AssertCenteredWithinHalfPhysicalPixel(
             button.ContentBounds.X + button.ContentBounds.Width / 2,
-            (image.LayoutBounds.X + text.LayoutBounds.X + text.LayoutBounds.Width) / 2,
-            12);
-        Assert.Equal(
-            button.ContentBounds.Y + button.ContentBounds.Height / 2,
-            image.LayoutBounds.Y + image.LayoutBounds.Height / 2,
-            12);
+            origin.X + content.LayoutBounds.Width / 2,
+            scale);
         AssertCenteredWithinHalfPhysicalPixel(
             button.ContentBounds.Y + button.ContentBounds.Height / 2,
-            text.LayoutBounds.Y + text.LayoutBounds.Height / 2,
+            origin.Y + content.LayoutBounds.Height / 2,
             scale);
     }
 
     [Fact]
     public void ExplicitSmallSizeKeepsCenteredOverflowAndDoesNotEnableClipping()
     {
+        var content = new Panel
+        {
+            Width = 20,
+            Height = 20,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top
+        };
         var button = new Button
         {
-            Icon = CreateImage(8, 8),
-            IconSize = 20,
+            Content = content,
             Width = 10,
             Height = 8
         };
+        _ = new UIScene(button);
         button.GetStyleRoot().UpdateStyles();
 
         button.Measure(new Size(100, 100));
         button.Arrange(new Rect(0, 0, 10, 8));
 
-        var image = Assert.IsType<ImageView>(Assert.Single(button.ReadOnlyChildren));
-        Assert.True(image.LayoutBounds.X < button.ContentBounds.X);
-        Assert.True(image.LayoutBounds.Y < button.ContentBounds.Y);
+        var origin = content.LocalToScene(Point.Zero);
+        Assert.True(origin.X < button.ContentBounds.X);
+        Assert.True(origin.Y < button.ContentBounds.Y);
         Assert.False(button.ClipToBounds);
-    }
-
-    [Theory]
-    [InlineData(double.NaN, false)]
-    [InlineData(double.NaN, true)]
-    [InlineData(-1d, false)]
-    [InlineData(-1d, true)]
-    [InlineData(double.PositiveInfinity, false)]
-    [InlineData(double.PositiveInfinity, true)]
-    [InlineData(double.NegativeInfinity, false)]
-    [InlineData(double.NegativeInfinity, true)]
-    public void InvalidIconSizePreservesValueAndValidLayout(double value, bool hasIcon)
-    {
-        var button = new Button
-        {
-            Icon = hasIcon ? CreateImage(4, 4) : null,
-            IconSize = 20
-        };
-        button.UpdateStyles();
-        button.Measure(Size.Infinite);
-        button.Arrange(new Rect(0, 0, button.DesiredSize));
-        var previousValue = button.IconSize;
-        var previousSize = button.DesiredSize;
-        var previousBounds = button.LayoutBounds;
-        var notifications = 0;
-        using var subscription = button.Subscribe(Button.IconSizeProperty, (_, _) => notifications++);
-
-        var error = Assert.Throws<ArgumentException>(() => button.IconSize = value);
-
-        Assert.Equal("value", error.ParamName);
-        Assert.Equal(previousValue, button.IconSize);
-        Assert.Equal(previousSize, button.DesiredSize);
-        Assert.Equal(previousBounds, button.LayoutBounds);
-        Assert.Equal(0, notifications);
-        Assert.True(button.IsMeasureValid);
-        Assert.True(button.IsArrangeValid);
-    }
-
-    [Theory]
-    [InlineData(double.NaN)]
-    [InlineData(-1d)]
-    [InlineData(double.PositiveInfinity)]
-    public void InvalidSpacingIsRejectedOnWrite(double value)
-    {
-        var button = new Button();
-        var previous = button.Spacing;
-        Assert.Throws<ArgumentException>(() => button.Spacing = value);
-        Assert.Equal(previous, button.Spacing);
     }
 
     [Fact]
@@ -427,20 +318,20 @@ public sealed class ButtonTests
     [Fact]
     public void StyleDrivenContentRemovalLeavesDetachedChildStylesPending()
     {
-        var button = new Button();
+        var button = new StyledContentHost();
         var scene = new UIScene(button);
         scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(
-                    StyleSelector.For<Button>(),
-                    [StyleSetter.Create(Button.TextProperty, "Old")]),
+                    StyleSelector.For<StyledContentHost>(),
+                    [StyleSetter.Create(StyledContentHost.ShowContentProperty, true)]),
                 new StyleRule(
                     StyleSelector.For<Text>(),
                     [StyleSetter.Create(UIElement.OpacityProperty, 0.4)])
             ])
         ]);
         scene.Root!.UpdateStyles();
-        var oldText = Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
+        var oldText = FindDescendant<Text>(button);
         scene.Root!.UpdateStyles();
         var opacityNotifications = 0;
         oldText.PropertyChanged += (_, e) =>
@@ -449,8 +340,8 @@ public sealed class ButtonTests
         scene.SetStyleSheets([
             new StyleSheet([
                 new StyleRule(
-                    StyleSelector.For<Button>(),
-                    [StyleSetter.Create(Button.TextProperty, string.Empty)]),
+                    StyleSelector.For<StyledContentHost>(),
+                    [StyleSetter.Create(StyledContentHost.ShowContentProperty, false)]),
                 new StyleRule(
                     StyleSelector.For<Text>(),
                     [StyleSetter.Create(UIElement.OpacityProperty, 0.8)])
@@ -458,7 +349,7 @@ public sealed class ButtonTests
         ]);
         scene.Root!.UpdateStyles();
 
-        Assert.Empty(button.ReadOnlyChildren);
+        Assert.Null(button.Content);
         Assert.Null(oldText.Scene);
         Assert.Equal(0.4, oldText.Opacity);
         Assert.Equal(0, opacityNotifications);
@@ -500,7 +391,6 @@ public sealed class ButtonTests
         if (danger)
             button.Classes.Add("danger");
         button.SetHovered(true);
-        button.SetPressed(true);
         button.SetFocused(true);
 
         button.IsEnabled = false;
@@ -518,9 +408,9 @@ public sealed class ButtonTests
     [Fact]
     public void DisabledColorIsInheritedByTextAndHonorsLocalOverride()
     {
-        var button = new Button { Text = "Delete" };
+        var button = new Button { Content = "Delete" };
         button.Classes.Add("danger");
-        var text = Assert.IsType<Text>(Assert.Single(button.ReadOnlyChildren));
+        var text = FindDescendant<Text>(button);
 
         button.IsEnabled = false;
         button.GetStyleRoot().UpdateStyles();
@@ -573,7 +463,7 @@ public sealed class ButtonTests
         var root = new Canvas();
         var button = Place(
             root,
-            new Button { Icon = CreateImage(8, 4), Text = "Go" },
+            new Button { Content = CreateImageContent(CreateImage(8, 4), "Go") },
             10,
             10,
             100,
@@ -586,41 +476,13 @@ public sealed class ButtonTests
         var commands = scene.CreateDrawCommandList();
         var imageCommand = Assert.Single(commands.OfType<DrawImageCommand>());
         var textCommand = Assert.Single(commands.OfType<DrawTextCommand>());
-        var image = Assert.IsType<ImageView>(button.ReadOnlyChildren[0]);
+        var image = FindDescendant<ImageView>(button);
 
         Assert.Equal(
             new Rect(0, 0, image.LayoutBounds.Width, image.LayoutBounds.Height),
             Assert.Single(commands.OfType<PushClipCommand>()).Clip);
         var ordered = commands.ToArray();
         Assert.True(Array.IndexOf(ordered, imageCommand) < Array.IndexOf(ordered, textCommand));
-        manager.Close();
-    }
-
-    [Fact]
-    public void InternalContentHitTargetsTheButtonAndClicksOnce()
-    {
-        using var context = new TextTestContext();
-        var root = new Canvas();
-        var button = Place(
-            root,
-            new Button { Icon = CreateImage(8, 8), Text = "Open" },
-            10,
-            10,
-            100,
-            40);
-        var manager = new UIManager();
-        var scene = new GameUIScene(root);
-        UIElement? source = null;
-        var clicks = 0;
-        button.PointerClicked += (_, eventArgs) => source = eventArgs.Source;
-        button.Click += (_, _) => clicks++;
-        manager.Open(scene);
-        manager.UpdateFrame(new Size(140, 80), 0);
-
-        Click(manager, new Point(60, 30), MouseButton.Left);
-
-        Assert.Same(button, source);
-        Assert.Equal(1, clicks);
         manager.Close();
     }
 
@@ -646,7 +508,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void HandledRawClickDoesNotCancelButtonClick()
+    public void HandledRawClickCancelsButtonActivation()
     {
         var (manager, scene, root, button) = OpenButtonScene();
         var ancestorClicks = 0;
@@ -657,8 +519,26 @@ public sealed class ButtonTests
 
         Click(manager, new Point(5, 5), MouseButton.Left);
 
-        Assert.Equal(1, clicks);
+        Assert.Equal(0, clicks);
         Assert.Equal(0, ancestorClicks);
+        manager.Close();
+    }
+
+    [Fact]
+    public void DisablingAnAncestorInRawClickDoesNotCancelTheCurrentDefaultAction()
+    {
+        var (manager, _, root, button) = OpenButtonScene();
+        var calls = new List<string>();
+        button.PointerClicked += (_, _) =>
+        {
+            calls.Add("raw");
+            root.IsEnabled = false;
+        };
+        button.Click += (_, _) => calls.Add("click");
+
+        Click(manager, new Point(5, 5), MouseButton.Left);
+
+        Assert.Equal(["raw", "click"], calls);
         manager.Close();
     }
 
@@ -714,7 +594,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void RawPointerClickCanRemoveButtonWithoutCancellingAcceptedClick()
+    public void RawPointerClickRemovalCancelsButtonActivation()
     {
         var (manager, scene, root, button) = OpenButtonScene();
         var calls = new List<string>();
@@ -727,7 +607,7 @@ public sealed class ButtonTests
 
         Click(manager, new Point(5, 5), MouseButton.Left);
 
-        Assert.Equal(["raw", "click"], calls);
+        Assert.Equal(["raw"], calls);
         Assert.Null(button.Parent);
         manager.Close();
     }
@@ -949,7 +829,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
-    public void AcceptedKeyboardActivationSurvivesRawHandlerTreeChanges()
+    public void RawKeyboardTreeAndSceneChangesCancelActivation()
     {
         var (enterManager, enterScene, enterRoot, enterButton) = OpenButtonScene();
         var enterClicks = 0;
@@ -963,7 +843,7 @@ public sealed class ButtonTests
 
         enterManager.ProcessKeyDown(Key.Enter, KeyModifiers.None);
 
-        Assert.Equal(1, enterClicks);
+        Assert.Equal(0, enterClicks);
         enterManager.Close();
 
         var (spaceManager, spaceScene, spaceRoot, spaceButton) = OpenButtonScene();
@@ -979,7 +859,7 @@ public sealed class ButtonTests
 
         spaceManager.ProcessKeyUp(Key.Space, KeyModifiers.None);
 
-        Assert.Equal(1, spaceClicks);
+        Assert.Equal(0, spaceClicks);
         Assert.Null(spaceManager.CurrentScene);
     }
 
@@ -1024,6 +904,33 @@ public sealed class ButtonTests
         manager.ProcessKeyDown(Key.Space, KeyModifiers.None);
         manager.ProcessKeyUp(Key.Space, KeyModifiers.None);
         Assert.Equal(1, clicks);
+        manager.Close();
+    }
+
+    [Theory]
+    [InlineData(Key.Enter)]
+    [InlineData(Key.Space)]
+    public void RefocusingInsideAKeyCallbackDoesNotRestoreTheActivationPair(Key key)
+    {
+        var (manager, scene, _, button) = OpenButtonScene();
+        var clicks = 0;
+        button.Click += (_, _) => clicks++;
+        EventHandler<KeyEventArgs> refocus = (_, _) =>
+        {
+            scene.ClearFocus();
+            Assert.True(button.Focus());
+        };
+        if (key == Key.Enter)
+            button.KeyDown += refocus;
+        else
+            button.KeyUp += refocus;
+        Assert.True(button.Focus());
+
+        manager.ProcessKeyDown(key, KeyModifiers.None);
+        manager.ProcessKeyUp(key, KeyModifiers.None);
+
+        Assert.Equal(0, clicks);
+        Assert.False(button.HasPseudoClass(PseudoClass.Pressed));
         manager.Close();
     }
 
@@ -1166,6 +1073,48 @@ public sealed class ButtonTests
     private static Image CreateImage(int width, int height) =>
         Image.FromRgba(new byte[checked(width * height * 4)], width, height);
 
+    private static StackPanel CreateImageContent(Image image, string value)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        row.Children.Add(new ImageView
+        {
+            Source = image,
+            Width = 16,
+            Height = 16,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        row.Children.Add(new Text { Content = value, VerticalAlignment = VerticalAlignment.Center });
+        return row;
+    }
+
+    private static T FindDescendant<T>(Container parent) where T : UIElement =>
+        Assert.Single(Descendants(parent).OfType<T>());
+
+    private static IEnumerable<UIElement> Descendants(Container parent)
+    {
+        foreach (var child in parent.ReadOnlyChildren)
+        {
+            yield return child;
+            if (child is Container nested)
+                foreach (var descendant in Descendants(nested))
+                    yield return descendant;
+        }
+    }
+
+    private sealed class StyledContentHost : ContentControl
+    {
+        internal static readonly Property<bool> ShowContentProperty =
+            Property.Register<StyledContentHost, bool>(nameof(ShowContent),
+                onChanged: static (host, _, visible) =>
+                    host.Content = visible ? new Text { Content = "Old" } : null);
+
+        internal bool ShowContent
+        {
+            get => GetValue(ShowContentProperty);
+            set => SetValue(ShowContentProperty, value);
+        }
+    }
+
     private static void AssertCenteredWithinHalfPhysicalPixel(
         double expected,
         double actual,
@@ -1176,8 +1125,8 @@ public sealed class ButtonTests
         Property<T> property,
         T defaultValue)
     {
-        Assert.Equal(typeof(Button), property.OwnerType);
-        Assert.Equal(typeof(Button), property.TargetType);
+        Assert.Equal(typeof(ContentControl), property.OwnerType);
+        Assert.Equal(typeof(ContentControl), property.TargetType);
         Assert.Equal(typeof(T), property.ValueType);
         Assert.Equal(defaultValue, property.DefaultValue);
         Assert.False(property.IsReadOnly);

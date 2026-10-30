@@ -362,6 +362,10 @@ public sealed class NumericUpDownTests
     {
         using var context = new TextTestContext();
         using var scene = new Scene<int>(new() { Value = 10 });
+        var innerClicks = 0;
+        var ancestorClicks = 0;
+        scene.Node.PointerClicked += (_, _) => innerClicks++;
+        scene.Root.PointerClicked += (_, _) => ancestorClicks++;
         Assert.True(scene.Node.Focus());
         Assert.False(scene.Node.IsFocused);
         Assert.Same(scene.Editor, scene.GameScene.FocusedNode);
@@ -377,8 +381,11 @@ public sealed class NumericUpDownTests
         Assert.Same(scene.Editor, scene.GameScene.FocusedNode);
         Assert.True(scene.Node.IsFocusWithin);
         Assert.True(scene.Node.HasPseudoClass(PseudoClass.FocusWithin));
+        scene.Frame(0);
         scene.Release(point);
         Assert.Equal(11, scene.Node.Value);
+        Assert.Equal(1, innerClicks);
+        Assert.Equal(0, ancestorClicks);
         scene.Edit("150");
         Assert.True(scene.Other.Focus());
         Assert.Equal(100, scene.Node.Value);
@@ -813,7 +820,7 @@ public sealed class NumericUpDownTests
 
         internal UIManager Manager { get; } = new();
         internal Canvas Root { get; } = new();
-        internal Button Other { get; } = new() { Width = 100, Height = 30, Text = "other" };
+        internal Button Other { get; } = new() { Width = 100, Height = 30, Content = "other" };
         internal GameUIScene GameScene { get; }
         internal NumericUpDown<T> Node { get; }
         internal TextBox Editor { get; }

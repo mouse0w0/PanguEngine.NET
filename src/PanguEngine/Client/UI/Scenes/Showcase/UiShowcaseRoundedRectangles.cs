@@ -154,7 +154,7 @@ internal static class UiShowcaseRoundedRectangles
         {
             var corner = new Button
             {
-                Text = "+",
+                Content = "+",
                 Width = 24,
                 Height = 24,
                 MinHeight = 0,

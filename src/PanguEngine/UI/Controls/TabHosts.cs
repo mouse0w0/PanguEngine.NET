@@ -1,82 +1,35 @@
+using PanguEngine.UI.Templates;
+
 namespace PanguEngine.UI.Controls;
 
 internal sealed class TabHeaderHost : Control
 {
-    private readonly TabItem _item;
-
-    internal TabHeaderHost(TabItem item)
+    internal TabHeaderHost(TabItem item, Action<object?, object?> contentChanged,
+        Action<IDataTemplate?, IDataTemplate?> templateChanged)
     {
-        _item = item;
         ClipToBounds = true;
         Classes.Add("tab-header-host");
-        Children.Changed += (_, change) =>
-        {
-            foreach (var child in change.OldItems)
-            {
-                if (!ReferenceEquals(child.Parent, this))
-                    _item.NotifyHeaderDetached(child);
-            }
-        };
+        Slot = new ContentSlot(this, item, item.VerifySlotMutationAccess,
+            contentChanged, templateChanged);
     }
 
-    internal void SetHeader(UIElement? header)
-    {
-        if (Children.Count > 0)
-            Children.Remove(Children[0]);
-        if (header is not null)
-            Children.Add(header);
-    }
+    internal ContentSlot Slot { get; }
 }
 
 /// <summary>
-/// Hosts the single content element of a <see cref="TabItem"/> and reports external content migration.
+/// Retains a stable host for a <see cref="TabItem"/> page.
 /// </summary>
 internal sealed class TabContentHost : Control
 {
-    private readonly TabItem _item;
-
-    internal TabContentHost(TabItem item)
+    internal TabContentHost(TabItem item, Action<object?, object?> contentChanged,
+        Action<IDataTemplate?, IDataTemplate?> templateChanged)
     {
-        _item = item;
         Classes.Add("tab-content-host");
-        Children.Changed += (_, change) =>
-        {
-            foreach (var child in change.OldItems)
-            {
-                if (!ReferenceEquals(child.Parent, this))
-                    _item.NotifyContentDetached(child);
-            }
-        };
+        Slot = new ContentSlot(this, item, item.VerifySlotMutationAccess,
+            contentChanged, templateChanged);
     }
 
-    internal UIElement? Content => Children.Count == 0 ? null : Children[0];
+    internal ContentSlot Slot { get; }
 
-    internal void SetContent(UIElement? content)
-    {
-        for (var index = Children.Count - 1; index >= 0; index--)
-        {
-            var child = Children[index];
-            if (!ReferenceEquals(child, content))
-                Children.Remove(child);
-        }
-
-        if (content is not null && !ReferenceEquals(content.Parent, this))
-            Children.Add(content);
-    }
-
-    /// <inheritdoc />
-    protected override Size MeasureContent(Size availableSize)
-    {
-        var content = Content;
-        if (content is null)
-            return Size.Zero;
-        content.Measure(availableSize);
-        return content.DesiredSize;
-    }
-
-    /// <inheritdoc />
-    protected override void ArrangeContent(Rect contentBounds)
-    {
-        Content?.Arrange(contentBounds);
-    }
+    internal UIElement? Content => Slot.Root;
 }

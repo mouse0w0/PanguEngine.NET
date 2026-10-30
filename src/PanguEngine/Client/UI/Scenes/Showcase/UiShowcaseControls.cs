@@ -59,12 +59,12 @@ internal static class UiShowcaseControls
             report($"按钮点击：{clicks} 次");
         });
         primary.Classes.Add("showcase-primary");
-        var secondary = new Button { StyleId = "showcase-state-target", Text = "次要操作" };
-        var outline = new Button { Text = "描边按钮" };
+        var secondary = new Button { StyleId = "showcase-state-target", Content = "次要操作" };
+        var outline = new Button { Content = "描边按钮" };
         outline.Classes.Add("showcase-outline");
-        var danger = new Button { Text = "危险操作" };
+        var danger = new Button { Content = "危险操作" };
         danger.Classes.Add("danger");
-        var disabled = new Button { Text = "暂不可用", StyleId = ButtonDisabledId, IsEnabled = false };
+        var disabled = new Button { Content = "暂不可用", StyleId = ButtonDisabledId, IsEnabled = false };
         return new UiShowcaseExample(
             "按钮",
             "悬停、按住或聚焦按钮查看状态；主要操作记录点击次数。",

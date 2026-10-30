@@ -298,9 +298,9 @@ public sealed class FontSizeInheritanceTests
     public void ButtonTextInheritsAndCanOverrideItsFontSizeWithCss()
     {
         var root = new Panel { FontSize = 22 };
-        var button = new Button { Text = "Button" };
+        var button = new Button { Content = "Button" };
         root.Children.Add(button);
-        var text = Assert.Single(button.ReadOnlyChildren.OfType<Text>());
+        var text = Assert.Single(Descendants(button).OfType<Text>());
         Assert.Equal(22d, text.FontSize);
         var scene = new UIScene(root);
 
@@ -313,9 +313,9 @@ public sealed class FontSizeInheritanceTests
         scene.SetStyleSheets([]);
         root.UpdateStyles();
         Assert.Equal(26d, text.FontSize);
-        button.Text = string.Empty;
-        button.Text = "Replacement";
-        Assert.Equal(26d, Assert.Single(button.ReadOnlyChildren.OfType<Text>()).FontSize);
+        button.Content = string.Empty;
+        button.Content = "Replacement";
+        Assert.Equal(26d, Assert.Single(Descendants(button).OfType<Text>()).FontSize);
     }
 
     [Fact]
@@ -406,6 +406,17 @@ public sealed class FontSizeInheritanceTests
         Assert.Equal(24d, child.FontSize);
         Assert.Equal(1, movingNotifications);
         Assert.Equal(new[] { (16d, 24d) }, changes);
+    }
+
+    private static IEnumerable<UIElement> Descendants(Container parent)
+    {
+        foreach (var child in parent.ReadOnlyChildren)
+        {
+            yield return child;
+            if (child is Container nested)
+                foreach (var descendant in Descendants(nested))
+                    yield return descendant;
+        }
     }
 
     private sealed class FontMutationNode : UIElement

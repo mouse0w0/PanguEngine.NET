@@ -583,6 +583,14 @@ public sealed class TextBox : Control
     }
 
     /// <inheritdoc />
+    protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
+    {
+        base.OnPointerClicked(eventArgs);
+        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left)
+            eventArgs.Handled = true;
+    }
+
+    /// <inheritdoc />
     protected override void OnGotFocus(FocusChangedEventArgs eventArgs)
     {
         ResetCaretPhase();

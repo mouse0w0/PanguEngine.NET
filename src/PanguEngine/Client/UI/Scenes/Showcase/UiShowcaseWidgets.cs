@@ -11,7 +11,7 @@ internal static class UiShowcaseWidgets
 
     internal static Button ActionButton(string id, string text, Action action)
     {
-        var button = new Button { StyleId = id, Text = text };
+        var button = new Button { StyleId = id, Content = text };
         button.Click += (_, _) => action();
         return button;
     }

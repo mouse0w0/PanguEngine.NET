@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using PanguEngine.Client.UI;
 using PanguEngine.Input;
 using PanguEngine.UI;
@@ -107,12 +106,14 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
-    public void FormattingContentCanReplaceTheLabelWithoutRemovingTheReplacement()
+    public void FormattingContentRejectsReplacementAndReleasesTheUpdateGuard()
     {
         var box = new CheckBox { Content = "initial" };
-        box.Content = new ReentrantLabel(() => box.Content = "replacement");
-        Assert.Equal("replacement", box.Content);
-        Assert.Equal("replacement", AutomaticText(box).Content);
+        var content = new ReentrantLabel(() => box.Content = "replacement");
+        Assert.Throws<InvalidOperationException>(() => box.Content = content);
+        Assert.Same(content, box.Content);
+        box.Content = "recovered";
+        Assert.Equal("recovered", AutomaticText(box).Content);
     }
 
     [Fact]
@@ -132,58 +133,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
-    public void ContentMigratesAndClearsThePreviousSlot()
-    {
-        var content = new Panel { Width = 20, Height = 10 };
-        var first = new CheckBox { Content = content };
-        var second = new CheckBox { Content = content };
-        Assert.Null(first.Content);
-        Assert.Same(content, second.Content);
-        var destination = new Panel();
-        destination.Children.Add(content);
-        Assert.Null(second.Content);
-        Assert.Same(destination, content.Parent);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MigratingBoundContentPreservesBindingAndOnlyWritesBackWhenTwoWay(bool twoWay)
-    {
-        var content = new Panel();
-        var source = new ContentSource { Value = content };
-        var box = new CheckBox();
-        if (twoWay)
-            box.BindTwoWay(CheckBox.ContentProperty, source, item => item.Value);
-        else
-            box.Bind(CheckBox.ContentProperty, source, item => item.Value);
-        var destination = new Panel();
-        destination.Children.Add(content);
-        Assert.Null(box.Content);
-        Assert.True(box.IsBound(CheckBox.ContentProperty));
-        if (twoWay)
-            Assert.Null(source.Value);
-        else
-            Assert.Same(content, source.Value);
-        Assert.Same(destination, content.Parent);
-    }
-
-    [Fact]
-    public void InvalidContentDoesNotDetachTheExistingLabel()
-    {
-        var label = new Panel();
-        var box = new CheckBox { Content = label };
-        var root = new Panel();
-        root.Children.Add(box);
-        var parent = label.Parent;
-        Assert.Throws<ArgumentException>(() => box.Content = box);
-        Assert.Throws<ArgumentException>(() => box.Content = root);
-        Assert.Same(label, box.Content);
-        Assert.Same(parent, label.Parent);
-    }
-
-    [Fact]
-    public void LabelNodesDoNotHandlePointerInputOrHaveTheirSettingsRewritten()
+    public void InteractiveContentHandlesItsOwnClickWithoutTogglingTheOuterCheckBox()
     {
         var nested = new Button { Width = 60, Height = 20 };
         var box = new CheckBox { Content = nested };
@@ -193,11 +143,11 @@ public sealed class CheckBoxTests
         nested.Click += (_, _) => nestedClicks++;
         box.Click += (_, _) => clicks++;
         Click(manager, new Point(50, 15));
-        Assert.Equal(1, clicks);
-        Assert.Equal(0, nestedClicks);
+        Assert.Equal(0, clicks);
+        Assert.Equal(1, nestedClicks);
         Assert.True(nested.IsHitTestVisible);
         Assert.True(nested.Focusable);
-        Assert.True(box.IsFocused);
+        Assert.True(nested.IsFocused);
         manager.Close();
     }
 
@@ -316,7 +266,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
-    public void RemovingIncomingContentCanReplaceTheDestinationWithoutLeavingTwoLabels()
+    public void RemovingIncomingContentCannotReenterTheDestinationSlot()
     {
         var incoming = new Panel();
         var replacement = new Panel();
@@ -324,22 +274,10 @@ public sealed class CheckBoxTests
         source.Children.Add(incoming);
         var box = new CheckBox();
         source.Children.Changed += (_, _) => box.Content = replacement;
-        box.Content = incoming;
-        Assert.Same(replacement, box.Content);
-        Assert.NotNull(replacement.Parent);
-        Assert.Single(replacement.Parent.ReadOnlyChildren);
+        Assert.Throws<InvalidOperationException>(() => box.Content = incoming);
+        Assert.Same(incoming, box.Content);
+        Assert.Null(replacement.Parent);
         Assert.Null(incoming.Parent);
-    }
-
-    [Fact]
-    public void ContentCanMoveFromASceneRoot()
-    {
-        var content = new Panel();
-        var source = new UIScene(content);
-        var box = new CheckBox { Content = content };
-        Assert.Null(source.Root);
-        Assert.Same(content, box.Content);
-        Assert.NotNull(content.Parent);
     }
 
     [Fact]
@@ -347,7 +285,7 @@ public sealed class CheckBoxTests
     {
         var box = new CheckBox { Content = "label" };
         var scene = new UIScene(box);
-        scene.SetStyleSheets([StyleSheet.Parse("CheckBox Text.checkbox-text { font-size: 23px; color: #123456; }")]);
+        scene.SetStyleSheets([StyleSheet.Parse("CheckBox > Text.checkbox-text { font-size: 23px; color: #123456; }")]);
         box.UpdateStyles();
         var text = AutomaticText(box);
         Assert.Equal(23, text.FontSize);
@@ -441,24 +379,6 @@ public sealed class CheckBoxTests
         {
             Calls++;
             return Value;
-        }
-    }
-
-    private sealed class ContentSource : INotifyPropertyChanged
-    {
-        private object? _value;
-        public event PropertyChangedEventHandler? PropertyChanged;
-
-        public object? Value
-        {
-            get => _value;
-            set
-            {
-                if (Equals(_value, value))
-                    return;
-                _value = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
-            }
         }
     }
 }

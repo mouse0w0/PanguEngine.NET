@@ -1,4 +1,5 @@
 using PanguEngine.ComponentModel;
+using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
 
@@ -15,8 +16,8 @@ internal static class UiShowcaseToggleButtons
     internal static UiShowcaseExample CreateExample(Action<string> report)
     {
         var model = new ShowcaseToggleModel();
-        var primary = new ToggleButton { StyleId = "showcase-toggle-primary", Text = "显示网格" };
-        var peer = new ToggleButton { StyleId = "showcase-toggle-peer", Text = "同步开关" };
+        var primary = new ToggleButton { StyleId = "showcase-toggle-primary", Content = "显示网格" };
+        var peer = new ToggleButton { StyleId = "showcase-toggle-peer", Content = "同步开关" };
         primary.BindTwoWay(ToggleButton.IsCheckedProperty, model, ShowcaseToggleModel.IsGridVisibleProperty);
         peer.BindTwoWay(ToggleButton.IsCheckedProperty, model, ShowcaseToggleModel.IsGridVisibleProperty);
 
@@ -46,23 +47,31 @@ internal static class UiShowcaseToggleButtons
             84, 169, 255, 255, 48, 54, 62, 255,
             48, 54, 62, 255, 84, 169, 255, 255
         ], 2, 2);
+        var iconContent = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
+        iconContent.Children.Add(new ImageView
+        {
+            Source = icon,
+            Width = 16,
+            Height = 16,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        iconContent.Children.Add(new Text { Content = "图标切换", VerticalAlignment = VerticalAlignment.Center });
         var withIcon = new ToggleButton
         {
             StyleId = "showcase-toggle-icon",
-            Text = "图标切换",
-            Icon = icon,
+            Content = iconContent,
             IsChecked = true
         };
         var disabled = new ToggleButton
         {
             StyleId = "showcase-toggle-disabled",
-            Text = "关闭且禁用",
+            Content = "关闭且禁用",
             IsEnabled = false
         };
         var disabledChecked = new ToggleButton
         {
             StyleId = "showcase-toggle-disabled-checked",
-            Text = "开启且禁用",
+            Content = "开启且禁用",
             IsChecked = true,
             IsEnabled = false
         };

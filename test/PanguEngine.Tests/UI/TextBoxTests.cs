@@ -588,6 +588,10 @@ public sealed class TextBoxTests
     {
         using var context = new TextTestContext();
         var (manager, scene, textBox) = OpenTextBox("a\r\nb");
+        var innerClicks = 0;
+        var ancestorClicks = 0;
+        textBox.PointerClicked += (_, _) => innerClicks++;
+        scene.Root!.PointerClicked += (_, _) => ancestorClicks++;
         Assert.True(textBox.Focus());
         textBox.Select(1, 0);
         var text = Assert.Single(scene.CreateDrawCommandList().OfType<DrawTextCommand>());
@@ -605,6 +609,8 @@ public sealed class TextBoxTests
         Assert.Equal(1, textBox.SelectionStart);
         Assert.Equal(3, textBox.CaretIndex);
         Assert.Equal("\r\n", textBox.SelectedText);
+        Assert.Equal(1, innerClicks);
+        Assert.Equal(0, ancestorClicks);
     }
 
     [Fact]

@@ -58,7 +58,7 @@ internal sealed class UiShowcaseShell : Region
         _scaleRow.Children.Add(_scaleReset);
         _scaleRow.Children.Add(_scaleUp);
         _scaleRow.Children.Add(_restoreScale);
-        _returnButton = new Button { Text = "返回暂停菜单", MinHeight = 36, StyleId = "showcase-return" };
+        _returnButton = new Button { Content = "返回暂停菜单", MinHeight = 36, StyleId = "showcase-return" };
         Children.Add(_header);
         Children.Add(_pageTabs);
         Children.Add(_feedback);
@@ -223,5 +223,5 @@ internal sealed class UiShowcaseShell : Region
     }
 
     private static Button CreateScaleButton(string text, string id) =>
-        new() { Text = text, MinHeight = 32, StyleId = id };
+        new() { Content = text, MinHeight = 32, StyleId = id };
 }

@@ -1,5 +1,4 @@
 using PanguEngine.ComponentModel;
-using PanguEngine.Graphics.Text;
 using PanguEngine.Input;
 using PanguEngine.UI.Input;
 using PanguEngine.UI.Styling;
@@ -7,14 +6,8 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.UI.Controls;
 
 /// <summary>Provides content, presentation, and input behavior shared by strongly typed radio buttons.</summary>
-public abstract class RadioButton : Control
+public abstract class RadioButton : ContentControl
 {
-    /// <summary>Identifies the <see cref="Content"/> property.</summary>
-    public static readonly DirectProperty<RadioButton, object?> ContentProperty =
-        Property.RegisterDirect<RadioButton, object?>(nameof(Content),
-            static button => button.Content, static (button, value) => button.Content = value,
-            onChanged: static (button, _, value) => button.SynchronizeContent(value));
-
     /// <summary>Identifies the <see cref="IsChecked"/> property.</summary>
     public static readonly DirectProperty<RadioButton, bool> IsCheckedProperty =
         Property.RegisterDirect<RadioButton, bool>(nameof(IsChecked),
@@ -34,54 +27,18 @@ public abstract class RadioButton : Control
     }
 
     private readonly RadioButtonIndicator _indicator;
-    private readonly RadioButtonContentHost _contentHost;
-    private object? _content;
-    private UIElement? _contentNode;
     private bool _isChecked;
-    private bool _changingContent;
     private bool _enterKeyDown;
     private bool _spaceKeyDown;
-    private int _focusVersion;
 
     /// <summary>Initializes a focusable radio button with no content.</summary>
     private protected RadioButton()
     {
         _indicator = new RadioButtonIndicator();
-        _contentHost = new RadioButtonContentHost(NotifyContentDetached);
-        Children.Add(_indicator);
-        Children.Add(_contentHost);
+        ContentSlot.DefaultTextClass = "radio-button-text";
+        Children.Insert(0, _indicator);
         Focusable = true;
         ClipToBounds = true;
-    }
-
-    /// <summary>Gets or sets an element, text, or object to display, or null for indicator-only content.</summary>
-    /// <remarks>
-    /// Other objects are displayed using ToString. Moving the displayed element elsewhere clears this property.
-    /// Changing content during its conversion, tree changes, or notifications is rejected; same-reference confirmation is allowed.
-    /// </remarks>
-    public object? Content
-    {
-        get => _content;
-        set
-        {
-            VerifyMutationAccess();
-            if (ContentProperty.ValuesEqual(_content, value))
-                return;
-            if (_changingContent)
-                throw new InvalidOperationException(
-                    "Radio button content cannot change during its update or notifications.");
-            _changingContent = true;
-            try
-            {
-                if (value is UIElement node)
-                    ValidateContentAssignment(node);
-                SetField(ContentProperty, ref _content, value);
-            }
-            finally
-            {
-                _changingContent = false;
-            }
-        }
     }
 
     /// <summary>Gets or sets whether this button is the selected member of its group.</summary>
@@ -99,7 +56,7 @@ public abstract class RadioButton : Control
         }
     }
 
-    /// <summary>Gets or sets the spacing between the indicator and non-null content in logical pixels.</summary>
+    /// <summary>Gets or sets the logical-pixel gap between the indicator and presented content that participates in layout.</summary>
     public double Spacing
     {
         get => GetValue(SpacingProperty);
@@ -109,14 +66,15 @@ public abstract class RadioButton : Control
     /// <inheritdoc />
     protected override Size MeasureContent(Size availableSize)
     {
-        var gap = _contentNode is null ? 0 : GetLayoutSpacing();
+        var gap = GetLayoutSpacing();
         _indicator.Measure(availableSize);
         var width = double.IsPositiveInfinity(availableSize.Width)
             ? double.PositiveInfinity
             : Math.Max(0, availableSize.Width - _indicator.DesiredSize.Width - gap);
-        _contentHost.Measure(new Size(width, availableSize.Height));
-        return new Size(_indicator.DesiredSize.Width + gap + _contentHost.DesiredSize.Width,
-            Math.Max(_indicator.DesiredSize.Height, _contentHost.DesiredSize.Height));
+        ContentRoot?.Measure(new Size(width, availableSize.Height));
+        var contentSize = ContentRoot?.DesiredSize ?? Size.Zero;
+        return new Size(_indicator.DesiredSize.Width + gap + contentSize.Width,
+            Math.Max(_indicator.DesiredSize.Height, contentSize.Height));
     }
 
     /// <inheritdoc />
@@ -128,36 +86,42 @@ public abstract class RadioButton : Control
         _indicator.Arrange(new Rect(contentBounds.X,
             contentBounds.Y + (contentBounds.Height - indicatorHeight) / 2,
             indicatorWidth, indicatorHeight));
-        var gap = _contentNode is null ? 0 : GetLayoutSpacing();
+        var gap = GetLayoutSpacing();
         var offset = Math.Min(contentBounds.Width, indicatorWidth + gap);
-        _contentHost.Arrange(new Rect(contentBounds.X + offset, contentBounds.Y,
+        ContentRoot?.Arrange(new Rect(contentBounds.X + offset, contentBounds.Y,
             Math.Max(0, contentBounds.Width - offset), contentBounds.Height));
     }
 
     /// <inheritdoc />
-    protected override bool IsPressedPseudoClassActive => IsPressed || _spaceKeyDown;
+    protected override bool IsPressedPseudoClassActive => base.IsPressedPseudoClassActive || _spaceKeyDown;
 
     /// <inheritdoc />
     protected override void OnPointerPressed(PointerButtonEventArgs eventArgs)
     {
+        var scene = Scene;
         base.OnPointerPressed(eventArgs);
-        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left && HasInputQualification())
+        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left &&
+            ReferenceEquals(Scene, scene))
             eventArgs.Handled = true;
     }
 
     /// <inheritdoc />
     protected override void OnPointerReleased(PointerButtonEventArgs eventArgs)
     {
+        var scene = Scene;
         base.OnPointerReleased(eventArgs);
-        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left && HasInputQualification())
+        if (!eventArgs.Handled && eventArgs.Button == MouseButton.Left &&
+            ReferenceEquals(Scene, scene))
             eventArgs.Handled = true;
     }
 
     /// <inheritdoc />
     protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)
     {
+        var scene = Scene;
         base.OnPointerClicked(eventArgs);
-        if (eventArgs.Handled || eventArgs.Button != MouseButton.Left || !HasInputQualification())
+        if (eventArgs.Handled || eventArgs.Button != MouseButton.Left ||
+            !ReferenceEquals(Scene, scene))
             return;
         eventArgs.Handled = true;
         SelectFromInput();
@@ -166,8 +130,12 @@ public abstract class RadioButton : Control
     /// <inheritdoc />
     protected override void OnKeyDown(KeyEventArgs eventArgs)
     {
-        var focusVersion = _focusVersion;
-        var eligible = IsFocused && Focusable && HasInputQualification();
+        if (!ReferenceEquals(eventArgs.Source, this) || !IsFocused)
+        {
+            base.OnKeyDown(eventArgs);
+            return;
+        }
+        var eligible = IsFocused && Focusable;
         var activateEnter = eligible && !eventArgs.IsRepeat && !_enterKeyDown;
         if (eligible && !eventArgs.IsRepeat)
         {
@@ -178,7 +146,7 @@ public abstract class RadioButton : Control
         }
 
         base.OnKeyDown(eventArgs);
-        if (eventArgs.Handled || focusVersion != _focusVersion || !IsFocused || !Focusable || !HasInputQualification())
+        if (eventArgs.Handled || !IsFocused || !Focusable)
         {
             if (eventArgs.Key == Key.Space)
                 SetSpaceKeyDown(false);
@@ -189,7 +157,7 @@ public abstract class RadioButton : Control
         {
             case Key.Enter:
                 eventArgs.Handled = true;
-                if (activateEnter)
+                if (activateEnter && _enterKeyDown)
                     SelectFromInput();
                 break;
             case Key.Space:
@@ -207,27 +175,45 @@ public abstract class RadioButton : Control
     /// <inheritdoc />
     protected override void OnKeyUp(KeyEventArgs eventArgs)
     {
-        var focusVersion = _focusVersion;
-        var activateSpace = _spaceKeyDown;
-        if (eventArgs.Key == Key.Enter)
-            _enterKeyDown = false;
-        else if (eventArgs.Key == Key.Space)
-            SetSpaceKeyDown(false);
-        base.OnKeyUp(eventArgs);
-        if (eventArgs.Handled || focusVersion != _focusVersion || !IsFocused || !Focusable || !HasInputQualification())
-            return;
-        if (eventArgs.Key is Key.Enter or Key.Space)
+        if (!ReferenceEquals(eventArgs.Source, this) || !IsFocused)
         {
-            eventArgs.Handled = true;
-            if (eventArgs.Key == Key.Space && activateSpace)
-                SelectFromInput();
+            base.OnKeyUp(eventArgs);
+            return;
         }
+        if (eventArgs.Key == Key.Enter)
+        {
+            _enterKeyDown = false;
+            base.OnKeyUp(eventArgs);
+            if (!eventArgs.Handled && IsFocused && Focusable)
+                eventArgs.Handled = true;
+            return;
+        }
+        if (eventArgs.Key != Key.Space)
+        {
+            base.OnKeyUp(eventArgs);
+            return;
+        }
+        var activate = false;
+        try
+        {
+            base.OnKeyUp(eventArgs);
+            if (!eventArgs.Handled && IsFocused && Focusable)
+            {
+                eventArgs.Handled = true;
+                activate = _spaceKeyDown;
+            }
+        }
+        finally
+        {
+            SetSpaceKeyDown(false);
+        }
+        if (activate && IsFocused && Focusable)
+            SelectFromInput();
     }
 
     /// <inheritdoc />
     protected override void OnLostFocus(FocusChangedEventArgs eventArgs)
     {
-        _focusVersion++;
         _enterKeyDown = false;
         SetSpaceKeyDown(false);
         base.OnLostFocus(eventArgs);
@@ -249,83 +235,14 @@ public abstract class RadioButton : Control
     /// <summary>Requests focus and selection movement within this button's group.</summary>
     private protected abstract bool Navigate(int direction);
 
-    private void SynchronizeContent(object? content)
-    {
-        _contentNode = null;
-        _contentNode = CreateContentNode(content);
-        _contentHost.SetContent(_contentNode);
-        InvalidateMeasure();
-    }
-
-    private void NotifyContentDetached(UIElement node)
-    {
-        if (!ReferenceEquals(node, _contentNode))
-            return;
-        var wasChangingContent = _changingContent;
-        _changingContent = true;
-        try
-        {
-            SetField(ContentProperty, ref _content, null);
-        }
-        finally
-        {
-            _changingContent = wasChangingContent;
-        }
-    }
-
-    private void ValidateContentAssignment(UIElement value)
-    {
-        value.Scene?.VerifyTreeMutationAccess();
-        for (UIElement? ancestor = this; ancestor is not null; ancestor = ancestor.Parent)
-        {
-            if (ReferenceEquals(ancestor, value))
-                throw new InvalidOperationException("Radio button content cannot create a parent cycle.");
-        }
-
-        if (value.Parent is null && value.Scene is not null)
-            throw new InvalidOperationException(
-                "A UI scene root must be cleared before it can be radio button content.");
-    }
-
-    private static UIElement? CreateContentNode(object? content)
-    {
-        if (content is null)
-            return null;
-        if (content is UIElement node)
-            return node;
-        var text = new Text
-        {
-            Content = content as string ?? content.ToString() ?? string.Empty,
-            Wrapping = TextWrapping.NoWrap,
-            IsHitTestVisible = false
-        };
-        text.Classes.Add("radio-button-text");
-        return text;
-    }
-
     private double GetLayoutSpacing()
     {
+        if (ContentRoot is not { Visibility: not Visibility.Collapsed })
+            return 0;
         var scene = Scene;
         return scene?.UseLayoutRounding ?? true
             ? LayoutHelper.RoundLayoutValue(Spacing, scene?.Scale ?? 1)
             : Spacing;
-    }
-
-    /// <summary>Determines whether this button can receive user input on its current scene.</summary>
-    private protected bool HasInputQualification()
-    {
-        var scene = Scene;
-        if (scene is null || !scene.IsOpen())
-            return false;
-        for (UIElement? node = this; node is not null; node = node.Parent)
-        {
-            if (!node.IsEnabled || node.Visibility != Visibility.Visible)
-                return false;
-            if (ReferenceEquals(node, scene.Root))
-                return true;
-        }
-
-        return false;
     }
 
     private void SetSpaceKeyDown(bool value)
@@ -451,7 +368,7 @@ public sealed class RadioButton<T> : RadioButton
                 continue;
             if (ReferenceEquals(_group, group) && ReferenceEquals(candidate.Group, group) &&
                 ReferenceEquals(candidate.Scene, scene) && candidate.IsFocused && candidate.Focusable &&
-                candidate.Value is not null && candidate.HasInputQualification())
+                candidate.Value is not null)
                 group.Select(candidate);
             return true;
         }
@@ -498,44 +415,5 @@ internal sealed class RadioButtonIndicator : Control
         var size = _dot.DesiredSize;
         _dot.Arrange(new Rect(contentBounds.X + (contentBounds.Width - size.Width) / 2,
             contentBounds.Y + (contentBounds.Height - size.Height) / 2, size));
-    }
-}
-
-internal sealed class RadioButtonContentHost : Control
-{
-    internal RadioButtonContentHost(Action<UIElement> notifyDetached)
-    {
-        Classes.Add("radio-button-content");
-        Children.Changed += (_, change) =>
-        {
-            foreach (var child in change.OldItems)
-            {
-                if (!ReferenceEquals(child.Parent, this))
-                    notifyDetached(child);
-            }
-        };
-    }
-
-    internal void SetContent(UIElement? content)
-    {
-        if (Children.Count > 0 && !ReferenceEquals(Children[0], content))
-            Children.Remove(Children[0]);
-        if (content is not null && !ReferenceEquals(content.Parent, this))
-            Children.Add(content);
-    }
-
-    protected override Size MeasureContent(Size availableSize)
-    {
-        if (Children.Count == 0)
-            return Size.Zero;
-        var content = Children[0];
-        content.Measure(availableSize);
-        return content.DesiredSize;
-    }
-
-    protected override void ArrangeContent(Rect contentBounds)
-    {
-        if (Children.Count > 0)
-            Children[0].Arrange(contentBounds);
     }
 }

@@ -342,14 +342,14 @@ public sealed class CssBindingTests
     {
         var button = new Button();
         var scene = new UIScene(button);
-        var sheet = StyleSheet.Parse("Button { text: hello; opacity: 0.6; }");
+        var sheet = StyleSheet.Parse("Button { focusable: false; opacity: 0.6; }");
 
         scene.SetStyleSheets([sheet]);
         scene.Root!.UpdateStyles();
 
         Assert.Same(sheet, Assert.Single(scene.StyleSheets));
-        Assert.Equal(Button.TextProperty.DefaultValue, button.Text);
-        Assert.Empty(button.GetStyleValueSources(Button.TextProperty));
+        Assert.True(button.Focusable);
+        Assert.Empty(button.GetStyleValueSources(UIElement.FocusableProperty));
         Assert.Equal(0.6, button.Opacity);
     }
 

@@ -43,7 +43,7 @@ internal static class UiShowcaseStyles
         const string sampleText = "Aa 0123456789\n第二行文字";
         var inherited = UiShowcaseWidgets.Label($"继承父级 · {sampleText}", "showcase-font-inherited");
         var overridden = UiShowcaseWidgets.Label($"局部覆盖 · {sampleText}", "showcase-font-overridden");
-        var button = new Button { StyleId = "showcase-font-button", Text = "示例按钮" };
+        var button = new Button { StyleId = "showcase-font-button", Content = "示例按钮" };
         var editor = new TextBox { StyleId = "showcase-font-editor", Text = "可编辑文本" };
         var preview = UiShowcaseWidgets.Preview(inherited, overridden, button, editor);
         preview.Classes.Add("showcase-font-inheritance");
@@ -74,7 +74,7 @@ internal static class UiShowcaseStyles
                 overridden.ClearValue(UIElement.ColorProperty);
             }
 
-            overrideButton.Text = enabled ? "清除局部覆盖" : "恢复局部覆盖";
+            overrideButton.Content = enabled ? "清除局部覆盖" : "恢复局部覆盖";
         }
 
         SetLocalOverride(true);
@@ -92,20 +92,20 @@ internal static class UiShowcaseStyles
 
     private static Button AuthorButton(string id, string text)
     {
-        var button = new Button { StyleId = id, Text = text };
+        var button = new Button { StyleId = id, Content = text };
         button.Classes.Add("showcase-author-target");
         return button;
     }
 
     private static UiShowcaseExample CreateSelectorExample()
     {
-        var plain = new Button { StyleId = "showcase-selector-plain", Text = "默认" };
-        var typed = new Button { StyleId = "showcase-selector-typed", Text = "类型" };
+        var plain = new Button { StyleId = "showcase-selector-plain", Content = "默认" };
+        var typed = new Button { StyleId = "showcase-selector-typed", Content = "类型" };
         typed.Classes.Add("showcase-typed");
-        var classOnly = new Button { StyleId = "showcase-selector-classonly", Text = "类" };
+        var classOnly = new Button { StyleId = "showcase-selector-classonly", Content = "类" };
         classOnly.Classes.Add("showcase-classonly");
-        var idTarget = new Button { StyleId = "showcase-id-target", Text = "id" };
-        var wildcard = new Button { StyleId = "showcase-selector-wildcard", Text = "通配" };
+        var idTarget = new Button { StyleId = "showcase-id-target", Content = "id" };
+        var wildcard = new Button { StyleId = "showcase-selector-wildcard", Content = "通配" };
         wildcard.Classes.Add("showcase-wildcard");
         return new UiShowcaseExample(
             "class、id 与通配选择器",
@@ -120,7 +120,7 @@ internal static class UiShowcaseStyles
 
     internal static UiShowcaseExample CreateComboStateExample()
     {
-        var button = new Button { StyleId = "showcase-combo-target", Text = "悬停并点击聚焦" };
+        var button = new Button { StyleId = "showcase-combo-target", Content = "悬停并点击聚焦" };
         button.Classes.Add("showcase-combo");
         return new UiShowcaseExample(
             "状态组合伪类",

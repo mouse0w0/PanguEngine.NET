@@ -130,66 +130,6 @@ public sealed class RadioButtonTests
         Assert.Contains(replacement, Descendants(button));
     }
 
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void MovingTheOldNodeDuringConversionDoesNotClearTheNewContent(bool failConversion)
-    {
-        var previous = new Panel();
-        var outside = new Canvas();
-        var button = new RadioButton<string> { Content = previous };
-        var error = new InvalidOperationException("conversion after migration");
-        var next = new CallbackDisplayObject(() =>
-        {
-            outside.Children.Add(previous);
-            if (failConversion)
-                throw error;
-            return "replacement";
-        });
-
-        if (failConversion)
-            Assert.Same(error, Assert.Throws<InvalidOperationException>(() => button.Content = next));
-        else
-            button.Content = next;
-
-        Assert.Same(next, button.Content);
-        Assert.Same(outside, previous.Parent);
-        if (!failConversion)
-            Assert.Equal("replacement", Descendants(button).OfType<Text>().Single().Content);
-        var replacement = new Panel();
-        button.Content = replacement;
-        Assert.Contains(replacement, Descendants(button));
-    }
-
-    [Fact]
-    public void MovingGeneratedTextClearsTheOriginalContentObject()
-    {
-        var button = new RadioButton<string> { Content = new DisplayObject("option") };
-        var text = Descendants(button).OfType<Text>().Single();
-        var outside = new Canvas();
-
-        outside.Children.Add(text);
-
-        Assert.Null(button.Content);
-        Assert.Same(outside, text.Parent);
-        Assert.Empty(Descendants(button).OfType<Text>());
-    }
-
-    [Fact]
-    public void MigratingContentClearsTheOldOwnerAndKeepsTheNewNode()
-    {
-        var content = new StackPanel();
-        var oldButton = new RadioButton<string> { Content = content };
-        var newButton = new RadioButton<string> { Content = content };
-        Assert.Null(oldButton.Content);
-        Assert.Same(content, newButton.Content);
-        Assert.Contains(content, Descendants(newButton));
-        var outside = new Canvas();
-        outside.Children.Add(content);
-        Assert.Null(newButton.Content);
-        Assert.Same(outside, content.Parent);
-    }
-
     [Fact]
     public void ReplacingContentDoesNotClearTheNewObject()
     {
@@ -241,19 +181,6 @@ public sealed class RadioButtonTests
         Assert.Contains(node, Descendants(button));
         button.Content = null;
         Assert.Null(node.Parent);
-    }
-
-    [Fact]
-    public void InvalidContentOwnershipIsRejectedWithoutReplacingTheExistingContent()
-    {
-        var content = new Panel();
-        var button = new RadioButton<string> { Content = content };
-        var root = new Canvas();
-        root.Children.Add(button);
-        Assert.Throws<InvalidOperationException>(() => button.Content = button);
-        Assert.Throws<InvalidOperationException>(() => button.Content = root);
-        Assert.Same(content, button.Content);
-        Assert.Contains(content, Descendants(button));
     }
 
     [Fact]
@@ -351,7 +278,6 @@ public sealed class RadioButtonTests
         button.GetStyleRoot().UpdateStyles();
         Assert.Equal(new SolidColorBrush(84, 169, 255), dot.Fill);
         button.SetHovered(true);
-        button.SetPressed(true);
         if (disableAncestor)
             root.IsEnabled = false;
         else
@@ -653,11 +579,6 @@ public sealed class RadioButtonTests
     private sealed class FailingDisplayObject(Exception error)
     {
         public override string ToString() => throw error;
-    }
-
-    private sealed class CallbackDisplayObject(Func<string> format)
-    {
-        public override string ToString() => format();
     }
 
     private sealed record DisplayObject(string Label)

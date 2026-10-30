@@ -1,5 +1,6 @@
 using PanguEngine.ComponentModel;
 using PanguEngine.UI.Styling;
+using PanguEngine.UI.Templates;
 
 namespace PanguEngine.UI.Controls;
 
@@ -8,13 +9,34 @@ namespace PanguEngine.UI.Controls;
 /// </summary>
 /// <remarks>
 /// A tab item can belong to at most one <see cref="TabView"/> at a time. The header and content
-/// slots hold arbitrary elements; assigning an element that already belongs elsewhere moves it and clears
-/// the previous slot owner. A stable internal content host keeps content ownership even while the
-/// item is not hosted by a view.
+/// slots hold data or elements with independent templates. Moving or reusing their roots externally
+/// has undefined behavior; slot state is not reconciled. Moving or reusing internal control parts is also
+/// unsupported; no rejection, synchronization, or recovery is guaranteed. A stable internal content host
+/// retains the page while the item is not hosted by a view.
 /// </remarks>
 public sealed class TabItem : Control
 {
     private const double HeaderGap = 4;
+
+    /// <summary>Identifies the <see cref="Header"/> property.</summary>
+    public static readonly DirectProperty<TabItem, object?> HeaderProperty =
+        Property.RegisterDirect<TabItem, object?>(nameof(Header),
+            static item => item.Header, static (item, value) => item.Header = value);
+
+    /// <summary>Identifies the <see cref="Content"/> property.</summary>
+    public static readonly DirectProperty<TabItem, object?> ContentProperty =
+        Property.RegisterDirect<TabItem, object?>(nameof(Content),
+            static item => item.Content, static (item, value) => item.Content = value);
+
+    /// <summary>Identifies the <see cref="HeaderTemplate"/> property.</summary>
+    public static readonly DirectProperty<TabItem, IDataTemplate?> HeaderTemplateProperty =
+        Property.RegisterDirect<TabItem, IDataTemplate?>(nameof(HeaderTemplate),
+            static item => item.HeaderTemplate, static (item, value) => item.HeaderTemplate = value);
+
+    /// <summary>Identifies the <see cref="ContentTemplate"/> property.</summary>
+    public static readonly DirectProperty<TabItem, IDataTemplate?> ContentTemplateProperty =
+        Property.RegisterDirect<TabItem, IDataTemplate?>(nameof(ContentTemplate),
+            static item => item.ContentTemplate, static (item, value) => item.ContentTemplate = value);
 
     /// <summary>Identifies the <see cref="IsClosable"/> property.</summary>
     public static readonly Property<bool> IsClosableProperty =
@@ -52,58 +74,61 @@ public sealed class TabItem : Control
 
     private readonly TabContentHost _contentHost;
     private readonly TabHeaderHost _headerHost;
-    private UIElement? _header;
-    private UIElement? _content;
     private TabCloseButton? _closeButton;
 
     /// <summary>Initializes a focusable tab item with a stable internal content host.</summary>
     public TabItem()
     {
-        _contentHost = new TabContentHost(this);
-        _headerHost = new TabHeaderHost(this);
+        _contentHost = new TabContentHost(this,
+            (previous, value) => RaisePropertyChanged(ContentProperty, previous, value),
+            (previous, value) => RaisePropertyChanged(ContentTemplateProperty, previous, value));
+        _headerHost = new TabHeaderHost(this,
+            (previous, value) => RaisePropertyChanged(HeaderProperty, previous, value),
+            (previous, value) => RaisePropertyChanged(HeaderTemplateProperty, previous, value));
         Children.Add(_headerHost);
         ClipToBounds = true;
         Focusable = true;
         Subscribe(IsEnabledProperty, (_, _) => OwnerView?.OnItemStateChanged(this));
     }
 
-    /// <summary>Gets or sets the element displayed in the tab header, or null for an empty header.</summary>
+    /// <summary>Gets or sets the data or element displayed in the tab header.</summary>
     /// <remarks>
-    /// The header cannot be this item, the content element, or an ancestor. Moving the header element
-    /// out through the tree API clears this slot. Moving or reusing internal control parts is unsupported;
-    /// no rejection, synchronization, or recovery is guaranteed for those operations.
+    /// Moving or reusing the content root externally has undefined behavior; slot state is not reconciled.
+    /// Updates are synchronous and cannot reenter this slot during its update or notifications,
+    /// including binding feedback with a different reference. Failures after commit do not roll back.
     /// </remarks>
-    public UIElement? Header
+    public object? Header
     {
-        get => _header;
-        set
-        {
-            if (ReferenceEquals(_header, value))
-                return;
-            ValidateHeaderAssignment(value);
-
-            _headerHost.SetHeader(value);
-            _header = value;
-        }
+        get => _headerHost.Slot.Content;
+        set => _headerHost.Slot.Content = value;
     }
 
-    /// <summary>Gets or sets the element displayed as the tab page content, or null for no content.</summary>
+    /// <summary>Gets or sets the data or element displayed as the tab page.</summary>
     /// <remarks>
-    /// The content cannot be this item, the header element, or an ancestor of this item or its owning view.
-    /// Moving the content element out through the tree API clears this slot. Moving or reusing internal
-    /// control parts is unsupported; no rejection, synchronization, or recovery is guaranteed for those operations.
+    /// Moving or reusing the content root externally has undefined behavior; slot state is not reconciled.
+    /// Updates are synchronous and cannot reenter this slot during its update or notifications,
+    /// including binding feedback with a different reference. Failures after commit do not roll back.
     /// </remarks>
-    public UIElement? Content
+    public object? Content
     {
-        get => _content;
-        set
-        {
-            if (ReferenceEquals(_content, value))
-                return;
-            ValidateContentAssignment(value);
-            _contentHost.SetContent(value);
-            _content = value;
-        }
+        get => _contentHost.Slot.Content;
+        set => _contentHost.Slot.Content = value;
+    }
+
+    /// <summary>Gets or sets the explicit template for non-null header data.</summary>
+    /// <remarks>Updates share the header's synchronous reentry and failure rules.</remarks>
+    public IDataTemplate? HeaderTemplate
+    {
+        get => _headerHost.Slot.Template;
+        set => _headerHost.Slot.Template = value;
+    }
+
+    /// <summary>Gets or sets the explicit template for non-null page data.</summary>
+    /// <remarks>Updates share the page's synchronous reentry and failure rules.</remarks>
+    public IDataTemplate? ContentTemplate
+    {
+        get => _contentHost.Slot.Template;
+        set => _contentHost.Slot.Template = value;
     }
 
     /// <summary>Gets or sets whether the tab displays an independent close button.</summary>
@@ -123,6 +148,12 @@ public sealed class TabItem : Control
 
     internal TabContentHost ContentHost => _contentHost;
 
+    internal UIElement? HeaderRoot => _headerHost.Slot.Root;
+
+    internal UIElement? ContentRoot => _contentHost.Slot.Root;
+
+    internal void VerifySlotMutationAccess() => VerifyMutationAccess();
+
     internal void SetSelected(bool value)
     {
         if (value)
@@ -140,18 +171,6 @@ public sealed class TabItem : Control
     }
 
     internal void NotifyCloseRequested() => OwnerView?.RequestClose(this);
-
-    internal void NotifyContentDetached(UIElement child)
-    {
-        if (ReferenceEquals(_content, child))
-            _content = null;
-    }
-
-    internal void NotifyHeaderDetached(UIElement child)
-    {
-        if (ReferenceEquals(_header, child))
-            _header = null;
-    }
 
     /// <inheritdoc />
     protected override Size MeasureContent(Size availableSize)
@@ -190,46 +209,6 @@ public sealed class TabItem : Control
 
         var headerWidth = Math.Max(0, contentBounds.Width - closeWidth - HeaderGap);
         _headerHost.Arrange(new Rect(contentBounds.X, contentBounds.Y, headerWidth, contentBounds.Height));
-    }
-
-    private void ValidateHeaderAssignment(UIElement? value)
-    {
-        Scene?.VerifyTreeMutationAccess();
-        if (value is null)
-            return;
-        value.Scene?.VerifyTreeMutationAccess();
-        if (ReferenceEquals(value, this))
-            throw new InvalidOperationException("A tab item cannot use itself as its header.");
-        if (ReferenceEquals(value, _content))
-            throw new InvalidOperationException("The header and content cannot reference the same node.");
-        if (value.Parent is null && value.Scene is not null)
-            throw new InvalidOperationException("A UI scene root must be cleared before it can be a tab header.");
-
-        for (UIElement? node = this; node is not null; node = node.Parent)
-        {
-            if (ReferenceEquals(node, value))
-                throw new InvalidOperationException("Adding the node would create a parent cycle.");
-        }
-    }
-
-    private void ValidateContentAssignment(UIElement? value)
-    {
-        Scene?.VerifyTreeMutationAccess();
-        if (value is null)
-            return;
-        value.Scene?.VerifyTreeMutationAccess();
-        if (ReferenceEquals(value, this))
-            throw new InvalidOperationException("A tab item cannot use itself as its content.");
-        if (ReferenceEquals(value, _header))
-            throw new InvalidOperationException("The content and header cannot reference the same node.");
-        if (value.Parent is null && value.Scene is not null)
-            throw new InvalidOperationException("A UI scene root must be cleared before it can be tab content.");
-
-        for (UIElement? node = this; node is not null; node = node.Parent)
-        {
-            if (ReferenceEquals(node, value))
-                throw new InvalidOperationException("Adding the node would create a parent cycle.");
-        }
     }
 
     private void SynchronizeCloseButton()

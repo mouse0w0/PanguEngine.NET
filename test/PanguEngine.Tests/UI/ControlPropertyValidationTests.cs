@@ -38,7 +38,6 @@ public sealed class ControlPropertyValidationTests
         AssertRejected(new Text(), Text.ContentProperty, null!);
         AssertRejected(new Panel(), UIElement.FontFamilyProperty, null!);
         AssertRejected(new Text(), UIElement.FontFamilyProperty, null!);
-        AssertRejected(new Button(), Button.TextProperty, null!);
         AssertRejected(new Button(), UIElement.FontFamilyProperty, null!);
         AssertRejected(new TextBox(), TextBox.TextProperty, null!);
         AssertRejected(new TextBox(), TextBox.PlaceholderProperty, null!);
