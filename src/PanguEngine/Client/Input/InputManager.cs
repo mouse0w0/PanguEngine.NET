@@ -74,6 +74,7 @@ public sealed class InputManager
         _window.Scroll += OnScroll;
         _window.FocusChanged += OnFocusChanged;
         _uiManager.CurrentSceneChanged += OnCurrentSceneChanged;
+        _uiManager.PointerCursorChanged += OnPointerCursorChanged;
         _started = true;
         OnCurrentSceneChanged(null, _uiManager.CurrentScene);
     }
@@ -188,6 +189,7 @@ public sealed class InputManager
                 _window.Scroll -= OnScroll;
                 _window.FocusChanged -= OnFocusChanged;
                 _uiManager.CurrentSceneChanged -= OnCurrentSceneChanged;
+                _uiManager.PointerCursorChanged -= OnPointerCursorChanged;
             }
 
             ReleasePointerCore();
@@ -310,6 +312,8 @@ public sealed class InputManager
 
         if (_uiManager.CurrentScene is not null)
             _uiManager.ProcessFocusChanged(focused);
+
+        ApplyPointerCursor();
     }
 
     private void OnCurrentSceneChanged(GameUIScene? oldScene, GameUIScene? newScene)
@@ -330,7 +334,36 @@ public sealed class InputManager
                 activation.Dispose();
         }
 
+        if (topologyVersion == _uiTopologyVersion && !_destroying && !_destroyed)
+        {
+            ApplyPointerCursor();
+            SynchronizePointerCursorPosition();
+        }
+
         _router.EndInputEvent();
+    }
+
+    private void OnPointerCursorChanged(object? sender, EventArgs args)
+    {
+        if (_started && !_destroying && !_destroyed)
+            ApplyPointerCursor();
+    }
+
+    private void ApplyPointerCursor()
+    {
+        _window.CursorShape = _started && !_destroying && !_destroyed && _window.IsFocused
+            ? _uiManager.PointerCursor
+            : CursorShape.Arrow;
+    }
+
+    private void SynchronizePointerCursorPosition()
+    {
+        if (!_started || _destroying || _destroyed || !_window.IsFocused)
+            return;
+
+        var position = _window.MousePosition;
+        if (TryGetFramebufferPosition(position.X, position.Y, out var framebufferPosition))
+            _uiManager.SynchronizePointerPosition(framebufferPosition);
     }
 
     private bool TryRoutePointer(
@@ -387,9 +420,13 @@ public sealed class InputManager
 
     private void ReleasePointerCore()
     {
+        var wasCaptured = IsPointerCaptured;
         IsPointerCaptured = false;
         _hasMouseBaseline = false;
         _window.CursorState = CursorState.Normal;
+        ApplyPointerCursor();
+        if (wasCaptured)
+            SynchronizePointerCursorPosition();
     }
 
     private void VerifyNotDestroyed()

@@ -23,6 +23,163 @@ namespace PanguEngine.Tests.Client.Input;
 public sealed class InputManagerTests
 {
     [Fact]
+    public void UIShutdownClearsTheWindowBeforeInputShutdown()
+    {
+        var (input, window, ui) = CreateManager();
+        OpenScene(ui, new GameUIScene(new TestNode { Cursor = CursorShape.Hand }));
+        input.Start();
+        Assert.Equal(CursorShape.Hand, window.CursorShape);
+
+        ui.Destroy();
+
+        Assert.Equal(CursorShape.Arrow, window.CursorShape);
+        input.Destroy();
+    }
+
+    [Fact]
+    public void DestroyedInputIgnoresAnInFlightUICursorNotification()
+    {
+        var (input, window, ui) = CreateManager();
+        var root = new TestNode { Cursor = CursorShape.Hand };
+        OpenScene(ui, new GameUIScene(root));
+        ui.PointerCursorChanged += (_, _) =>
+        {
+            if (ui.PointerCursor == CursorShape.Wait)
+            {
+                input.Destroy();
+                window.CursorShape = CursorShape.HResize;
+            }
+        };
+        input.Start();
+
+        root.Cursor = CursorShape.Wait;
+
+        Assert.Equal(CursorShape.HResize, window.CursorShape);
+        ui.Destroy();
+    }
+
+    [Fact]
+    public void CursorFollowsSceneChangesWithoutRequiringMouseMovement()
+    {
+        var (input, window, ui) = CreateManager();
+        var sceneContext = new InputContext(InputScope.Ui, pointerCapturePolicy: PointerCapturePolicy.Preserve);
+        window.SetMousePosition(new Vector2D<float>(5, 5));
+        var first = new TestNode { Cursor = CursorShape.Hand };
+        var firstScene = new GameUIScene(first) { InputContext = sceneContext };
+        OpenScene(ui, firstScene);
+        var moves = 0;
+        first.PointerMoved += (_, _) => moves++;
+        input.Start();
+        Assert.Equal(CursorShape.Hand, window.CursorShape);
+        Assert.Equal(0, moves);
+
+        var second = new TestNode { Cursor = CursorShape.Crosshair };
+        ui.Open(new GameUIScene(second) { InputContext = sceneContext });
+        Assert.Equal(CursorShape.Arrow, window.CursorShape);
+        ui.UpdateFrame(new Size(100, 100), 0);
+        Assert.Equal(CursorShape.Crosshair, window.CursorShape);
+        first.Cursor = CursorShape.Wait;
+        Assert.Equal(CursorShape.Crosshair, window.CursorShape);
+
+        window.RaiseFocusChanged(false);
+        Assert.Equal(CursorShape.Arrow, window.CursorShape);
+        window.RaiseFocusChanged(true);
+        Assert.Equal(CursorShape.Arrow, window.CursorShape);
+        window.RaiseMouseMove(new MouseMoveEventArgs(5, 5));
+        Assert.Equal(CursorShape.Crosshair, window.CursorShape);
+        ui.Close();
+        Assert.Equal(CursorShape.Arrow, window.CursorShape);
+
+        OpenScene(ui, firstScene);
+        Assert.Equal(CursorShape.Wait, window.CursorShape);
+        input.Destroy();
+        Assert.Equal(CursorShape.Arrow, window.CursorShape);
+        window.CursorShape = CursorShape.HResize;
+        first.Cursor = CursorShape.Hand;
+        Assert.Equal(CursorShape.HResize, window.CursorShape);
+        ui.Destroy();
+    }
+
+    [Fact]
+    public void ReleasingCaptureInsideKeyRoutingSynchronizesTheAbsolutePointerPosition()
+    {
+        var (input, window, ui) = CreateManager();
+        var root = new Canvas();
+        var first = new Panel { Width = 20, Height = 20, Focusable = true, Cursor = CursorShape.Hand };
+        var second = new Panel { Width = 20, Height = 20, Cursor = CursorShape.Crosshair };
+        Canvas.SetLeft(second, 30);
+        root.Children.Add(first);
+        root.Children.Add(second);
+        OpenScene(ui, new GameUIScene(root)
+        {
+            InputContext = new InputContext(InputScope.Ui, pointerCapturePolicy: PointerCapturePolicy.Preserve)
+        });
+        window.SetMousePosition(new Vector2D<float>(5, 5));
+        input.Start();
+        Assert.True(first.Focus());
+        Assert.True(input.TryCapturePointer());
+        first.KeyDown += (_, _) => input.ReleasePointer();
+        window.SetMousePosition(new Vector2D<float>(35, 5));
+
+        window.RaiseKeyDown(new KeyEventArgs(Key.E, KeyAction.Press, KeyModifiers.None));
+
+        Assert.False(input.IsPointerCaptured);
+        Assert.Equal(CursorState.Normal, window.CursorState);
+        Assert.Equal(CursorShape.Crosshair, window.CursorShape);
+        ui.UpdateFrame(new Size(100, 100), 0);
+        Assert.Equal(CursorShape.Crosshair, window.CursorShape);
+        input.Destroy();
+        ui.Destroy();
+    }
+
+    [Fact]
+    public void CursorShapeUpdatesDoNotReleaseRelativePointerCapture()
+    {
+        var (input, window, ui) = CreateManager();
+        var leaf = new TestNode { Cursor = CursorShape.Hand };
+        OpenScene(ui, new GameUIScene(leaf)
+        {
+            InputContext = new InputContext(InputScope.Ui, pointerCapturePolicy: PointerCapturePolicy.Preserve)
+        });
+        input.Start();
+        Assert.True(input.TryCapturePointer());
+
+        leaf.Cursor = CursorShape.Wait;
+
+        Assert.Equal(CursorShape.Wait, window.CursorShape);
+        Assert.Equal(CursorState.Disabled, window.CursorState);
+        Assert.True(input.IsPointerCaptured);
+        input.ReleasePointer();
+        Assert.Equal(CursorShape.Wait, window.CursorShape);
+        input.Destroy();
+        ui.Destroy();
+    }
+
+    [Fact]
+    public void ReentrantCursorNotificationCannotRestoreThePreviousScenesShape()
+    {
+        var (input, window, ui) = CreateManager();
+        var first = new TestNode { Cursor = CursorShape.Hand };
+        var firstScene = new GameUIScene(first);
+        var secondScene = new GameUIScene(new TestNode { Cursor = CursorShape.Crosshair });
+        firstScene.PointerCursorChanged += (_, _) =>
+        {
+            if (firstScene.PointerCursor == CursorShape.Wait)
+                ui.Open(secondScene);
+        };
+        OpenScene(ui, firstScene);
+        input.Start();
+
+        first.Cursor = CursorShape.Wait;
+        ui.UpdateFrame(new Size(100, 100), 0);
+
+        Assert.Same(secondScene, ui.CurrentScene);
+        Assert.Equal(CursorShape.Crosshair, window.CursorShape);
+        input.Destroy();
+        ui.Destroy();
+    }
+
+    [Fact]
     public void WindowTextInputAndKeyRepeatPreserveTheirContracts()
     {
         var window = new TestWindow();

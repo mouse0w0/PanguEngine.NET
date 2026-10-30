@@ -6,11 +6,96 @@ using PanguEngine.Threading;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
+using CursorShape = PanguEngine.Windowing.CursorShape;
 
 namespace PanguEngine.Tests.UI;
 
 public sealed class UIManagerTests
 {
+    [Fact]
+    public void PointerCursorFollowsOnlyTheCurrentSceneAcrossItsLifecycle()
+    {
+        var manager = new UIManager();
+        var first = new GameUIScene(new Panel { Cursor = CursorShape.Hand });
+        var second = new GameUIScene(new Panel { Cursor = CursorShape.Crosshair });
+        var notifications = 0;
+        CursorShape? sceneChangeCursor = null;
+        manager.CurrentSceneChanged += (_, _) => sceneChangeCursor = manager.PointerCursor;
+        manager.PointerCursorChanged += (sender, _) =>
+        {
+            Assert.Same(manager, sender);
+            notifications++;
+        };
+        manager.Open(first);
+        manager.UpdateFrame(new Size(100, 100), 0);
+        manager.SynchronizePointerPosition(new Point(5, 5));
+        Assert.Equal(CursorShape.Hand, manager.PointerCursor);
+        var beforeEqualUpdate = notifications;
+        manager.SynchronizePointerPosition(new Point(6, 5));
+        Assert.Equal(beforeEqualUpdate, notifications);
+
+        var beforeSceneSwitch = notifications;
+        sceneChangeCursor = null;
+        manager.Open(second);
+        Assert.Equal(beforeSceneSwitch, notifications);
+        Assert.Equal(CursorShape.Arrow, sceneChangeCursor);
+        manager.UpdateFrame(new Size(100, 100), 0);
+        manager.SynchronizePointerPosition(new Point(5, 5));
+        Assert.Equal(CursorShape.Crosshair, manager.PointerCursor);
+        var beforeOldSceneChanges = notifications;
+        first.Open();
+        first.PrepareFrame(new Size(100, 100));
+        first.ProcessPointerMoved(new Point(5, 5));
+        Assert.Equal(CursorShape.Crosshair, manager.PointerCursor);
+        Assert.Equal(beforeOldSceneChanges, notifications);
+        first.Close();
+
+        var beforeClose = notifications;
+        sceneChangeCursor = null;
+        manager.Close();
+        Assert.Equal(beforeClose, notifications);
+        Assert.Equal(CursorShape.Arrow, manager.PointerCursor);
+        Assert.Equal(CursorShape.Arrow, sceneChangeCursor);
+        manager.Open(second);
+        manager.UpdateFrame(new Size(100, 100), 0);
+        var beforeReopenedHover = notifications;
+        manager.SynchronizePointerPosition(new Point(5, 5));
+        Assert.Equal(CursorShape.Crosshair, manager.PointerCursor);
+        Assert.True(notifications > beforeReopenedHover);
+        var beforeDestroy = notifications;
+        sceneChangeCursor = null;
+        manager.Destroy();
+        manager.SynchronizePointerPosition(new Point(5, 5));
+        Assert.Equal(beforeDestroy, notifications);
+        Assert.Equal(CursorShape.Arrow, manager.PointerCursor);
+        Assert.Equal(CursorShape.Arrow, sceneChangeCursor);
+    }
+
+    [Fact]
+    public void PointerCursorNotificationCanReplaceTheCurrentScene()
+    {
+        var manager = new UIManager();
+        var firstRoot = new Panel { Cursor = CursorShape.Hand };
+        var first = new GameUIScene(firstRoot);
+        var second = new GameUIScene(new Panel { Cursor = CursorShape.Crosshair });
+        manager.Open(first);
+        manager.UpdateFrame(new Size(100, 100), 0);
+        manager.SynchronizePointerPosition(new Point(5, 5));
+        manager.PointerCursorChanged += (_, _) =>
+        {
+            if (ReferenceEquals(manager.CurrentScene, first))
+                manager.Open(second);
+        };
+
+        firstRoot.Cursor = CursorShape.Wait;
+
+        Assert.Same(second, manager.CurrentScene);
+        manager.UpdateFrame(new Size(100, 100), 0);
+        manager.SynchronizePointerPosition(new Point(5, 5));
+        Assert.Equal(CursorShape.Crosshair, manager.PointerCursor);
+        manager.Destroy();
+    }
+
     [Fact]
     public void ManagerStartsWithoutScene()
     {

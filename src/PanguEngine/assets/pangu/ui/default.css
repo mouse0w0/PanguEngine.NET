@@ -255,6 +255,7 @@ RadioButton:disabled:checked > .radio-button-indicator > .radio-button-dot,
 }
 
 TextBox {
+    cursor: text;
     min-width: 160px;
     padding: 6px 8px;
     background-color: #1f2329;

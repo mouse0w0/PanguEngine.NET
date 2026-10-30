@@ -97,6 +97,7 @@ public partial class UIScene
         try
         {
             UpdateHover(ToLogicalPoint(_pointerOutputPosition));
+            _ = CompleteInput(false);
         }
         finally
         {
@@ -121,7 +122,7 @@ public partial class UIScene
             UpdateHover(logicalPosition);
 
             if (!IsSceneActive())
-                return false;
+                return CompleteInput(false);
 
             HitPathEntry[] path;
             var pressedTarget = _pressedTargets[GetButtonIndex(MouseButton.Left)];
@@ -130,14 +131,14 @@ public partial class UIScene
             else
                 path = _hoverPath.ToArray();
             if (path.Length == 0)
-                return false;
+                return CompleteInput(false);
 
             var args = new PointerEventArgs(path[^1].Node, logicalPosition, path);
             Bubble(
                 path,
                 args,
                 static (node, eventArgs) => node.RaisePointerMoved(eventArgs));
-            return args.Handled;
+            return CompleteInput(args.Handled);
         }
         finally
         {
@@ -167,7 +168,7 @@ public partial class UIScene
             UpdateHover(logicalPosition);
 
             if (!IsSceneActive())
-                return false;
+                return CompleteInput(false);
 
             var path = _hoverPath.ToArray();
             var index = GetButtonIndex(button);
@@ -184,7 +185,7 @@ public partial class UIScene
             }
 
             if (!IsSceneActive())
-                return false;
+                return CompleteInput(false);
 
             UIElement? focusCandidate = null;
             for (var pathIndex = path.Length - 1; pathIndex >= 0; pathIndex--)
@@ -202,7 +203,7 @@ public partial class UIScene
 
             _ = ChangeFocus(focusCandidate);
             if (!IsSceneActive() || path.Length == 0)
-                return false;
+                return CompleteInput(false);
 
             var args = new PointerButtonEventArgs(
                 path[^1].Node,
@@ -214,7 +215,7 @@ public partial class UIScene
                 path,
                 args,
                 static (node, eventArgs) => node.RaisePointerPressed(eventArgs));
-            return args.Handled;
+            return CompleteInput(args.Handled);
         }
         finally
         {
@@ -244,7 +245,7 @@ public partial class UIScene
             UpdateHover(logicalPosition);
 
             if (!IsSceneActive())
-                return false;
+                return CompleteInput(false);
 
             var buttonIndex = GetButtonIndex(button);
             var target = _pressedTargets[buttonIndex];
@@ -257,11 +258,11 @@ public partial class UIScene
             }
 
             if (target is null || !IsActive(target))
-                return false;
+                return CompleteInput(false);
 
             var path = BuildPathForNode(target, logicalPosition);
             if (path.Count == 0)
-                return false;
+                return CompleteInput(false);
 
             var args = new PointerButtonEventArgs(
                 target,
@@ -276,11 +277,11 @@ public partial class UIScene
             var handled = args.Handled;
 
             if (!IsActive(target))
-                return handled;
+                return CompleteInput(handled);
 
             var currentPath = BuildHitPath(logicalPosition);
             if (currentPath.Count == 0 || !ReferenceEquals(currentPath[^1].Node, target))
-                return handled;
+                return CompleteInput(handled);
 
             var pointerClickedArgs = new PointerButtonEventArgs(
                 target,
@@ -292,7 +293,7 @@ public partial class UIScene
                 currentPath,
                 pointerClickedArgs,
                 static (node, eventArgs) => node.RaisePointerClicked(eventArgs));
-            return handled || pointerClickedArgs.Handled;
+            return CompleteInput(handled || pointerClickedArgs.Handled);
         }
         finally
         {
@@ -323,7 +324,7 @@ public partial class UIScene
             var logicalPosition = UpdatePointerPosition(position);
             UpdateHover(logicalPosition);
             if (!IsSceneActive() || _hoverPath.Count == 0)
-                return false;
+                return CompleteInput(false);
 
             var path = _hoverPath.ToArray();
             var args = new PointerWheelEventArgs(
@@ -337,7 +338,7 @@ public partial class UIScene
                 path,
                 args,
                 static (node, eventArgs) => node.RaisePointerWheel(eventArgs));
-            return args.Handled;
+            return CompleteInput(args.Handled);
         }
         finally
         {
@@ -406,6 +407,7 @@ public partial class UIScene
                 return;
 
             CancelPendingPointerInput();
+            _ = CompleteInput(false);
         }
         finally
         {
@@ -466,6 +468,8 @@ public partial class UIScene
                 for (var index = snapshot.ExitedNodes.Length - 1; index >= 0; index--)
                     snapshot.ExitedNodes[index].RaisePointerExited(args);
             }
+
+            RefreshPointerCursor();
         }
         finally
         {
@@ -481,6 +485,8 @@ public partial class UIScene
         var snapshot = CommitInputStateForClose();
         if (snapshot is not null)
             NotifyInputStateLoss(snapshot);
+
+        RefreshPointerCursor();
 
         for (var index = 0; index < pressedTargets.Length; index++)
         {
@@ -511,6 +517,7 @@ public partial class UIScene
         _pointerOutputPosition = Point.Zero;
         _pointerPosition = Point.Zero;
         _hasPointerPosition = false;
+        _pendingPointerPosition = null;
         return snapshot;
     }
 
@@ -648,15 +655,15 @@ public partial class UIScene
             if (FocusedNode is not null && !CanFocus(FocusedNode))
                 _ = ChangeFocus(null);
             if (!IsSceneActive() || FocusedNode is null)
-                return false;
+                return CompleteInput(false);
 
             var path = BuildPathForNode(FocusedNode, _pointerPosition);
             if (path.Count == 0)
-                return false;
+                return CompleteInput(false);
 
             var args = createEventArgs(FocusedNode);
             Bubble(path, args, raise);
-            return args.Handled;
+            return CompleteInput(args.Handled);
         }
         finally
         {
@@ -726,6 +733,8 @@ public partial class UIScene
                 newPath[index].Node.RaisePointerEntered(args);
             }
         }
+
+        RefreshPointerCursor();
     }
 
     private Point UpdatePointerPosition(Point outputPosition)
@@ -1047,6 +1056,7 @@ public partial class UIScene
 
     private void EndInputRouting()
     {
+        _pendingPointerPosition = null;
         _isRoutingInput = false;
         EndRuntimeOperation();
     }

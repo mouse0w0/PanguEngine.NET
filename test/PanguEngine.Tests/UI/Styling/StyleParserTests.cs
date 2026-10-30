@@ -5,11 +5,48 @@ using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
 using PanguEngine.UI.Styling;
+using PanguEngine.Windowing;
 
 namespace PanguEngine.Tests.UI.Styling;
 
 public sealed class StyleParserTests
 {
+    [Theory]
+    [InlineData("default", CursorShape.Arrow)]
+    [InlineData("TeXt", CursorShape.IBeam)]
+    [InlineData("pointer", CursorShape.Hand)]
+    [InlineData("crosshair", CursorShape.Crosshair)]
+    [InlineData("ew-resize", CursorShape.HResize)]
+    [InlineData("ns-resize", CursorShape.VResize)]
+    [InlineData("nwse-resize", CursorShape.NwseResize)]
+    [InlineData("nesw-resize", CursorShape.NeswResize)]
+    [InlineData("move", CursorShape.ResizeAll)]
+    [InlineData("not-allowed", CursorShape.NotAllowed)]
+    [InlineData("wait", CursorShape.Wait)]
+    [InlineData("progress", CursorShape.WaitArrow)]
+    public void ParsesCursorKeywords(string value, CursorShape expected)
+    {
+        Assert.Equal(expected, ParsedValue<CursorShape>(new Panel(), $"Panel {{ cursor: {value}; }}"));
+    }
+
+    [Theory]
+    [InlineData("auto")]
+    [InlineData("none")]
+    [InlineData("Hand")]
+    [InlineData("IBeam")]
+    [InlineData("0")]
+    [InlineData("pointer text")]
+    [InlineData("url(cursor.png), pointer")]
+    public void RejectsUnsupportedCursorValues(string value)
+    {
+        var node = new Panel();
+        var rule = SingleRule($"Panel {{ cursor: {value}; }}");
+
+        var error = Assert.Throws<StyleParseException>(() => rule.Bind(node.GetType()));
+
+        Assert.Equal(StyleParseError.InvalidValue, error.Error);
+    }
+
     private static Stream Utf8(string text) => new MemoryStream(Encoding.UTF8.GetBytes(text));
 
     private static StyleSheet ParseCss(string text, string? sourceName = null) =>

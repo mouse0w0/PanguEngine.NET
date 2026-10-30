@@ -2,6 +2,7 @@ using System.Globalization;
 using PanguEngine.Graphics.Text;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
+using PanguEngine.Windowing;
 
 namespace PanguEngine.UI.Styling;
 
@@ -11,6 +12,22 @@ namespace PanguEngine.UI.Styling;
 /// </summary>
 public static class CssValueConverters
 {
+    private static readonly Dictionary<string, CursorShape> CursorMap = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["default"] = CursorShape.Arrow,
+        ["text"] = CursorShape.IBeam,
+        ["pointer"] = CursorShape.Hand,
+        ["crosshair"] = CursorShape.Crosshair,
+        ["ew-resize"] = CursorShape.HResize,
+        ["ns-resize"] = CursorShape.VResize,
+        ["nwse-resize"] = CursorShape.NwseResize,
+        ["nesw-resize"] = CursorShape.NeswResize,
+        ["move"] = CursorShape.ResizeAll,
+        ["not-allowed"] = CursorShape.NotAllowed,
+        ["wait"] = CursorShape.Wait,
+        ["progress"] = CursorShape.WaitArrow
+    };
+
     private static readonly Dictionary<string, HorizontalAlignment> HorizontalAlignmentMap = new(StringComparer.OrdinalIgnoreCase)
     {
         ["left"] = HorizontalAlignment.Left,
@@ -238,6 +255,12 @@ public static class CssValueConverters
     /// <returns>The parsed enumeration member.</returns>
     /// <exception cref="FormatException">Thrown when the value is not a recognized member.</exception>
     public static ImageSamplingMode ParseImageSamplingMode(string value) => ParseEnum(value, ImageSamplingModeMap);
+
+    /// <summary>Converts a trimmed CSS cursor keyword into a system pointer shape.</summary>
+    /// <param name="value">The trimmed CSS keyword.</param>
+    /// <returns>The requested pointer shape.</returns>
+    /// <exception cref="FormatException">Thrown when the keyword is not supported.</exception>
+    public static CursorShape ParseCursor(string value) => ParseEnum(value, CursorMap);
 
     private static double ParseFinite(string text, string original)
     {

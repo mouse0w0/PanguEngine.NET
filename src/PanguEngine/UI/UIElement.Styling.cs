@@ -3,6 +3,7 @@ using PanguEngine.ComponentModel;
 using PanguEngine.Graphics.Text;
 using PanguEngine.UI.Drawing;
 using PanguEngine.UI.Styling;
+using PanguEngine.Windowing;
 
 namespace PanguEngine.UI;
 
@@ -18,6 +19,7 @@ public abstract partial class UIElement
     static UIElement()
     {
         CssRegistry.RegisterElement<UIElement>("UIElement");
+        CssRegistry.RegisterProperty<UIElement, CursorShape>("cursor", CursorProperty, CssValueConverters.ParseCursor);
         CssRegistry.RegisterProperty<UIElement, string>("font-family", FontFamilyProperty,
             CssFontConverters.ParseFamily);
         CssRegistry.RegisterProperty<UIElement, FontWeight>("font-weight", FontWeightProperty,

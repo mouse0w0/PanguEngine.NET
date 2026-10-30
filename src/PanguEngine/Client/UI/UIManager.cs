@@ -4,6 +4,7 @@ using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.UI;
 using PanguEngine.UI.Drawing;
+using CursorShape = PanguEngine.Windowing.CursorShape;
 
 namespace PanguEngine.Client.UI;
 
@@ -39,6 +40,12 @@ public sealed class UIManager
     public GameUIScene? CurrentScene { get; private set; }
 
     internal event Action<GameUIScene?, GameUIScene?>? CurrentSceneChanged;
+
+    /// <summary>Gets the current scene's pointer shape, or an arrow when no scene is available.</summary>
+    internal CursorShape PointerCursor => CurrentScene?.PointerCursor ?? CursorShape.Arrow;
+
+    /// <summary>Forwards pointer shape changes from the current scene.</summary>
+    internal event EventHandler? PointerCursorChanged;
 
     internal void InitializeHud(IRegistry<HudDefinition> definitions)
     {
@@ -122,12 +129,15 @@ public sealed class UIManager
                 oldScene?.VerifyCanClose();
                 if (oldScene is not null)
                 {
+                    oldScene.PointerCursorChanged -= OnScenePointerCursorChanged;
                     CurrentScene = null;
                     oldScene.Close();
                 }
 
                 nextScene?.Open();
                 CurrentScene = nextScene;
+                if (nextScene is not null)
+                    nextScene.PointerCursorChanged += OnScenePointerCursorChanged;
                 NotifyCurrentSceneChanged(oldScene);
             }
         }
@@ -220,6 +230,8 @@ public sealed class UIManager
         VerifyLifecycleOperation();
         VerifyNotUpdating();
         var scene = CurrentScene;
+        if (scene is not null)
+            scene.PointerCursorChanged -= OnScenePointerCursorChanged;
         CurrentScene = null;
         _isTransitioning = true;
         _isDestroying = true;
@@ -235,6 +247,25 @@ public sealed class UIManager
             _isDestroying = false;
             _isTransitioning = false;
         }
+    }
+
+    /// <summary>Synchronizes the current scene's pointer position without routing a movement event.</summary>
+    /// <param name="position">The pointer position in framebuffer coordinates.</param>
+    internal void SynchronizePointerPosition(Point position)
+    {
+        var scene = CurrentScene;
+        if (scene is null)
+            return;
+
+        VerifyAccess();
+        if (scene.IsOpen())
+            scene.SynchronizePointerPosition(position);
+    }
+
+    private void OnScenePointerCursorChanged(object? sender, EventArgs args)
+    {
+        if (ReferenceEquals(sender, CurrentScene))
+            PointerCursorChanged?.Invoke(this, EventArgs.Empty);
     }
 
     internal bool ProcessPointerMoved(Point position)

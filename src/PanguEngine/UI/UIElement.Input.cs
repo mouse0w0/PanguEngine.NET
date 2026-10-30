@@ -1,11 +1,16 @@
 using PanguEngine.ComponentModel;
 using PanguEngine.UI.Input;
 using PanguEngine.UI.Styling;
+using CursorShape = PanguEngine.Windowing.CursorShape;
 
 namespace PanguEngine.UI;
 
 public abstract partial class UIElement
 {
+    /// <summary>Identifies the inherited <see cref="Cursor"/> property.</summary>
+    public static readonly Property<CursorShape> CursorProperty =
+        Property.Register<UIElement, CursorShape>(nameof(Cursor), CursorShape.Arrow, inherits: true);
+
     private static readonly PropertyKey<bool> IsHoveredPropertyKey =
         Property.RegisterReadOnly<UIElement, bool>(
             nameof(IsHovered),
@@ -64,6 +69,13 @@ public abstract partial class UIElement
     /// Identifies the <see cref="IsFocusWithin"/> property.
     /// </summary>
     public static readonly Property<bool> IsFocusWithinProperty = IsFocusWithinPropertyKey.Property;
+
+    /// <summary>Gets or sets the pointer shape, inherited when no local or styled value applies.</summary>
+    public CursorShape Cursor
+    {
+        get => GetValue(CursorProperty);
+        set => SetValue(CursorProperty, value);
+    }
 
     /// <summary>
     /// Gets or sets whether this element can receive keyboard focus.
