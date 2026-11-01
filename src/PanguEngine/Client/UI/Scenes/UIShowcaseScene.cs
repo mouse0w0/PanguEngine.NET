@@ -1,6 +1,6 @@
-using System.Globalization;
 using PanguEngine.Client.UI.Scenes.Showcase;
 using PanguEngine.UI;
+using PanguEngine.UI.Controls;
 using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Client.UI.Scenes;
@@ -36,22 +36,18 @@ internal sealed class UIShowcaseScene : GameUIScene
         CloseOnEscape = true;
 
         _shell.ReturnButton.Click += (_, _) => ReturnToPause();
-        _shell.ScaleDownButton.Click += (_, _) => SetScaleFactor(0.75);
-        _shell.ScaleResetButton.Click += (_, _) => SetScaleFactor(1);
-        _shell.ScaleUpButton.Click += (_, _) => SetScaleFactor(1.25);
-        _shell.RestoreScaleButton.Click += (_, _) => SetScaleFactor(1);
+        _shell.ScaleEditor.Subscribe(NumericUpDown<double>.ValueProperty, (_, args) => Scale = args.NewValue);
+        _shell.RestoreScaleButton.Click += (_, _) =>
+        {
+            Scale = _openingScale;
+            UpdateScaleDisplay();
+        };
 
         Root = _shell;
         UpdateScaleDisplay();
     }
 
     internal UiShowcaseShell Shell => _shell;
-
-    internal void SetScaleFactor(double factor)
-    {
-        Scale = _openingScale * factor;
-        UpdateScaleDisplay();
-    }
 
     internal void ReturnToPause() => _returnToPause();
 
@@ -83,6 +79,5 @@ internal sealed class UIShowcaseScene : GameUIScene
 
     private void Report(string message) => _shell.SetFeedback(message);
 
-    private void UpdateScaleDisplay() =>
-        _shell.SetScaleValue(string.Create(CultureInfo.InvariantCulture, $"缩放 {Scale:0.##}x"));
+    private void UpdateScaleDisplay() => _shell.ScaleEditor.Value = Scale;
 }

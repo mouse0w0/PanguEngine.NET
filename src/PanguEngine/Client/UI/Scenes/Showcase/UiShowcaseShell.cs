@@ -1,3 +1,4 @@
+using System.Globalization;
 using PanguEngine.Graphics.Text;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
@@ -22,10 +23,7 @@ internal sealed class UiShowcaseShell : Region
     private readonly Text _feedback;
     private readonly Text _warning;
     private readonly StackPanel _scaleRow;
-    private readonly Text _scaleValue;
-    private readonly Button _scaleDown;
-    private readonly Button _scaleReset;
-    private readonly Button _scaleUp;
+    private readonly NumericUpDown<double> _scaleEditor;
     private readonly Button _restoreScale;
     private readonly Button _returnButton;
     private bool _isCompact;
@@ -48,15 +46,22 @@ internal sealed class UiShowcaseShell : Region
         _feedback = CreateClassedText("悬停、点击、输入或滚动，体验真实交互。", "showcase-feedback");
         _warning = CreateClassedText("窗口较小，可缩小 UI 或放大窗口", "showcase-warning");
         _warning.Visibility = Visibility.Collapsed;
-        _scaleDown = CreateScaleButton("0.75x", "showcase-scale-down");
-        _scaleReset = CreateScaleButton("1x", "showcase-scale-reset");
-        _scaleUp = CreateScaleButton("1.25x", "showcase-scale-up");
+        _scaleEditor = new NumericUpDown<double>
+        {
+            StyleId = "showcase-scale-editor",
+            Minimum = 0.5,
+            Maximum = 3,
+            Increment = 0.05,
+            Value = 1,
+            FormatString = "0.##",
+            FormatProvider = CultureInfo.InvariantCulture,
+            Width = 120,
+            MinHeight = 32
+        };
         _restoreScale = CreateScaleButton("恢复", "showcase-scale-restore");
-        _scaleValue = UiShowcaseWidgets.Label(string.Empty, "showcase-scale-value");
         _scaleRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = Gap };
-        _scaleRow.Children.Add(_scaleDown);
-        _scaleRow.Children.Add(_scaleReset);
-        _scaleRow.Children.Add(_scaleUp);
+        _scaleRow.Children.Add(new Text { Content = "缩放", VerticalAlignment = VerticalAlignment.Center });
+        _scaleRow.Children.Add(_scaleEditor);
         _scaleRow.Children.Add(_restoreScale);
         _returnButton = new Button { Content = "返回暂停菜单", MinHeight = 36, StyleId = "showcase-return" };
         Children.Add(_header);
@@ -64,15 +69,11 @@ internal sealed class UiShowcaseShell : Region
         Children.Add(_feedback);
         Children.Add(_warning);
         Children.Add(_scaleRow);
-        Children.Add(_scaleValue);
         Children.Add(_returnButton);
     }
 
     internal TabView PageTabs => _pageTabs;
-    internal IReadOnlyList<Button> ScaleButtons => new[] { _scaleDown, _scaleReset, _scaleUp, _restoreScale };
-    internal Button ScaleDownButton => _scaleDown;
-    internal Button ScaleResetButton => _scaleReset;
-    internal Button ScaleUpButton => _scaleUp;
+    internal NumericUpDown<double> ScaleEditor => _scaleEditor;
     internal Button RestoreScaleButton => _restoreScale;
     internal Button ReturnButton => _returnButton;
     internal bool IsCompact => _isCompact;
@@ -99,7 +100,6 @@ internal sealed class UiShowcaseShell : Region
     }
 
     internal void SetFeedback(string message) => _feedback.Content = message;
-    internal void SetScaleValue(string text) => _scaleValue.Content = text;
 
     internal void ApplyViewportMode(Size viewport)
     {
@@ -111,8 +111,6 @@ internal sealed class UiShowcaseShell : Region
             var supplementalVisibility = compact ? Visibility.Collapsed : Visibility.Visible;
             _escapeHint.Visibility = supplementalVisibility;
             _feedback.Visibility = supplementalVisibility;
-            _scaleValue.Visibility = supplementalVisibility;
-            _restoreScale.Visibility = supplementalVisibility;
             if (compact)
             {
                 Classes.Add("showcase-compact");
@@ -138,14 +136,14 @@ internal sealed class UiShowcaseShell : Region
     protected override Size MeasureContent(Size availableSize)
     {
         var width = availableSize.Width;
-        foreach (var node in new UIElement[] { _header, _feedback, _warning, _scaleRow, _scaleValue, _returnButton })
+        foreach (var node in new UIElement[] { _header, _feedback, _warning, _scaleRow, _returnButton })
             node.Measure(new Size(width, double.PositiveInfinity));
         var footerHeight = _isCompact
             ? _returnButton.DesiredSize.Height + Gap + _scaleRow.DesiredSize.Height
             : Math.Max(_returnButton.DesiredSize.Height, _scaleRow.DesiredSize.Height);
         var informationHeight = _showWarning ? _warning.DesiredSize.Height + Gap : 0;
         if (!_isCompact)
-            informationHeight += _feedback.DesiredSize.Height + _scaleValue.DesiredSize.Height + Gap * 2;
+            informationHeight += _feedback.DesiredSize.Height + Gap;
         var reservedHeight = _header.DesiredSize.Height + footerHeight + informationHeight + Gap * 2;
         var pageHeight = double.IsPositiveInfinity(availableSize.Height)
             ? double.PositiveInfinity
@@ -178,7 +176,6 @@ internal sealed class UiShowcaseShell : Region
             ArrangeNode(_returnButton, left, returnTop, width, _returnButton.DesiredSize.Height);
             ArrangeNode(_scaleRow, left, scaleTop, width, _scaleRow.DesiredSize.Height);
             _feedback.Arrange(Rect.Zero);
-            _scaleValue.Arrange(Rect.Zero);
             middleBottom = scaleTop - Gap;
         }
         else
@@ -188,9 +185,7 @@ internal sealed class UiShowcaseShell : Region
             ArrangeNode(_scaleRow, left, footerTop, width, _scaleRow.DesiredSize.Height);
             ArrangeNode(_returnButton, left + width - returnWidth, footerTop, returnWidth,
                 _returnButton.DesiredSize.Height);
-            var valueTop = footerTop - Gap - _scaleValue.DesiredSize.Height;
-            ArrangeNode(_scaleValue, left, valueTop, width, _scaleValue.DesiredSize.Height);
-            middleBottom = valueTop - Gap;
+            middleBottom = footerTop - Gap;
         }
 
         if (_showWarning)
