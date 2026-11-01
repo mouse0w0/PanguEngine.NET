@@ -99,6 +99,33 @@ ToggleButton:checked:disabled {
     background-color: #253447;
 }
 
+ProgressBar {
+    width: 160px;
+    height: 8px;
+    border-radius: 4px;
+    background-color: #30363e;
+}
+
+ProgressBar:vertical {
+    width: 8px;
+    height: 160px;
+}
+
+ProgressBar .progress-bar-fill {
+    background-color: #54a9ff;
+    border-radius: 4px;
+}
+
+ProgressBar:disabled,
+:disabled ProgressBar {
+    background-color: #1b1e23;
+}
+
+ProgressBar:disabled .progress-bar-fill,
+:disabled ProgressBar .progress-bar-fill {
+    background-color: #566a80;
+}
+
 ToggleSwitch {
     width: 44px;
     height: 24px;

@@ -1,3 +1,14 @@
+ProgressBar.showcase-progress-accent {
+    height: 12px;
+    border-radius: 6px;
+    background-color: #243c30;
+}
+
+ProgressBar.showcase-progress-accent .progress-bar-fill {
+    border-radius: 6px;
+    background-color: #76d39b;
+}
+
 .showcase-items-view {
     margin: 6px 0px;
 }
