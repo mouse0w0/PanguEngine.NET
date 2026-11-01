@@ -19,7 +19,11 @@ public sealed class TreeViewTests
         var child = Branch("child", grandchild);
         var root = Branch("root", child);
         var calls = new List<Node>();
-        var tree = Create([root], node => { calls.Add(node); return node.Children; });
+        var tree = Create([root], node =>
+        {
+            calls.Add(node);
+            return node.Children;
+        });
         var scene = Open(tree);
         tree.Expand(root);
         tree.Selection.SelectOnly(child);
@@ -60,7 +64,11 @@ public sealed class TreeViewTests
         using var text = new TextTestContext();
         var root = new Node("root");
         var calls = 0;
-        var tree = Create([root], node => { calls++; return node.Children; });
+        var tree = Create([root], node =>
+        {
+            calls++;
+            return node.Children;
+        });
         tree.Expand(root);
         root.Children.Add(new Node("child"));
         tree.Expand(root);
@@ -78,7 +86,11 @@ public sealed class TreeViewTests
         using var text = new TextTestContext();
         var root = new Node("root") { MayHaveChildren = true };
         var calls = 0;
-        var tree = Create([root], node => { calls++; return node.Children; });
+        var tree = Create([root], node =>
+        {
+            calls++;
+            return node.Children;
+        });
         var changes = new List<bool>();
         tree.ExpansionChanged += (_, args) => changes.Add(args.IsExpanded);
         tree.Expand(root);
@@ -107,7 +119,11 @@ public sealed class TreeViewTests
         var previous = new ObservableList<Node>([previousChild]);
         var current = previous;
         var calls = 0;
-        var tree = Create([root], _ => { calls++; return current; });
+        var tree = Create([root], _ =>
+        {
+            calls++;
+            return current;
+        });
         var scene = Open(tree);
         tree.Expand(root);
         tree.Selection.SelectOnly(previousChild);
@@ -119,6 +135,7 @@ public sealed class TreeViewTests
             roots.RemoveAt(0);
             roots.Add(root);
         }
+
         Assert.Empty(tree.Selection.SelectedItems);
         var child = new Node("current");
         current = new ObservableList<Node>([child]);
@@ -207,9 +224,10 @@ public sealed class TreeViewTests
         foreach (var row in Descendants(tree).OfType<TreeItemContainer>())
         {
             Assert.False(row.HasPseudoClass(PseudoClass.Selected));
-            Assert.False(row.HasPseudoClass(PseudoClass.Get("current")));
-            Assert.False(row.HasPseudoClass(PseudoClass.Get("expanded")));
+            Assert.False(row.HasPseudoClass(PseudoClass.Current));
+            Assert.False(row.HasPseudoClass(PseudoClass.Expanded));
         }
+
         var horizontal = Descendants(tree).OfType<ScrollBar>().Single(bar => bar.Orientation == Orientation.Horizontal);
         Assert.True(horizontal.Maximum > 0);
         var maximum = horizontal.Maximum;
@@ -246,7 +264,8 @@ public sealed class TreeViewTests
     [InlineData(8, 120, false)]
     [InlineData(120, 0, true)]
     [InlineData(120, 8, true)]
-    public void ScrollBarsStayInsideViewportsSmallerThanTheirNominalThickness(double width, double height, bool establishWidth)
+    public void ScrollBarsStayInsideViewportsSmallerThanTheirNominalThickness(double width, double height,
+        bool establishWidth)
     {
         using var text = new TextTestContext();
         var tree = Create(Enumerable.Range(0, 100).Select(index => new Node($"node {index}") { ContentWidth = 400 }));
@@ -263,6 +282,7 @@ public sealed class TreeViewTests
             Assert.Contains(Descendants(tree).OfType<ScrollBar>(),
                 bar => bar.Orientation == Orientation.Horizontal && bar.Visibility == Visibility.Visible);
         }
+
         foreach (var bar in Descendants(tree).OfType<ScrollBar>().Where(bar => bar.Visibility == Visibility.Visible))
         {
             Assert.InRange(bar.LayoutBounds.X, 0, tree.LayoutBounds.Width);
@@ -270,6 +290,7 @@ public sealed class TreeViewTests
             Assert.InRange(bar.LayoutBounds.X + bar.LayoutBounds.Width, 0, tree.LayoutBounds.Width);
             Assert.InRange(bar.LayoutBounds.Y + bar.LayoutBounds.Height, 0, tree.LayoutBounds.Height);
         }
+
         scene.Close();
     }
 
@@ -349,8 +370,8 @@ public sealed class TreeViewTests
         yield return element;
         if (element is Container container)
             foreach (var child in container.ReadOnlyChildren)
-                foreach (var descendant in Descendants(child))
-                    yield return descendant;
+            foreach (var descendant in Descendants(child))
+                yield return descendant;
     }
 
     private sealed class RecordingTemplate : IRecyclingDataTemplate

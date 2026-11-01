@@ -6,7 +6,6 @@ namespace PanguEngine.UI.Controls;
 
 internal sealed class ItemContainer : Control
 {
-    private static readonly PseudoClass CurrentPseudoClass = PseudoClass.Get("current");
     private readonly Action<ItemContainer, PointerButtonEventArgs> _clicked;
 
     static ItemContainer() => CssRegistry.RegisterElement<ItemContainer>("ItemContainer");
@@ -38,7 +37,7 @@ internal sealed class ItemContainer : Control
     internal void SetStates(bool selected, bool current)
     {
         SetPseudoClass(PseudoClass.Selected, selected);
-        SetPseudoClass(CurrentPseudoClass, current);
+        SetPseudoClass(PseudoClass.Current, current);
     }
 
     protected override void OnPointerClicked(PointerButtonEventArgs eventArgs)

@@ -6,8 +6,6 @@ namespace PanguEngine.UI.Controls;
 /// <summary>Displays a numeric progress value within a range.</summary>
 public sealed class ProgressBar : Control
 {
-    private static readonly PseudoClass ReversedPseudoClass = PseudoClass.Get("reversed");
-
     /// <summary>Identifies the lower bound of the progress range.</summary>
     public static readonly DirectProperty<ProgressBar, double> MinimumProperty =
         Property.RegisterDirect<ProgressBar, double>(nameof(Minimum), static bar => bar.Minimum,
@@ -150,7 +148,7 @@ public sealed class ProgressBar : Control
     {
         SetPseudoClass(PseudoClass.Horizontal, Orientation == Orientation.Horizontal);
         SetPseudoClass(PseudoClass.Vertical, Orientation == Orientation.Vertical);
-        SetPseudoClass(ReversedPseudoClass, IsReversed);
+        SetPseudoClass(PseudoClass.Reversed, IsReversed);
     }
 
     private static void EnsureFinite(double value, string name)

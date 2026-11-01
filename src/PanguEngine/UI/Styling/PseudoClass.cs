@@ -6,14 +6,6 @@ public sealed class PseudoClass
     private static readonly Lock Sync = new();
     private static readonly Dictionary<string, PseudoClass> Instances = new(StringComparer.Ordinal);
 
-    private PseudoClass(string name)
-    {
-        Name = name;
-    }
-
-    /// <summary>Gets the normalized lower-case name without a leading colon.</summary>
-    public string Name { get; }
-
     /// <summary>Gets the built-in structural pseudo class that matches nodes without a parent.</summary>
     /// <remarks>The name <c>root</c> is reserved. Its matching state cannot be changed manually.</remarks>
     public static PseudoClass Root { get; } = Get("root");
@@ -30,12 +22,6 @@ public sealed class PseudoClass
     /// <summary>Gets the structural pseudo class that matches a node without child nodes, regardless of content.</summary>
     public static PseudoClass Empty { get; } = Get("empty");
 
-    /// <summary>Gets whether this identifier constrains sibling position or count.</summary>
-    internal bool IsChildIndexed => this == FirstChild || this == LastChild || this == OnlyChild;
-
-    /// <summary>Gets whether this identifier is matched automatically from tree structure.</summary>
-    internal bool IsStructural => this == Root || this == Empty || IsChildIndexed;
-
     /// <summary>Gets the built-in hover pseudo class.</summary>
     public static PseudoClass Hover { get; } = Get("hover");
 
@@ -51,6 +37,9 @@ public sealed class PseudoClass
     /// <summary>Gets the built-in pressed pseudo class.</summary>
     public static PseudoClass Pressed { get; } = Get("pressed");
 
+    /// <summary>Gets the built-in dragging pseudo class.</summary>
+    public static PseudoClass Dragging { get; } = Get("dragging");
+
     /// <summary>Gets the built-in checked pseudo class.</summary>
     public static PseudoClass Checked { get; } = Get("checked");
 
@@ -60,20 +49,40 @@ public sealed class PseudoClass
     /// <summary>Gets the built-in read-only pseudo class.</summary>
     public static PseudoClass ReadOnly { get; } = Get("readonly");
 
-    /// <summary>Gets the built-in horizontal orientation pseudo class.</summary>
-    public static PseudoClass Horizontal { get; } = Get("horizontal");
-
-    /// <summary>Gets the built-in vertical orientation pseudo class.</summary>
-    public static PseudoClass Vertical { get; } = Get("vertical");
-
     /// <summary>Gets the built-in pseudo class for controls without a value.</summary>
     public static PseudoClass NoValue { get; } = Get("no-value");
 
     /// <summary>Gets the built-in selected pseudo class.</summary>
     public static PseudoClass Selected { get; } = Get("selected");
 
-    /// <summary>Gets the built-in dragging pseudo class.</summary>
-    public static PseudoClass Dragging { get; } = Get("dragging");
+    /// <summary>Gets the built-in pseudo class for the current navigation item.</summary>
+    public static PseudoClass Current { get; } = Get("current");
+
+    /// <summary>Gets the built-in expanded pseudo class.</summary>
+    public static PseudoClass Expanded { get; } = Get("expanded");
+
+    /// <summary>Gets the built-in horizontal orientation pseudo class.</summary>
+    public static PseudoClass Horizontal { get; } = Get("horizontal");
+
+    /// <summary>Gets the built-in vertical orientation pseudo class.</summary>
+    public static PseudoClass Vertical { get; } = Get("vertical");
+
+    /// <summary>Gets the built-in pseudo class for controls with a reversed direction.</summary>
+    public static PseudoClass Reversed { get; } = Get("reversed");
+
+    private PseudoClass(string name)
+    {
+        Name = name;
+    }
+
+    /// <summary>Gets the normalized lower-case name without a leading colon.</summary>
+    public string Name { get; }
+
+    /// <summary>Gets whether this identifier constrains sibling position or count.</summary>
+    internal bool IsChildIndexed => this == FirstChild || this == LastChild || this == OnlyChild;
+
+    /// <summary>Gets whether this identifier is matched automatically from tree structure.</summary>
+    internal bool IsStructural => this == Root || this == Empty || IsChildIndexed;
 
     /// <summary>Gets or creates the shared identifier for a case-insensitive pseudo-class name.</summary>
     /// <param name="name">An ASCII identifier without a leading colon.</param>

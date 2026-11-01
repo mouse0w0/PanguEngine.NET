@@ -87,7 +87,7 @@ public sealed class ItemsViewInputTests
         Assert.Equal(new[] { 99 }, view.Selection.SelectedItems);
         var current = Descendants(view).OfType<ItemContainer>().Single(item => item.Index == 99);
         Assert.Same(currentRoot, current.ContentRoot);
-        Assert.True(current.HasPseudoClass(PseudoClass.Get("current")));
+        Assert.True(current.HasPseudoClass(PseudoClass.Current));
 
         source.Move(100, 98);
         manager.UpdateFrame(new Size(240, 160), 0);
@@ -96,7 +96,7 @@ public sealed class ItemsViewInputTests
         Assert.Equal(new[] { 99 }, view.Selection.SelectedItems);
         current = Descendants(view).OfType<ItemContainer>().Single(item => item.Index == 100);
         Assert.Same(currentRoot, current.ContentRoot);
-        Assert.True(current.HasPseudoClass(PseudoClass.Get("current")));
+        Assert.True(current.HasPseudoClass(PseudoClass.Current));
         manager.ProcessKeyDown(Key.Up, KeyModifiers.Shift);
         Assert.Equal(new[] { 98, 99 }, view.Selection.SelectedIndices);
 
@@ -388,6 +388,7 @@ public sealed class ItemsViewInputTests
             x += node.LayoutBounds.X;
             y += node.LayoutBounds.Y;
         }
+
         return new Point(x, y);
     }
 }

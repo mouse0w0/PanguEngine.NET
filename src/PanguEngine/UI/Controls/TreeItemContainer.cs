@@ -8,8 +8,6 @@ internal sealed class TreeItemContainer : Control
 {
     private const double DisclosureWidth = 20;
     private const double DisclosureSpacing = 6;
-    private static readonly PseudoClass CurrentClass = PseudoClass.Get("current");
-    private static readonly PseudoClass ExpandedClass = PseudoClass.Get("expanded");
     private readonly Button _expand;
     private readonly Action<TreeItemContainer, PointerButtonEventArgs> _clicked;
     private double _indentation;
@@ -63,8 +61,8 @@ internal sealed class TreeItemContainer : Control
     internal void SetStates(bool selected, bool current, bool expanded, bool canExpand)
     {
         SetPseudoClass(PseudoClass.Selected, selected);
-        SetPseudoClass(CurrentClass, current);
-        SetPseudoClass(ExpandedClass, expanded);
+        SetPseudoClass(PseudoClass.Current, current);
+        SetPseudoClass(PseudoClass.Expanded, expanded);
         _expand.Visibility = canExpand ? Visibility.Visible : Visibility.Hidden;
     }
 

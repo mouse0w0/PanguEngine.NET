@@ -53,6 +53,9 @@ public sealed class PseudoClassTests
         Assert.Same(PseudoClass.NoValue, PseudoClass.Get("no-value"));
         Assert.Same(PseudoClass.Selected, PseudoClass.Get("selected"));
         Assert.Same(PseudoClass.Dragging, PseudoClass.Get("dragging"));
+        Assert.Same(PseudoClass.Current, PseudoClass.Get("current"));
+        Assert.Same(PseudoClass.Expanded, PseudoClass.Get("expanded"));
+        Assert.Same(PseudoClass.Reversed, PseudoClass.Get("reversed"));
 
         Assert.Equal("hover", PseudoClass.Hover.Name);
         Assert.Equal("focus", PseudoClass.Focus.Name);
