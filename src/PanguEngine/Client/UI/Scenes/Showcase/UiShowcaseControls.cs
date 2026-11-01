@@ -31,7 +31,8 @@ internal static class UiShowcaseControls
         UiShowcaseScroll.CreateScrollBarExample(),
         UiShowcaseScroll.CreateScrollViewExample(),
         UiShowcaseItemsViews.CreateListExample(),
-        UiShowcaseItemsViews.CreateGridExample()
+        UiShowcaseItemsViews.CreateGridExample(),
+        UiShowcaseTreeView.CreateExample()
     ];
 
     private static UiShowcaseExample CreateImageExample()

@@ -1,38 +1,75 @@
-ListView, GridView {
+ListView, GridView, TreeView {
     background-color: #1b1e23;
     border-color: #5c6774;
     border-thickness: 1px;
     padding: 4px;
 }
 
-ItemContainer {
+ItemContainer, TreeItemContainer {
     padding: 3px 6px;
     border-thickness: 1px;
     border-color: transparent;
 }
 
-ItemContainer:hover {
+ItemContainer:hover, TreeItemContainer:hover {
     background-color: #30363e;
 }
 
-ItemContainer:selected {
+ItemContainer:selected, TreeItemContainer:selected {
     background-color: #2f64a0;
 }
 
-ItemContainer:selected:hover {
+ItemContainer:selected:hover, TreeItemContainer:selected:hover {
     background-color: #3d75b5;
 }
 
-ItemContainer:current {
+ItemContainer:current, TreeItemContainer:current {
     border-color: #54a9ff;
 }
 
-ListView:focus, GridView:focus {
+ListView:focus, GridView:focus, TreeView:focus {
     border-color: #54a9ff;
 }
 
-ItemContainer:disabled {
+ItemContainer:disabled, TreeItemContainer:disabled {
     color: #8b94a0;
+}
+
+Button.tree-disclosure {
+    padding: 0px;
+    border-thickness: 0px;
+    background-color: transparent;
+    cursor: pointer;
+}
+
+Button.tree-disclosure:hover,
+Button.tree-disclosure:pressed,
+Button.tree-disclosure:disabled {
+    background-color: transparent;
+}
+
+Button.tree-disclosure:disabled,
+:disabled Button.tree-disclosure {
+    cursor: default;
+}
+
+TreeItemContainer > Button.tree-disclosure > Path.tree-disclosure-arrow {
+    width: 12px;
+    height: 12px;
+    data: "M 0 0 L 4 4 L 0 8 Z";
+    fill: #f2f4f7;
+    stroke: none;
+    stretch: uniform;
+}
+
+TreeItemContainer:expanded > Button.tree-disclosure > Path.tree-disclosure-arrow {
+    data: "M 0 0 L 8 0 L 4 4 Z";
+}
+
+TreeItemContainer > Button.tree-disclosure:disabled > Path.tree-disclosure-arrow,
+TreeItemContainer:disabled > Button.tree-disclosure > Path.tree-disclosure-arrow,
+:disabled TreeItemContainer > Button.tree-disclosure > Path.tree-disclosure-arrow {
+    fill: #6e7884;
 }
 
 Button {
