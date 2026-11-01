@@ -1,3 +1,15 @@
+.showcase-items-view {
+    margin: 6px 0px;
+}
+
+.showcase-item-content Text {
+    font-size: 13px;
+}
+
+.showcase-item-meter {
+    background-color: #7db4ea;
+}
+
 .showcase-shell {
     padding: 16px;
 }

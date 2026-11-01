@@ -1,3 +1,40 @@
+ListView, GridView {
+    background-color: #1b1e23;
+    border-color: #5c6774;
+    border-thickness: 1px;
+    padding: 4px;
+}
+
+ItemContainer {
+    padding: 3px 6px;
+    border-thickness: 1px;
+    border-color: transparent;
+}
+
+ItemContainer:hover {
+    background-color: #30363e;
+}
+
+ItemContainer:selected {
+    background-color: #2f64a0;
+}
+
+ItemContainer:selected:hover {
+    background-color: #3d75b5;
+}
+
+ItemContainer:current {
+    border-color: #54a9ff;
+}
+
+ListView:focus, GridView:focus {
+    border-color: #54a9ff;
+}
+
+ItemContainer:disabled {
+    color: #8b94a0;
+}
+
 Button {
     padding: 7px 12px;
     background-color: #30363e;
