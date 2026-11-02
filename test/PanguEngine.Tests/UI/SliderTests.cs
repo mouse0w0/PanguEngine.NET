@@ -8,9 +8,11 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.Tests.UI;
 
 [Collection(TextServicesCollection.Name)]
+[UIThreadTest]
 public sealed class SliderTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void NoValueStateChangesTheDefaultTrackStyleAndRestoresItWhenValuesReturn()
     {
         var items = new ObservableList<int>([60]);
@@ -36,6 +38,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void AvailabilityTransitionsPublishOnlyCommittedAvailability()
     {
         var items = new ObservableList<int>();
@@ -63,6 +66,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ClrAndRegisteredWritesAndClearingUseTheSameAssignmentRules()
     {
         var slider = new Slider<int>(new NumericSliderValueModel<int>
@@ -88,6 +92,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void TwoWayBindingPreservesNumericAssignmentPolicies()
     {
         var source = new Slider<int>(new NumericSliderValueModel<int>()) { Value = 15 };
@@ -104,6 +109,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void BoundListRejectsNonMembersAndRequiresExplicitResynchronizationAfterEmpty()
     {
         var source = new Slider<int>(new NumericSliderValueModel<int> { Maximum = 200 }) { Value = 60 };
@@ -186,6 +192,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ClearingTheRequiredModelIsRejectedWithoutReplacingIt()
     {
         var model = new NumericSliderValueModel<int>();
@@ -200,6 +207,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ReplacingModelsPreservesLegalValuesOrUsesTheNewInitialValue()
     {
         var oldModel = new NumericSliderValueModel<int>();
@@ -215,6 +223,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ModelReplacementCallbacksDoNotDuplicatePreservedValueChanges()
     {
         var slider = new Slider<int>(new NumericSliderValueModel<int>()) { Value = 60 };
@@ -232,6 +241,7 @@ public sealed class SliderTests
     [Theory]
     [InlineData(10)]
     [InlineData(15)]
+    [UIThreadTest(false)]
     public void ModelReplacementPublishesValueChangesBeforeExternalModelCallbacks(int assignedValue)
     {
         var slider = new Slider<int>(new NumericSliderValueModel<int>()) { Value = 60 };
@@ -252,6 +262,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ReentrantModelReplacementDoesNotInventValueChangesAcrossAvailabilityTransitions()
     {
         var slider = new Slider<int>(new NumericSliderValueModel<int>()) { Value = 60 };
@@ -277,6 +288,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ReentrantValueWritesPreserveAvailabilityNotificationsAfterModelReplacement()
     {
         var slider = new Slider<int>(new ListSliderValueModel<int>(new ObservableList<int>()));
@@ -589,6 +601,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void MeasuredLabelsAvoidOverlapAndPreferTheSelectedTick()
     {
         using var textContext = new TextTestContext();
@@ -650,6 +663,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ModelReplacementUsesTheCandidateListsMatchingRule()
     {
         var slider = new Slider<string>(new ListSliderValueModel<string>(new ObservableList<string>(["HIGH"])));
@@ -683,6 +697,7 @@ public sealed class SliderTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void TickLabelsCanBeEnabledAndHiddenSelectedLabelsCanBecomeVisible()
     {
         using var textContext = new TextTestContext();

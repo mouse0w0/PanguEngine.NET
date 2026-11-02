@@ -10,6 +10,8 @@ using CursorShape = PanguEngine.Windowing.CursorShape;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class UIManagerTests
 {
     [Fact]
@@ -796,7 +798,7 @@ public sealed class UIManagerTests
         manager.UpdateFrame(new Size(20, 10), 0);
 
         Assert.Same(scene, manager.CurrentScene);
-        Assert.False(replacement.IsOpen());
+        Assert.False(replacement.IsOpen);
         Assert.Equal(1, root.MeasureCalls);
         Assert.Equal(1, root.ArrangeCalls);
         manager.Destroy();
@@ -844,7 +846,7 @@ public sealed class UIManagerTests
         Assert.Same(oldScene, oldScene.Root!.Scene);
         Assert.Same(oldScene, manager.CurrentScene);
         Assert.False(change.IsCompleted);
-        Assert.False(replacement.IsOpen());
+        Assert.False(replacement.IsOpen);
         Assert.Empty(events);
         Assert.False(replacement.Root!.IsMeasureValid);
         var commands = new DrawCommandList();
@@ -854,7 +856,7 @@ public sealed class UIManagerTests
         queue.RunPending();
         Assert.True(change.IsCompletedSuccessfully);
         Assert.Same(replacement, manager.CurrentScene);
-        Assert.False(oldScene.IsOpen());
+        Assert.False(oldScene.IsOpen);
 
         manager.UpdateFrame(new Size(20, 10), 0);
 
@@ -911,7 +913,7 @@ public sealed class UIManagerTests
         manager.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
     public void WrongThreadManagerOperationsFailWithoutChangingState()
     {
         var manager = new UIManager();
@@ -995,7 +997,7 @@ public sealed class UIManagerTests
 
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScene);
-        Assert.True(manager.Hud.Scene.IsOpen());
+        Assert.True(manager.Hud.Scene.IsOpen);
         Assert.Empty(changes);
     }
 
@@ -1229,7 +1231,8 @@ public sealed class UIManagerTests
         queue.RunPending();
 
         Assert.Null(manager.CurrentScene);
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
+        Assert.True(change.IsCompletedSuccessfully);
         manager.Destroy();
         queue.Destroy();
         await change;
@@ -1260,6 +1263,7 @@ public sealed class UIManagerTests
         manager.Destroy();
         queue.Destroy();
 
+        Assert.True(change.IsFaulted);
         var actual = await Assert.ThrowsAsync<InvalidOperationException>(() => change);
         Assert.Same(failure, actual);
     }
@@ -1422,8 +1426,8 @@ public sealed class UIManagerTests
 
         Assert.Same(scene, manager.CurrentScene);
         Assert.Equal(1, calls);
-        Assert.False(replacement.IsOpen());
-        Assert.True(scene.IsOpen());
+        Assert.False(replacement.IsOpen);
+        Assert.True(scene.IsOpen);
         Assert.Equal(!fixedUpdate, root.IsMeasureValid);
         manager.Destroy();
         Assert.Throws<ObjectDisposedException>(manager.Update);

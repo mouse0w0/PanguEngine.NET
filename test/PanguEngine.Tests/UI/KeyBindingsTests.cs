@@ -7,9 +7,12 @@ using PanguEngine.UI.Input;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class KeyBindingsTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void PublicSurfaceExposesBindingRegistrationAndDispatch()
     {
         var openType = typeof(KeyBindings<>);
@@ -116,6 +119,7 @@ public sealed class KeyBindingsTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void AddBindingOverloadsUseExpectedDefaultsAndReturnSameCollection()
     {
         var bindings = new KeyBindings<OverloadNode>();
@@ -149,6 +153,7 @@ public sealed class KeyBindingsTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void DuplicateBindingThrowsInvalidOperationException()
     {
         var calls = 0;
@@ -169,6 +174,7 @@ public sealed class KeyBindingsTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void NullBindingHandlerThrowsArgumentNullException()
     {
         Action<NullHandlerNode, KeyEventArgs> handler = null!;

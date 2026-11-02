@@ -6,6 +6,7 @@ using Path = PanguEngine.UI.Controls.Path;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class ShapeTests
 {
     [Fact]
@@ -424,6 +425,7 @@ public sealed class ShapeTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ValidGeometryRecordsDrawingCommands()
     {
         var rectangle = new Rectangle { Width = 10, Height = 10 };
@@ -441,6 +443,7 @@ public sealed class ShapeTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void SceneScaleChangesKeepLocalHitGeometryConsistent()
     {
         var rectangle = new Rectangle { Width = 20, Height = 20 };

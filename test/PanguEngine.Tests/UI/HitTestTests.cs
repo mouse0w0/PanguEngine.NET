@@ -4,6 +4,7 @@ using PanguEngine.UI;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class HitTestTests
 {
     [Fact]
@@ -165,6 +166,7 @@ public sealed class HitTestTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CoordinateConversionUsesOwnedSceneAndAllCommittedLayoutOffsets()
     {
         var manager = new UIManager();
@@ -196,7 +198,8 @@ public sealed class HitTestTests
         Assert.Equal(new Point(19, 32), leaf.LocalToScene(new Point(1, 2)));
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void CoordinateConversionUsesOpenSceneOwnerThread()
     {
         var root = new TestNode();
@@ -220,6 +223,7 @@ public sealed class HitTestTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CoordinateConversionRejectsNonFiniteAccumulation()
     {
         var manager = new UIManager();
@@ -235,7 +239,8 @@ public sealed class HitTestTests
             leaf.SceneToLocal(new Point(-double.MaxValue, 0)));
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveContainsAndHitTestRequireOwnerThread()
     {
         var root = new TestNode { Width = 20, Height = 20 };

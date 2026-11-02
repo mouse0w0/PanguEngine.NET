@@ -6,6 +6,7 @@ using PanguEngine.UI.Drawing;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class RegionTests
 {
     [Fact]
@@ -645,7 +646,8 @@ public sealed class RegionTests
         Assert.Same(expectedBackground, region.Background);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveRegionRejectsWrongThreadRenderPropertyPathsWithoutPartialState()
     {
         var region = new TestRegion();
@@ -699,7 +701,8 @@ public sealed class RegionTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveRegionRejectsWrongThreadBorderChangesWithoutPartialState()
     {
         var originalBrush = new SolidColorBrush(10, 20, 30);

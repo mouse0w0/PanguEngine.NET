@@ -5,6 +5,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class CanvasTests
 {
     [Fact]
@@ -364,7 +365,8 @@ public sealed class CanvasTests
         Assert.False(root.IsArrangeValid);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActivePositionPathsRejectWrongThreadWithoutPartialState()
     {
         var node = new TestNode();

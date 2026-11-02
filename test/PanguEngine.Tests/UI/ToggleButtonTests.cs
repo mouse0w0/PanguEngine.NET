@@ -10,9 +10,12 @@ using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class ToggleButtonTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void DefaultsAndStyleRegistrationMatchTheToggleContract()
     {
         var button = new ToggleButton();
@@ -31,6 +34,7 @@ public sealed class ToggleButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ExternalWritesAndClearValueNotifyWithoutClicking()
     {
         var button = new ToggleButton();

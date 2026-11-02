@@ -21,7 +21,7 @@ public sealed class HudManager
     }
 
     /// <summary>
-    /// Posts a HUD tree operation to the client UI owner thread.
+    /// Posts a HUD tree operation to the host UI thread.
     /// </summary>
     /// <param name="action">The operation to execute during the next HUD frame preparation.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="action"/> is null.</exception>
@@ -36,7 +36,7 @@ public sealed class HudManager
     /// <param name="key">The key of the HUD component.</param>
     /// <returns>The running HUD component.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the HUD scene is closed or access is not on its owner thread.
+    /// Thrown when the HUD scene is closed, or in Debug builds when accessed from outside the host UI thread.
     /// </exception>
     /// <exception cref="KeyNotFoundException">Thrown when no component with the key is running.</exception>
     public Hud Get(ResourceKey key)
@@ -52,7 +52,7 @@ public sealed class HudManager
     /// <param name="hud">The running HUD component when found.</param>
     /// <returns>Whether a component with the key is running.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the HUD scene is closed or access is not on its owner thread.
+    /// Thrown when the HUD scene is closed, or in Debug builds when accessed from outside the host UI thread.
     /// </exception>
     public bool TryGet(ResourceKey key, [NotNullWhen(true)] out Hud? hud)
     {

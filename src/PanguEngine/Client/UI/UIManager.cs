@@ -11,10 +11,12 @@ namespace PanguEngine.Client.UI;
 /// <summary>
 /// Manages the persistent HUD and the current regular UI scene.
 /// </summary>
-/// <remarks>The engine owns this manager and destroys it after UI dispatch has stopped.</remarks>
+/// <remarks>
+/// The engine owns this manager and destroys it after UI dispatch has stopped.
+/// Access requires the shared host UI thread; thread diagnostics are enabled only in Debug builds.
+/// </remarks>
 public sealed class UIManager
 {
-    private readonly int _ownerThreadId;
     private readonly Queue<GameUIScene?> _pendingScenes = [];
     private bool _isTransitioning;
     private bool _isDestroying;
@@ -24,7 +26,6 @@ public sealed class UIManager
 
     internal UIManager()
     {
-        _ownerThreadId = Environment.CurrentManagedThreadId;
         Hud = new HudManager();
         Hud.Open();
     }
@@ -168,7 +169,7 @@ public sealed class UIManager
 
     /// <summary>Updates the HUD and current scene and prepares their UI for drawing.</summary>
     /// <remarks>
-    /// Runs on the UI owner thread before drawing, completing the HUD before the current scene.
+    /// Runs on the host UI thread before drawing, completing the HUD before the current scene.
     /// Each scene's game frame callback precedes UI preparation, which processes posted actions,
     /// advances tickers, and updates layout.
     /// </remarks>
@@ -179,7 +180,7 @@ public sealed class UIManager
 
     /// <summary>Updates the HUD and current scene and prepares their UI for drawing.</summary>
     /// <remarks>
-    /// Runs on the UI owner thread before drawing, completing the HUD before the current scene.
+    /// Runs on the host UI thread before drawing, completing the HUD before the current scene.
     /// Each scene's game frame callback precedes UI preparation, which processes posted actions,
     /// advances tickers, and updates layout.
     /// </remarks>
@@ -196,12 +197,12 @@ public sealed class UIManager
         try
         {
             Hud.UpdateFrame(alpha);
-            if (Hud.Scene.IsOpen())
+            if (Hud.Scene.IsOpen)
                 Hud.PrepareFrame(viewportSize, frameTime);
             if (CurrentScene is { } scene)
             {
                 scene.UpdateFrame(alpha);
-                if (scene.IsOpen())
+                if (scene.IsOpen)
                     scene.PrepareFrame(viewportSize, frameTime);
             }
         }
@@ -258,7 +259,7 @@ public sealed class UIManager
             return;
 
         VerifyAccess();
-        if (scene.IsOpen())
+        if (scene.IsOpen)
             scene.SynchronizePointerPosition(position);
     }
 
@@ -336,8 +337,7 @@ public sealed class UIManager
     private void VerifyAccess()
     {
         ObjectDisposedException.ThrowIf(_destroyed, this);
-        if (_ownerThreadId != Environment.CurrentManagedThreadId)
-            throw new InvalidOperationException("UI manager access requires its owner thread.");
+        UIToolkit.VerifyAccess();
     }
 
     private void VerifyLifecycleOperation(bool allowQueuedChange = false)

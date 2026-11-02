@@ -6,12 +6,9 @@ public partial class UIScene
 
     internal void VerifyTickerStart()
     {
-        lock (_stateSync)
-        {
-            VerifyOwnerThreadCore();
-            if (_isClosing)
-                throw new InvalidOperationException("The UI scene is closing.");
-        }
+        VerifyOwnerThreadCore();
+        if (_isClosing)
+            throw new InvalidOperationException("The UI scene is closing.");
     }
 
     internal LinkedListNode<Ticker> RegisterTicker(Ticker ticker) =>

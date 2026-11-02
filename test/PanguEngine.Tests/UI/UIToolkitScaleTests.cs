@@ -29,6 +29,7 @@ public sealed class UIToolkitScaleTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void SceneUsesCurrentDefaultScaleAtConstructionAndOpening()
     {
         var original = UIToolkit.DefaultScale;
@@ -52,6 +53,7 @@ public sealed class UIToolkitScaleTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void UnoverriddenSceneReflowsWhenDefaultScaleChanges()
     {
         var original = UIToolkit.DefaultScale;
@@ -81,6 +83,7 @@ public sealed class UIToolkitScaleTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ExplicitScaleEqualToCurrentValueStopsFollowingDefaultScale()
     {
         var original = UIToolkit.DefaultScale;
@@ -105,6 +108,7 @@ public sealed class UIToolkitScaleTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FailedExplicitScaleAssignmentDoesNotStopFollowingDefaultScale()
     {
         var original = UIToolkit.DefaultScale;
@@ -128,6 +132,7 @@ public sealed class UIToolkitScaleTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void UnoverriddenSceneUsesLatestDefaultScaleWhenReopened()
     {
         var original = UIToolkit.DefaultScale;
@@ -152,6 +157,7 @@ public sealed class UIToolkitScaleTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ExplicitScalePersistsWhenSceneReopens()
     {
         var original = UIToolkit.DefaultScale;

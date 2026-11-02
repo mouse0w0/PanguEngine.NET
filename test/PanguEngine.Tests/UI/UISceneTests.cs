@@ -9,6 +9,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class UISceneTests
 {
     [Fact]
@@ -19,7 +20,6 @@ public sealed class UISceneTests
         [
             (Action)scene.Open,
             (Action)scene.Close,
-            (Func<bool>)scene.IsOpen,
             (Action<Size>)scene.PrepareFrame,
             (Action<Size, TimeSpan>)scene.PrepareFrame,
             (Func<Point, bool>)scene.ProcessPointerMoved,
@@ -34,6 +34,7 @@ public sealed class UISceneTests
 
         Assert.All(entryPoints, entryPoint =>
             Assert.True(entryPoint.Method.IsPublic, entryPoint.Method.Name));
+        Assert.False(scene.IsOpen);
     }
 
     [Fact]
@@ -98,7 +99,8 @@ public sealed class UISceneTests
         Assert.Equal(1.5, scene.Scale);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void OpenSceneScaleRejectsWrongThread()
     {
         var scene = new UIScene();
@@ -115,7 +117,8 @@ public sealed class UISceneTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void OpenSceneLayoutRoundingRejectsWrongThreadButAllowsSameValue()
     {
         var scene = new UIScene();
@@ -138,6 +141,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void UISceneScaleCannotChangeDuringLayout()
     {
         UIScene scene = null!;
@@ -157,6 +161,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void UISceneLayoutRoundingCannotChangeDuringLayout()
     {
         UIScene scene = null!;
@@ -196,6 +201,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ScaleChangeImmediatelyInvalidatesEntireRootSubtree()
     {
         var root = new Canvas();
@@ -222,6 +228,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void LayoutRoundingChangeImmediatelyInvalidatesEntireRootSubtree()
     {
         var root = new Canvas();
@@ -245,6 +252,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ExtremelySmallScaleRejectsNonFiniteLogicalViewportBeforeLayout()
     {
         var root = new LayoutNode();
@@ -260,6 +268,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void AssigningSameScaleDoesNotInvalidateLayout()
     {
         var root = new LayoutNode();
@@ -312,6 +321,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RootTransferWhileClosedInvalidatesExistingLayoutCacheOnReopen()
     {
         var manager = new UIManager();
@@ -342,6 +352,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RootTransferAcrossScenesWithEqualLayoutSettingsInvalidatesEntireSubtree()
     {
         var incoming = new Canvas();
@@ -371,6 +382,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClosedSceneTreeCanBeModifiedOnAnotherThread()
     {
         var root = new Canvas();
@@ -426,6 +438,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RootMovesBetweenOpenScenesOnTheirOwnerThread()
     {
         var incoming = new LayoutNode();
@@ -463,30 +476,22 @@ public sealed class UISceneTests
         Assert.Same(scene, leaf.Scene);
     }
 
-    [Fact]
-    public void RootTransferAcrossDifferentOwnerThreadsFailsBeforeMutation()
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
+    public void RootTransferOnBackgroundThreadFailsBeforeMutation()
     {
-        var ready = new ManualResetEventSlim();
-        var release = new ManualResetEventSlim();
-        UIScene source = null!;
-        Canvas incoming = null!;
-        var thread = new Thread(() =>
-        {
-            incoming = new Canvas();
-            source = new UIScene(incoming);
-            source.Open();
-            ready.Set();
-            release.Wait();
-            source.Close();
-        });
-        thread.Start();
-        ready.Wait();
+        var incoming = new Canvas();
+        var source = new UIScene(incoming);
+        source.Open();
         var oldRoot = new Canvas();
         var target = new UIScene(oldRoot);
         target.Open();
         try
         {
-            var error = Record.Exception(() => target.Root = incoming);
+            Exception? error = null;
+            var thread = new Thread(() => error = Record.Exception(() => target.Root = incoming));
+            thread.Start();
+            thread.Join();
 
             Assert.IsType<InvalidOperationException>(error);
             Assert.Same(incoming, source.Root);
@@ -497,12 +502,12 @@ public sealed class UISceneTests
         finally
         {
             target.Close();
-            release.Set();
-            thread.Join();
+            source.Close();
         }
     }
 
     [Fact]
+    [UIThreadTest]
     public void RootCannotChangeDuringLayout()
     {
         var oldRoot = new LayoutNode();
@@ -523,6 +528,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void AssigningCurrentRootIsANoOpBeforeThreadValidation()
     {
         var root = new LayoutNode();
@@ -542,6 +548,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpenAndCloseExposeExpectedRootStatesToCallbacks()
     {
         var root = new LayoutNode();
@@ -569,6 +576,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RootCanChangeInEveryLifecycleCallback()
     {
         var openingRoot = new LayoutNode();
@@ -595,6 +603,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void NeverOpenedAndClosedSceneCloseOperationsAreNoOps()
     {
         var scene = new UIScene(new LayoutNode());
@@ -607,8 +616,9 @@ public sealed class UISceneTests
         Assert.Same(scene, scene.Root!.Scene);
     }
 
-    [Fact]
-    public void ClosedSceneCanOpenOnAnotherThread()
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
+    public void ClosedSceneCannotReopenOutsideTheToolkitThread()
     {
         var scene = new UIScene(new LayoutNode());
         scene.Open();
@@ -630,11 +640,13 @@ public sealed class UISceneTests
         thread.Start();
         thread.Join();
 
-        Assert.Null(error);
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.False(scene.IsOpen);
         Assert.Same(scene, scene.Root!.Scene);
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpeningAnAlreadyOpenSceneFailsWithoutChangingState()
     {
         var scene = new UIScene(new LayoutNode());
@@ -647,6 +659,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void PostRequiresAnOpenScene()
     {
         var scene = new UIScene(new LayoutNode());
@@ -658,6 +671,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpeningAndOpenedCanPostUntilUpdate()
     {
         var calls = 0;
@@ -677,6 +691,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void PostPreservesFifoAndDefersActionsPostedDuringUpdate()
     {
         var calls = new List<string>();
@@ -684,7 +699,12 @@ public sealed class UISceneTests
         scene.Opened = () => scene.Post(() =>
         {
             calls.Add("first");
-            scene.Post(() => calls.Add("deferred"));
+            Exception? postError = null;
+            var thread = new Thread(() => postError = Record.Exception(() =>
+                scene.Post(() => calls.Add("deferred")))) { IsBackground = true };
+            thread.Start();
+            Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
+            Assert.Null(postError);
         });
 
         scene.Open();
@@ -698,6 +718,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void PostCanBeCalledFromBackgroundThread()
     {
         var scene = new UIScene(new LayoutNode());
@@ -727,6 +748,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActionFailureStopsTheBatchAndPreservesRemainingActions()
     {
         var expected = new InvalidOperationException("action failed");
@@ -750,6 +772,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CloseRejectsNewPostsAndClearsPendingActions()
     {
         var calls = 0;
@@ -757,10 +780,21 @@ public sealed class UISceneTests
         RecordingScene scene = null!;
         scene = new RecordingScene(new LayoutNode())
         {
-            Closing = () => postError = Record.Exception(() => scene.Post(() => calls++))
+            Closing = () =>
+            {
+                var thread = new Thread(() => postError = Record.Exception(() =>
+                    scene.Post(() => calls++))) { IsBackground = true };
+                thread.Start();
+                Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
+            }
         };
         scene.Open();
-        scene.Post(() => calls++);
+        Exception? beforeCloseError = null;
+        var beforeCloseThread = new Thread(() => beforeCloseError = Record.Exception(() =>
+            scene.Post(() => calls++))) { IsBackground = true };
+        beforeCloseThread.Start();
+        Assert.True(beforeCloseThread.Join(TimeSpan.FromSeconds(5)));
+        Assert.Null(beforeCloseError);
 
         scene.Close();
         scene.Open();
@@ -772,6 +806,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CloseInsidePostRejectsSameSceneReopenUntilUpdateReturns()
     {
         var root = new LayoutNode();
@@ -796,6 +831,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CloseInsidePostRejectsBackgroundReopenUntilUpdateReturns()
     {
         var scene = new UIScene(new LayoutNode());
@@ -821,21 +857,12 @@ public sealed class UISceneTests
         thread.Join();
 
         Assert.IsType<InvalidOperationException>(reopenError);
-        Exception? afterUpdateError = null;
-        var afterUpdateThread = new Thread(() =>
-        {
-            afterUpdateError = Record.Exception(() =>
-            {
-                scene.Open();
-                scene.Close();
-            });
-        });
-        afterUpdateThread.Start();
-        afterUpdateThread.Join();
-        Assert.Null(afterUpdateError);
+        scene.Open();
+        scene.Close();
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActionClosingBeforeThrowingPropagatesAndSkipsLayout()
     {
         var expected = new InvalidOperationException("action failed");
@@ -858,6 +885,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpeningFailurePreservesStateAndStopsLifecycleCallbacks()
     {
         var postedCalls = 0;
@@ -880,7 +908,7 @@ public sealed class UISceneTests
 
         Assert.Same(expected, actual);
         Assert.Same(scene, scene.Root!.Scene);
-        Assert.True(scene.IsOpen());
+        Assert.True(scene.IsOpen);
         Assert.Empty(callbacks);
         Assert.Throws<InvalidOperationException>(scene.Open);
         scene.PrepareFrame(new Size(20, 20));
@@ -889,6 +917,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpenedFailurePreservesStateWithoutAutomaticClose()
     {
         var postedCalls = 0;
@@ -910,7 +939,7 @@ public sealed class UISceneTests
 
         Assert.Same(expected, actual);
         Assert.Same(scene, scene.Root!.Scene);
-        Assert.True(scene.IsOpen());
+        Assert.True(scene.IsOpen);
         Assert.Empty(callbacks);
         Assert.Throws<InvalidOperationException>(scene.Open);
         scene.PrepareFrame(new Size(20, 20));
@@ -921,6 +950,7 @@ public sealed class UISceneTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void CloseFailurePreservesOriginalExceptionAndStopsLifecycle(bool failOnClosed)
     {
         var expected = new InvalidOperationException("close failed");
@@ -946,11 +976,12 @@ public sealed class UISceneTests
         Assert.Same(expected, actual);
         string[] expectedCallbacks = failOnClosed ? ["closing", "closed"] : ["closing"];
         Assert.Equal(expectedCallbacks, callbacks);
-        Assert.True(scene.IsOpen());
+        Assert.True(scene.IsOpen);
         Assert.Throws<InvalidOperationException>(() => scene.Post(() => { }));
     }
 
     [Fact]
+    [UIThreadTest]
     public void UpdateMeasuresAndArrangesZeroOriginViewport()
     {
         var root = new LayoutNode();
@@ -965,7 +996,8 @@ public sealed class UISceneTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void OpenSceneOperationsRejectWrongThread()
     {
         var scene = new UIScene(new LayoutNode());
@@ -1138,6 +1170,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void StyleSheetApplicationRejectsReplacementButAllowsStyleInput()
     {
         var first = new ProbeNode { ValueUnderNewStyles = 2 };
@@ -1173,7 +1206,8 @@ public sealed class UISceneTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void OpenSceneStyleSheetsRejectWrongThreadButAllowCurrentSnapshot()
     {
         var sheets = SourceStyleSheets;
@@ -1200,6 +1234,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void StyleSheetsCannotChangeDuringLayout()
     {
         UIScene scene = null!;
@@ -1219,6 +1254,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void StyleSheetsCannotChangeDuringDrawing()
     {
         UIScene scene = null!;
@@ -1239,6 +1275,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClosedSceneStyleChangesApplyWhenFrameUpdatesResume()
     {
         var node = new ProbeNode();
@@ -1352,6 +1389,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FailedCrossSceneStyleApplicationOccursAfterTransferAndInputCleanup()
     {
         var node = new FailOnceStyleNode { Focusable = true };

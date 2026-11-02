@@ -1,11 +1,13 @@
 using System.ComponentModel;
 using PanguEngine.ComponentModel;
 using PanguEngine.UI;
+using PanguEngine.Tests.UI;
 using PanguEngine.UI.Styling;
 using SourcePropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.ComponentModel;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class PropertyKeyTests
 {
     [Fact]
@@ -105,7 +107,8 @@ public sealed class PropertyKeyTests
         Assert.Equal(5, node.Value);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void KeyWritesOnOpenSceneRejectWrongThreadBeforeMutation()
     {
         var node = new ReadOnlyNode();

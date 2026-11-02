@@ -74,7 +74,7 @@ public abstract class ItemsView<T> : Control
     }
 
     /// <summary>Gets the view-owned selection model; its source must not be changed externally.</summary>
-    /// <remarks>Mutate the model on the view's scene owner thread and outside drawing callbacks.</remarks>
+    /// <remarks>Mutate the model on the host UI thread while the view is open, and outside drawing callbacks.</remarks>
     public MultiSelectionModel<T> Selection { get; }
     private VirtualizedItemsHost Host { get; }
     private ItemsViewLayout Layout { get; set; }

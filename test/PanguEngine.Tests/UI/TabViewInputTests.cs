@@ -6,6 +6,8 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class TabViewInputTests
 {
     [Fact]

@@ -8,9 +8,12 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class ControlTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void ControlHasRegionBaseAndOnlyReadOnlyPublicChildren()
     {
         var control = new TestControl();
@@ -41,6 +44,7 @@ public sealed class ControlTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ControlPressedPropertyExposesExpectedMetadataAndDefaults()
     {
         var control = new TestControl();

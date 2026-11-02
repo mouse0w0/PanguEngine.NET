@@ -7,6 +7,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI.Styling;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class UIElementStylingTests
 {
     private static readonly PseudoClass Loading = PseudoClass.Get("loading");
@@ -1346,7 +1347,8 @@ public sealed class UIElementStylingTests
         Assert.Equal(0.4, host.Opacity);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void OpenSceneStyleIdRejectsWrongThreadButAllowsNoOps()
     {
         var button = new Button { StyleId = "save" };
@@ -1377,6 +1379,7 @@ public sealed class UIElementStylingTests
     [InlineData(4, new string[] { })]
     [InlineData(5, new string[] { })]
     [InlineData(6, new[] { "kept", "next" })]
+    [UIThreadTest]
     public void ClassSetMutationsInvalidateStylesBeforeListenersRun(
         int operation, string[] expected)
     {
@@ -1418,7 +1421,8 @@ public sealed class UIElementStylingTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void OpenScenePseudoClassInputsRejectWrongThreadButAllowNoOps()
     {
         var host = new PseudoClassHost();
@@ -1442,6 +1446,7 @@ public sealed class UIElementStylingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void PseudoClassInputsCanChangeDuringLayoutButNotDrawing()
     {
         var node = new StyleMutationNode();
@@ -1491,6 +1496,7 @@ public sealed class UIElementStylingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClassChangesDuringDrawingApplyStylesOnTheNextFrame()
     {
         var node = new StyleMutationNode();
@@ -1540,6 +1546,7 @@ public sealed class UIElementStylingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void StyleChangesApplyAfterAllChildrenCompleteTheCurrentLayoutPass(bool duringArrange)
     {
         var root = new StackPanel();
@@ -1591,6 +1598,7 @@ public sealed class UIElementStylingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void LayoutAndStyleApplicationDoNotBlockUnrelatedScenes(bool duringLayout)
     {
         var node = new StyleMutationNode();

@@ -49,6 +49,7 @@ public sealed class UISceneLayoutStabilityTests
     [InlineData(0)]
     [InlineData(3)]
     [InlineData(15)]
+    [UIThreadTest]
     public void FiniteMeasureInvalidationSettles(int invalidations)
     {
         var root = new InvalidatingNode(invalidations);
@@ -70,6 +71,7 @@ public sealed class UISceneLayoutStabilityTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void EndlessInvalidationThrowsAfterSixteenPasses()
     {
         var root = new InvalidatingNode(int.MaxValue);
@@ -93,6 +95,7 @@ public sealed class UISceneLayoutStabilityTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void HoverCanReplaceRootAndScaleBeforeFrameCompletes()
     {
         var root = new Panel();
@@ -122,6 +125,7 @@ public sealed class UISceneLayoutStabilityTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void HoverDrivenPositionOscillationStopsAtLimit()
     {
         var root = new Canvas();

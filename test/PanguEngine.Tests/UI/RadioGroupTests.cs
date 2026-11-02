@@ -5,6 +5,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class RadioGroupTests
 {
     [Fact]
@@ -676,8 +677,9 @@ public sealed class RadioGroupTests
         Assert.False(first.IsChecked);
     }
 
-    [Fact]
-    public void GroupWritesHonorTheThreadOfItsSceneOwnedMembers()
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
+    public void GroupNotificationsDiagnoseUpdatesToActiveMembersOnAnotherThread()
     {
         var group = new RadioGroup<int?>();
         var button = new RadioButton<int?> { Group = group, Value = 1 };
@@ -698,7 +700,6 @@ public sealed class RadioGroupTests
         thread.Start();
         thread.Join();
         Assert.IsType<InvalidOperationException>(failure);
-        Assert.Null(group.SelectedButton);
         manager.Close();
     }
 

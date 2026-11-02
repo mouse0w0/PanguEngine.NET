@@ -8,9 +8,11 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.Tests.UI;
 
 [Collection(TextServicesCollection.Name)]
+[UIThreadTest]
 public sealed class ScrollViewTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void DefaultStateAndPropertyDescriptorsMatchSpecification()
     {
         var view = new ScrollView();
@@ -43,6 +45,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void DefaultBaseStyleSheetStylesScrollViewChrome()
     {
         var view = new ScrollView();
@@ -59,6 +62,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void SmallChangeRejectsNegativeAndNonFiniteValuesWithTheValueParameter()
     {
         var view = new ScrollView();
@@ -128,6 +132,7 @@ public sealed class ScrollViewTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest(false)]
     public void DisablingAnAxisBeforeFirstLayoutImmediatelyClearsItsOffset(bool horizontal)
     {
         var view = new ScrollView
@@ -501,6 +506,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ReplacingContentMovesNodesThroughTheViewport()
     {
         var first = new Panel();
@@ -593,6 +599,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void InfiniteMeasureResolvesFiniteViewportWithoutBars()
     {
         var view = new ScrollView
@@ -610,6 +617,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void InternalBarsDisableFocusAndTheirOwnWheelHandling()
     {
         var view = new ScrollView();
@@ -944,6 +952,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void HandledTextBoxKeyDoesNotScrollTheView()
     {
         using var context = new TextTestContext();
@@ -985,6 +994,7 @@ public sealed class ScrollViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ManualArrangeWithDifferentSizeStaysValid()
     {
         var view = new ScrollView

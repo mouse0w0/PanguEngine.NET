@@ -6,6 +6,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class TabInfrastructureTests
 {
     [Fact]
@@ -82,6 +83,7 @@ public sealed class TabInfrastructureTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void HidingClearsInputEvenWhenOnPropertyChangedOverrideSkipsBase()
     {
         var root = new Canvas();

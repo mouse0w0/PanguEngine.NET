@@ -9,6 +9,7 @@ using Container = PanguEngine.UI.Container;
 namespace PanguEngine.Tests.UI;
 
 [Collection(TextServicesCollection.Name)]
+[UIThreadTest]
 public sealed class CheckBoxTests
 {
     [Theory]
@@ -28,6 +29,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ProgrammaticChangesKeepIndeterminateAndDoNotActivate()
     {
         var box = new CheckBox { IsThreeState = true, IsChecked = null };
@@ -92,6 +94,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void EqualContentDoesNotReformatAndObjectMutationDoesNotRefresh()
     {
         var value = new LabelValue { Value = "first" };
@@ -106,6 +109,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void FormattingContentRejectsReplacementAndReleasesTheUpdateGuard()
     {
         var box = new CheckBox { Content = "initial" };
@@ -117,6 +121,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void EmptyAndNullFormattedContentDoNotReserveLabelSpacing()
     {
         var box = new CheckBox();
@@ -266,6 +271,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void RemovingIncomingContentCannotReenterTheDestinationSlot()
     {
         var incoming = new Panel();
@@ -281,6 +287,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void AuthorStylesControlGeneratedTextWithoutLocalValueMasks()
     {
         var box = new CheckBox { Content = "label" };
@@ -295,6 +302,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void StateChangesKeepTheSameLayoutSize()
     {
         var box = new CheckBox { Content = new Panel { Width = 40, Height = 12 } };
@@ -311,6 +319,7 @@ public sealed class CheckBoxTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void CollapsedContentDropsItsSpacingAndMarginParticipatesInLayout()
     {
         var content = new Panel { Width = 40, Height = 10, Margin = new Thickness(3) };

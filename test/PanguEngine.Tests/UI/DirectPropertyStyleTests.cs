@@ -5,6 +5,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class DirectPropertyStyleTests
 {
     [Theory]
@@ -58,6 +59,7 @@ public sealed class DirectPropertyStyleTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void DirectSetterHonorsDrawingWriteRestriction()
     {
         var node = new DirectNode();

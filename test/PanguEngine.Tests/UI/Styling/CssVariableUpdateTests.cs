@@ -4,11 +4,13 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI.Styling;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class CssVariableUpdateTests
 {
     [Theory]
     [InlineData("#root:hover #child { padding: 8px; }")]
     [InlineData("#root:hover { --spacing: 8px; } #child { padding: var(--spacing, 0); }")]
+    [UIThreadTest]
     public void PseudoChangesInvalidateChildLayoutAndRestoreValues(string css)
     {
         var root = new Panel { StyleId = "root" };
@@ -50,6 +52,7 @@ public sealed class CssVariableUpdateTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void PseudoChangesInvalidateArrangeOnlyProperties()
     {
         var child = new Panel { StyleId = "child" };

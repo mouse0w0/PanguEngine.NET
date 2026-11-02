@@ -5,6 +5,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI.Styling;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class StyleCombinatorUpdateTests
 {
     private static Panel MakePanel(params string[] classes)
@@ -520,6 +521,7 @@ public sealed class StyleCombinatorUpdateTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReorderThatStartsAFittingSiblingRuleInvalidatesLayout()
     {
         var target = MakePanel("target");

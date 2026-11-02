@@ -9,9 +9,11 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.Tests.UI;
 
 [Collection(TextServicesCollection.Name)]
+[UIThreadTest]
 public sealed class RadioButtonTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void NonGenericButtonsExposeContentLayoutAndTypedSelectionRequests()
     {
         var numberGroup = new RadioGroup<int?>();
@@ -41,6 +43,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentRetainsOriginalObjectsAndPresentsTheirText()
     {
         var value = new DisplayObject("option");
@@ -54,6 +57,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void EqualContentObjectsWithDifferentReferencesUpdateThePresentation()
     {
         var original = new DisplayObject("option");
@@ -76,6 +80,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentReentryAcceptsOnlyTheCurrentReference()
     {
         var button = new RadioButton<string>();
@@ -93,6 +98,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentNotificationsObserveTheUpdatedPresentation()
     {
         var previous = new Panel();
@@ -115,6 +121,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentConversionFailurePreservesTheCommittedPropertyAndReleasesTheGuard()
     {
         var error = new InvalidOperationException("conversion");
@@ -131,6 +138,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ReplacingContentDoesNotClearTheNewObject()
     {
         var first = new Panel();
@@ -144,6 +152,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentReentryDuringTreeNotificationsIsRejectedBeforeChangingFields()
     {
         var oldNode = new Panel();
@@ -170,6 +179,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentNotificationFailuresReleaseTheReentryGuardWithoutRollback()
     {
         var button = new RadioButton<string>();
@@ -184,6 +194,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void TextContentMeasuresWithToolkitAndSelectionDoesNotChangeSize()
     {
         using var context = new TextTestContext();
@@ -201,6 +212,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentGetsTheRemainingWidthAndNullRemovesTheGap()
     {
         var content = new Panel { Width = 30, Height = 12 };
@@ -216,6 +228,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void FiniteMeasurementSubtractsIndicatorSpacingAndContentMarginExactlyOnce()
     {
         var content = new MeasurementProbe { Margin = new Thickness(2, 0) };
@@ -240,6 +253,7 @@ public sealed class RadioButtonTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest(false)]
     public void SpacingUsesTheSceneScaleAndLayoutRoundingPolicy(bool rounding)
     {
         var content = new Panel { Width = 15, Height = 12, HorizontalAlignment = HorizontalAlignment.Left };
@@ -260,6 +274,7 @@ public sealed class RadioButtonTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest(false)]
     public void DefaultCheckedAndDisabledStylesAffectTheIndicatorAndGeneratedText(bool disableAncestor)
     {
         var group = new RadioGroup<string>();
@@ -289,6 +304,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void CheckedStyleDoesNotSelectAnUnselectedRadioInsideContent()
     {
         var group = new RadioGroup<string>();
@@ -302,6 +318,7 @@ public sealed class RadioButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void CheckedStylesApplyToEveryClosedGenericType()
     {
         var firstGroup = new RadioGroup<int?>();

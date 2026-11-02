@@ -4,6 +4,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class StackPanelTests
 {
     [Fact]
@@ -294,7 +295,8 @@ public sealed class StackPanelTests
         Assert.False(arrangePanel.IsArrangeValid);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveStackPanelPropertiesRejectWrongThreadWithoutPartialState()
     {
         var panel = new StackPanel();

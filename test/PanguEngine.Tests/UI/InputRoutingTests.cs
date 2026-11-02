@@ -7,6 +7,8 @@ using PanguEngine.UI.Input;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class InputRoutingTests
 {
     [Fact]
@@ -50,9 +52,11 @@ public sealed class InputRoutingTests
         manager.ProcessPointerMoved(new Point(5, 5));
 
         Assert.Equal(new Point(-35, 5), actual);
+#if DEBUG
         var threadError = RunOnBackgroundThread(() =>
             Record.Exception(() => captured!.GetPosition(sibling)));
         Assert.IsType<InvalidOperationException>(threadError);
+#endif
     }
 
     [Fact]
@@ -89,6 +93,7 @@ public sealed class InputRoutingTests
         manager.ProcessKeyUp(Key.A, KeyModifiers.Shift);
         manager.ProcessTextInput("text");
 
+#if DEBUG
         var threadError = RunOnBackgroundThread(() =>
             Record.Exception(() =>
             {
@@ -101,6 +106,7 @@ public sealed class InputRoutingTests
                 manager.ProcessTextInput("text");
             }));
         Assert.IsType<InvalidOperationException>(threadError);
+#endif
     }
 
     [Fact]
@@ -405,7 +411,7 @@ public sealed class InputRoutingTests
         Assert.Equal(0, events);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
     public void SceneInputRejectsWrongOwnerThread()
     {
         var (_, scene, _) = OpenScene();
@@ -517,7 +523,7 @@ public sealed class InputRoutingTests
         {
             events.Add("first");
             manager.Close();
-            Assert.False(scene.IsOpen());
+            Assert.False(scene.IsOpen);
         };
         second.PointerCanceled += (_, _) => events.Add("second");
         root.PointerCanceled += (_, _) => events.Add("root");
@@ -526,7 +532,7 @@ public sealed class InputRoutingTests
 
         manager.ProcessFocusChanged(false);
 
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         Assert.Equal(["first", "root", "second", "root"], events);
     }
 
@@ -677,7 +683,7 @@ public sealed class InputRoutingTests
         scene.Close();
 
         Assert.Equal(["closing", "lost", "exit", "root-exit", "cancel", "root-cancel", "closed"], events);
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         scene.Open();
         scene.PrepareFrame(new Size(100, 100));
         scene.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
@@ -704,7 +710,7 @@ public sealed class InputRoutingTests
         else
             manager.Open(new GameUIScene());
 
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         Assert.Equal(["cancel", "changed"], events);
     }
 
@@ -761,7 +767,7 @@ public sealed class InputRoutingTests
             else
                 manager.Close();
 
-            Assert.False(scene.IsOpen());
+            Assert.False(scene.IsOpen);
             Assert.Equal(["leaf-press", "closing", "leaf-cancel", "root-cancel", "closed"], events);
         };
         root.PointerPressed += (_, _) => events.Add("root-press");
@@ -773,7 +779,7 @@ public sealed class InputRoutingTests
         manager.ProcessPointerPressed(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
         Assert.Equal(["leaf-press", "closing", "leaf-cancel", "root-cancel", "closed", "root-press"], events);
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
     }
 
     [Theory]
@@ -825,7 +831,7 @@ public sealed class InputRoutingTests
 
         string[] expected = expectCancellation ? ["request", "cancel"] : ["request"];
         Assert.Equal(expected, events);
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         Assert.Null(scene.FocusedNode);
         Assert.False(leaf.IsPressed);
         Assert.False(leaf.IsHovered);
@@ -860,7 +866,7 @@ public sealed class InputRoutingTests
             manager.ProcessKeyDown(Key.A, KeyModifiers.None);
 
         Assert.Equal(["leaf", "closed", "root"], events);
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
     }
 
     [Theory]
@@ -886,7 +892,7 @@ public sealed class InputRoutingTests
         Assert.Equal(handled, result);
         string[] expected = handled ? ["leaf", "closed"] : ["leaf", "closed", "root"];
         Assert.Equal(expected, events);
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
     }
 
     [Fact]
@@ -899,7 +905,7 @@ public sealed class InputRoutingTests
         {
             events.Add("leaf");
             manager.Destroy();
-            Assert.False(scene.IsOpen());
+            Assert.False(scene.IsOpen);
         };
         root.PointerPressed += (_, _) => events.Add("root");
         leaf.PointerCanceled += (_, _) => events.Add("cancel");
@@ -927,7 +933,7 @@ public sealed class InputRoutingTests
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(() =>
             manager.ProcessPointerMoved(new Point(5, 5))));
 
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         Assert.Throws<ObjectDisposedException>(manager.Close);
     }
 
@@ -977,7 +983,7 @@ public sealed class InputRoutingTests
         manager.ProcessPointerReleased(new Point(5, 5), MouseButton.Left, KeyModifiers.None);
 
         Assert.Equal(["leaf-release", "closed", "root-release"], events);
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
     }
 
     [Fact]
@@ -999,10 +1005,10 @@ public sealed class InputRoutingTests
             manager.ProcessPointerMoved(new Point(5, 5))));
 
         Assert.Same(replacement, manager.CurrentScene);
-        Assert.False(scene.IsOpen());
-        Assert.True(replacement.IsOpen());
+        Assert.False(scene.IsOpen);
+        Assert.True(replacement.IsOpen);
         manager.Close();
-        Assert.False(replacement.IsOpen());
+        Assert.False(replacement.IsOpen);
     }
 
     [Fact]
@@ -1029,9 +1035,9 @@ public sealed class InputRoutingTests
 
         Assert.Empty(events);
         Assert.Null(manager.CurrentScene);
-        Assert.False(replacement.IsOpen());
+        Assert.False(replacement.IsOpen);
         manager.Open(new GameUIScene());
-        Assert.False(replacement.IsOpen());
+        Assert.False(replacement.IsOpen);
     }
 
     [Fact]
@@ -1127,7 +1133,7 @@ public sealed class InputRoutingTests
 
         Assert.Same(expected, actual);
         Assert.Equal(["cancel-Left"], events);
-        Assert.True(scene.IsOpen());
+        Assert.True(scene.IsOpen);
         Assert.Null(manager.CurrentScene);
         scene.Close();
         Assert.Equal(["cancel-Left", "closed"], events);
@@ -2005,7 +2011,7 @@ public sealed class InputRoutingTests
         Assert.Same(scene, root.Scene);
         Assert.Same(root, scene.FocusedNode);
         Assert.True(root.IsFocused);
-        Assert.True(scene.IsOpen());
+        Assert.True(scene.IsOpen);
         var otherManager = new UIManager();
         Assert.Throws<InvalidOperationException>(() => otherManager.Open(scene));
         Assert.Null(otherManager.CurrentScene);
@@ -2052,7 +2058,7 @@ public sealed class InputRoutingTests
         Assert.Same(expected, actual);
         Assert.Null(manager.CurrentScene);
         Assert.Same(scene, root.Scene);
-        Assert.True(manager.Hud.Scene.IsOpen());
+        Assert.True(manager.Hud.Scene.IsOpen);
     }
 
     [Fact]
@@ -2102,7 +2108,7 @@ public sealed class InputRoutingTests
         Assert.Null(manager.CurrentScene);
         Assert.Same(scene, root.Scene);
         Assert.Null(scene.FocusedNode);
-        Assert.True(scene.IsOpen());
+        Assert.True(scene.IsOpen);
         var otherManager = new UIManager();
         Assert.Throws<InvalidOperationException>(() => otherManager.Open(scene));
         Assert.Null(otherManager.CurrentScene);
@@ -2229,7 +2235,7 @@ public sealed class InputRoutingTests
             manager.Close();
             reopenError = Record.Exception(() => manager.Open(scene));
             Assert.Null(manager.CurrentScene);
-            Assert.False(scene.IsOpen());
+            Assert.False(scene.IsOpen);
         };
         root.PointerMoved += (_, _) => events.Add("root");
         manager.Open(scene);
@@ -2545,7 +2551,7 @@ public sealed class InputRoutingTests
         Canvas.SetLeft(child, x);
         Canvas.SetTop(child, y);
         parent.Children.Add(child);
-        if (parent.Scene?.IsOpen() == true)
+        if (parent.Scene?.IsOpen == true)
         {
             var root = parent;
             while (root.Parent is Canvas ancestor)

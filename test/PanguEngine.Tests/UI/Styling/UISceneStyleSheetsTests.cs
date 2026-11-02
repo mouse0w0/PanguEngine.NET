@@ -123,9 +123,10 @@ public sealed class UISceneStyleSheetsTests
         Assert.Equal(background, button.Background);
     }
 
-    [Theory]
+    [Theory(Skip = UIThreadTestAttribute.DebugOnly)]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void WrongThreadRejectsNewSequenceButAllowsCurrentSnapshot(bool baseStyles)
     {
         var scene = new UIScene(new Button());
@@ -150,6 +151,7 @@ public sealed class UISceneStyleSheetsTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void PreparationRejectsTreeAndLifecycleChangesButAllowsClasses(bool open)
     {
         var root = new Panel();
@@ -201,7 +203,7 @@ public sealed class UISceneStyleSheetsTests
         Assert.Equal("blocked", Assert.Single(root.Classes));
         Assert.Equal(1, collectionNotifications);
         Assert.Null(root.StyleId);
-        Assert.Equal(open, scene.IsOpen());
+        Assert.Equal(open, scene.IsOpen);
         if (open)
             scene.Close();
     }
@@ -286,6 +288,7 @@ public sealed class UISceneStyleSheetsTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ConverterCanInvalidateStyleInputsButCannotReplaceSceneSources()
     {
         var node = new CallbackNode();
@@ -322,6 +325,7 @@ public sealed class UISceneStyleSheetsTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void NotificationRejectsReplacingSourcesButAllowsInvalidatingClasses()
     {
         var button = new Button();

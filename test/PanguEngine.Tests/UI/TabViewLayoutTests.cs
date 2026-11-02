@@ -5,6 +5,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class TabViewLayoutTests
 {
     [Fact]
@@ -99,6 +100,7 @@ public sealed class TabViewLayoutTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void SufficientSpaceHidesScrollButtons()
     {
         var (view, strip, _, _) = CreateView(3);
@@ -122,6 +124,7 @@ public sealed class TabViewLayoutTests
     [InlineData(TabStripPlacement.Bottom)]
     [InlineData(TabStripPlacement.Left)]
     [InlineData(TabStripPlacement.Right)]
+    [UIThreadTest]
     public void ScrollButtonStatesSettleWithLayoutStylesAndViewportChanges(TabStripPlacement placement)
     {
         var (view, strip, _, _) = CreateView(6, placement);

@@ -7,9 +7,12 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class ToggleSwitchTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void SameValueDoesNotNotifyAndClearValueResetsState()
     {
         var control = new ToggleSwitch();
@@ -28,6 +31,7 @@ public sealed class ToggleSwitchTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void StateIsCommittedBeforeSubscriptionsAndSurvivesTheirExceptions()
     {
         var control = new ToggleSwitch();
@@ -47,6 +51,7 @@ public sealed class ToggleSwitchTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ReentrantStateChangeKeepsTheFinalPseudoClassAndBindingValue()
     {
         var source = new ToggleSwitch();

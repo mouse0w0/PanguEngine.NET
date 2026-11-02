@@ -219,7 +219,7 @@ public abstract class RadioButton : ContentControl
         base.OnLostFocus(eventArgs);
     }
 
-    internal void VerifyGroupAccess() => VerifyMutationAccess();
+    internal void VerifyGroupAccess() => Scene?.VerifyTreeMutationState();
     internal void CommitChecked(bool value) => _isChecked = value;
     internal void RefreshCheckedPseudoClass() => SetPseudoClass(PseudoClass.Checked, IsChecked);
 

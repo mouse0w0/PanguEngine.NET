@@ -48,7 +48,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
         get => _source;
         set
         {
-            VerifyMutationAccess();
             if (ReferenceEquals(_source, value))
                 return;
             VerifyNotNotifying();
@@ -73,7 +72,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
         get => _selectionMode;
         set
         {
-            VerifyMutationAccess();
             if (_selectionMode == value)
                 return;
             VerifyNotNotifying();
@@ -93,7 +91,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
     /// <param name="index">The zero-based source index; invalid indices are ignored.</param>
     public void Select(int index)
     {
-        VerifyMutationAccess();
         if (!CanSelect(index))
             return;
         if (_selectionMode == SelectionMode.Single)
@@ -116,7 +113,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
     /// <param name="index">The zero-based source index; invalid indices are ignored.</param>
     public void SelectOnly(int index)
     {
-        VerifyMutationAccess();
         if (CanSelect(index))
             Commit([index]);
     }
@@ -125,7 +121,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
     /// <param name="index">The zero-based source index.</param>
     public void Deselect(int index)
     {
-        VerifyMutationAccess();
         var position = Array.BinarySearch(_indices.Items, index);
         if (position < 0)
             return;
@@ -158,7 +153,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
     /// <summary>Selects all current source occurrences in multiple mode.</summary>
     public void SelectAll()
     {
-        VerifyMutationAccess();
         if (VerifyMultiple())
             Commit(Enumerable.Range(0, _source?.Count ?? 0).ToArray());
     }
@@ -166,7 +160,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
     /// <summary>Clears the selection.</summary>
     public void Clear()
     {
-        VerifyMutationAccess();
         Commit([]);
     }
 
@@ -184,7 +177,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
 
     private void ChangeRange(int start, int end, bool replace)
     {
-        VerifyMutationAccess();
         if (!VerifyMultiple() || !CanSelect(start) || !CanSelect(end))
             return;
         var low = Math.Min(start, end);
@@ -261,7 +253,6 @@ public sealed class MultiSelectionModel<T> : ObservableObject
 
     private void OnSourceChanged(ListChangedEventArgs<T> change)
     {
-        VerifyMutationAccess();
         VerifyNotNotifying();
         if (_indices.Count == 0)
             return;

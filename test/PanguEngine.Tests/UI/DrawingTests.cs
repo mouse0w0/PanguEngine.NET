@@ -8,6 +8,7 @@ using PanguEngine.UI.Rendering;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class DrawingTests
 {
     [Fact]
@@ -79,6 +80,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ScaleChangeProducesEmptySnapshotUntilLayoutUpdates()
     {
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
@@ -101,6 +103,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void LayoutRoundingChangeProducesEmptySnapshotUntilLayoutUpdates()
     {
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
@@ -121,6 +124,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpenEmptySceneDoesNotLeaveAnEmptyScaleScope()
     {
         var scene = new UIScene { Scale = 2 };
@@ -1104,6 +1108,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void DrawingRejectsRootTreeLayoutAndPropertyMutationsBeforeCommit()
     {
         var root = new DrawingParent();
@@ -1157,6 +1162,42 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
+    public void ModelPrechecksRejectDrawingMutationsBeforeCommittingState()
+    {
+        var model = new NumericSliderValueModel<int>();
+        var slider = new Slider<int>(model);
+        var group = new RadioGroup<int?>();
+        var radio = new RadioButton<int?> { Group = group, Value = 1 };
+        var root = new DrawingParent();
+        root.Add(slider);
+        root.Add(radio);
+        var scene = new UIScene(root);
+        scene.Open();
+        scene.PrepareFrame(new Size(100, 100));
+        Exception? sliderError = null;
+        Exception? groupError = null;
+        root.DrawAction = _ =>
+        {
+            sliderError = Record.Exception(() => model.Minimum = 5);
+            groupError = Record.Exception(() => group.SelectedValue = 1);
+        };
+
+        _ = scene.CreateDrawCommandList();
+
+        Assert.IsType<InvalidOperationException>(sliderError);
+        Assert.IsType<InvalidOperationException>(groupError);
+        Assert.Equal(0, model.Minimum);
+        Assert.Null(group.SelectedButton);
+
+        model.Minimum = 5;
+        group.SelectedValue = 1;
+        Assert.Equal(5, slider.Value);
+        Assert.Same(radio, group.SelectedButton);
+        scene.Close();
+    }
+
+    [Fact]
     public void ExistingNoOpTreeOperationsRemainNoOpsWhileDrawing()
     {
         var root = new DrawingParent();
@@ -1189,6 +1230,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void DrawingRejectsManagerLifecycleOperationsBeforeManagerStateChanges()
     {
         var manager = new UIManager();
@@ -1212,6 +1254,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClosedDrawingSceneCannotOpenUntilGenerationReturns()
     {
         var manager = new UIManager();
@@ -1246,6 +1289,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void DrawingAllowsPostButDoesNotRunItSynchronously()
     {
         var calls = 0;
@@ -1264,6 +1308,7 @@ public sealed class DrawingTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpenSceneRequiresOwnerThreadAndClosedSceneAllowsBackgroundDrawing()
     {
         var node = new DrawingNode { DrawAction = DrawUnitRectangle };
@@ -1271,10 +1316,12 @@ public sealed class DrawingTests
         Arrange(node, new Rect(0, 0, 10, 10));
         scene.Open();
 
+#if DEBUG
         var openError = RunOnBackgroundThread(() =>
             Record.Exception(scene.CreateDrawCommandList));
 
         Assert.IsType<InvalidOperationException>(openError);
+#endif
         scene.Close();
 
         var closedCount = RunOnBackgroundThread(() =>

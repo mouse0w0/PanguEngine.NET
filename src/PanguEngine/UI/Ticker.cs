@@ -31,13 +31,14 @@ public sealed class Ticker
     /// Starts a new run, or leaves an already active run unchanged.
     /// </summary>
     /// <remarks>
-    /// Requires scene ownership, the owning scene's UI thread, and an open scene that has not begun closing.
+    /// Requires scene ownership, the host UI thread, and an open scene that has not begun closing.
     /// Scene ownership is determined by the element's Scene property.
     /// Starting after the owning scene begins frame preparation takes effect no earlier than its next prepared frame.
     /// No callback runs synchronously; consumers reset their time baseline for each new run.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the element has no scene ownership, its scene is closed or closing, or access is on the wrong thread.
+    /// Thrown when the element has no scene ownership or its scene is closed or closing.
+    /// Also thrown in Debug builds when accessed from outside the host UI thread.
     /// </exception>
     public void Start()
     {
@@ -56,10 +57,10 @@ public sealed class Ticker
     /// Stops the current run, or does nothing when already stopped.
     /// </summary>
     /// <remarks>
-    /// Stopping an active run requires its owning UI thread. An executing callback continues normally.
+    /// Stopping an active run requires the host UI thread. An executing callback continues normally.
     /// Stopping does not invoke the callback or imply a business cancellation.
     /// </remarks>
-    /// <exception cref="InvalidOperationException">Thrown when an active run is stopped from the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown in Debug builds when an active run is stopped from outside the host UI thread.</exception>
     public void Stop()
     {
         if (_registration is null)

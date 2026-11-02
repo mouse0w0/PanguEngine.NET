@@ -111,7 +111,7 @@ public partial class UIScene
     /// <param name="position">The pointer position in output coordinates.</param>
     /// <returns>Whether the routed movement event was handled.</returns>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// </remarks>
     public bool ProcessPointerMoved(Point position)
     {
@@ -154,7 +154,7 @@ public partial class UIScene
     /// <param name="modifiers">The modifiers held when the button was pressed.</param>
     /// <returns>Whether the routed press event was handled.</returns>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// </remarks>
     public bool ProcessPointerPressed(
         Point position,
@@ -231,7 +231,7 @@ public partial class UIScene
     /// <param name="modifiers">The modifiers held when the button was released.</param>
     /// <returns>Whether either the routed release or click event was handled.</returns>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// </remarks>
     public bool ProcessPointerReleased(
         Point position,
@@ -310,7 +310,7 @@ public partial class UIScene
     /// <param name="modifiers">The modifiers held when the wheel event occurred.</param>
     /// <returns>Whether the routed wheel event was handled.</returns>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// </remarks>
     public bool ProcessPointerWheel(
         Point position,
@@ -354,7 +354,7 @@ public partial class UIScene
     /// <param name="isRepeat">Whether this is a repeated key press.</param>
     /// <returns>Whether the routed key event was handled.</returns>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// </remarks>
     public bool ProcessKeyDown(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
@@ -369,7 +369,7 @@ public partial class UIScene
     /// <param name="isRepeat">Whether the input source marked this event as a repeat.</param>
     /// <returns>Whether the routed key event was handled.</returns>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// </remarks>
     public bool ProcessKeyUp(Key key, KeyModifiers modifiers, bool isRepeat = false)
     {
@@ -381,7 +381,7 @@ public partial class UIScene
     /// </summary>
     /// <param name="text">The text supplied by the input source.</param>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// </remarks>
     public void ProcessTextInput(string text)
     {
@@ -395,7 +395,7 @@ public partial class UIScene
     /// </summary>
     /// <param name="focused">Whether the host has focus.</param>
     /// <remarks>
-    /// Call on the active scene's owner thread, outside lifecycle transitions, layout, and other input routing.
+    /// Call on the host UI thread, outside lifecycle transitions, layout, and other input routing.
     /// Regaining host focus does not restore previous element focus or pointer state.
     /// </remarks>
     public void ProcessFocusChanged(bool focused)
@@ -1002,11 +1002,8 @@ public partial class UIScene
 
     /// <summary>Gets whether this scene is open and active.</summary>
     /// <returns>Whether the scene can process updates and input.</returns>
-    private protected bool IsSceneActive()
-    {
-        lock (_stateSync)
-            return _ownerThreadId is not null && _isInteractionActive && !_isClosing;
-    }
+    private protected bool IsSceneActive() =>
+        _isOpen && _isInteractionActive && !_isClosing;
 
     private bool IsActive(UIElement node) =>
         IsSceneActive() && ReferenceEquals(node.Scene, this);
@@ -1039,7 +1036,6 @@ public partial class UIScene
             throw new InvalidOperationException("The UI scene is not active.");
         }
 
-        VerifyOwnerThread();
         if (IsUpdatingLayout)
             throw new InvalidOperationException("The UI scene cannot route input during layout.");
         if (_isTransitioning)

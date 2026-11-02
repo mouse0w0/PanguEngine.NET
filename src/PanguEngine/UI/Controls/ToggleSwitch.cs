@@ -162,7 +162,7 @@ public sealed class ToggleSwitch : Control
 
     private bool CanReceivePointerInput(UIScene? scene)
     {
-        if (scene is null || !ReferenceEquals(Scene, scene) || !scene.IsOpen())
+        if (scene is null || !ReferenceEquals(Scene, scene) || !scene.IsOpen)
             return false;
 
         for (UIElement? node = this; node is not null; node = node.Parent)

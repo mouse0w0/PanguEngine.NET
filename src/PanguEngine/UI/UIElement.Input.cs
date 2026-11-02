@@ -196,7 +196,7 @@ public abstract partial class UIElement
     /// <returns>Whether the focus request was accepted.</returns>
     /// <remarks>Notification callbacks may make the resolved target unavailable before this method returns.</remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open scene is accessed from the wrong thread or a focus transition is already notifying.
+    /// Thrown when a focus transition is already notifying, or in Debug builds when the open scene is accessed from outside the host UI thread.
     /// </exception>
     public bool Focus() =>
         Scene is not null && Scene.TryFocus(this);
@@ -215,7 +215,7 @@ public abstract partial class UIElement
     /// <param name="scenePoint">The point in scene coordinates.</param>
     /// <returns>The point in this element's local coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this element does not belong to a UI scene or its open scene is accessed from the wrong thread.
+    /// Thrown when this element does not belong to a UI scene, or in Debug builds when its open scene is accessed from outside the host UI thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
@@ -244,7 +244,7 @@ public abstract partial class UIElement
     /// <param name="localPoint">The point in this element's local coordinates.</param>
     /// <returns>The point in scene coordinates.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this element does not belong to a UI scene or its open scene is accessed from the wrong thread.
+    /// Thrown when this element does not belong to a UI scene, or in Debug builds when its open scene is accessed from outside the host UI thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.
@@ -402,7 +402,7 @@ public abstract partial class UIElement
     /// <param name="localPoint">The point in local coordinates.</param>
     /// <returns>Whether the point lies within this element's local geometry.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an element owned by an open scene is queried from the wrong thread.
+    /// Thrown in Debug builds when an element owned by an open scene is queried from outside the host UI thread.
     /// </exception>
     public bool Contains(Point localPoint)
     {
@@ -416,7 +416,7 @@ public abstract partial class UIElement
     /// <param name="localPoint">The point in local coordinates.</param>
     /// <returns>The deepest hit element, or null when the subtree is not hit.</returns>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a tree owned by an open scene is queried from the wrong thread.
+    /// Thrown in Debug builds when a tree owned by an open scene is queried from outside the host UI thread.
     /// </exception>
     public UIElement? HitTest(Point localPoint)
     {

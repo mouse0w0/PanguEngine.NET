@@ -6,6 +6,7 @@ using PanguEngine.UI.Drawing;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class GameUISceneTests
 {
     [Fact]
@@ -26,6 +27,7 @@ public sealed class GameUISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FrameUpdateReceivesAlphaBeforePostsTickersAndLayout()
     {
         var events = new List<string>();
@@ -68,6 +70,7 @@ public sealed class GameUISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClosingFromFrameUpdateStopsManagerUiPreparation()
     {
         var events = new List<string>();
@@ -88,7 +91,7 @@ public sealed class GameUISceneTests
 
             Assert.Equal(["frame"], events);
             Assert.False(ticker.IsActive);
-            Assert.False(scene.IsOpen());
+            Assert.False(scene.IsOpen);
         }
         finally
         {
@@ -99,6 +102,7 @@ public sealed class GameUISceneTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest]
     public void UiPreparationDoesNotRequireGameFrameUpdate(bool gameScene)
     {
         var events = new List<string>();
@@ -128,6 +132,7 @@ public sealed class GameUISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void NullRootGameUISceneCompletesLifecycleAndUpdate()
     {
         var calls = 0;
@@ -154,6 +159,7 @@ public sealed class GameUISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FixedUpdateDoesNotDrainPostsOrLayout()
     {
         var events = new List<string>();
@@ -181,6 +187,7 @@ public sealed class GameUISceneTests
     [Theory]
     [InlineData(Visibility.Hidden)]
     [InlineData(Visibility.Collapsed)]
+    [UIThreadTest]
     public void VisibilityDoesNotSuppressUpdates(Visibility visibility)
     {
         var fixedUpdates = 0;
@@ -202,6 +209,7 @@ public sealed class GameUISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void PostsFromFrameCallbackRunDuringSameFramePreparation()
     {
         var events = new List<string>();
@@ -226,6 +234,7 @@ public sealed class GameUISceneTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest]
     public void UpdatingSceneRejectsReentryAndDirectDrawing(bool fixedUpdate)
     {
         var scene = new RecordingGameUIScene();
@@ -258,6 +267,7 @@ public sealed class GameUISceneTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest]
     public void ClosingDuringCallbackCannotReopenSameSceneUntilCallbackReturns(bool fixedUpdate)
     {
         var scene = new RecordingGameUIScene();
@@ -277,7 +287,7 @@ public sealed class GameUISceneTests
         else
             scene.UpdateFrame(0);
 
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         scene.Open();
         scene.Close();
     }
@@ -285,6 +295,7 @@ public sealed class GameUISceneTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest]
     public void FrameUpdateRejectsReentryAndWrongThreadWithoutInvokingCallback(bool fromOtherThread)
     {
         var alphas = new List<double>();
@@ -325,6 +336,7 @@ public sealed class GameUISceneTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest]
     public void CallbackFailureStopsRemainingWorkAndAllowsNextUpdate(bool fixedUpdate)
     {
         var events = new List<string>();
@@ -382,6 +394,7 @@ public sealed class GameUISceneTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FrameCallbackFailureStopsManagerUiPreparationAndAllowsNextFrame()
     {
         var events = new List<string>();
@@ -429,9 +442,10 @@ public sealed class GameUISceneTests
         }
     }
 
-    [Theory]
+    [Theory(Skip = UIThreadTestAttribute.DebugOnly)]
     [InlineData(true)]
     [InlineData(false)]
+    [UIThreadTest]
     public void OpenSceneRejectsUpdatesFromAnotherThreadWhenIdle(bool fixedUpdate)
     {
         var fixedUpdates = 0;

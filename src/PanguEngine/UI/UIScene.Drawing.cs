@@ -14,8 +14,9 @@ public partial class UIScene
     /// An open scene must be laid out before its first draw and after its output size or scale changes.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open scene is accessed from the wrong thread, the scene is changing lifecycle
-    /// or layout state, an update callback is running, command generation is reentered, or drawing code mutates UI state.
+    /// Thrown when the scene is changing lifecycle or layout state, an update callback is running,
+    /// command generation is reentered, or drawing code mutates UI state.
+    /// Also thrown in Debug builds when an open scene is accessed from outside the host UI thread.
     /// </exception>
     public DrawCommandList CreateDrawCommandList()
     {
@@ -39,56 +40,47 @@ public partial class UIScene
         }
     }
 
-    internal bool IsDrawing
-    {
-        get
-        {
-            lock (_stateSync)
-                return _isDrawing;
-        }
-    }
+    internal bool IsDrawing => _isDrawing;
 
     internal void VerifyTreeMutationAccess()
     {
-        lock (_stateSync)
+        if (_isOpen)
+            VerifyOwnerThreadCore();
+        VerifyTreeMutationStateCore();
+    }
+
+    internal void VerifyTreeMutationState() => VerifyTreeMutationStateCore();
+
+    private void VerifyTreeMutationStateCore()
+    {
+        VerifyNotPreparingStyleSheets();
+        if (_isDrawing)
         {
-            VerifyNotPreparingStyleSheets();
-            if (_ownerThreadId is not null)
-                VerifyOwnerThreadCore();
-            if (_isDrawing)
-            {
-                throw new InvalidOperationException(
-                    "The UI scene tree cannot change while drawing commands are generated.");
-            }
+            throw new InvalidOperationException(
+                "The UI scene tree cannot change while drawing commands are generated.");
         }
     }
 
     private void BeginDrawing()
     {
-        lock (_stateSync)
-        {
-            if (_ownerThreadId is not null)
-                VerifyOwnerThreadCore();
-            if (_isTransitioning)
-                throw new InvalidOperationException("The UI scene cannot draw during a lifecycle transition.");
-            if (IsUpdatingLayout)
-                throw new InvalidOperationException("The UI scene cannot draw while layout is updating.");
-            if (IsUpdating)
-                throw new InvalidOperationException("The UI scene cannot draw during an update callback.");
-            if (_isDrawing)
-                throw new InvalidOperationException("The UI scene is already generating drawing commands.");
+        if (_isOpen)
+            VerifyOwnerThreadCore();
+        if (_isTransitioning)
+            throw new InvalidOperationException("The UI scene cannot draw during a lifecycle transition.");
+        if (IsUpdatingLayout)
+            throw new InvalidOperationException("The UI scene cannot draw while layout is updating.");
+        if (IsUpdating)
+            throw new InvalidOperationException("The UI scene cannot draw during an update callback.");
+        if (_isDrawing)
+            throw new InvalidOperationException("The UI scene is already generating drawing commands.");
 
-            _isDrawing = true;
-            _operationDepth++;
-        }
+        _isDrawing = true;
+        _operationDepth++;
     }
 
     private void EndDrawing()
     {
-        lock (_stateSync)
-        {
-            _operationDepth--;
-            _isDrawing = false;
-        }
+        _operationDepth--;
+        _isDrawing = false;
     }
 }

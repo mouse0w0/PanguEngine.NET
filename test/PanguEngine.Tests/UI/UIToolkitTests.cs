@@ -9,12 +9,79 @@ namespace PanguEngine.Tests.UI;
 public sealed class UIToolkitTests
 {
     [Fact]
+    public void OpeningASceneRequiresToolkitInitialization()
+    {
+        var scene = new UIScene();
+
+        Assert.Throws<InvalidOperationException>(scene.Open);
+        Assert.False(scene.IsOpen);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void OfflineTreesIgnoreTheInitializedUIThread(bool previouslyOpened)
+    {
+        using var context = new TextTestContext();
+        var root = new Panel();
+        var scene = new UIScene(root);
+        if (previouslyOpened)
+        {
+            scene.Open();
+            scene.Close();
+        }
+
+        Exception? error = null;
+        var thread = new Thread(() => error = Record.Exception(() =>
+        {
+            var child = new Panel { Width = 20, Height = 10 };
+            root.Children.Add(child);
+            root.Measure(new Size(100, 100));
+            root.Arrange(new Rect(0, 0, 100, 100));
+            child.Width = 30;
+        }));
+        thread.Start();
+        thread.Join();
+
+        Assert.Null(error);
+        Assert.Equal(30, Assert.Single(root.Children).Width);
+        Assert.False(scene.IsOpen);
+    }
+
+    [Fact]
     public void ServicesAreUnavailableBeforeInitialization()
     {
         Assert.Throws<InvalidOperationException>(() => UIToolkit.FontManager);
         Assert.Throws<InvalidOperationException>(() => UIToolkit.TextLayoutEngine);
         Assert.Throws<InvalidOperationException>(() => UIToolkit.Clipboard);
         Assert.Throws<InvalidOperationException>(() => UIToolkit.Logger);
+    }
+
+    [Fact]
+    public void ANewLifecycleCanOpenScenesOnAnotherThreadWithNewServices()
+    {
+        using (var context = new TextTestContext())
+        {
+            var scene = new UIScene();
+            scene.Open();
+            scene.Close();
+        }
+
+        Exception? error = null;
+        var thread = new Thread(() => error = Record.Exception(() =>
+        {
+            using var context = new TextTestContext();
+            var scene = new UIScene();
+            scene.Open();
+            Assert.True(scene.IsOpen);
+            scene.Close();
+            Assert.False(scene.IsOpen);
+        }));
+        thread.Start();
+        thread.Join();
+
+        Assert.Null(error);
+        Assert.Throws<InvalidOperationException>(() => UIToolkit.FontManager);
     }
 
     [Fact]
@@ -112,7 +179,7 @@ public sealed class UIToolkitTests
         Assert.Equal("new host", Assert.Single(secondLogger.Messages));
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
     public void ShutdownFromAnotherThreadRejectsTheOperationAndPreservesTheBinding()
     {
         using var context = new TextTestContext();
@@ -127,7 +194,7 @@ public sealed class UIToolkitTests
         Assert.Same(context.Logger, UIToolkit.Logger);
     }
 
-    [Theory]
+    [Theory(Skip = UIThreadTestAttribute.DebugOnly)]
     [InlineData(0)]
     [InlineData(1)]
     public void SettingChangesFromAnotherThreadAreRejectedWithoutChangingState(int setting)

@@ -7,6 +7,7 @@ using PropertyChangedEventArgs = System.ComponentModel.PropertyChangedEventArgs;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class UIElementLayoutTests
 {
     [Fact]
@@ -720,7 +721,8 @@ public sealed class UIElementLayoutTests
         Assert.True(child.IsArrangeValid);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveVisibilityMutationRejectsWrongThreadWithoutPartialState()
     {
         var node = new TestNode { CoreDesiredSize = new Size(10, 10) };
@@ -792,7 +794,8 @@ public sealed class UIElementLayoutTests
         Assert.False(node.IsArrangeValid);
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveNodesRejectWrongThreadLayoutMutationWithoutPartialState()
     {
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
@@ -851,38 +854,49 @@ public sealed class UIElementLayoutTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void BindingRechecksLayoutAccessAfterInitialSourceEvaluation()
     {
         var node = new TestNode { Width = 10, CoreDesiredSize = new Size(5, 5) };
         var scene = new UIScene(node);
         ValidateLayout(node);
-        scene.Open();
-        var reopened = new ManualResetEventSlim();
-        var release = new ManualResetEventSlim();
-        Thread? background = null;
+        using var evaluated = new ManualResetEventSlim();
+        using var release = new ManualResetEventSlim();
         var source = new LayoutSource
         {
             Width = 20,
             WidthReadAction = () =>
             {
-                scene.Close();
-                background = new Thread(() =>
-                {
-                    scene.Open();
-                    reopened.Set();
-                    release.Wait();
-                    scene.Close();
-                });
-                background.Start();
-                reopened.Wait();
+                evaluated.Set();
+                release.Wait();
             }
         };
 
-        var actual = Record.Exception(() =>
-            node.Bind(UIElement.WidthProperty, source, item => item.Width));
-        release.Set();
-        background?.Join();
+        Exception? actual = null;
+        var background = new Thread(() =>
+        {
+            try
+            {
+                actual = Record.Exception(() =>
+                    node.Bind(UIElement.WidthProperty, source, item => item.Width));
+            }
+            finally
+            {
+                evaluated.Set();
+            }
+        });
+        background.Start();
+        evaluated.Wait();
+        try
+        {
+            scene.Open();
+        }
+        finally
+        {
+            release.Set();
+            background.Join();
+        }
 
         Assert.IsType<InvalidOperationException>(actual);
         Assert.Equal(10, node.Width);
@@ -890,6 +904,7 @@ public sealed class UIElementLayoutTests
         Assert.True(node.IsMeasureValid);
         Assert.True(node.IsArrangeValid);
         Assert.Same(scene, node.Scene);
+        scene.Close();
     }
 
     private static void ValidateLayout(UIElement node)

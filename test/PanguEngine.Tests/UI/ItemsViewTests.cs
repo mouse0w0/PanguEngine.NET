@@ -9,6 +9,7 @@ using PanguEngine.UI.Templates;
 namespace PanguEngine.Tests.UI;
 
 [Collection(TextServicesCollection.Name)]
+[UIThreadTest]
 public sealed class ItemsViewTests
 {
     [Fact]
@@ -133,6 +134,7 @@ public sealed class ItemsViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void UnconstrainedVirtualViewsRejectAnInfiniteViewport()
     {
         using var context = new TextTestContext();
@@ -177,6 +179,7 @@ public sealed class ItemsViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ClosedGenericCssAndSelectedStylesFollowRecycledContainers()
     {
         using var context = new TextTestContext();
@@ -211,6 +214,7 @@ public sealed class ItemsViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void SelectionModeNotifiesBothEntrypointsWithoutDuplicatingState()
     {
         var view = new ListView<int> { ItemsSource = new ObservableList<int>([1, 2, 3]) };
@@ -497,6 +501,7 @@ public sealed class ItemsViewTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest(false)]
     public void DefaultTextRootsAreReusedAndDisplayTheirNewItems(bool grid)
     {
         using var context = new TextTestContext();
@@ -541,6 +546,7 @@ public sealed class ItemsViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void DirectTextDataIsNotClearedOrReusedAsDefaultContent()
     {
         using var context = new TextTestContext();
@@ -563,6 +569,7 @@ public sealed class ItemsViewTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ExplicitOrdinaryTextTemplatesRemainBuildOnly()
     {
         using var context = new TextTestContext();

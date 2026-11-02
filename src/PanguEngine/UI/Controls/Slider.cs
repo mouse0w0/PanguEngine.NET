@@ -356,7 +356,7 @@ public sealed class Slider<T> : Slider
             RaisePropertyChanged(ValueProperty, oldState.Value, state.Value);
     }
 
-    internal void VerifyModelAccess() => VerifyMutationAccess();
+    internal void VerifyModelAccess() => Scene?.VerifyTreeMutationState();
 
     internal SliderSelectionChange<T> PrepareModelChange(SliderValueModelChange<T> change)
     {
@@ -509,7 +509,7 @@ public sealed class Slider<T> : Slider
 
     private bool CanInteract()
     {
-        if (!HasValue || Scene is not { } scene || !scene.IsOpen())
+        if (!HasValue || Scene is not { } scene || !scene.IsOpen)
             return false;
         for (UIElement? node = this; node is not null; node = node.Parent)
             if (!node.IsEnabled || !node.IsHitTestVisible || node.Visibility != Visibility.Visible)

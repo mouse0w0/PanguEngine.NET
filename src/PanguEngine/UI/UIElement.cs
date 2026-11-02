@@ -174,7 +174,7 @@ public abstract partial class UIElement : StyledObject
     /// while already at the front has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a tree owned by an open scene is modified from the wrong thread.
+    /// Thrown in Debug builds when a tree owned by an open scene is modified from outside the host UI thread.
     /// </exception>
     public void MoveToFront() =>
         Parent?.MoveChildToFront(this);
@@ -187,7 +187,7 @@ public abstract partial class UIElement : StyledObject
     /// while already at the back has no effect.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a tree owned by an open scene is modified from the wrong thread.
+    /// Thrown in Debug builds when a tree owned by an open scene is modified from outside the host UI thread.
     /// </exception>
     public void MoveToBack() =>
         Parent?.MoveChildToBack(this);

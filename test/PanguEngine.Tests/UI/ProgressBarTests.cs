@@ -5,9 +5,11 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class ProgressBarTests
 {
     [Fact]
+    [UIThreadTest]
     public void RangeChangesKeepTheRawValueAndTwoWayBindingSource()
     {
         var source = new ProgressBar { Value = 150 };
@@ -82,6 +84,7 @@ public sealed class ProgressBarTests
 
     [Theory]
     [MemberData(nameof(ExtremeRanges))]
+    [UIThreadTest]
     public void ExtremeAndSubnormalRangesKeepTheirProportion(double minimum, double maximum, double value,
         double proportion)
     {
@@ -107,6 +110,7 @@ public sealed class ProgressBarTests
     [InlineData(Orientation.Horizontal, true, 86, 8, 26, 64)]
     [InlineData(Orientation.Vertical, false, 8, 56, 104, 16)]
     [InlineData(Orientation.Vertical, true, 8, 8, 104, 16)]
+    [UIThreadTest]
     public void FillUsesTheContentBoxAndRequestedDirection(Orientation orientation, bool reversed,
         double x, double y, double width, double height)
     {
@@ -136,6 +140,7 @@ public sealed class ProgressBarTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void EmptyContentDoesNotProduceVisibleFill()
     {
         var bar = new ProgressBar { Width = 0, Height = 0, Value = 100 };
@@ -153,6 +158,7 @@ public sealed class ProgressBarTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CssConfiguresDirectionAndRecordsTheOuterRoundedClip()
     {
         var bar = CreateBar();

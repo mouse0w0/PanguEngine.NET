@@ -77,7 +77,6 @@ public sealed class SingleSelectionModel<T> : ObservableObject
 
     public void Select(int index)
     {
-        VerifyMutationAccess();
         if ((uint)index < (uint)(_source?.Count ?? 0))
             SelectedIndex = index;
     }
@@ -166,7 +165,6 @@ public sealed class SingleSelectionModel<T> : ObservableObject
 
     private void OnItemsChanged(ListChangedEventArgs<T> change)
     {
-        VerifyMutationAccess();
         VerifyNotNotifying();
         if (_selectedIndex < 0)
             return;

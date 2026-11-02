@@ -8,12 +8,11 @@ namespace PanguEngine.UI.Drawing;
 /// <remarks>
 /// Coordinates on drawing commands are local to their enclosing transform scopes.
 /// Consumers must interpret state commands in order to obtain final bounds, clips, and opacity.
-/// Append and Clear require the creating thread. Callers must finish recording before consumption
-/// and must not modify this list while it is being enumerated or used to build geometry.
+/// Callers must finish recording before consumption and synchronize any handoff between threads.
+/// This list must not be modified while it is being enumerated or used to build geometry.
 /// </remarks>
 public sealed class DrawCommandList : IReadOnlyList<DrawCommand>
 {
-    private readonly int _ownerThreadId = Environment.CurrentManagedThreadId;
     private readonly List<DrawCommand> _commands;
     private bool _isAppending;
 
@@ -37,11 +36,11 @@ public sealed class DrawCommandList : IReadOnlyList<DrawCommand>
     /// <remarks>If scene recording fails, all commands currently in this list are discarded.</remarks>
     /// <exception cref="ArgumentNullException">Thrown when the scene is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown on the wrong thread, during another append, or when the scene cannot draw.
+    /// Thrown during another append, when the scene cannot draw, or when a Debug scene thread diagnostic rejects access.
     /// </exception>
     public void Append(UIScene scene)
     {
-        VerifyMutationAccess();
+        VerifyNotAppending();
         ArgumentNullException.ThrowIfNull(scene);
         _isAppending = true;
         try
@@ -62,10 +61,10 @@ public sealed class DrawCommandList : IReadOnlyList<DrawCommand>
     /// <summary>
     /// Clears the list so it can be reused for a new recording.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown on the wrong thread or during an append.</exception>
+    /// <exception cref="InvalidOperationException">Thrown during an append.</exception>
     public void Clear()
     {
-        VerifyMutationAccess();
+        VerifyNotAppending();
         _commands.Clear();
     }
 
@@ -110,13 +109,6 @@ public sealed class DrawCommandList : IReadOnlyList<DrawCommand>
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    private void VerifyMutationAccess()
-    {
-        if (_ownerThreadId != Environment.CurrentManagedThreadId)
-            throw new InvalidOperationException("UI command collection requires its owner thread.");
-        VerifyNotAppending();
-    }
 
     private void VerifyNotAppending()
     {

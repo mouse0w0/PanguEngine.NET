@@ -397,7 +397,7 @@ public sealed class DrawCommandListTests
     }
 
     [Fact]
-    public void ListRejectsWrongThreadMutationWithoutChangingCompletedCommands()
+    public void ListCanBeHandedToAnotherThreadForSerialRecording()
     {
         var commands = new DrawCommandList();
         var scene = CreateScene(DrawRectangle);
@@ -412,12 +412,12 @@ public sealed class DrawCommandListTests
         thread.Start();
         thread.Join();
 
-        Assert.All(errors, error => Assert.IsType<InvalidOperationException>(error));
-        Assert.Single(commands);
+        Assert.All(errors, error => Assert.Null(error));
+        Assert.Empty(commands);
     }
 
     [Fact]
-    public void ActiveContextRejectsWrongThreadAndExpiresAfterRecording()
+    public void ActiveContextAllowsSerialHandoffAndExpiresAfterRecording()
     {
         DrawingContext? captured = null;
         Exception? error = null;
@@ -430,8 +430,8 @@ public sealed class DrawCommandListTests
             DrawRectangle(context);
         });
 
-        Assert.Single(scene.CreateDrawCommandList());
-        Assert.IsType<InvalidOperationException>(error);
+        Assert.Equal(2, scene.CreateDrawCommandList().Count);
+        Assert.Null(error);
         Assert.Throws<InvalidOperationException>(() => DrawRectangle(captured!));
     }
 

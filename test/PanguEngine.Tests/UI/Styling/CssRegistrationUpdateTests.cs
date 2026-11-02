@@ -11,6 +11,7 @@ public sealed class CssRegistrationUpdateTests
     private static bool LayoutInitialized;
 
     [Fact]
+    [UIThreadTest]
     public void LateLayoutPropertyIsAppliedOnTheNextStyleRecalculation()
     {
         var child = new Panel();
@@ -49,6 +50,7 @@ public sealed class CssRegistrationUpdateTests
     [Theory]
     [InlineData("8")]
     [InlineData("var(--offset)")]
+    [UIThreadTest]
     public void LateAttachedDefinitionWaitsForEachSceneStyleInvalidationAndPreservesLocalValues(string value)
     {
         var name = $"late-offset-{Guid.NewGuid():N}";
@@ -164,6 +166,7 @@ public sealed class CssRegistrationUpdateTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RegistrationDuringNotificationsWaitsForTheNextStyleInvalidation()
     {
         var name = $"notification-offset-{Guid.NewGuid():N}";

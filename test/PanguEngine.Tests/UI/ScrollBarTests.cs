@@ -8,9 +8,12 @@ using Path = PanguEngine.UI.Controls.Path;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class ScrollBarTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void PublicSurfaceAndDefaultsMatchTheScrollBarContract()
     {
         var bar = new ScrollBar();
@@ -54,6 +57,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void PartsCarryStableRoleClassesAndTheOrientationPseudoClass()
     {
         var bar = new ScrollBar();
@@ -202,6 +206,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ValueIsCoercedToTheCurrentRange()
     {
         var bar = new ScrollBar();
@@ -227,6 +232,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void SetValueAndClrWritesShareTheSameCoercedEffectiveValue()
     {
         var bar = new ScrollBar();
@@ -243,6 +249,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void NonFiniteInputFailsBeforeCommittingAndPreservesTheOldValue()
     {
         var bar = new ScrollBar { Value = 25 };
@@ -258,6 +265,7 @@ public sealed class ScrollBarTests
     [Theory]
     [InlineData(10d)]
     [InlineData(70d)]
+    [UIThreadTest(false)]
     public void ClearingValueClampsTheResetValueAndOnlyNotifiesARealChange(double initialValue)
     {
         var bar = new ScrollBar { Minimum = 10, Value = initialValue };
@@ -280,6 +288,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void DirectRangeWritesRejectInvalidInputBeforeChangingFields()
     {
         var bar = new ScrollBar { Minimum = 10, Maximum = 200, ViewportSize = 50, Value = 80 };
@@ -301,6 +310,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void OneWayValueBindingClampsSourceWritesAndKeepsTheSourceUnchanged()
     {
         var source = new ScrollBar { Maximum = 1000, Value = 300 };
@@ -321,6 +331,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void TwoWayValueBindingAcceptsTheSourceSettersFinalValue()
     {
         var source = new ScrollBar { Maximum = 50, Value = 48 };
@@ -915,6 +926,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void StandaloneRangeChangeRefreshesGeometryAndKeepsArrangeValid()
     {
         var bar = new ScrollBar
@@ -938,6 +950,7 @@ public sealed class ScrollBarTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void SynchronizeRangeDuringDirectArrangeDoesNotInvalidateTheHostPass()
     {
         var bar = new ScrollBar();

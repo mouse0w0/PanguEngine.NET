@@ -7,9 +7,12 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class UIElementInputStateTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void UIElementPropertiesExposeExpectedMetadataAndDefaults()
     {
         var node = new TestNode();
@@ -630,11 +633,13 @@ public sealed class UIElementInputStateTests
         var scene = new UIScene(node);
         scene.Open();
 
+#if DEBUG
         var openError = RunOnBackgroundThread(() =>
             Record.Exception(() => node.IsEnabled = false));
 
         Assert.IsType<InvalidOperationException>(openError);
         Assert.True(node.IsEnabled);
+#endif
         scene.Close();
 
         var closedError = RunOnBackgroundThread(() =>

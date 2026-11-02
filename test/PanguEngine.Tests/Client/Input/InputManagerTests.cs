@@ -7,6 +7,7 @@ using PanguEngine.Client.World;
 using PanguEngine.Input;
 using PanguEngine.Registries;
 using PanguEngine.Tests.Windowing;
+using PanguEngine.Tests.UI;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.Windowing;
@@ -20,6 +21,8 @@ using UiKeyEventArgs = PanguEngine.UI.Input.KeyEventArgs;
 
 namespace PanguEngine.Tests.Client.Input;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class InputManagerTests
 {
     [Fact]

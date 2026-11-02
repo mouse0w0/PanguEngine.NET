@@ -4,6 +4,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class ContainerTests
 {
     [Fact]
@@ -149,6 +150,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void MoveCommandsAreNoOpsWithoutParentOrAtTargetPosition()
     {
         var independent = new TestNode();
@@ -175,6 +177,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActiveTreeMoveCommandsReorderOnOwnerThread()
     {
         var parent = new TestParent();
@@ -219,6 +222,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void SceneRootMustBeClearedBeforeBecomingAChild()
     {
         var activeRoot = new TestParent();
@@ -240,6 +244,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActiveParentActivatesAddedSubtreeAndDeactivatesRemovedSubtree()
     {
         var root = new TestParent();
@@ -263,6 +268,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActiveParentClearDeactivatesEveryRemovedSubtree()
     {
         var root = new TestParent();
@@ -288,6 +294,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClearingSceneParentInvalidatesEveryRemovedSubtree()
     {
         var root = new Canvas();
@@ -316,6 +323,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReparentWithinSameSceneInvalidatesSubtreeLayout()
     {
         var root = new Canvas();
@@ -350,6 +358,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReparentAcrossSameThreadScenesChangesScene()
     {
         var oldRoot = new TestParent();
@@ -375,6 +384,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReparentAcrossDifferentSceneScalesInvalidatesEntireSubtree()
     {
         var oldRoot = new Canvas();
@@ -402,6 +412,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReparentAcrossDifferentRoundingModesInvalidatesEntireSubtree()
     {
         var oldRoot = new Canvas();
@@ -427,6 +438,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReparentAcrossScenesWithEqualLayoutSettingsInvalidatesEntireSubtree()
     {
         var oldRoot = new Canvas();
@@ -452,6 +464,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RemovingSubtreeFromSceneInvalidatesDescendants()
     {
         var root = new Canvas();
@@ -473,6 +486,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void AddingDetachedSubtreeToSceneInvalidatesDescendants()
     {
         var root = new Canvas();
@@ -496,6 +510,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReplacingAcrossScenesInvalidatesIncomingAndReplacedSubtrees()
     {
         var sourceRoot = new Canvas();
@@ -534,6 +549,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReparentBetweenActiveAndInactiveTreesTransitionsSubtreeState()
     {
         var activeRoot = new TestParent();
@@ -563,7 +579,8 @@ public sealed class ContainerTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void WrongThreadCannotReplaceOpenSceneRoot()
     {
         var root = new TestParent();
@@ -580,7 +597,8 @@ public sealed class ContainerTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveStructuralChangesRequireOwnerThread()
     {
         var root = new TestParent();
@@ -611,6 +629,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActiveNoOpOperationsDoNotRequireOwnerThread()
     {
         var root = new TestParent();
@@ -629,25 +648,23 @@ public sealed class ContainerTests
         scene.Close();
     }
 
-    [Fact]
-    public void CrossThreadSceneMoveFailsWithoutChangingEitherTree()
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
+    public void ActiveSourceRejectsBackgroundTransferIntoAnInactiveTree()
     {
-        var backgroundTree = RunOnBackgroundThread(() =>
-        {
-            var root = new TestParent();
-            var child = new TestParent();
-            var leaf = new TestNode();
-            child.Add(leaf);
-            root.Add(child);
-            var scene = new UIScene(root);
-            scene.Open();
-            return (Scene: scene, Root: root, Child: child, Leaf: leaf);
-        });
+        var root = new TestParent();
+        var child = new TestParent();
+        var leaf = new TestNode();
+        child.Add(leaf);
+        root.Add(child);
+        var scene = new UIScene(root);
+        scene.Open();
+        var backgroundTree = (Scene: scene, Root: root, Child: child, Leaf: leaf);
         var target = new TestParent();
         var targetScene = new UIScene(target);
-        targetScene.Open();
 
-        Assert.Throws<InvalidOperationException>(() => target.Add(backgroundTree.Child));
+        var error = RunOnBackgroundThread(() => Record.Exception(() => target.Add(backgroundTree.Child)));
+        Assert.IsType<InvalidOperationException>(error);
 
         Assert.Equal(new UIElement[] { backgroundTree.Child }, backgroundTree.Root.Children);
         Assert.Same(backgroundTree.Root, backgroundTree.Child.Parent);
@@ -655,11 +672,12 @@ public sealed class ContainerTests
         Assert.Same(backgroundTree.Scene, backgroundTree.Leaf.Scene);
         Assert.Empty(target.Children);
         Assert.Same(targetScene, target.Scene);
-        targetScene.Close();
+        scene.Close();
     }
 
-    [Fact]
-    public void NewSceneCheckFailsBeforeDetachingFromAccessibleOldTree()
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
+    public void ActiveTargetRejectsBackgroundTransferBeforeDetachingFromInactiveSource()
     {
         var oldRoot = new TestParent();
         var child = new TestParent();
@@ -667,16 +685,13 @@ public sealed class ContainerTests
         child.Add(leaf);
         oldRoot.Add(child);
         var oldScene = new UIScene(oldRoot);
-        oldScene.Open();
-        var backgroundTarget = RunOnBackgroundThread(() =>
-        {
-            var root = new TestParent();
-            var scene = new UIScene(root);
-            scene.Open();
-            return (Scene: scene, Root: root);
-        });
+        var root = new TestParent();
+        var scene = new UIScene(root);
+        scene.Open();
+        var backgroundTarget = (Scene: scene, Root: root);
 
-        Assert.Throws<InvalidOperationException>(() => backgroundTarget.Root.Add(child));
+        var error = RunOnBackgroundThread(() => Record.Exception(() => backgroundTarget.Root.Add(child)));
+        Assert.IsType<InvalidOperationException>(error);
 
         Assert.Equal(new UIElement[] { child }, oldRoot.Children);
         Assert.Same(oldRoot, child.Parent);
@@ -684,7 +699,7 @@ public sealed class ContainerTests
         Assert.Same(oldScene, leaf.Scene);
         Assert.Empty(backgroundTarget.Root.Children);
         Assert.Same(backgroundTarget.Scene, backgroundTarget.Root.Scene);
-        oldScene.Close();
+        scene.Close();
     }
 
     [Fact]
@@ -714,6 +729,7 @@ public sealed class ContainerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClosedSceneKeepsRootAssociated()
     {
         var root = new TestParent();

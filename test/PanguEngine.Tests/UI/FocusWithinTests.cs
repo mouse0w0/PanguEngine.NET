@@ -4,6 +4,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class FocusWithinTests
 {
     [Fact]
@@ -18,6 +19,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FocusWithinMatchesTheFocusedNodeAndAncestorsBeforeFocusEvents()
     {
         var root = new Canvas();
@@ -62,6 +64,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FocusWithinUpdatesGroupAndDescendantStylesAcrossFocusChanges()
     {
         var root = new Canvas();
@@ -123,6 +126,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RemovingFocusedBranchRefreshesFormerAncestorStyles()
     {
         var root = new Canvas();
@@ -168,6 +172,7 @@ public sealed class FocusWithinTests
     [InlineData("collapse")]
     [InlineData("window-focus")]
     [InlineData("close")]
+    [UIThreadTest]
     public void LosingFocusClearsTheOriginalAncestorPathBeforeLostFocus(string change)
     {
         var root = new Canvas();
@@ -226,6 +231,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void MovingFocusedSubtreeToAnotherScenePreservesDestinationFocusWithin()
     {
         var root = new Canvas();
@@ -263,6 +269,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FocusStateCallbackDisablingAncestorDoesNotRestoreFocusWithin()
     {
         var root = new Canvas();
@@ -294,6 +301,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CommonAncestorsOnlyNotifyWhenEnteringAndLeavingTheirSubtree()
     {
         var root = new Canvas();
@@ -339,6 +347,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FocusWithinCanBeUsedAsARegisteredPropertyBindingSource()
     {
         var root = new Canvas();
@@ -367,6 +376,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReopeningASceneDoesNotRestoreItsFormerFocusWithin()
     {
         var root = new Canvas();
@@ -396,6 +406,7 @@ public sealed class FocusWithinTests
     [InlineData("disable")]
     [InlineData("hide")]
     [InlineData("remove")]
+    [UIThreadTest]
     public void FocusWithinActivationCallbackCannotRestoreAnUnavailablePath(string change)
     {
         var root = new Canvas();
@@ -433,6 +444,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClearingOldLeafStillClearsOldAncestorsWhenItsCallbackDisablesTheNewTarget()
     {
         var root = new Canvas();
@@ -471,6 +483,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void UnavailabilityCleanupRejectsFocusRequestsDuringRangeNotifications()
     {
         var root = new Canvas();
@@ -510,6 +523,7 @@ public sealed class FocusWithinTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void RangeCleanupPreservesFocusEstablishedByItsCallbackInAnotherScene(bool cleanup)
     {
         var root = new Canvas();
@@ -561,6 +575,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RangeActivationCanTransferFocusToAnotherScene()
     {
         var root = new Canvas();
@@ -602,6 +617,7 @@ public sealed class FocusWithinTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void RangeNotificationExceptionsPropagateWithoutRollingBackCommittedState()
     {
         var root = new Canvas();

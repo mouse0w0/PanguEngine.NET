@@ -3,6 +3,7 @@ using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
 using PanguEngine.Registries;
+using PanguEngine.Tests.UI;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
@@ -10,6 +11,8 @@ using PanguEngine.UI.Rendering;
 
 namespace PanguEngine.Tests.Client.UI.Huds;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class HudManagerTests
 {
     [Fact]

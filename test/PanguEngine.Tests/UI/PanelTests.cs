@@ -4,6 +4,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class PanelTests
 {
     [Fact]
@@ -157,6 +158,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void AddAndInsertRejectCyclesAndActiveRootsWithoutChangingTree()
     {
         var root = new TestPanel();
@@ -197,6 +199,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActiveIndexReplacementKeepsIncomingMountedAndDeactivatesOutgoing()
     {
         var root = new TestPanel();
@@ -223,6 +226,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReplacementCanPromoteIncomingChildFromOutgoingSubtree()
     {
         var target = new TestPanel();
@@ -245,6 +249,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ReplacementAcrossScenesAdoptsTheTargetScene()
     {
         var oldRoot = new TestPanel();
@@ -287,6 +292,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void IndexReplacementRejectsCycleAndActiveRootWithoutChangingTree()
     {
         var root = new TestPanel();
@@ -309,6 +315,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void SameChildReplacementPreservesTreeAndLayout()
     {
         var panel = new TestPanel();
@@ -332,6 +339,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void MoveUsesFinalIndexAndKeepsChildMounted()
     {
         var panel = new TestPanel();
@@ -359,6 +367,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void SameIndexMoveIsANoOpOnWrongThread()
     {
         var panel = new TestPanel();
@@ -380,6 +389,7 @@ public sealed class PanelTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void MissingRemoveAndEmptyClearAreNoOpsOnWrongThread()
     {
         var panel = new TestPanel();
@@ -401,7 +411,8 @@ public sealed class PanelTests
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void ActiveCollectionRejectsRealChangesOnWrongThread()
     {
         var panel = new TestPanel();

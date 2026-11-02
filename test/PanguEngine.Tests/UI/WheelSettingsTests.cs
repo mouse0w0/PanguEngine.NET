@@ -6,6 +6,7 @@ using PanguEngine.UI.Controls;
 namespace PanguEngine.Tests.UI;
 
 [Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class WheelSettingsTests
 {
     [Theory]

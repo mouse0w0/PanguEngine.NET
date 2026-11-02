@@ -10,7 +10,6 @@ public sealed class DrawingContext
 {
     private readonly List<DrawCommand> _commands;
     private readonly List<StateEntry> _states = [];
-    private readonly int _ownerThreadId = Environment.CurrentManagedThreadId;
     private int _nextToken;
     private bool _isActive = true;
 
@@ -25,7 +24,7 @@ public sealed class DrawingContext
     /// <param name="bounds">The rectangle in the current local drawing coordinates.</param>
     /// <param name="color">The non-premultiplied fill color.</param>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this context is no longer active or is accessed from the wrong thread.
+    /// Thrown when this context is no longer active.
     /// </exception>
     public void FillRectangle(Rect bounds, Color color)
     {
@@ -143,7 +142,7 @@ public sealed class DrawingContext
     /// <param name="samplingMode">The image sampling mode.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="image"/> is null.</exception>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the source region is outside the image.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public void DrawImage(
         Rect bounds,
         Image image,
@@ -185,7 +184,7 @@ public sealed class DrawingContext
     /// <param name="fontSize">The font size in logical pixels used to rasterize the layout.</param>
     /// <param name="color">The non-premultiplied text color.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="layout"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public void DrawText(
         Point origin,
         TextLayout layout,
@@ -214,7 +213,7 @@ public sealed class DrawingContext
     /// <param name="color">The non-premultiplied fill color.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="mesh"/> is null.</exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this context is inactive or on the wrong thread.
+    /// Thrown when this context is inactive.
     /// </exception>
     internal void DrawGeometry(TriangleMesh mesh, Color color)
     {
@@ -233,7 +232,7 @@ public sealed class DrawingContext
     /// <param name="scale">The finite positive uniform scale.</param>
     /// <returns>A scope that restores the previous drawing state when disposed.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when scale is not finite and positive.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public DrawingScope PushTransform(Point translation, double scale = 1)
     {
         VerifyActive();
@@ -248,7 +247,7 @@ public sealed class DrawingContext
     /// </summary>
     /// <param name="translation">The local translation, affected by the current scale.</param>
     /// <returns>A scope that restores the previous drawing state when disposed.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public DrawingScope PushTranslate(Point translation) => PushTransform(translation);
 
     /// <summary>
@@ -257,7 +256,7 @@ public sealed class DrawingContext
     /// <param name="scale">The finite positive relative scale.</param>
     /// <returns>A scope that restores the previous drawing state when disposed.</returns>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when scale is not finite and positive.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public DrawingScope PushScale(double scale) => PushTransform(Point.Zero, scale);
 
     /// <summary>
@@ -268,7 +267,7 @@ public sealed class DrawingContext
     /// <returns>A scope that restores the previous drawing state when disposed.</returns>
     /// <remarks>Established clips and opacity remain unchanged.</remarks>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when scale is not finite and positive.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public DrawingScope SetTransform(Point translation, double scale = 1)
     {
         VerifyActive();
@@ -284,7 +283,7 @@ public sealed class DrawingContext
     /// <param name="translation">The absolute translation in framebuffer pixels.</param>
     /// <returns>A scope that restores the previous drawing state when disposed.</returns>
     /// <remarks>The current scale, established clips, and opacity remain unchanged.</remarks>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public DrawingScope SetTranslate(Point translation)
     {
         VerifyActive();
@@ -298,7 +297,7 @@ public sealed class DrawingContext
     /// <returns>A scope that restores the previous drawing state when disposed.</returns>
     /// <remarks>The current framebuffer origin, established clips, and opacity remain unchanged.</remarks>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when scale is not finite and positive.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public DrawingScope SetScale(double scale)
     {
         VerifyActive();
@@ -315,7 +314,7 @@ public sealed class DrawingContext
     /// <returns>A scope that restores the previous clip when disposed.</returns>
     /// <remarks>A zero-area clip suppresses drawing until the returned scope is disposed.</remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when this context is no longer active or is accessed from the wrong thread.
+    /// Thrown when this context is no longer active.
     /// </exception>
     public DrawingScope PushClip(Rect clip)
     {
@@ -331,7 +330,7 @@ public sealed class DrawingContext
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="opacity"/> is not finite or is outside the range from zero through one.
     /// </exception>
-    /// <exception cref="InvalidOperationException">Thrown when this context is inactive or on the wrong thread.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when this context is inactive.</exception>
     public DrawingScope PushOpacity(double opacity)
     {
         VerifyActive();
@@ -645,8 +644,6 @@ public sealed class DrawingContext
     {
         if (!_isActive)
             throw new InvalidOperationException("The UI drawing context is no longer active.");
-        if (_ownerThreadId != Environment.CurrentManagedThreadId)
-            throw new InvalidOperationException("UI drawing requires its recording thread.");
     }
 
     private readonly record struct StateEntry(int Token, int PushIndex);

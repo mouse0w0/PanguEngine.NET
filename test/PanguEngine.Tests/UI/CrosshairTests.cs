@@ -6,9 +6,11 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class CrosshairTests
 {
     [Fact]
+    [UIThreadTest]
     public void ParentColorDoesNotAffectCrosshairAndOwnCssColorCanBeCleared()
     {
         var root = new Panel { Color = new Color(10, 20, 30) };
@@ -63,6 +65,7 @@ public sealed class CrosshairTests
     [InlineData(CrosshairShape.Cross, 8)]
     [InlineData(CrosshairShape.T, 6)]
     [InlineData(CrosshairShape.InvertedT, 6)]
+    [UIThreadTest]
     public void ShapesProduceExpectedArmCommands(CrosshairShape shape, int commandCount)
     {
         var crosshair = new Crosshair
@@ -99,6 +102,7 @@ public sealed class CrosshairTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CenterDotAddsOutlinedAndFilledCommands()
     {
         var crosshair = new Crosshair
@@ -118,6 +122,7 @@ public sealed class CrosshairTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void GeometryChangesUpdateDesiredSizeAndRemainCentered()
     {
         var crosshair = new Crosshair
@@ -136,6 +141,7 @@ public sealed class CrosshairTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ThicknessWidensArmsAndKeepsSymmetricExtent()
     {
         var crosshair = new Crosshair { Thickness = 6 };
@@ -157,6 +163,7 @@ public sealed class CrosshairTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CrosshairRemainsCenteredAcrossViewportAndScale()
     {
         var root = new Panel();
@@ -174,6 +181,7 @@ public sealed class CrosshairTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FixedGeometryIgnoresUiScale()
     {
         var root = new Panel();
@@ -197,6 +205,7 @@ public sealed class CrosshairTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void UseUiScaleKeepsLogicalGeometry()
     {
         var root = new Panel();
@@ -237,6 +246,7 @@ public sealed class CrosshairTests
     [InlineData(true, 0.5, 12f)]
     [InlineData(true, 1.5, 36f)]
     [InlineData(true, 2, 48f)]
+    [UIThreadTest]
     public void BuiltGeometryPreservesPhysicalCenterAndScaling(bool useUiScale, double scale, float expectedSize)
     {
         var root = new Panel();

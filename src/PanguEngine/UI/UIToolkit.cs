@@ -10,14 +10,18 @@ namespace PanguEngine.UI;
 /// <remarks>
 /// Read and write toolkit state on the host UI thread. Reads from other threads have no synchronization guarantees.
 /// Before initialization or after shutdown, the host may configure settings on its intended UI thread.
+/// Initialization establishes one shared UI thread for all open scenes. UI thread diagnostics are enabled only in Debug builds.
 /// </remarks>
 public static class UIToolkit
 {
+    private static bool _isInitialized;
     private static FontManager? _fontManager;
     private static TextLayoutEngine? _textLayoutEngine;
     private static Clipboard? _clipboard;
     private static ILogger? _logger;
+#if DEBUG
     private static int _ownerThreadId;
+#endif
     private static double _defaultScale = 1;
     private static int _wheelScrollLines = 3;
 
@@ -27,7 +31,7 @@ public static class UIToolkit
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when the value is not finite or is not greater than zero.
     /// </exception>
-    /// <exception cref="InvalidOperationException">Thrown when modified from another thread while initialized.</exception>
+    /// <exception cref="InvalidOperationException">Thrown in Debug builds when modified from another thread while initialized.</exception>
     public static double DefaultScale
     {
         get => _defaultScale;
@@ -44,7 +48,7 @@ public static class UIToolkit
     /// and minus one selects page scrolling.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">Thrown when the value is less than minus one.</exception>
-    /// <exception cref="InvalidOperationException">Thrown when modified from another thread while initialized.</exception>
+    /// <exception cref="InvalidOperationException">Thrown in Debug builds when modified from another thread while initialized.</exception>
     public static int WheelScrollLines
     {
         get => _wheelScrollLines;
@@ -116,7 +120,7 @@ public static class UIToolkit
         ValidateScale(defaultScale, nameof(defaultScale));
         ValidateWheelScrollLines(wheelScrollLines, nameof(wheelScrollLines));
 
-        if (_fontManager is not null)
+        if (_isInitialized)
             throw new InvalidOperationException("UI toolkit services are already initialized.");
 
         _defaultScale = defaultScale;
@@ -125,16 +129,19 @@ public static class UIToolkit
         _textLayoutEngine = textLayoutEngine;
         _clipboard = clipboard;
         _logger = logger;
+#if DEBUG
         _ownerThreadId = Environment.CurrentManagedThreadId;
+#endif
+        _isInitialized = true;
     }
 
     /// <summary>
-    /// Releases the host's service bindings on the UI thread without destroying services or resetting settings.
+    /// Releases the host's service bindings after all active UI use has ended, without destroying services or resetting settings.
     /// </summary>
-    /// <exception cref="InvalidOperationException">Thrown when called from another thread while initialized.</exception>
+    /// <exception cref="InvalidOperationException">Thrown in Debug builds when called from another thread while initialized.</exception>
     public static void Shutdown()
     {
-        if (_fontManager is null)
+        if (!_isInitialized)
             return;
         VerifyAccess();
 
@@ -142,7 +149,10 @@ public static class UIToolkit
         _textLayoutEngine = null;
         _clipboard = null;
         _logger = null;
+#if DEBUG
         _ownerThreadId = 0;
+#endif
+        _isInitialized = false;
     }
 
     /// <summary>
@@ -170,9 +180,17 @@ public static class UIToolkit
                 "Wheel scroll lines must be minus one or non-negative.");
     }
 
-    private static void VerifyAccess()
+    internal static void VerifyInitialized()
     {
-        if (_ownerThreadId != 0 && _ownerThreadId != Environment.CurrentManagedThreadId)
-            throw new InvalidOperationException("UI toolkit changes require its host UI thread.");
+        if (!_isInitialized)
+            throw new InvalidOperationException("UI toolkit services have not been initialized.");
+    }
+
+    internal static void VerifyAccess()
+    {
+#if DEBUG
+        if (_isInitialized && _ownerThreadId != Environment.CurrentManagedThreadId)
+            throw new InvalidOperationException("UI access requires the host UI thread.");
+#endif
     }
 }

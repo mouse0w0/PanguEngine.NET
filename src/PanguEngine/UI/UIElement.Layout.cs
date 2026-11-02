@@ -429,7 +429,7 @@ public abstract partial class UIElement
     /// Invalidates measurement and arrangement for this element and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open scene is accessed from another thread.
+    /// Thrown in Debug builds when the open scene is accessed from outside the host UI thread.
     /// </exception>
     public void InvalidateMeasure()
     {
@@ -441,7 +441,7 @@ public abstract partial class UIElement
     /// Invalidates arrangement for this element and its ancestors.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the open scene is accessed from another thread.
+    /// Thrown in Debug builds when the open scene is accessed from outside the host UI thread.
     /// </exception>
     public void InvalidateArrange()
     {

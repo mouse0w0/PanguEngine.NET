@@ -32,7 +32,7 @@ public class PointerEventArgs : InputEventArgs
     /// Thrown when the element is not in the event's root tree.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when an active element outside the event path is queried from the wrong thread.
+    /// Thrown in Debug builds when an active element outside the event path is queried from outside the host UI thread.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when coordinate accumulation produces a non-finite value.

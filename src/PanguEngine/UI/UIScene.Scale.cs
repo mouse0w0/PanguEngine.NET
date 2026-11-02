@@ -13,16 +13,12 @@ public partial class UIScene
     /// Thrown when the value is not finite or is not greater than zero.
     /// </exception>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a different value is assigned while an open scene is accessed from the wrong
-    /// thread, is updating layout, or is generating drawing commands.
+    /// Thrown when a different value is assigned during layout or drawing, or in Debug builds when
+    /// an open scene is accessed from outside the host UI thread.
     /// </exception>
     public double Scale
     {
-        get
-        {
-            lock (_stateSync)
-                return _scale;
-        }
+        get => _scale;
         set => SetScale(value);
     }
 
@@ -30,16 +26,12 @@ public partial class UIScene
     /// Gets or sets whether layout values snap to the physical pixel grid defined by <see cref="Scale"/>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when a different value is assigned while an open scene is accessed from the wrong
-    /// thread, is updating layout, or is generating drawing commands.
+    /// Thrown when a different value is assigned during layout or drawing, or in Debug builds when
+    /// an open scene is accessed from outside the host UI thread.
     /// </exception>
     public bool UseLayoutRounding
     {
-        get
-        {
-            lock (_stateSync)
-                return _useLayoutRounding;
-        }
+        get => _useLayoutRounding;
         set => SetUseLayoutRounding(value);
     }
 
@@ -47,69 +39,57 @@ public partial class UIScene
     {
         UIToolkit.ValidateScale(value, nameof(value));
 
-        lock (_stateSync)
+        // ReSharper disable once CompareOfFloatsByEqualityOperator
+        if (_scale == value)
         {
-            // ReSharper disable once CompareOfFloatsByEqualityOperator
-            if (_scale == value)
-            {
-                _hasExplicitScale = true;
-                return;
-            }
-
-            if (_ownerThreadId is not null)
-                VerifyOwnerThreadCore();
-            if (IsUpdatingLayout)
-                throw new InvalidOperationException("The UI scene scale cannot change during layout.");
-            if (_isDrawing)
-            {
-                throw new InvalidOperationException(
-                    "The UI scene scale cannot change while drawing commands are generated.");
-            }
-
-            _scale = value;
             _hasExplicitScale = true;
+            return;
         }
 
+        if (_isOpen)
+            VerifyOwnerThreadCore();
+        if (IsUpdatingLayout)
+            throw new InvalidOperationException("The UI scene scale cannot change during layout.");
+        if (_isDrawing)
+        {
+            throw new InvalidOperationException(
+                "The UI scene scale cannot change while drawing commands are generated.");
+        }
+
+        _scale = value;
+        _hasExplicitScale = true;
         Root?.InvalidateMeasureSubtree();
     }
 
     private void SynchronizeDefaultScale()
     {
-        lock (_stateSync)
-        {
-            if (_hasExplicitScale)
-                return;
+        if (_hasExplicitScale)
+            return;
 
-            var scale = UIToolkit.DefaultScale;
-            // ReSharper disable once CompareOfFloatsByEqualityOperator
-            if (_scale == scale)
-                return;
+        var scale = UIToolkit.DefaultScale;
+        // ReSharper disable once CompareOfFloatsByEqualityOperator
+        if (_scale == scale)
+            return;
 
-            _scale = scale;
-        }
-
+        _scale = scale;
         Root?.InvalidateMeasureSubtree();
     }
 
     private void SetUseLayoutRounding(bool value)
     {
-        lock (_stateSync)
+        if (_useLayoutRounding == value)
+            return;
+        if (_isOpen)
+            VerifyOwnerThreadCore();
+        if (IsUpdatingLayout)
+            throw new InvalidOperationException("UI layout rounding cannot change during layout.");
+        if (_isDrawing)
         {
-            if (_useLayoutRounding == value)
-                return;
-            if (_ownerThreadId is not null)
-                VerifyOwnerThreadCore();
-            if (IsUpdatingLayout)
-                throw new InvalidOperationException("UI layout rounding cannot change during layout.");
-            if (_isDrawing)
-            {
-                throw new InvalidOperationException(
-                    "UI layout rounding cannot change while drawing commands are generated.");
-            }
-
-            _useLayoutRounding = value;
+            throw new InvalidOperationException(
+                "UI layout rounding cannot change while drawing commands are generated.");
         }
 
+        _useLayoutRounding = value;
         Root?.InvalidateMeasureSubtree();
     }
 

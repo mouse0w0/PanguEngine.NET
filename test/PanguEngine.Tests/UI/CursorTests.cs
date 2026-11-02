@@ -6,6 +6,8 @@ using PanguEngine.Windowing;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class CursorTests
 {
     [Fact]
@@ -58,7 +60,7 @@ public sealed class CursorTests
         scene.SetStyleSheets([StyleSheet.Parse("Panel { cursor: crosshair; }")]);
         scene.PrepareFrame(new Size(100, 100));
 
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         Assert.Equal(CursorShape.Arrow, scene.PointerCursor);
     }
 
@@ -76,7 +78,7 @@ public sealed class CursorTests
 
         scene.ProcessPointerMoved(new Point(150, 150));
 
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         Assert.Equal(CursorShape.Arrow, scene.PointerCursor);
     }
 
@@ -216,7 +218,7 @@ public sealed class CursorTests
                 scene.Close();
         };
         root.Cursor = CursorShape.Crosshair;
-        Assert.False(scene.IsOpen());
+        Assert.False(scene.IsOpen);
         Assert.Equal(CursorShape.Arrow, scene.PointerCursor);
     }
 }

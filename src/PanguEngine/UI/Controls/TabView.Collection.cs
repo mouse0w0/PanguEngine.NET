@@ -309,7 +309,6 @@ public sealed partial class TabView
             if (item.OwnerView is not null && !ReferenceEquals(item.OwnerView, this))
                 throw new InvalidOperationException("The tab item already belongs to another view.");
 
-            Scene?.VerifyTreeMutationAccess();
             item.Scene?.VerifyTreeMutationAccess();
             if (item.Parent is null && item.Scene is not null)
                 throw new InvalidOperationException("A UI scene root must be cleared before it can join a tab view.");

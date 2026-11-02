@@ -7,6 +7,7 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.Tests.UI;
 
 [Collection(TextServicesCollection.Name)]
+[UIThreadTest]
 public sealed class ContentActivationTests
 {
     [Theory]
@@ -49,6 +50,7 @@ public sealed class ContentActivationTests
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]
+    [UIThreadTest(false)]
     public void FocusedEditorKeysDoNotCreateAnOuterActivationPair(int kind)
     {
         using var context = new TextTestContext();

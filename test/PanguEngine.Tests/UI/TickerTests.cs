@@ -8,6 +8,7 @@ using PanguEngine.UI.Controls;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class TickerTests
 {
     private static readonly Size Viewport = new(100, 100);
@@ -39,6 +40,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void StoppedTickerIsNotRetainedByItsNodeOrScene()
     {
         var node = new TickingNode();
@@ -58,6 +60,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ActiveTickerRunsWithoutConsumerReferenceAndIsReleasedOnStop()
     {
         var node = new TickingNode();
@@ -85,6 +88,7 @@ public sealed class TickerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void LifecycleStopReleasesTickerWhileNodeAndSceneRemainAlive(bool close)
     {
         var node = new TickingNode();
@@ -110,6 +114,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void StartAndStopAreIdempotentAndRestartMovesToEnd()
     {
         var node = new TickingNode();
@@ -141,6 +146,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ConsumerIntegratesExplicitTimeAndResetsBaselineForNewRun()
     {
         var node = new TickingNode();
@@ -182,6 +188,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void EqualTimestampsStillRepresentSeparateFrames()
     {
         var node = new TickingNode();
@@ -205,6 +212,7 @@ public sealed class TickerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void StoppingPendingRunSkipsItEvenIfRestarted(bool restart)
     {
         var node = new TickingNode();
@@ -236,6 +244,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CallbackStartsNewTaskAndRestartsItselfOnlyForNextFrame()
     {
         var node = new TickingNode();
@@ -270,6 +279,7 @@ public sealed class TickerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void TickersStartedByFrameUpdatesRunImmediatelyAndPostsWaitUntilNextFrame(bool fromPost)
     {
         var node = new TickingNode();
@@ -295,6 +305,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void TickerStartedByPostFromFrameUpdateWaitsUntilNextFrame()
     {
         var node = new TickingNode();
@@ -319,6 +330,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void HudAndSceneShareTimeAndUseStableSceneOrder()
     {
         var manager = new UIManager();
@@ -347,6 +359,7 @@ public sealed class TickerTests
     [InlineData(false, true)]
     [InlineData(true, false)]
     [InlineData(true, true)]
+    [UIThreadTest]
     public void CrossSceneStartAndRestartFollowTargetPreparationOrder(bool fromHud, bool restart)
     {
         var manager = new UIManager();
@@ -382,6 +395,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void HudExceptionStopsRemainingWorkAndAllowsNextFrame()
     {
         var manager = new UIManager();
@@ -417,6 +431,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void TickerRunsAfterFrameUpdateAndBeforeAllLayoutRetries()
     {
         var events = new List<string>();
@@ -444,6 +459,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OpeningCanStartTickerBeforeInteractionActivation()
     {
         var node = new TickingNode();
@@ -463,7 +479,8 @@ public sealed class TickerTests
         }
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
     public void WrongThreadCannotStartOrStopAnActiveRun()
     {
         var node = new TickingNode();
@@ -490,6 +507,7 @@ public sealed class TickerTests
     [InlineData(2)]
     [InlineData(3)]
     [InlineData(4)]
+    [UIThreadTest]
     public void DetachAndTransferStopSubtreeRunsWithoutRestoringThem(int transfer)
     {
         var root = new Panel();
@@ -543,6 +561,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void SiblingReorderingDoesNotStopTicker()
     {
         var root = new Panel();
@@ -569,6 +588,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void DetachingDuringCallbackLetsItReturnAndSkipsOtherOwnedRuns()
     {
         var root = new Panel();
@@ -600,6 +620,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void CloseStopsBeforeCallbacksAndPreservesPointerCanceledBusinessCleanup()
     {
         var node = new TickingNode();
@@ -639,6 +660,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClosingFailureAlreadyStoppedAllRuns()
     {
         var node = new TickingNode();
@@ -655,6 +677,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ClosedTreeCanRemoveStoppedTickerOnAnotherThread()
     {
         var root = new Panel();
@@ -676,6 +699,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void HudStopsBeforeDestroyCallbackEvenWhenItThrows()
     {
         var node = new TickingNode();
@@ -700,6 +724,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void FocusLossVisibilityAndEnabledStateDoNotAutomaticallyStopTicker()
     {
         var node = new TickingNode();
@@ -724,6 +749,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void OwnershipNotificationFailureLeavesUnchangedDescendantTickerActive()
     {
         var root = new TickingNode();
@@ -762,6 +788,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void ChildRemovedDuringOwnershipNotificationStopsItsTicker()
     {
         var root = new Panel();
@@ -796,6 +823,7 @@ public sealed class TickerTests
     }
 
     [Fact]
+    [UIThreadTest]
     public void IndependentSceneExceptionAllowsNextPreparation()
     {
         var node = new TickingNode();
@@ -820,6 +848,7 @@ public sealed class TickerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void StartUsesSceneOwnershipDuringParentNotification(bool startedBeforeRemoval)
     {
         var root = new Panel();

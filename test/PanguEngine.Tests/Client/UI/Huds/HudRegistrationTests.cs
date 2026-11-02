@@ -1,12 +1,15 @@
 using PanguEngine.Client.UI;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Registries;
+using PanguEngine.Tests.UI;
 using PanguEngine.UI;
 using PanguEngine.UI.Controls;
 using PanguEngine.UI.Drawing;
 
 namespace PanguEngine.Tests.Client.UI.Huds;
 
+[Collection(UIToolkitCollection.Name)]
+[UIThreadTest]
 public sealed class HudRegistrationTests
 {
     [Fact]
@@ -344,7 +347,7 @@ public sealed class HudRegistrationTests
 
         Assert.Same(expected, actual);
         Assert.Equal(["third:destroy", "second:destroy"], events);
-        Assert.True(manager.Hud.Scene.IsOpen());
+        Assert.True(manager.Hud.Scene.IsOpen);
         Assert.Equal(3, HudRoot(manager).Children.Count);
         Assert.Throws<InvalidOperationException>(() => manager.Hud.Post(static () => { }));
     }

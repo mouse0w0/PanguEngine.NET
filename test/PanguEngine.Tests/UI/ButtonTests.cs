@@ -13,9 +13,11 @@ using PanguEngine.UI.Styling;
 namespace PanguEngine.Tests.UI;
 
 [Collection(TextServicesCollection.Name)]
+[UIThreadTest]
 public sealed class ButtonTests
 {
     [Fact]
+    [UIThreadTest(false)]
     public void PublicSurfaceAndDefaultsMatchTheButtonContract()
     {
         var button = new Button();
@@ -54,6 +56,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void TextContentChangesReplaceTheDisplayedTextAndEmptyContentRemovesIt()
     {
         var button = new Button { Content = "Open" };
@@ -71,6 +74,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentPropertiesSynchronizeExistingAndFutureChildren()
     {
         var font = new Font("Requested Family");
@@ -104,6 +108,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void EmptyButtonMeasuresFromPaddingAndBorder()
     {
         var button = new Button();
@@ -118,6 +123,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void TextMeasurementRequiresInitializedToolkitServices()
     {
         var button = new Button { Content = "Text" };
@@ -129,6 +135,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ContentIsCenteredWithLayoutRounding()
     {
         const double scale = 1.25;
@@ -158,6 +165,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ExplicitSmallSizeKeepsCenteredOverflowAndDoesNotEnableClipping()
     {
         var content = new Panel
@@ -316,6 +324,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void StyleDrivenContentRemovalLeavesDetachedChildStylesPending()
     {
         var button = new StyledContentHost();
@@ -385,6 +394,7 @@ public sealed class ButtonTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest(false)]
     public void DisabledStyleWinsWhenOtherPseudoClassesRemainActive(bool danger)
     {
         var button = new Button();
@@ -406,6 +416,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void DisabledColorIsInheritedByTextAndHonorsLocalOverride()
     {
         var button = new Button { Content = "Delete" };
@@ -457,6 +468,7 @@ public sealed class ButtonTests
     }
 
     [Fact]
+    [UIThreadTest(false)]
     public void ImageKeepsItsViewClipWhileTextInheritsTheOuterClip()
     {
         using var context = new TextTestContext();

@@ -5,6 +5,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.Tests.UI;
 
+[Collection(UIToolkitCollection.Name)]
 public sealed class ContentControlTests
 {
     [Fact]
@@ -25,9 +26,10 @@ public sealed class ContentControlTests
         Assert.Equal(1, changes);
     }
 
-    [Theory]
+    [Theory(Skip = UIThreadTestAttribute.DebugOnly)]
     [InlineData(false)]
     [InlineData(true)]
+    [UIThreadTest]
     public void DetachedPageRejectsWrongThreadClrAndPropertyWrites(bool setValue)
     {
         var root = new Panel();
