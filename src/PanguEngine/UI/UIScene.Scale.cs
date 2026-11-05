@@ -46,11 +46,11 @@ public partial class UIScene
             return;
         }
 
-        if (_isOpen)
+        if (IsOpen || _isClosing)
             VerifyOwnerThreadCore();
         if (IsUpdatingLayout)
             throw new InvalidOperationException("The UI scene scale cannot change during layout.");
-        if (_isDrawing)
+        if (IsDrawing)
         {
             throw new InvalidOperationException(
                 "The UI scene scale cannot change while drawing commands are generated.");
@@ -79,11 +79,11 @@ public partial class UIScene
     {
         if (_useLayoutRounding == value)
             return;
-        if (_isOpen)
+        if (IsOpen || _isClosing)
             VerifyOwnerThreadCore();
         if (IsUpdatingLayout)
             throw new InvalidOperationException("UI layout rounding cannot change during layout.");
-        if (_isDrawing)
+        if (IsDrawing)
         {
             throw new InvalidOperationException(
                 "UI layout rounding cannot change while drawing commands are generated.");

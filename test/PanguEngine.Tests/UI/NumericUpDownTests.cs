@@ -636,6 +636,22 @@ public sealed class NumericUpDownTests
     }
 
     [Fact]
+    public void ClosingFromTheInitialStepDoesNotRestartLongPress()
+    {
+        using var context = new TextTestContext();
+        using var scene = new Scene<int>(new() { Value = 10 });
+        using var subscription = scene.Node.Subscribe(NumericUpDown<int>.ValueProperty, (_, _) => scene.Manager.Close());
+
+        scene.Press(scene.PartCenter("increase"));
+
+        Assert.False(scene.GameScene.IsOpen);
+        scene.Manager.Open(scene.GameScene);
+        scene.Frame(0);
+        scene.Frame(1000);
+        Assert.Equal(11, scene.Node.Value);
+    }
+
+    [Fact]
     public void PrecisionLimitedLongPressStopsWithoutRepeatedNotifications()
     {
         using var context = new TextTestContext();

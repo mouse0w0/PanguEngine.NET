@@ -27,7 +27,8 @@ public sealed class UISceneLayoutStabilityTests
         {
             scene.ProcessPointerMoved(new Point(10, 10));
             var posts = 0;
-            scene.Post(() => posts++);
+            UIToolkit.Post(() => posts++);
+            UIToolkit.UpdateFrame(TimeSpan.Zero);
             scene.UpdateFrame(0);
             scene.PrepareFrame(new Size(400, 300));
 

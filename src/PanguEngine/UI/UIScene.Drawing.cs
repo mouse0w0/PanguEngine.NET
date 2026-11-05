@@ -4,8 +4,6 @@ namespace PanguEngine.UI;
 
 public partial class UIScene
 {
-    private bool _isDrawing;
-
     /// <summary>
     /// Creates a new command list recording the current root subtree.
     /// </summary>
@@ -40,11 +38,11 @@ public partial class UIScene
         }
     }
 
-    internal bool IsDrawing => _isDrawing;
+    internal bool IsDrawing { get; private set; }
 
     internal void VerifyTreeMutationAccess()
     {
-        if (_isOpen)
+        if (IsOpen || _isClosing)
             VerifyOwnerThreadCore();
         VerifyTreeMutationStateCore();
     }
@@ -54,7 +52,7 @@ public partial class UIScene
     private void VerifyTreeMutationStateCore()
     {
         VerifyNotPreparingStyleSheets();
-        if (_isDrawing)
+        if (IsDrawing)
         {
             throw new InvalidOperationException(
                 "The UI scene tree cannot change while drawing commands are generated.");
@@ -63,7 +61,7 @@ public partial class UIScene
 
     private void BeginDrawing()
     {
-        if (_isOpen)
+        if (IsOpen || _isClosing)
             VerifyOwnerThreadCore();
         if (_isTransitioning)
             throw new InvalidOperationException("The UI scene cannot draw during a lifecycle transition.");
@@ -71,16 +69,16 @@ public partial class UIScene
             throw new InvalidOperationException("The UI scene cannot draw while layout is updating.");
         if (IsUpdating)
             throw new InvalidOperationException("The UI scene cannot draw during an update callback.");
-        if (_isDrawing)
+        if (IsDrawing)
             throw new InvalidOperationException("The UI scene is already generating drawing commands.");
 
-        _isDrawing = true;
+        IsDrawing = true;
         _operationDepth++;
     }
 
     private void EndDrawing()
     {
         _operationDepth--;
-        _isDrawing = false;
+        IsDrawing = false;
     }
 }

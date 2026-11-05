@@ -8,7 +8,7 @@ public sealed partial class ScrollBar
     private const int InitialRepeatDelayMilliseconds = 400;
     private const int RepeatIntervalMilliseconds = 50;
 
-    private readonly Ticker _repeatTicker;
+    private Ticker? _repeatTicker;
     private InteractionKind _interaction;
     private double _thumbDragStartPointer;
     private double _thumbDragStartValue;
@@ -48,13 +48,11 @@ public sealed partial class ScrollBar
                 break;
             case ScrollBarPartKind.Decrease:
                 Step(-SmallChange);
-                if (part.IsEnabled)
-                    StartRepeat(InteractionKind.RepeatDecrease, 0);
+                StartRepeat(InteractionKind.RepeatDecrease, 0, part);
                 break;
             case ScrollBarPartKind.Increase:
                 Step(SmallChange);
-                if (part.IsEnabled)
-                    StartRepeat(InteractionKind.RepeatIncrease, 0);
+                StartRepeat(InteractionKind.RepeatIncrease, 0, part);
                 break;
         }
 
@@ -199,8 +197,7 @@ public sealed partial class ScrollBar
         _trackDirection = 0;
         _hasPointerPosition = false;
         ResetRepeatDelay();
-        if (_repeatTicker.IsActive)
-            _repeatTicker.Stop();
+        _repeatTicker?.Stop();
     }
 
     private bool TryStartThumbDrag(Point position)
@@ -221,18 +218,20 @@ public sealed partial class ScrollBar
     {
         var thumb = _thumb.LayoutBounds;
         var main = GetMainPoint(position, Orientation);
-        _trackDirection = main < GetMainOrigin(thumb, Orientation) ? -1 : 1;
-        Step(LargeChange * _trackDirection);
-        StartRepeat(InteractionKind.RepeatTrack, _trackDirection);
+        var direction = main < GetMainOrigin(thumb, Orientation) ? -1 : 1;
+        Step(LargeChange * direction);
+        StartRepeat(InteractionKind.RepeatTrack, direction, _track);
     }
 
-    private void StartRepeat(InteractionKind interaction, int trackDirection)
+    private void StartRepeat(InteractionKind interaction, int trackDirection, ScrollBarPart part)
     {
+        if (!part.IsEnabled || !part.IsPressed)
+            return;
+
         _interaction = interaction;
         _trackDirection = trackDirection;
         ResetRepeatDelay();
-        if (!_repeatTicker.IsActive)
-            _repeatTicker.Start();
+        (_repeatTicker ??= UIToolkit.CreateTicker(OnRepeatTick)).Start();
     }
 
     private void UpdateThumbDrag(Point position)

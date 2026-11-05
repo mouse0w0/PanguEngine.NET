@@ -21,7 +21,7 @@ public sealed class UISceneTests
             (Action)scene.Open,
             (Action)scene.Close,
             (Action<Size>)scene.PrepareFrame,
-            (Action<Size, TimeSpan>)scene.PrepareFrame,
+            (Action<TimeSpan>)UIToolkit.UpdateFrame,
             (Func<Point, bool>)scene.ProcessPointerMoved,
             (Func<Point, MouseButton, KeyModifiers, bool>)scene.ProcessPointerPressed,
             (Func<Point, MouseButton, KeyModifiers, bool>)scene.ProcessPointerReleased,
@@ -660,31 +660,20 @@ public sealed class UISceneTests
 
     [Fact]
     [UIThreadTest]
-    public void PostRequiresAnOpenScene()
-    {
-        var scene = new UIScene(new LayoutNode());
-
-        Assert.Throws<InvalidOperationException>(() => scene.Post(() => { }));
-        scene.Open();
-        scene.Close();
-        Assert.Throws<InvalidOperationException>(() => scene.Post(() => { }));
-    }
-
-    [Fact]
-    [UIThreadTest]
     public void OpeningAndOpenedCanPostUntilUpdate()
     {
         var calls = 0;
         RecordingScene scene = null!;
         scene = new RecordingScene(new LayoutNode())
         {
-            Opening = () => scene.Post(() => calls++),
-            Opened = () => scene.Post(() => calls++)
+            Opening = () => UIToolkit.Post(() => calls++),
+            Opened = () => UIToolkit.Post(() => calls++)
         };
 
         scene.Open();
 
         Assert.Equal(0, calls);
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         scene.PrepareFrame(new Size(20, 20));
         Assert.Equal(2, calls);
         scene.Close();
@@ -692,88 +681,7 @@ public sealed class UISceneTests
 
     [Fact]
     [UIThreadTest]
-    public void PostPreservesFifoAndDefersActionsPostedDuringUpdate()
-    {
-        var calls = new List<string>();
-        var scene = new RecordingScene(new LayoutNode());
-        scene.Opened = () => scene.Post(() =>
-        {
-            calls.Add("first");
-            Exception? postError = null;
-            var thread = new Thread(() => postError = Record.Exception(() =>
-                scene.Post(() => calls.Add("deferred")))) { IsBackground = true };
-            thread.Start();
-            Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
-            Assert.Null(postError);
-        });
-
-        scene.Open();
-        scene.Post(() => calls.Add("second"));
-        scene.PrepareFrame(new Size(20, 20));
-
-        Assert.Equal(["first", "second"], calls);
-        scene.PrepareFrame(new Size(20, 20));
-        Assert.Equal(["first", "second", "deferred"], calls);
-        scene.Close();
-    }
-
-    [Fact]
-    [UIThreadTest]
-    public void PostCanBeCalledFromBackgroundThread()
-    {
-        var scene = new UIScene(new LayoutNode());
-        var calls = 0;
-        scene.Open();
-
-        Exception? error = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                scene.Post(() => calls++);
-            }
-            catch (Exception exception)
-            {
-                error = exception;
-            }
-        });
-        thread.Start();
-        thread.Join();
-
-        Assert.Null(error);
-        Assert.Equal(0, calls);
-        scene.PrepareFrame(new Size(20, 20));
-        Assert.Equal(1, calls);
-        scene.Close();
-    }
-
-    [Fact]
-    [UIThreadTest]
-    public void ActionFailureStopsTheBatchAndPreservesRemainingActions()
-    {
-        var expected = new InvalidOperationException("action failed");
-        var calls = new List<string>();
-        var scene = new UIScene(new LayoutNode());
-        scene.Open();
-        scene.Post(() =>
-        {
-            calls.Add("failing");
-            throw expected;
-        });
-        scene.Post(() => calls.Add("remaining"));
-
-        var actual = Assert.Throws<InvalidOperationException>(() => scene.PrepareFrame(new Size(20, 20)));
-
-        Assert.Same(expected, actual);
-        Assert.Equal(["failing"], calls);
-        scene.PrepareFrame(new Size(20, 20));
-        Assert.Equal(["failing", "remaining"], calls);
-        scene.Close();
-    }
-
-    [Fact]
-    [UIThreadTest]
-    public void CloseRejectsNewPostsAndClearsPendingActions()
+    public void CloseDoesNotRejectOrDiscardGlobalPosts()
     {
         var calls = 0;
         Exception? postError = null;
@@ -783,7 +691,7 @@ public sealed class UISceneTests
             Closing = () =>
             {
                 var thread = new Thread(() => postError = Record.Exception(() =>
-                    scene.Post(() => calls++))) { IsBackground = true };
+                    UIToolkit.Post(() => calls++))) { IsBackground = true };
                 thread.Start();
                 Assert.True(thread.Join(TimeSpan.FromSeconds(5)));
             }
@@ -791,23 +699,24 @@ public sealed class UISceneTests
         scene.Open();
         Exception? beforeCloseError = null;
         var beforeCloseThread = new Thread(() => beforeCloseError = Record.Exception(() =>
-            scene.Post(() => calls++))) { IsBackground = true };
+            UIToolkit.Post(() => calls++))) { IsBackground = true };
         beforeCloseThread.Start();
         Assert.True(beforeCloseThread.Join(TimeSpan.FromSeconds(5)));
         Assert.Null(beforeCloseError);
 
         scene.Close();
         scene.Open();
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         scene.PrepareFrame(new Size(20, 20));
 
-        Assert.Equal(0, calls);
-        Assert.IsType<InvalidOperationException>(postError);
+        Assert.Equal(2, calls);
+        Assert.Null(postError);
         scene.Close();
     }
 
     [Fact]
     [UIThreadTest]
-    public void CloseInsidePostRejectsSameSceneReopenUntilUpdateReturns()
+    public void GlobalPostCanCloseAndReopenTheSameSceneBeforeLayout()
     {
         var root = new LayoutNode();
         var scene = new UIScene(root);
@@ -815,31 +724,32 @@ public sealed class UISceneTests
         scene.Open();
         scene.PrepareFrame(new Size(20, 20));
         var arrangeCalls = root.ArrangeCalls;
-        scene.Post(() =>
+        UIToolkit.Post(() =>
         {
             scene.Close();
             reopenError = Record.Exception(scene.Open);
         });
 
-        scene.PrepareFrame(new Size(20, 20));
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
 
-        Assert.IsType<InvalidOperationException>(reopenError);
+        Assert.Null(reopenError);
         Assert.Equal(arrangeCalls, root.ArrangeCalls);
         Assert.Same(scene, root.Scene);
-        scene.Open();
+        Assert.True(scene.IsOpen);
+        scene.PrepareFrame(new Size(20, 20));
         scene.Close();
     }
 
-    [Fact]
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
     [UIThreadTest]
-    public void CloseInsidePostRejectsBackgroundReopenUntilUpdateReturns()
+    public void CloseInsideGlobalPostStillRejectsBackgroundReopen()
     {
         var scene = new UIScene(new LayoutNode());
         var closed = new ManualResetEventSlim();
         var attempted = new ManualResetEventSlim();
         Exception? reopenError = null;
         scene.Open();
-        scene.Post(() =>
+        UIToolkit.Post(() =>
         {
             scene.Close();
             closed.Set();
@@ -853,7 +763,7 @@ public sealed class UISceneTests
         });
         thread.Start();
 
-        scene.PrepareFrame(new Size(20, 20));
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         thread.Join();
 
         Assert.IsType<InvalidOperationException>(reopenError);
@@ -871,13 +781,13 @@ public sealed class UISceneTests
         scene.Open();
         scene.PrepareFrame(new Size(20, 20));
         var arrangeCalls = root.ArrangeCalls;
-        scene.Post(() =>
+        UIToolkit.Post(() =>
         {
             scene.Close();
             throw expected;
         });
 
-        var actual = Assert.Throws<InvalidOperationException>(() => scene.PrepareFrame(new Size(20, 20)));
+        var actual = Assert.Throws<InvalidOperationException>(() => UIToolkit.UpdateFrame(TimeSpan.Zero));
 
         Assert.Same(expected, actual);
         Assert.Equal(arrangeCalls, root.ArrangeCalls);
@@ -896,7 +806,7 @@ public sealed class UISceneTests
         {
             Opening = () =>
             {
-                scene.Post(() => postedCalls++);
+                UIToolkit.Post(() => postedCalls++);
                 throw expected;
             },
             Opened = () => callbacks.Add("opened"),
@@ -911,6 +821,7 @@ public sealed class UISceneTests
         Assert.True(scene.IsOpen);
         Assert.Empty(callbacks);
         Assert.Throws<InvalidOperationException>(scene.Open);
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         scene.PrepareFrame(new Size(20, 20));
         Assert.Equal(1, postedCalls);
         scene.Close();
@@ -928,7 +839,7 @@ public sealed class UISceneTests
         {
             Opened = () =>
             {
-                scene.Post(() => postedCalls++);
+                UIToolkit.Post(() => postedCalls++);
                 throw expected;
             },
             Closing = () => callbacks.Add("closing"),
@@ -942,6 +853,7 @@ public sealed class UISceneTests
         Assert.True(scene.IsOpen);
         Assert.Empty(callbacks);
         Assert.Throws<InvalidOperationException>(scene.Open);
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         scene.PrepareFrame(new Size(20, 20));
         Assert.Equal(1, postedCalls);
         scene.Close();
@@ -976,8 +888,8 @@ public sealed class UISceneTests
         Assert.Same(expected, actual);
         string[] expectedCallbacks = failOnClosed ? ["closing", "closed"] : ["closing"];
         Assert.Equal(expectedCallbacks, callbacks);
-        Assert.True(scene.IsOpen);
-        Assert.Throws<InvalidOperationException>(() => scene.Post(() => { }));
+        Assert.False(scene.IsOpen);
+        Assert.Null(Record.Exception(() => UIToolkit.Post(() => { })));
     }
 
     [Fact]
@@ -1016,6 +928,100 @@ public sealed class UISceneTests
         Assert.IsType<InvalidOperationException>(updateError);
         Assert.IsType<InvalidOperationException>(closeError);
         scene.Close();
+    }
+
+    [Fact]
+    [UIThreadTest]
+    public void IsOpenNotifiesBeforeLifecycleCallbacksAndPreservesOwnership()
+    {
+        var events = new List<string>();
+        var root = new LayoutNode();
+        var scene = new RecordingScene(root);
+        scene.Opening = () =>
+        {
+            Assert.True(scene.IsOpen);
+            events.Add("opening");
+        };
+        scene.Opened = () => events.Add("opened");
+        scene.Closing = () =>
+        {
+            Assert.False(scene.IsOpen);
+            Assert.Throws<InvalidOperationException>(scene.Close);
+            events.Add("closing");
+        };
+        scene.Closed = () => events.Add("closed");
+        using var subscription = scene.Subscribe(UIScene.IsOpenProperty, (_, change) =>
+        {
+            Assert.Equal(change.NewValue, scene.IsOpen);
+            events.Add(change.NewValue ? "state:true" : "state:false");
+        });
+
+        Assert.Empty(events);
+        Assert.False(scene.GetValue(UIScene.IsOpenProperty));
+        Assert.Throws<InvalidOperationException>(() => scene.SetValue(UIScene.IsOpenProperty, true));
+        scene.Open();
+        scene.Close();
+        scene.Close();
+
+        Assert.Equal(["state:true", "opening", "opened", "state:false", "closing", "closed"], events);
+        Assert.Same(root, scene.Root);
+        Assert.Same(scene, root.Scene);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [UIThreadTest]
+    public void IsOpenNotificationFailurePreservesStateAndStopsLaterNotifications(bool opening)
+    {
+        var scene = new RecordingScene(new LayoutNode());
+        if (!opening)
+            scene.Open();
+        var callbacks = new List<string>();
+        scene.Opening = () => callbacks.Add("opening");
+        scene.Closing = () => callbacks.Add("closing");
+        var expected = new InvalidOperationException("state notification failed");
+        using var failure = scene.Subscribe(UIScene.IsOpenProperty, (_, _) => throw expected);
+        var laterCalls = 0;
+        using var later = scene.Subscribe(UIScene.IsOpenProperty, (_, _) => laterCalls++);
+
+        Assert.Same(expected, Assert.Throws<InvalidOperationException>(() =>
+        {
+            if (opening)
+                scene.Open();
+            else
+                scene.Close();
+        }));
+        Assert.Equal(opening, scene.IsOpen);
+        Assert.Empty(callbacks);
+        Assert.Equal(0, laterCalls);
+        Assert.Throws<InvalidOperationException>(scene.Open);
+        failure.Dispose();
+        scene.Close();
+        Assert.False(scene.IsOpen);
+        Assert.Equal(opening ? 1 : 0, laterCalls);
+    }
+
+    [Fact(Skip = UIThreadTestAttribute.DebugOnly)]
+    [UIThreadTest]
+    public void ClosingSceneStillEnforcesOwnerThread()
+    {
+        var scene = new RecordingScene(new LayoutNode());
+        var originalScale = scene.Scale;
+        Exception? error = null;
+        scene.Closing = () =>
+        {
+            Assert.False(scene.IsOpen);
+            var thread = new Thread(() => error = Record.Exception(() => scene.Scale = originalScale + 1));
+            thread.Start();
+            thread.Join();
+        };
+
+        scene.Open();
+        scene.Close();
+
+        Assert.IsType<InvalidOperationException>(error);
+        Assert.Equal(originalScale, scene.Scale);
     }
 
     private sealed class RecordingScene(UIElement? root = null) : UIScene(root)

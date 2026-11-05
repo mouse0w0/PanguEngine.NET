@@ -211,7 +211,7 @@ public sealed class ProgressBarTests
     }
 
     private static void Prepare(UIScene scene) =>
-        scene.PrepareFrame(new Size(120, 80), TimeSpan.Zero);
+        scene.PrepareFrame(new Size(120, 80));
 
     private static UIElement Fill(ProgressBar bar) =>
         bar.ReadOnlyChildren.Single(child => child.Classes.Contains("progress-bar-fill"));

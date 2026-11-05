@@ -21,16 +21,6 @@ public sealed class HudManager
     }
 
     /// <summary>
-    /// Posts a HUD tree operation to the host UI thread.
-    /// </summary>
-    /// <param name="action">The operation to execute during the next HUD frame preparation.</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="action"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when the HUD is not accepting posted actions.
-    /// </exception>
-    public void Post(Action action) => Scene.Post(action);
-
-    /// <summary>
     /// Gets a running HUD component by its registry key.
     /// </summary>
     /// <param name="key">The key of the HUD component.</param>
@@ -74,12 +64,11 @@ public sealed class HudManager
 
     internal void UpdateFrame(double alpha) => Scene.UpdateFrame(alpha);
 
-    internal void PrepareFrame(Size viewportSize, TimeSpan frameTime) =>
-        Scene.PrepareFrame(viewportSize, frameTime);
+    internal void PrepareFrame(Size viewportSize) => Scene.PrepareFrame(viewportSize);
 
     internal void Close()
     {
-        Scene.StopAcceptingPosts();
+        Scene.DeactivateForClose();
         for (var index = _hudsInOrder.Count - 1; index >= 0; index--)
             _hudsInOrder[index].DestroyHud();
 

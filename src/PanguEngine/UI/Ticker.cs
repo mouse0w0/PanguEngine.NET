@@ -1,56 +1,39 @@
 namespace PanguEngine.UI;
 
 /// <summary>
-/// Runs a callback tied to a UI element once per prepared frame while active.
+/// Runs a callback once per UI frame while started.
 /// </summary>
 /// <remarks>
-/// The owning scene supplies the same absolute monotonic time to all tickers in a client frame.
-/// Changing the element's scene ownership or closing its scene stops the current run without invoking business callbacks.
-/// Remounting or reopening does not resume a stopped run. Callback exceptions propagate immediately.
-/// Consumers retain tickers for reuse. Elements and scenes register active runs only.
+/// The toolkit supplies the same absolute monotonic time to all tickers in a UI frame.
+/// Consumers manage their time baselines and decide when to start, stop, or resume their tasks.
+/// Scene and element lifecycle changes do not stop a ticker. Active registrations retain their callbacks.
+/// Callback exceptions propagate immediately. Tickers must not be reused after toolkit shutdown.
 /// </remarks>
 public sealed class Ticker
 {
-    private readonly UIElement _owner;
     private readonly Action<TimeSpan> _onTick;
-    private UIScene? _scene;
     private LinkedListNode<Ticker>? _registration;
 
-    internal Ticker(UIElement owner, Action<TimeSpan> onTick)
-    {
-        _owner = owner;
-        _onTick = onTick;
-    }
+    internal Ticker(Action<TimeSpan> onTick) => _onTick = onTick;
 
-    /// <summary>
-    /// Gets whether this ticker has an active run.
-    /// </summary>
+    /// <summary>Gets whether this ticker is registered for execution.</summary>
     public bool IsActive => _registration is not null;
 
     /// <summary>
-    /// Starts a new run, or leaves an already active run unchanged.
+    /// Starts a run, or leaves an already started run unchanged.
     /// </summary>
     /// <remarks>
-    /// Requires scene ownership, the host UI thread, and an open scene that has not begun closing.
-    /// Scene ownership is determined by the element's Scene property.
-    /// Starting after the owning scene begins frame preparation takes effect no earlier than its next prepared frame.
-    /// No callback runs synchronously; consumers reset their time baseline for each new run.
+    /// Requires the initialized host UI thread. Registrations created after the frame snapshot
+    /// wait until the next UI frame. No callback runs synchronously, and starting does not rebase frame time.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
-    /// Thrown when the element has no scene ownership or its scene is closed or closing.
-    /// Also thrown in Debug builds when accessed from outside the host UI thread.
+    /// Thrown when the toolkit is not initialized, or in Debug builds for access outside its UI thread.
     /// </exception>
     public void Start()
     {
-        var scene = _owner.Scene
-                    ?? throw new InvalidOperationException("The UI node has no scene ownership.");
-        scene.VerifyTickerStart();
-        if (_registration is not null)
-            return;
-
-        _scene = scene;
-        _registration = scene.RegisterTicker(this);
-        _owner.RegisterTicker(this);
+        UIToolkit.VerifyInitialized();
+        UIToolkit.VerifyAccess();
+        _registration ??= UIToolkit.RegisterTicker(this);
     }
 
     /// <summary>
@@ -63,10 +46,10 @@ public sealed class Ticker
     /// <exception cref="InvalidOperationException">Thrown in Debug builds when an active run is stopped from outside the host UI thread.</exception>
     public void Stop()
     {
-        if (_registration is null)
+        if (!IsActive)
             return;
 
-        _scene!.VerifyOwnerThread();
+        UIToolkit.VerifyAccess();
         StopCore();
     }
 
@@ -75,15 +58,15 @@ public sealed class Ticker
         if (_registration is null)
             return;
 
-        _scene!.UnregisterTicker(_registration);
-        _owner.UnregisterTicker(this);
+        UIToolkit.UnregisterTicker(_registration);
         _registration = null;
-        _scene = null;
     }
 
     internal void Tick(LinkedListNode<Ticker> registration, TimeSpan frameTime)
     {
-        if (ReferenceEquals(_registration, registration))
-            _onTick(frameTime);
+        if (!ReferenceEquals(_registration, registration))
+            return;
+
+        _onTick(frameTime);
     }
 }

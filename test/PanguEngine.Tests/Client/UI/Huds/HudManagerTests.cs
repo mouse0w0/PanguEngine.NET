@@ -26,7 +26,7 @@ public sealed class HudManagerTests
             InitializeHud(manager, root);
             var panel = new Panel { Width = 10, Height = 10 };
 
-            manager.Hud.Post(() => root.Children.Add(panel));
+            UIToolkit.Post(() => root.Children.Add(panel));
 
             Assert.Empty(root.Children);
 
@@ -44,13 +44,16 @@ public sealed class HudManagerTests
     }
 
     [Fact]
-    public void DestroyClosesHudPostQueue()
+    public void DestroyDoesNotCloseTheToolkitPostQueue()
     {
         var manager = new UIManager();
 
         manager.Destroy();
 
-        Assert.Throws<InvalidOperationException>(() => manager.Hud.Post(static () => { }));
+        var executed = false;
+        UIToolkit.Post(() => executed = true);
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
+        Assert.True(executed);
     }
 
     [Fact]
@@ -204,7 +207,7 @@ public sealed class HudManagerTests
             }
 
             manager.UpdateFrame(new Size(200, 100), 0);
-            manager.Hud.Post(() => postedActionExecuted = true);
+            UIToolkit.Post(() => postedActionExecuted = true);
 
             manager.AppendDrawCommands(commands);
 

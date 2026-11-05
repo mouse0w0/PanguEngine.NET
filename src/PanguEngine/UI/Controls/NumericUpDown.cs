@@ -113,7 +113,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     private bool _editing;
     private bool _writingDisplay;
     private bool _userModified;
-    private readonly Ticker _repeatTicker;
+    private Ticker? _repeatTicker;
     private NumericUpDownPart? _pressedPart;
     private bool _hasRepeatBaseline;
     private TimeSpan _lastRepeatTime;
@@ -125,7 +125,6 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     public NumericUpDown()
     {
         Focusable = true;
-        _repeatTicker = CreateTicker(OnRepeatTick);
         _editor.Classes.Add("numeric-up-down-editor");
         Children.Add(_editor);
         Children.Add(_increase);
@@ -437,7 +436,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
 
         _pressedPart = part;
         ResetRepeatDelay();
-        _repeatTicker.Start();
+        (_repeatTicker ??= UIToolkit.CreateTicker(OnRepeatTick)).Start();
     }
 
     /// <inheritdoc />
@@ -531,7 +530,7 @@ public sealed class NumericUpDown<T> : NumericUpDown where T : INumber<T>
     {
         _pressedPart = null;
         ResetRepeatDelay();
-        _repeatTicker.Stop();
+        _repeatTicker?.Stop();
     }
 
     /// <inheritdoc />

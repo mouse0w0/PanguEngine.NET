@@ -1295,13 +1295,14 @@ public sealed class DrawingTests
         var calls = 0;
         var node = new DrawingNode();
         var scene = new UIScene(node);
-        node.DrawAction = _ => scene.Post(() => calls++);
+        node.DrawAction = _ => UIToolkit.Post(() => calls++);
         Arrange(node, new Rect(0, 0, 10, 10));
         scene.Open();
 
         _ = scene.CreateDrawCommandList();
         Assert.Equal(0, calls);
 
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         scene.PrepareFrame(new Size(10, 10));
         Assert.Equal(1, calls);
         scene.Close();

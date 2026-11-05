@@ -648,7 +648,7 @@ public sealed class UIManagerTests
     }
 
     [Fact]
-    public void ScenePostRunsBeforeManagerLayout()
+    public void ToolkitPostRunsBeforeManagerLayout()
     {
         var manager = new UIManager();
         var events = new List<string>();
@@ -660,7 +660,7 @@ public sealed class UIManagerTests
         };
         var scene = new GameUIScene(root);
         manager.Open(scene);
-        scene.Post(() =>
+        UIToolkit.Post(() =>
         {
             scene.Scale = 2;
             events.Add("post");
@@ -680,7 +680,7 @@ public sealed class UIManagerTests
         var root = new TestNode { CoreDesiredSize = new Size(10.25, 10.25) };
         var scene = new GameUIScene(root);
         manager.Open(scene);
-        scene.Post(() => scene.UseLayoutRounding = false);
+        UIToolkit.Post(() => scene.UseLayoutRounding = false);
 
         manager.UpdateFrame(new Size(100, 100), 0);
 
@@ -781,27 +781,58 @@ public sealed class UIManagerTests
         manager.Close();
     }
 
-    [Fact]
-    public void ScenePostRejectsSynchronousSceneChanges()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ToolkitCallbacksSwitchScenesAndPrepareTheReplacement(bool fromTicker)
     {
         var manager = new UIManager();
         var root = new TestNode { CoreDesiredSize = new Size(5, 5) };
         var scene = new GameUIScene(root);
-        var replacement = new GameUIScene();
+        var events = new List<string>();
+        var replacementRoot = new TestNode { MeasureAction = () => events.Add("layout") };
+        var replacement = new RecordingScene(replacementRoot) { FrameAction = _ => events.Add("frame") };
         manager.Open(scene);
-        scene.Post(() =>
+
+        void Switch()
         {
-            Assert.Throws<InvalidOperationException>(manager.Close);
-            Assert.Throws<InvalidOperationException>(() => manager.Open(replacement));
-        });
+            events.Add("switch");
+            manager.Close();
+            manager.Open(replacement);
+        }
 
-        manager.UpdateFrame(new Size(20, 10), 0);
+        var switching = UIToolkit.CreateTicker(_ => Switch());
+        var pending = UIToolkit.CreateTicker(_ => events.Add("old-tick"));
+        var newTicker = UIToolkit.CreateTicker(_ => events.Add("new-tick"));
+        if (fromTicker)
+            switching.Start();
+        else
+            UIToolkit.Post(Switch);
+        pending.Start();
+        newTicker.Start();
 
-        Assert.Same(scene, manager.CurrentScene);
-        Assert.False(replacement.IsOpen);
-        Assert.Equal(1, root.MeasureCalls);
-        Assert.Equal(1, root.ArrangeCalls);
-        manager.Destroy();
+        try
+        {
+            manager.UpdateFrame(new Size(20, 10), 0);
+            Assert.Equal(["switch", "old-tick", "new-tick", "frame", "layout"], events);
+            Assert.Same(replacement, manager.CurrentScene);
+            Assert.False(scene.IsOpen);
+            Assert.True(pending.IsActive);
+            Assert.Equal(0, root.MeasureCalls);
+            Assert.True(replacementRoot.IsArrangeValid);
+
+            events.Clear();
+            switching.Stop();
+            manager.UpdateFrame(new Size(20, 10), 0);
+            Assert.Equal(["old-tick", "new-tick", "frame"], events);
+        }
+        finally
+        {
+            switching.Stop();
+            pending.Stop();
+            newTicker.Stop();
+            manager.Destroy();
+        }
     }
 
     [Theory]
@@ -832,14 +863,14 @@ public sealed class UIManagerTests
             change = dispatcher.InvokeAsync(() =>
             {
                 manager.Open(replacement);
-                replacement.Post(() => events.Add("post"));
+                UIToolkit.Post(() => events.Add("post"));
             });
         }
 
         if (fromFrameCallback)
             oldScene.FrameAction = _ => Replace();
         else
-            oldScene.Post(Replace);
+            UIToolkit.Post(Replace);
 
         manager.UpdateFrame(new Size(20, 10), 0);
 
@@ -860,7 +891,7 @@ public sealed class UIManagerTests
 
         manager.UpdateFrame(new Size(20, 10), 0);
 
-        Assert.Equal(["frame", "post", "layout"], events);
+        Assert.Equal(["post", "frame", "layout"], events);
         Assert.True(replacement.Root!.IsArrangeValid);
         commands.Clear();
         manager.AppendDrawCommands(commands);
@@ -897,16 +928,16 @@ public sealed class UIManagerTests
     }
 
     [Fact]
-    public void InvalidViewportDoesNotUpdateScene()
+    public void InvalidViewportRejectsLayoutAfterTheIndependentToolkitUpdate()
     {
         var manager = new UIManager();
         var calls = 0;
         var scene = new GameUIScene(new TestNode());
         manager.Open(scene);
-        scene.Post(() => calls++);
+        UIToolkit.Post(() => calls++);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => manager.UpdateFrame(Size.Infinite, 0));
-        Assert.Equal(0, calls);
+        Assert.Equal(1, calls);
 
         manager.UpdateFrame(new Size(20, 10), 0);
         Assert.Equal(1, calls);
@@ -1019,20 +1050,20 @@ public sealed class UIManagerTests
     }
 
     [Fact]
-    public void DestroyDuringScenePostIsRejectedAndLayoutContinues()
+    public void DestroyDuringToolkitPostIsRejectedAndLayoutContinues()
     {
         var manager = new UIManager();
         var root = new TestNode { CoreDesiredSize = new Size(5, 5) };
         var scene = new GameUIScene(root);
         var events = new List<string>();
         manager.Open(scene);
-        scene.Post(() =>
+        UIToolkit.Post(() =>
         {
             events.Add("current-start");
             Assert.Throws<InvalidOperationException>(manager.Destroy);
             events.Add("current-end");
         });
-        scene.Post(() => events.Add("remaining"));
+        UIToolkit.Post(() => events.Add("remaining"));
 
         manager.UpdateFrame(new Size(20, 10), 0);
 
@@ -1106,7 +1137,7 @@ public sealed class UIManagerTests
     }
 
     [Fact]
-    public void HudPreparationCompletesBeforeScenePreparation()
+    public void ToolkitPrecedesAllGameFrameCallbacksAndLayout()
     {
         var events = new List<string>();
         var manager = new UIManager();
@@ -1123,7 +1154,7 @@ public sealed class UIManagerTests
         definitions.Register(ResourceKey.Create("test", "updates"), new HudDefinition(() => hud));
         definitions.Freeze();
         manager.InitializeHud(definitions);
-        manager.Hud.Post(() => events.Add("hud-post"));
+        UIToolkit.Post(() => events.Add("hud-post"));
         var scene = new RecordingScene(new TestNode { MeasureAction = () => events.Add("scene-layout") })
         {
             FixedAction = () => events.Add("scene-fixed"),
@@ -1134,14 +1165,14 @@ public sealed class UIManagerTests
             }
         };
         manager.Open(scene);
-        scene.Post(() => events.Add("scene-post"));
+        UIToolkit.Post(() => events.Add("scene-post"));
 
         manager.Update();
         Assert.Equal(["hud-fixed", "scene-fixed"], events);
         events.Clear();
         manager.UpdateFrame(new Size(100, 100), 0.75);
 
-        Assert.Equal(["hud-frame", "hud-post", "hud-layout", "scene-frame", "scene-post", "scene-layout"], events);
+        Assert.Equal(["hud-post", "scene-post", "hud-frame", "scene-frame", "hud-layout", "scene-layout"], events);
         events.Clear();
         manager.UpdateFrame(new Size(100, 100), 0.75);
         Assert.Equal(["hud-frame", "scene-frame"], events);
@@ -1173,14 +1204,14 @@ public sealed class UIManagerTests
             change = dispatcher.InvokeAsync(() =>
             {
                 manager.Open(scene);
-                scene.Post(() => events.Add("scene-post"));
+                UIToolkit.Post(() => events.Add("scene-post"));
             });
         }
 
         if (fromFrameCallback)
             hud.FrameAction = _ => OpenScene();
         else
-            manager.Hud.Post(OpenScene);
+            UIToolkit.Post(OpenScene);
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
         definitions.Register(ResourceKey.Create("test", "opener"), new HudDefinition(() => hud));
         definitions.Freeze();
@@ -1200,7 +1231,7 @@ public sealed class UIManagerTests
         Assert.True(change.IsCompletedSuccessfully);
         manager.UpdateFrame(new Size(100, 100), 0);
 
-        Assert.Equal(["hud-request", "scene-frame", "scene-post", "layout"], events);
+        Assert.Equal(["hud-request", "scene-post", "scene-frame", "layout"], events);
         Assert.True(scene.Root!.IsArrangeValid);
         commands.Clear();
         manager.AppendDrawCommands(commands);
@@ -1307,15 +1338,15 @@ public sealed class UIManagerTests
             FixedAction = () => events.Add("scene-fixed"),
             FrameAction = _ => events.Add("scene-frame")
         };
-        var hudTicker = hudRoot.AddTicker(_ => events.Add("hud-ticker"));
-        var ticker = root.AddTicker(_ => events.Add("scene-ticker"));
+        var hudTicker = UIToolkit.CreateTicker(_ => events.Add("hud-ticker"));
+        var ticker = UIToolkit.CreateTicker(_ => events.Add("scene-ticker"));
         var manager = new UIManager();
         try
         {
             manager.InitializeHud(definitions);
             manager.Open(scene);
-            manager.Hud.Post(() => events.Add("hud-post"));
-            scene.Post(() => events.Add("scene-post"));
+            UIToolkit.Post(() => events.Add("hud-post"));
+            UIToolkit.Post(() => events.Add("scene-post"));
             hudTicker.Start();
             ticker.Start();
 
@@ -1325,7 +1356,7 @@ public sealed class UIManagerTests
                     manager.UpdateFrame(new Size(100, 100), 0.25, TimeSpan.FromSeconds(10)));
 
             Assert.Same(failure, actual);
-            Assert.Equal(fixedUpdate ? new[] { "first-fixed" } : ["first-frame"], events);
+            Assert.Equal(fixedUpdate ? new[] { "first-fixed" } : ["hud-post", "scene-post", "hud-ticker", "scene-ticker", "first-frame"], events);
             Assert.False(manager.Hud.Scene.IsUpdating);
             Assert.False(scene.IsUpdating);
             Assert.False(hudRoot.IsMeasureValid);
@@ -1339,15 +1370,19 @@ public sealed class UIManagerTests
             Assert.Equal(["first-fixed", "later-fixed", "scene-fixed"], events);
             events.Clear();
             manager.UpdateFrame(new Size(100, 100), 0.5, TimeSpan.FromSeconds(11));
-            Assert.Equal(
-                [
-                    "first-frame", "later-frame", "hud-post", "hud-ticker", "hud-layout",
-                    "scene-frame", "scene-post", "scene-ticker", "scene-layout"
-                ],
-                events);
+            var expectedEvents = new List<string>();
+            if (fixedUpdate)
+                expectedEvents.AddRange(["hud-post", "scene-post"]);
+            expectedEvents.AddRange([
+                "hud-ticker", "scene-ticker", "first-frame", "later-frame", "scene-frame",
+                "hud-layout", "scene-layout"
+            ]);
+            Assert.Equal(expectedEvents, events);
         }
         finally
         {
+            hudTicker.Stop();
+            ticker.Stop();
             manager.Destroy();
         }
     }
@@ -1380,10 +1415,8 @@ public sealed class UIManagerTests
     public void ManagerRejectsNestedUpdateAndRecordingDuringPost()
     {
         var manager = new UIManager();
-        manager.Hud.Post(() =>
+        UIToolkit.Post(() =>
         {
-            Assert.Throws<InvalidOperationException>(() => manager.Open(new GameUIScene()));
-            Assert.Throws<InvalidOperationException>(manager.Close);
             Assert.Throws<InvalidOperationException>(manager.Update);
             Assert.Throws<InvalidOperationException>(manager.Destroy);
             Assert.Throws<InvalidOperationException>(() => manager.UpdateFrame(new Size(10, 10), 0));
@@ -1492,8 +1525,6 @@ public sealed class UIManagerTests
         internal Action<DrawingContext>? DrawAction { get; set; }
         internal int MeasureCalls { get; private set; }
         internal int ArrangeCalls { get; private set; }
-
-        internal Ticker AddTicker(Action<TimeSpan> onTick) => CreateTicker(onTick);
 
         protected override Size MeasureCore(Size availableSize)
         {

@@ -901,7 +901,7 @@ public sealed class ScrollViewTests
                 eventArgs.OldValue is not null)
             {
                 notificationRaised = true;
-                scene.Post(() => view.Content = replacement);
+                UIToolkit.Post(() => view.Content = replacement);
             }
         };
 

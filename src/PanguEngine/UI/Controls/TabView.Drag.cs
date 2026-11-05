@@ -21,11 +21,14 @@ public sealed partial class TabView
 
         _isDragging = true;
         _dragItem = item;
-        item.SetDragging(true);
         _lastPointer = viewportPosition;
         _insertionIndex = Items.IndexOf(item);
         _hasFrameBaseline = false;
-        _dragTicker.Start();
+        item.SetDragging(true);
+        if (!_isDragging || !ReferenceEquals(_dragItem, item))
+            return;
+
+        (_dragTicker ??= UIToolkit.CreateTicker(OnDragTick)).Start();
         UpdateDragFromPointer();
         _strip.Viewport.SetMarkerVisible(true);
     }
@@ -50,11 +53,11 @@ public sealed partial class TabView
 
         _isDragging = false;
         _dragItem = null;
-        item.SetDragging(false);
-        _dragTicker.Stop();
+        _dragTicker?.Stop();
         _strip.Viewport.SetMarkerVisible(false);
         _hasFrameBaseline = false;
         _suppressClick = true;
+        item.SetDragging(false);
 
         if (commit && oldIndex >= 0 && newIndex >= 0 && newIndex != oldIndex)
             CommitDragMove(oldIndex, newIndex);

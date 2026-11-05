@@ -840,11 +840,13 @@ public sealed class ScrollBarTests
         }
     }
 
-    [Fact]
-    public void ArrowHoldRepeatsUntilReleaseAndStopsAfterwards()
+    [Theory]
+    [InlineData("release")]
+    [InlineData("scene")]
+    public void ArrowHoldDoesNotResumeAfterCancellation(string finish)
     {
         var bar = new ScrollBar { Value = 50 };
-        var (manager, _, _) = OpenBarScene(bar, 16, 200);
+        var (manager, scene, _) = OpenBarScene(bar, 16, 200);
         try
         {
             manager.ProcessPointerMoved(new Point(8, 192));
@@ -856,13 +858,23 @@ public sealed class ScrollBarTests
             manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1400));
             Assert.Equal(82, bar.Value);
 
-            manager.ProcessPointerReleased(new Point(8, 195), MouseButton.Left, KeyModifiers.None);
+            if (finish == "scene")
+            {
+                manager.Close();
+                manager.Open(scene);
+            }
+            else
+            {
+                manager.ProcessPointerReleased(new Point(8, 195), MouseButton.Left, KeyModifiers.None);
+            }
+
             manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(1800));
+            manager.UpdateFrame(new Size(240, 320), 0, TimeSpan.FromMilliseconds(2200));
             Assert.Equal(82, bar.Value);
         }
         finally
         {
-            manager.Close();
+            manager.Destroy();
         }
     }
 
@@ -1224,6 +1236,33 @@ public sealed class ScrollBarTests
 
             Assert.True(handled);
             Assert.Equal(96, bar.Value);
+        }
+        finally
+        {
+            manager.Close();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ClosingFromTheInitialStepDoesNotRestartRepeat(bool track)
+    {
+        var bar = new ScrollBar { Value = 50 };
+        var (manager, scene, _) = OpenBarScene(bar, 16, 200);
+        using var subscription = bar.Subscribe(ScrollBar.ValueProperty, (_, _) => manager.Close());
+        var part = FindPart(bar, track ? "track" : "increase");
+        var position = part.LocalToScene(new Point(8, part.LayoutBounds.Height - 2));
+
+        manager.ProcessPointerPressed(position, MouseButton.Left, KeyModifiers.None);
+        var value = bar.Value;
+        Assert.False(scene.IsOpen);
+        manager.Open(scene);
+        try
+        {
+            UIToolkit.UpdateFrame(TimeSpan.Zero);
+            UIToolkit.UpdateFrame(TimeSpan.FromSeconds(1));
+            Assert.Equal(value, bar.Value);
         }
         finally
         {

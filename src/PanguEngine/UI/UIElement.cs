@@ -199,8 +199,6 @@ public abstract partial class UIElement : StyledObject
 
     internal void SetSceneRecursive(UIScene? scene)
     {
-        if (!ReferenceEquals(Scene, scene))
-            StopActiveTickers();
         SetValue(ScenePropertyKey, scene);
         if (this is not Container parent)
             return;

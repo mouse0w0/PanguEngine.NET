@@ -28,7 +28,7 @@ public sealed class GameUISceneTests
 
     [Fact]
     [UIThreadTest]
-    public void FrameUpdateReceivesAlphaBeforePostsTickersAndLayout()
+    public void FrameUpdateReceivesAlphaAfterToolkitAndBeforeLayout()
     {
         var events = new List<string>();
         var root = new TickingPanel(events);
@@ -41,7 +41,7 @@ public sealed class GameUISceneTests
                 events.Add("frame");
             }
         };
-        var ticker = root.AddTicker(time =>
+        var ticker = UIToolkit.CreateTicker(time =>
         {
             Assert.Equal(TimeSpan.FromSeconds(10), time);
             events.Add("ticker");
@@ -50,21 +50,23 @@ public sealed class GameUISceneTests
         try
         {
             ticker.Start();
-            scene.Post(() => events.Add("post"));
+            UIToolkit.Post(() => events.Add("post"));
 
             scene.Update();
             Assert.Equal(["fixed"], events);
             Assert.False(root.IsMeasureValid);
 
+            UIToolkit.UpdateFrame(TimeSpan.FromSeconds(10));
             scene.UpdateFrame(0.25);
-            Assert.Equal(["fixed", "frame"], events);
+            Assert.Equal(["fixed", "post", "ticker", "frame"], events);
             Assert.False(root.IsMeasureValid);
-            scene.PrepareFrame(new Size(100, 100), TimeSpan.FromSeconds(10));
+            scene.PrepareFrame(new Size(100, 100));
 
-            Assert.Equal(["fixed", "frame", "post", "ticker", "layout"], events);
+            Assert.Equal(["fixed", "post", "ticker", "frame", "layout"], events);
         }
         finally
         {
+            ticker.Stop();
             scene.Close();
         }
     }
@@ -81,7 +83,7 @@ public sealed class GameUISceneTests
             events.Add("frame");
             scene.Close();
         };
-        var ticker = root.AddTicker(_ => events.Add("ticker"));
+        var ticker = UIToolkit.CreateTicker(_ => events.Add("ticker"));
         var manager = new UIManager();
         manager.Open(scene);
         try
@@ -89,12 +91,13 @@ public sealed class GameUISceneTests
             ticker.Start();
             manager.UpdateFrame(new Size(100, 100), 0.5, TimeSpan.FromSeconds(10));
 
-            Assert.Equal(["frame"], events);
-            Assert.False(ticker.IsActive);
+            Assert.Equal(["ticker", "frame"], events);
+            Assert.True(ticker.IsActive);
             Assert.False(scene.IsOpen);
         }
         finally
         {
+            ticker.Stop();
             manager.Destroy();
         }
     }
@@ -110,7 +113,7 @@ public sealed class GameUISceneTests
         UIScene scene = gameScene
             ? new RecordingGameUIScene(root) { FrameAction = _ => throw new InvalidOperationException("game update") }
             : new UIScene(root);
-        var ticker = root.AddTicker(time =>
+        var ticker = UIToolkit.CreateTicker(time =>
         {
             Assert.Equal(TimeSpan.FromSeconds(10), time);
             events.Add("ticker");
@@ -119,15 +122,51 @@ public sealed class GameUISceneTests
         try
         {
             ticker.Start();
-            scene.Post(() => events.Add("post"));
-            scene.PrepareFrame(new Size(100, 100), TimeSpan.FromSeconds(10));
+            UIToolkit.Post(() => events.Add("post"));
+            UIToolkit.UpdateFrame(TimeSpan.FromSeconds(10));
+            scene.PrepareFrame(new Size(100, 100));
 
             Assert.Equal(["post", "ticker", "layout"], events);
             Assert.Same(scene, root.Scene);
         }
         finally
         {
+            ticker.Stop();
             scene.Close();
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [UIThreadTest]
+    public void TickerStartedFromGameFrameWaitsForTheNextToolkitFrame(bool post)
+    {
+        var times = new List<TimeSpan>();
+        var ticker = UIToolkit.CreateTicker(times.Add);
+        var scene = new RecordingGameUIScene
+        {
+            FrameAction = _ =>
+            {
+                if (post)
+                    UIToolkit.Post(ticker.Start);
+                else
+                    ticker.Start();
+            }
+        };
+        var manager = new UIManager();
+        manager.Open(scene);
+        try
+        {
+            manager.UpdateFrame(new Size(100, 100), 0, TimeSpan.FromSeconds(10));
+            Assert.Empty(times);
+            manager.UpdateFrame(new Size(100, 100), 0, TimeSpan.FromSeconds(11));
+            Assert.Equal([TimeSpan.FromSeconds(11)], times);
+        }
+        finally
+        {
+            ticker.Stop();
+            manager.Destroy();
         }
     }
 
@@ -144,10 +183,11 @@ public sealed class GameUISceneTests
             FrameAction = _ => frameUpdates++
         };
         scene.Open();
-        scene.Post(() => calls++);
+        UIToolkit.Post(() => calls++);
 
         scene.Update();
         Assert.Equal(0, calls);
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         scene.UpdateFrame(0);
         scene.PrepareFrame(new Size(20, 20));
         scene.Close();
@@ -170,17 +210,18 @@ public sealed class GameUISceneTests
             FrameAction = _ => events.Add("frame")
         };
         scene.Open();
-        scene.Post(() => events.Add("post"));
+        UIToolkit.Post(() => events.Add("post"));
 
         scene.Update();
 
         Assert.Equal(["fixed"], events);
         Assert.False(root.IsMeasureValid);
 
+        UIToolkit.UpdateFrame(TimeSpan.Zero);
         scene.UpdateFrame(0.25);
         scene.PrepareFrame(new Size(100, 100));
 
-        Assert.Equal(["fixed", "frame", "post", "layout"], events);
+        Assert.Equal(["fixed", "post", "frame", "layout"], events);
         scene.Close();
     }
 
@@ -210,25 +251,28 @@ public sealed class GameUISceneTests
 
     [Fact]
     [UIThreadTest]
-    public void PostsFromFrameCallbackRunDuringSameFramePreparation()
+    public void PostsFromFrameCallbackRunDuringTheNextToolkitUpdate()
     {
         var events = new List<string>();
         var scene = new RecordingGameUIScene();
         scene.FrameAction = _ =>
         {
             events.Add("frame");
-            scene.Post(() => events.Add("posted"));
+            UIToolkit.Post(() => events.Add("posted"));
         };
-        scene.Open();
-
-        scene.UpdateFrame(0);
-        Assert.Equal(["frame"], events);
-        scene.PrepareFrame(new Size(10, 10));
-        Assert.Equal(["frame", "posted"], events);
-        scene.UpdateFrame(0);
-        scene.PrepareFrame(new Size(10, 10));
-        Assert.Equal(["frame", "posted", "frame", "posted"], events);
-        scene.Close();
+        var manager = new UIManager();
+        manager.Open(scene);
+        try
+        {
+            manager.UpdateFrame(new Size(10, 10), 0, TimeSpan.Zero);
+            Assert.Equal(["frame"], events);
+            manager.UpdateFrame(new Size(10, 10), 0, TimeSpan.FromSeconds(1));
+            Assert.Equal(["frame", "posted", "frame"], events);
+        }
+        finally
+        {
+            manager.Destroy();
+        }
     }
 
     [Theory]
@@ -356,12 +400,12 @@ public sealed class GameUISceneTests
                 throw expected;
             }
         };
-        var ticker = root.AddTicker(_ => events.Add("ticker"));
+        var ticker = UIToolkit.CreateTicker(_ => events.Add("ticker"));
         scene.Open();
         try
         {
             ticker.Start();
-            scene.Post(() => events.Add("post"));
+            UIToolkit.Post(() => events.Add("post"));
 
             var actual = fixedUpdate
                 ? Assert.Throws<InvalidOperationException>(scene.Update)
@@ -382,13 +426,15 @@ public sealed class GameUISceneTests
                 events.Add("frame");
             };
             scene.Update();
+            UIToolkit.UpdateFrame(TimeSpan.FromSeconds(11));
             scene.UpdateFrame(0.5);
-            scene.PrepareFrame(new Size(100, 100), TimeSpan.FromSeconds(11));
+            scene.PrepareFrame(new Size(100, 100));
 
-            Assert.Equal(["fixed", "frame", "post", "ticker", "layout"], events);
+            Assert.Equal(["fixed", "post", "ticker", "frame", "layout"], events);
         }
         finally
         {
+            ticker.Stop();
             scene.Close();
         }
     }
@@ -408,19 +454,19 @@ public sealed class GameUISceneTests
                 throw expected;
             }
         };
-        var ticker = root.AddTicker(_ => events.Add("ticker"));
+        var ticker = UIToolkit.CreateTicker(_ => events.Add("ticker"));
         var manager = new UIManager();
         manager.Open(scene);
         try
         {
             ticker.Start();
-            scene.Post(() => events.Add("post"));
+            UIToolkit.Post(() => events.Add("post"));
 
             var actual = Assert.Throws<InvalidOperationException>(() =>
                 manager.UpdateFrame(new Size(100, 100), 0.25, TimeSpan.FromSeconds(10)));
 
             Assert.Same(expected, actual);
-            Assert.Equal(["frame"], events);
+            Assert.Equal(["post", "ticker", "frame"], events);
             Assert.False(scene.IsUpdating);
             Assert.True(ticker.IsActive);
             Assert.False(root.IsMeasureValid);
@@ -434,10 +480,11 @@ public sealed class GameUISceneTests
             };
             manager.UpdateFrame(new Size(100, 100), 0.5, TimeSpan.FromSeconds(11));
 
-            Assert.Equal(["frame", "post", "ticker", "layout"], events);
+            Assert.Equal(["ticker", "frame", "layout"], events);
         }
         finally
         {
+            ticker.Stop();
             manager.Destroy();
         }
     }
@@ -497,8 +544,6 @@ public sealed class GameUISceneTests
 
     private sealed class TickingPanel(List<string> events) : Panel
     {
-        internal Ticker AddTicker(Action<TimeSpan> onTick) => CreateTicker(onTick);
-
         protected override Size MeasureContent(Size availableSize)
         {
             events.Add("layout");

@@ -472,7 +472,7 @@ public sealed class StyleCombinatorUpdateTests
             GuardedValue.ThrowOnCompare = false;
         }
 
-        Assert.True(host.IsActive("loading"));
+        Assert.True(host.HasActivePseudoClass("loading"));
         Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
     }
 
@@ -898,7 +898,7 @@ public sealed class StyleCombinatorUpdateTests
 
         internal void Set(string name, bool active) => SetPseudoClass(PseudoClass.Get(name), active);
 
-        internal bool IsActive(string name) => HasPseudoClass(PseudoClass.Get(name));
+        internal bool HasActivePseudoClass(string name) => HasPseudoClass(PseudoClass.Get(name));
     }
 
     private sealed class GuardedValue(int number) : IEquatable<GuardedValue>

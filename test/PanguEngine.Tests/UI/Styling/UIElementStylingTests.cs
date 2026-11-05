@@ -1227,7 +1227,7 @@ public sealed class UIElementStylingTests
 
         host.Set(Loading, true);
         Assert.Same(expected, Assert.Throws<InvalidOperationException>(host.GetStyleRoot().UpdateStyles));
-        Assert.True(host.IsActive(Loading));
+        Assert.True(host.HasActivePseudoClass(Loading));
         Assert.Equal(0.4, host.Opacity);
         Assert.Single(host.GetStyleValueSources(UIElement.OpacityProperty));
 
@@ -1315,8 +1315,8 @@ public sealed class UIElementStylingTests
         host.Set(Loading, true);
         host.GetStyleRoot().UpdateStyles();
 
-        Assert.False(host.IsActive(Loading));
-        Assert.True(host.IsActive(Phantom));
+        Assert.False(host.HasActivePseudoClass(Loading));
+        Assert.True(host.HasActivePseudoClass(Phantom));
         Assert.Equal(0.4, host.Opacity);
         Assert.Equal(1, notifications);
         Assert.False(host.IsStyleValid);
@@ -1324,7 +1324,7 @@ public sealed class UIElementStylingTests
         Assert.Equal(0.7, host.Opacity);
         Assert.Equal(2, notifications);
         host.Set(Phantom, false);
-        Assert.False(host.IsActive(Phantom));
+        Assert.False(host.HasActivePseudoClass(Phantom));
         host.GetStyleRoot().UpdateStyles();
         Assert.Equal(1d, host.Opacity);
         Assert.Equal(3, notifications);
@@ -1441,7 +1441,7 @@ public sealed class UIElementStylingTests
 
         Assert.IsType<InvalidOperationException>(wrongThreadError);
         Assert.Null(noOpError);
-        Assert.False(host.IsActive(Loading));
+        Assert.False(host.HasActivePseudoClass(Loading));
         scene.Close();
     }
 
@@ -1462,7 +1462,7 @@ public sealed class UIElementStylingTests
 
         Assert.Null(layoutError);
         Assert.IsType<InvalidOperationException>(drawingError);
-        Assert.True(node.IsActive(Loading));
+        Assert.True(node.HasActivePseudoClass(Loading));
         scene.Close();
     }
 
@@ -1492,7 +1492,7 @@ public sealed class UIElementStylingTests
         scene.Root!.UpdateStyles();
 
         Assert.Null(error);
-        Assert.True(host.IsActive(Loading));
+        Assert.True(host.HasActivePseudoClass(Loading));
     }
 
     [Fact]
@@ -1685,7 +1685,7 @@ public sealed class UIElementStylingTests
     {
         internal void Set(PseudoClass pseudoClass, bool active) => SetPseudoClass(pseudoClass, active);
 
-        internal bool IsActive(PseudoClass pseudoClass) => HasPseudoClass(pseudoClass);
+        internal bool HasActivePseudoClass(PseudoClass pseudoClass) => HasPseudoClass(pseudoClass);
     }
 
     private sealed class GuardedValue(double number) : IEquatable<GuardedValue>

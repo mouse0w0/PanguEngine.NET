@@ -45,9 +45,9 @@ public partial class UIScene
         if (ReferenceEquals(currentSheets, styleSheets))
             return;
 
-        if (_isOpen)
+        if (IsOpen || _isClosing)
             VerifyOwnerThreadCore();
-        if (_isTransitioning || IsUpdatingLayout || _isDrawing)
+        if (_isTransitioning || IsUpdatingLayout || IsDrawing)
             throw new InvalidOperationException(
                 "The UI scene style sheets cannot change while it is transitioning, updating layout, applying styles, or drawing.");
 

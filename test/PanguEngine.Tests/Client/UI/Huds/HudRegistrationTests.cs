@@ -347,13 +347,13 @@ public sealed class HudRegistrationTests
 
         Assert.Same(expected, actual);
         Assert.Equal(["third:destroy", "second:destroy"], events);
-        Assert.True(manager.Hud.Scene.IsOpen);
+        Assert.False(manager.Hud.Scene.IsOpen);
         Assert.Equal(3, HudRoot(manager).Children.Count);
-        Assert.Throws<InvalidOperationException>(() => manager.Hud.Post(static () => { }));
+        Assert.Null(Record.Exception(() => UIToolkit.Post(static () => { })));
     }
 
     [Fact]
-    public void ClosingSealsPostAndDiscardsPendingActions()
+    public void ClosingKeepsGlobalPostsIncludingThoseFromDestroyCallbacks()
     {
         var events = new List<string>();
         var postError = default(Exception?);
@@ -365,9 +365,9 @@ public sealed class HudRegistrationTests
             {
                 DestroyAction = () =>
                 {
-                    postError = Record.Exception(() => manager.Hud.Post(() => events.Add("posted")));
+                    postError = Record.Exception(() => UIToolkit.Post(() => events.Add("posted")));
                     var thread = new Thread(() =>
-                        backgroundError = Record.Exception(() => manager.Hud.Post(static () => { })));
+                        backgroundError = Record.Exception(() => UIToolkit.Post(static () => { })));
                     thread.Start();
                     thread.Join();
                 }
@@ -378,14 +378,17 @@ public sealed class HudRegistrationTests
         {
             manager.InitializeHud(definitions);
             var posted = false;
-            manager.Hud.Post(() => posted = true);
+            UIToolkit.Post(() => posted = true);
 
             manager.Destroy();
 
             Assert.False(posted);
-            Assert.IsType<InvalidOperationException>(postError);
-            Assert.IsType<InvalidOperationException>(backgroundError);
+            Assert.Null(postError);
+            Assert.Null(backgroundError);
             Assert.DoesNotContain("posted", events);
+            UIToolkit.UpdateFrame(TimeSpan.Zero);
+            Assert.True(posted);
+            Assert.Contains("posted", events);
         }
         finally
         {

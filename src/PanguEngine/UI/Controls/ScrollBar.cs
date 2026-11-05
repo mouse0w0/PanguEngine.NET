@@ -174,7 +174,6 @@ public sealed partial class ScrollBar : Control
     public ScrollBar()
     {
         Focusable = true;
-        _repeatTicker = CreateTicker(OnRepeatTick);
         _track = CreatePart(ScrollBarPartKind.Track);
         _decrease = CreatePart(ScrollBarPartKind.Decrease);
         _increase = CreatePart(ScrollBarPartKind.Increase);

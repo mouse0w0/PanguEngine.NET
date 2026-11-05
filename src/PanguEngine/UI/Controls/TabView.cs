@@ -82,7 +82,7 @@ public sealed partial class TabView : Control
 
     private readonly TabStripPanel _strip;
     private readonly TabContentArea _contentArea;
-    private readonly Ticker _dragTicker;
+    private Ticker? _dragTicker;
     private int _collectionMutationDepth;
     private int _selectionUpdateDepth;
     private bool _collectionNotificationPending;
@@ -90,7 +90,6 @@ public sealed partial class TabView : Control
     /// <summary>Initializes an empty tab view.</summary>
     public TabView()
     {
-        _dragTicker = CreateTicker(OnDragTick);
         Items = new TabItemCollection(this);
         Selection = new SingleSelectionModel<TabItem>(Items);
         Selection.PropertyChanged += OnSelectionPropertyChanged;

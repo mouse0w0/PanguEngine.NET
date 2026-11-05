@@ -1,4 +1,4 @@
-using System.Diagnostics;
+using PanguEngine.ComponentModel;
 using PanguEngine.UI.Styling;
 
 namespace PanguEngine.UI;
@@ -11,18 +11,18 @@ namespace PanguEngine.UI;
 /// Callback failures propagate immediately without rolling back completed changes or invoking later callbacks.
 /// Open scenes share the host UI thread established by UIToolkit. Thread diagnostics are enabled only in Debug builds.
 /// </remarks>
-public partial class UIScene
+public partial class UIScene : ObservableObject
 {
+    /// <summary>Identifies the read-only property indicating whether this scene is open.</summary>
+    public static readonly Property<bool> IsOpenProperty =
+        Property.RegisterDirect<UIScene, bool>(nameof(IsOpen), static scene => scene.IsOpen);
+
     private const int MaxLayoutPasses = 16;
-    private readonly Lock _postSync = new();
-    private readonly Queue<Action> _pendingActions = [];
-    private bool _isOpen;
     private bool _isClosing;
 
     private UIElement? _root;
     private StyleResolver _styleResolver = StyleResolver.Default;
     private int _operationDepth;
-    private bool _isDraining;
     private bool _isInteractionActive;
     private bool _isTransitioning;
     private bool _isPreparingStyleSheets;
@@ -52,28 +52,6 @@ public partial class UIScene
     {
         get => _root;
         set => SetRoot(value);
-    }
-
-    /// <summary>
-    /// Posts an action for execution during the next frame preparation of the open scene.
-    /// </summary>
-    /// <param name="action">The action to enqueue.</param>
-    /// <remarks>May be called from any thread. The host UI thread executes the action during frame preparation.</remarks>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="action"/> is null.</exception>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when the scene is not open or has entered its close transition.
-    /// </exception>
-    public void Post(Action action)
-    {
-        ArgumentNullException.ThrowIfNull(action);
-
-        lock (_postSync)
-        {
-            if (!_isOpen || _isClosing)
-                throw new InvalidOperationException("The UI scene is not accepting posted actions.");
-
-            _pendingActions.Enqueue(action);
-        }
     }
 
     /// <summary>
@@ -120,9 +98,10 @@ public partial class UIScene
     /// </exception>
     public void Open()
     {
-        BeginOpening();
+        VerifyCanOpenCore();
         try
         {
+            BeginOpening();
             SynchronizeDefaultScale();
             OnOpening();
             ActivateInteraction();
@@ -138,23 +117,23 @@ public partial class UIScene
     /// Closes this scene while preserving its root and tree ownership.
     /// </summary>
     /// <remarks>
-    /// Closing a scene that is not open has no effect. An open scene must be closed on the host UI thread.
+    /// Closing a fully closed scene has no effect. An open or closing scene requires the host UI thread.
     /// Scenes managed by a UI manager must be closed through that manager.
     /// Callback failures propagate immediately without invoking later callbacks or rolling back completed changes.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown during conflicting lifecycle, layout, stylesheet preparation, or drawing operations.
-    /// Also thrown in Debug builds when an open scene is accessed from outside the host UI thread.
+    /// Also thrown in Debug builds when an open or closing scene is accessed from outside the host UI thread.
     /// </exception>
     public void Close()
     {
-        if (!IsOpen)
+        if (!IsOpen && !_isClosing)
             return;
 
         VerifyCanClose();
-        BeginClosing();
         try
         {
+            BeginClosing();
             CloseCore();
         }
         finally
@@ -166,11 +145,11 @@ public partial class UIScene
     internal bool IsUpdating { get; private set; }
 
     /// <summary>
-    /// Processes posted actions, advances tickers, and updates layout using the current monotonic time.
+    /// Updates styles and layout for this scene.
     /// </summary>
     /// <param name="viewportSize">The viewport size in output coordinates.</param>
     /// <remarks>
-    /// Call on the host UI thread before recording drawing commands.
+    /// Call on the host UI thread after the toolkit update and game frame callbacks, before recording drawing commands.
     /// Scenes managed by a UI manager receive frame preparation from that manager.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
@@ -178,32 +157,11 @@ public partial class UIScene
     /// or its layout does not stabilize. Also thrown in Debug builds when accessed from outside the host UI thread.
     /// </exception>
     public void PrepareFrame(Size viewportSize)
-        => PrepareFrame(viewportSize, Stopwatch.GetElapsedTime(0, Stopwatch.GetTimestamp()));
-
-    /// <summary>
-    /// Processes posted actions, advances tickers, and updates layout using the supplied monotonic time.
-    /// </summary>
-    /// <param name="viewportSize">The viewport size in output coordinates.</param>
-    /// <param name="frameTime">The absolute monotonic time for this frame, not a frame duration.</param>
-    /// <remarks>
-    /// Call on the host UI thread before recording drawing commands.
-    /// Use a consistent time origin across frames. Scenes managed by a UI manager receive frame preparation
-    /// from that manager.
-    /// </remarks>
-    /// <exception cref="InvalidOperationException">
-    /// Thrown when the scene is not open, is changing lifecycle state, is already updating or drawing,
-    /// or its layout does not stabilize. Also thrown in Debug builds when accessed from outside the host UI thread.
-    /// </exception>
-    public void PrepareFrame(Size viewportSize, TimeSpan frameTime)
     {
         CreateViewportBounds(viewportSize);
         BeginUpdate();
         try
         {
-            var tickers = FreezeTickers();
-            DrainPending();
-            if (IsSceneActive())
-                AdvanceTickers(tickers, frameTime);
             if (IsSceneActive())
                 UpdateLayout(viewportSize);
         }
@@ -280,18 +238,18 @@ public partial class UIScene
 
     internal void VerifyTreeAccess()
     {
-        if (_isOpen)
+        if (IsOpen || _isClosing)
             VerifyOwnerThreadCore();
     }
 
     /// <summary>
-    /// Gets whether this scene is open.
+    /// Gets whether this scene has entered its open state and has not begun closing.
     /// </summary>
     /// <remarks>
     /// This does not indicate whether opening callbacks completed successfully or the scene is accepting input.
     /// Query on the host UI thread, or with serialized access while offline. Concurrent background queries are not synchronized.
     /// </remarks>
-    public bool IsOpen => _isOpen;
+    public bool IsOpen { get; private set; }
 
     internal void VerifyCanOpen() => VerifyCanOpenCore();
 
@@ -372,9 +330,9 @@ public partial class UIScene
     private bool BeginRootTransferOperation()
     {
         VerifyNotPreparingStyleSheets();
-        if (_isOpen)
+        if (IsOpen || _isClosing)
             VerifyOwnerThreadCore();
-        if (_isDrawing)
+        if (IsDrawing)
         {
             throw new InvalidOperationException(
                 "The UI scene root cannot change while drawing commands are generated.");
@@ -382,7 +340,7 @@ public partial class UIScene
 
         if (IsUpdatingLayout)
             throw new InvalidOperationException("The UI scene root cannot change during layout.");
-        if (!_isOpen)
+        if (!IsOpen && !_isClosing)
             return false;
         _operationDepth++;
         return true;
@@ -390,15 +348,11 @@ public partial class UIScene
 
     private void BeginOpening()
     {
-        VerifyCanOpenCore();
         _isTransitioning = true;
         _isInteractionActive = false;
-        lock (_postSync)
-        {
-            _pendingActions.Clear();
-            _isClosing = false;
-            _isOpen = true;
-        }
+        _isClosing = false;
+        IsOpen = true;
+        RaisePropertyChanged(IsOpenProperty, false, true);
     }
 
     private void VerifyCanOpenCore()
@@ -408,16 +362,16 @@ public partial class UIScene
         VerifyNotPreparingStyleSheets();
         if (IsUpdatingLayout)
             throw new InvalidOperationException("The UI scene cannot open during layout or style application.");
-        if (_isOpen)
-            throw new InvalidOperationException("The UI scene is already open.");
+        if (IsOpen || _isClosing)
+            throw new InvalidOperationException("The UI scene is already open or has not completed closing.");
         if (_isTransitioning || _operationDepth != 0)
             throw new InvalidOperationException("The previous UI scene operation has not completed.");
     }
 
     private void VerifyOwnerThreadCore()
     {
-        if (!_isOpen)
-            throw new InvalidOperationException("The UI scene is not open.");
+        if (!IsOpen && !_isClosing)
+            throw new InvalidOperationException("The UI scene is not open or closing.");
         UIToolkit.VerifyAccess();
     }
 
@@ -429,7 +383,7 @@ public partial class UIScene
 
     internal bool BeginRuntimeOperationIfOpen()
     {
-        if (!_isOpen)
+        if (!IsOpen && !_isClosing)
             return false;
 
         VerifyOwnerThreadCore();
@@ -447,56 +401,22 @@ public partial class UIScene
     {
         _isTransitioning = true;
         _isInteractionActive = false;
-        lock (_postSync)
-        {
-            _isClosing = true;
-            _pendingActions.Clear();
-        }
-
-        StopAllTickers();
+        MarkClosing();
     }
 
-    internal void StopAcceptingPosts()
+    internal void DeactivateForClose()
     {
         VerifyOwnerThreadCore();
-        lock (_postSync)
-        {
-            _isClosing = true;
-            _pendingActions.Clear();
-        }
-
-        StopAllTickers();
+        MarkClosing();
     }
 
-    private void DrainPending()
+    private void MarkClosing()
     {
-        if (_isDraining)
-            throw new InvalidOperationException("The UI scene is already draining posted actions.");
-
-        _isDraining = true;
-        try
-        {
-            int batchSize;
-            lock (_postSync)
-                batchSize = _pendingActions.Count;
-
-            for (var index = 0; index < batchSize; index++)
-            {
-                Action action;
-                lock (_postSync)
-                {
-                    if (_pendingActions.Count == 0)
-                        break;
-                    action = _pendingActions.Dequeue();
-                }
-
-                action();
-            }
-        }
-        finally
-        {
-            _isDraining = false;
-        }
+        var wasOpen = IsOpen;
+        _isClosing = true;
+        IsOpen = false;
+        if (wasOpen)
+            RaisePropertyChanged(IsOpenProperty, true, false);
     }
 
     private void CloseCore()
@@ -510,12 +430,7 @@ public partial class UIScene
     private void ResetOpenState()
     {
         _isInteractionActive = false;
-        lock (_postSync)
-        {
-            _isOpen = false;
-            _isClosing = false;
-            _pendingActions.Clear();
-        }
+        _isClosing = false;
     }
 
     private void VerifyNotTransitioningOrUpdatingLayout()
@@ -525,7 +440,7 @@ public partial class UIScene
             throw new InvalidOperationException("The UI scene is already changing lifecycle state.");
         if (IsUpdatingLayout)
             throw new InvalidOperationException("The UI scene cannot change lifecycle state during layout.");
-        if (_isDrawing)
+        if (IsDrawing)
         {
             throw new InvalidOperationException(
                 "The UI scene cannot change lifecycle state while drawing commands are generated.");

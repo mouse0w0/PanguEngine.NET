@@ -1133,7 +1133,7 @@ public sealed class InputRoutingTests
 
         Assert.Same(expected, actual);
         Assert.Equal(["cancel-Left"], events);
-        Assert.True(scene.IsOpen);
+        Assert.False(scene.IsOpen);
         Assert.Null(manager.CurrentScene);
         scene.Close();
         Assert.Equal(["cancel-Left", "closed"], events);
@@ -1529,7 +1529,7 @@ public sealed class InputRoutingTests
         first.GotFocus += (_, _) =>
         {
             reentryError = Record.Exception(() => { first.Focus(); });
-            scene.Post(() => second.Focus());
+            UIToolkit.Post(() => second.Focus());
         };
 
         Assert.True(first.Focus());
@@ -1840,7 +1840,7 @@ public sealed class InputRoutingTests
         manager.Open(scene);
         manager.UpdateFrame(new Size(100, 80), 0);
 
-        scene.Post(() =>
+        UIToolkit.Post(() =>
         {
             scene.Scale = 2;
             manager.ProcessPointerMoved(new Point(24, 8));
@@ -2108,7 +2108,7 @@ public sealed class InputRoutingTests
         Assert.Null(manager.CurrentScene);
         Assert.Same(scene, root.Scene);
         Assert.Null(scene.FocusedNode);
-        Assert.True(scene.IsOpen);
+        Assert.False(scene.IsOpen);
         var otherManager = new UIManager();
         Assert.Throws<InvalidOperationException>(() => otherManager.Open(scene));
         Assert.Null(otherManager.CurrentScene);

@@ -1003,7 +1003,7 @@ public partial class UIScene
     /// <summary>Gets whether this scene is open and active.</summary>
     /// <returns>Whether the scene can process updates and input.</returns>
     private protected bool IsSceneActive() =>
-        _isOpen && _isInteractionActive && !_isClosing;
+        IsOpen && _isInteractionActive;
 
     private bool IsActive(UIElement node) =>
         IsSceneActive() && ReferenceEquals(node.Scene, this);

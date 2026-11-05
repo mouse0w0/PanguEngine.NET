@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using PanguEngine.Client.UI;
 using PanguEngine.Input;
 using PanguEngine.UI;
@@ -330,25 +331,27 @@ public sealed class TabViewInputTests
     [Fact]
     public void ClosingSceneCommitsDragWithoutClickOrDuplicateReorder()
     {
-        var (manager, scene, view, items) = OpenScene(3, canReorder: true);
+        var (manager, scene, view, items) = OpenScene(6, canReorder: true, width: 300);
         var reorderCount = 0;
         var clickCount = 0;
         view.TabReordered += (_, _) => reorderCount++;
         view.PointerClicked += (_, _) => clickCount++;
         var start = ItemCenter(items[0]);
         manager.ProcessPointerPressed(start, MouseButton.Left, KeyModifiers.None);
-        manager.ProcessPointerMoved(new Point(start.X + 400, start.Y));
+        var end = items[^1].LocalToScene(new Point(items[^1].LayoutBounds.Width, 0));
+        manager.ProcessPointerMoved(new Point(end.X + 10, start.Y));
         Assert.True(items[0].IsDragging);
+        manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.Zero);
 
         manager.Close();
 
         Assert.False(items[0].IsDragging);
-        Assert.Same(items[0], view.Items[2]);
+        Assert.Same(items[0], view.Items[^1]);
         Assert.Equal(1, reorderCount);
         Assert.Equal(0, clickCount);
 
         manager.Open(scene);
-        manager.UpdateFrame(new Size(600, 100), 0);
+        manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(2));
         Assert.False(items[0].IsDragging);
         Assert.Equal(1, reorderCount);
         manager.Close();
@@ -387,6 +390,61 @@ public sealed class TabViewInputTests
         Assert.Same(replacement, view.Selection.SelectedItem);
         Assert.Null(scene.FocusedNode);
         manager.Close();
+    }
+
+    [Theory]
+    [InlineData("close")]
+    [InlineData("disable")]
+    [InlineData("detach")]
+    public void DraggingNotificationCancellationDoesNotRestartAutoScroll(string cause)
+    {
+        var weakView = CreateCanceledDragStartup(cause);
+
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        Assert.False(weakView.TryGetTarget(out _));
+    }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static WeakReference<TabView> CreateCanceledDragStartup(string cause)
+    {
+        var (manager, scene, view, items) = OpenScene(6, canReorder: true, width: 300);
+        var viewport = Assert.IsType<TabStripPanel>(view.Children[0]).Viewport;
+        using var subscription = items[0].Subscribe(TabItem.IsDraggingProperty, (_, _) =>
+        {
+            if (!items[0].IsDragging)
+                return;
+            switch (cause)
+            {
+                case "close": manager.Close(); break;
+                case "disable": view.IsEnabled = false; break;
+                case "detach": scene.Root = null; break;
+            }
+        });
+        var start = ItemCenter(items[0]);
+        manager.ProcessPointerPressed(start, MouseButton.Left, KeyModifiers.None);
+        manager.ProcessPointerMoved(new Point(295, start.Y));
+        Assert.False(items[0].IsDragging);
+        if (!scene.IsOpen)
+            manager.Open(scene);
+        view.IsEnabled = true;
+        scene.Root = view;
+        try
+        {
+            manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.Zero);
+            var offset = viewport.ScrollOffset;
+            manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(1));
+            Assert.Equal(offset, viewport.ScrollOffset);
+            Assert.False(items[0].IsDragging);
+        }
+        finally
+        {
+            manager.Close();
+        }
+
+        return new WeakReference<TabView>(view);
     }
 
     [Fact]
@@ -445,10 +503,12 @@ public sealed class TabViewInputTests
         manager.Close();
     }
 
-    [Fact]
-    public void AutoScrollAdvancesWhileDraggingAtTheEdge()
+    [Theory]
+    [InlineData("release")]
+    [InlineData("scene")]
+    public void AutoScrollStopsAfterCancellation(string finish)
     {
-        var (manager, _, view, items) = OpenScene(4, canReorder: true, width: 300, height: 100);
+        var (manager, scene, view, items) = OpenScene(4, canReorder: true, width: 300, height: 100);
         var strip = Assert.IsType<TabStripPanel>(view.Children[0]);
         var viewport = strip.Viewport;
         var start = ItemCenter(items[0]);
@@ -465,14 +525,25 @@ public sealed class TabViewInputTests
         }
 
         var scrolled = viewport.ScrollOffset;
-        manager.ProcessPointerReleased(new Point(260, 200), MouseButton.Left, KeyModifiers.None);
+        if (finish == "scene")
+        {
+            manager.Close();
+            Assert.False(items[0].IsDragging);
+            manager.Open(scene);
+            manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(2));
+        }
+        else
+        {
+            manager.ProcessPointerReleased(new Point(260, 200), MouseButton.Left, KeyModifiers.None);
+        }
+
         var settled = viewport.ScrollOffset;
-        manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(2));
+        manager.UpdateFrame(new Size(300, 100), 0, TimeSpan.FromSeconds(3));
 
         Assert.True(viewport.HasOverflow);
         Assert.Equal(before + TabView.AutoScrollSpeed * 0.09, scrolled, 3);
         Assert.Equal(settled, viewport.ScrollOffset, 3);
-        manager.Close();
+        manager.Destroy();
     }
 
     [Fact]

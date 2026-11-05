@@ -76,7 +76,7 @@ public sealed class UIManager
     /// Reentrant requests execute in order after the current scene change and its notifications complete.
     /// A lifecycle failure propagates immediately and prevents subsequent scene change notifications.
     /// Deferred failures are reported by the outermost Open or Close call, and remaining requests are discarded.
-    /// Scene changes from update callbacks must be scheduled through the engine dispatcher.
+    /// Scene changes from game update callbacks must be posted to UIToolkit. Toolkit callbacks may switch scenes directly.
     /// </remarks>
     /// <param name="scene">The scene to open.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="scene"/> is null.</exception>
@@ -99,7 +99,7 @@ public sealed class UIManager
     /// A deferred close applies to the scene current when the request executes.
     /// A lifecycle failure propagates immediately and prevents subsequent scene change notifications.
     /// Deferred failures are reported by the outermost Open or Close call, and remaining requests are discarded.
-    /// Scene changes from update callbacks must be scheduled through the engine dispatcher.
+    /// Scene changes from game update callbacks must be posted to UIToolkit. Toolkit callbacks may switch scenes directly.
     /// </remarks>
     /// <exception cref="InvalidOperationException">
     /// Thrown when the manager is initializing the HUD, shutting down, updating, updating layout,
@@ -112,7 +112,7 @@ public sealed class UIManager
     {
         VerifyAccess();
         VerifyLifecycleOperation(allowQueuedChange: true);
-        VerifyNotUpdating();
+        VerifyNotUpdating(allowToolkitUpdate: true);
         _pendingScenes.Enqueue(scene);
         if (_isTransitioning)
             return;
@@ -169,9 +169,8 @@ public sealed class UIManager
 
     /// <summary>Updates the HUD and current scene and prepares their UI for drawing.</summary>
     /// <remarks>
-    /// Runs on the host UI thread before drawing, completing the HUD before the current scene.
-    /// Each scene's game frame callback precedes UI preparation, which processes posted actions,
-    /// advances tickers, and updates layout.
+    /// Runs toolkit actions and tickers before the HUD and current scene's game frame callbacks.
+    /// Scene layout follows all game frame callbacks.
     /// </remarks>
     /// <param name="viewportSize">The output viewport size.</param>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
@@ -180,9 +179,8 @@ public sealed class UIManager
 
     /// <summary>Updates the HUD and current scene and prepares their UI for drawing.</summary>
     /// <remarks>
-    /// Runs on the host UI thread before drawing, completing the HUD before the current scene.
-    /// Each scene's game frame callback precedes UI preparation, which processes posted actions,
-    /// advances tickers, and updates layout.
+    /// Runs toolkit actions and tickers before the HUD and current scene's game frame callbacks.
+    /// Scene layout follows all game frame callbacks.
     /// </remarks>
     /// <param name="viewportSize">The output viewport size.</param>
     /// <param name="alpha">The interpolation factor between fixed updates.</param>
@@ -193,18 +191,17 @@ public sealed class UIManager
         VerifyLifecycleOperation();
         VerifyNotUpdating();
 
+        UIToolkit.UpdateFrame(frameTime);
         _isUpdating = true;
         try
         {
             Hud.UpdateFrame(alpha);
-            if (Hud.Scene.IsOpen)
-                Hud.PrepareFrame(viewportSize, frameTime);
-            if (CurrentScene is { } scene)
-            {
+            if (CurrentScene is { IsOpen: true } scene)
                 scene.UpdateFrame(alpha);
-                if (scene.IsOpen)
-                    scene.PrepareFrame(viewportSize, frameTime);
-            }
+            if (Hud.Scene.IsOpen)
+                Hud.PrepareFrame(viewportSize);
+            if (CurrentScene is { IsOpen: true } current)
+                current.PrepareFrame(viewportSize);
         }
         finally
         {
@@ -359,9 +356,10 @@ public sealed class UIManager
         }
     }
 
-    private void VerifyNotUpdating()
+    private void VerifyNotUpdating(bool allowToolkitUpdate = false)
     {
-        if (_isUpdating || Hud.Scene.IsUpdating || CurrentScene?.IsUpdating == true)
+        if (_isUpdating || (!allowToolkitUpdate && UIToolkit.IsUpdatingFrame) ||
+            Hud.Scene.IsUpdating || CurrentScene?.IsUpdating == true)
             throw new InvalidOperationException("The UI manager cannot perform this operation during an update.");
     }
 }

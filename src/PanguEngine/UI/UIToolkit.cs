@@ -5,7 +5,7 @@ using PanguEngine.Graphics.Text;
 namespace PanguEngine.UI;
 
 /// <summary>
-/// Provides the shared UI settings and services for the process.
+/// Provides the shared UI settings, services, and frame scheduling for the process.
 /// </summary>
 /// <remarks>
 /// Read and write toolkit state on the host UI thread. Reads from other threads have no synchronization guarantees.
@@ -14,6 +14,10 @@ namespace PanguEngine.UI;
 /// </remarks>
 public static class UIToolkit
 {
+    private static readonly Lock PostSync = new();
+    private static readonly Queue<Action> PendingActions = [];
+    private static readonly LinkedList<Ticker> Tickers = new();
+    private static bool _acceptingPosts;
     private static bool _isInitialized;
     private static FontManager? _fontManager;
     private static TextLayoutEngine? _textLayoutEngine;
@@ -24,6 +28,8 @@ public static class UIToolkit
 #endif
     private static double _defaultScale = 1;
     private static int _wheelScrollLines = 3;
+
+    internal static bool IsUpdatingFrame { get; private set; }
 
     /// <summary>
     /// Gets or sets the default scale used by UI roots without a local scale.
@@ -92,6 +98,72 @@ public static class UIToolkit
                                     throw new InvalidOperationException(
                                         "UI toolkit services have not been initialized.");
 
+    /// <summary>Posts an action for a subsequent UI frame without associating it with a scene.</summary>
+    /// <param name="action">The action to execute on the host UI thread.</param>
+    /// <remarks>
+    /// May be called from any thread while the toolkit is initialized. Actions execute in queue order.
+    /// Actions posted during a batch wait for the next frame. Closing a scene does not cancel queued actions.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="action"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the toolkit is not accepting actions.</exception>
+    public static void Post(Action action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        lock (PostSync)
+        {
+            if (!_acceptingPosts)
+                throw new InvalidOperationException("The UI toolkit is not accepting posted actions.");
+            PendingActions.Enqueue(action);
+        }
+    }
+
+    /// <summary>Executes a batch of posted actions and advances registered tickers for one UI frame.</summary>
+    /// <param name="frameTime">The absolute monotonic time shared by this frame's ticker callbacks.</param>
+    /// <remarks>
+    /// The host calls this once per UI frame, before game frame callbacks, scene layout, and drawing.
+    /// Ticker registrations are frozen after posted actions. Callback failures propagate without rollback.
+    /// </remarks>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when the toolkit is not initialized or an update is already in progress.
+    /// Also thrown in Debug builds when called from outside the host UI thread.
+    /// </exception>
+    public static void UpdateFrame(TimeSpan frameTime)
+    {
+        VerifyInitialized();
+        VerifyAccess();
+        if (IsUpdatingFrame)
+            throw new InvalidOperationException("The UI toolkit is already updating.");
+
+        IsUpdatingFrame = true;
+        try
+        {
+            DrainPending();
+            var registrations = FreezeTickers();
+            foreach (var registration in registrations)
+                registration.Value.Tick(registration, frameTime);
+        }
+        finally
+        {
+            IsUpdatingFrame = false;
+        }
+    }
+
+    /// <summary>Creates an inactive ticker whose lifecycle is controlled by its consumer.</summary>
+    /// <param name="onTick">The callback receiving the absolute monotonic frame time.</param>
+    /// <returns>A ticker controlled by its consumer and the current toolkit runtime.</returns>
+    /// <remarks>
+    /// Creation may precede initialization. Starting requires an initialized toolkit.
+    /// Consumers must stop runs that are no longer needed. Tickers must not be reused after toolkit shutdown.
+    /// </remarks>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="onTick"/> is null.</exception>
+    /// <exception cref="InvalidOperationException">Thrown in Debug builds for access outside the initialized UI thread.</exception>
+    public static Ticker CreateTicker(Action<TimeSpan> onTick)
+    {
+        ArgumentNullException.ThrowIfNull(onTick);
+        VerifyAccess();
+        return new Ticker(onTick);
+    }
+
     /// <summary>
     /// Binds the host's services and default settings to the toolkit on the UI thread.
     /// The host retains ownership of the supplied services.
@@ -133,17 +205,32 @@ public static class UIToolkit
         _ownerThreadId = Environment.CurrentManagedThreadId;
 #endif
         _isInitialized = true;
+        lock (PostSync)
+            _acceptingPosts = true;
     }
 
     /// <summary>
     /// Releases the host's service bindings after all active UI use has ended, without destroying services or resetting settings.
     /// </summary>
+    /// <remarks>
+    /// The host must close all scenes and finish UI frame callbacks before calling this method.
+    /// Do not call from a posted action or ticker callback. Tickers from this runtime must not be reused after shutdown.
+    /// </remarks>
     /// <exception cref="InvalidOperationException">Thrown in Debug builds when called from another thread while initialized.</exception>
     public static void Shutdown()
     {
         if (!_isInitialized)
             return;
         VerifyAccess();
+
+        lock (PostSync)
+        {
+            _acceptingPosts = false;
+            PendingActions.Clear();
+        }
+
+        while (Tickers.First is { } registration)
+            registration.Value.StopCore();
 
         _fontManager = null;
         _textLayoutEngine = null;
@@ -153,6 +240,34 @@ public static class UIToolkit
         _ownerThreadId = 0;
 #endif
         _isInitialized = false;
+    }
+
+    internal static LinkedListNode<Ticker> RegisterTicker(Ticker ticker) => Tickers.AddLast(ticker);
+
+    internal static void UnregisterTicker(LinkedListNode<Ticker> registration) => Tickers.Remove(registration);
+
+    private static void DrainPending()
+    {
+        int batchSize;
+        lock (PostSync)
+            batchSize = PendingActions.Count;
+
+        for (var index = 0; index < batchSize; index++)
+        {
+            Action action;
+            lock (PostSync)
+                action = PendingActions.Dequeue();
+            action();
+        }
+    }
+
+    private static LinkedListNode<Ticker>[] FreezeTickers()
+    {
+        var registrations = new LinkedListNode<Ticker>[Tickers.Count];
+        var index = 0;
+        for (var registration = Tickers.First; registration is not null; registration = registration.Next)
+            registrations[index++] = registration;
+        return registrations;
     }
 
     /// <summary>
