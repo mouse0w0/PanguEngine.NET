@@ -24,10 +24,10 @@ public sealed class ServerEngine
     {
         IsDedicated = isDedicated;
         _connection = new LocalConnection(_gate);
-        _thread = new Thread(Run)
+        _thread = isDedicated ? Thread.CurrentThread : new Thread(Run)
         {
             IsBackground = true,
-            Name = isDedicated ? "Pangu dedicated server" : "Pangu integrated server"
+            Name = "Pangu integrated server"
         };
     }
 
@@ -86,7 +86,6 @@ public sealed class ServerEngine
         try
         {
             server.Start();
-            server.WaitForExit();
         }
         finally
         {
@@ -95,7 +94,13 @@ public sealed class ServerEngine
         Engine.Shutdown();
     }
 
-    internal void Start() => _thread.Start();
+    internal void Start()
+    {
+        if (IsDedicated)
+            Run();
+        else
+            _thread.Start();
+    }
 
     internal LocalConnection ConnectLocal()
     {
@@ -215,7 +220,7 @@ public sealed class ServerEngine
             }
             _connection.Complete();
         }
-        catch (Exception error)
+        catch (Exception error) when (!IsDedicated)
         {
             _connection.Complete(error);
         }
