@@ -16,7 +16,11 @@ public abstract partial class UIElement : StyledObject
     private static readonly PropertyKey<Container?> ParentPropertyKey =
         Property.RegisterReadOnly<UIElement, Container?>(
             nameof(Parent),
-            onChanged: static (node, oldParent, _) => node.OnInheritanceParentChanged(oldParent));
+            onChanged: static (node, oldParent, _) =>
+            {
+                node.OnInheritanceParentChanged(oldParent);
+                node.UpdateEffectiveVisibility();
+            });
 
     private static readonly PropertyKey<UIScene?> ScenePropertyKey =
         Property.RegisterReadOnly<UIElement, UIScene?>(nameof(Scene));

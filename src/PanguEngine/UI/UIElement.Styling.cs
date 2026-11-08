@@ -228,6 +228,8 @@ public abstract partial class UIElement
                         continue;
                     property.RaiseEffectiveValueChanged(this, oldValue, newValue);
                 }
+
+                UpdateEffectiveVisibility();
             }
 
             if (!ReferenceEquals(GetStyleRoot(), root))

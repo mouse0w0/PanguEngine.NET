@@ -110,12 +110,20 @@ public abstract partial class UIElement
         Property.Register<UIElement, Visibility>(
             nameof(Visibility),
             Visibility.Visible,
-            onChanged: static (node, _, newValue) =>
+            onChanged: static (node, _, _) =>
             {
                 node.InvalidateMeasure();
-                if (newValue != Visibility.Visible)
+                if (node.Visibility != Visibility.Visible)
                     node.Scene?.CommitAndNotifyInputStateAfterNodeUnavailable(node);
+                node.UpdateEffectiveVisibility();
             });
+
+    /// <summary>
+    /// Identifies the read-only <see cref="IsEffectivelyVisible"/> property.
+    /// </summary>
+    public static readonly Property<bool> IsEffectivelyVisibleProperty =
+        Property.RegisterDirect<UIElement, bool>(nameof(IsEffectivelyVisible),
+            static node => node.IsEffectivelyVisible, unsetValue: true);
 
     private Size _lastMeasureConstraint;
     private Size _desiredContentSize;
@@ -226,6 +234,21 @@ public abstract partial class UIElement
         get => GetValue(VisibilityProperty);
         set => SetValue(VisibilityProperty, value);
     }
+
+    /// <summary>
+    /// Gets whether this element and its ancestors permit visibility.
+    /// </summary>
+    /// <remarks>
+    /// The value is true when this element and every ancestor have Visibility.Visible.
+    /// An element without a parent follows its own Visibility, regardless of scene ownership or openness.
+    /// This does not indicate actual rendering, opacity, occlusion, or viewport intersection.
+    /// During an incomplete batch tree update, pending parent changes may temporarily leave this value
+    /// out of sync with the parent chain and intermediate visibility transitions may not be reported.
+    /// Each element notifies before updating its descendants. Input-loss and inherited-property callbacks
+    /// may run before effective visibility is refreshed. Synchronous reentry may make notification values
+    /// differ from the current value. Parent-change notifications may precede input-state cleanup.
+    /// </remarks>
+    public bool IsEffectivelyVisible { get; private set; } = true;
 
     /// <summary>
     /// Gets the measured size, including margin.
@@ -477,6 +500,25 @@ public abstract partial class UIElement
     /// <inheritdoc />
     protected override void VerifyMutationAccess() =>
         VerifyLayoutMutationAccess();
+
+    private void UpdateEffectiveVisibility()
+    {
+        var value = Visibility == Visibility.Visible && (Parent?.IsEffectivelyVisible ?? true);
+        if (IsEffectivelyVisible == value)
+            return;
+
+        var oldValue = IsEffectivelyVisible;
+        IsEffectivelyVisible = value;
+        RaisePropertyChanged(IsEffectivelyVisibleProperty, oldValue, value);
+        if (this is not Container parent)
+            return;
+
+        foreach (var child in parent.ReadOnlyChildren.ToArray())
+        {
+            if (ReferenceEquals(child.Parent, this))
+                child.UpdateEffectiveVisibility();
+        }
+    }
 
     private void InvalidateMeasureCore()
     {
