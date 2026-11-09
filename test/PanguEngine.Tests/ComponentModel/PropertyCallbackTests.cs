@@ -102,18 +102,19 @@ public sealed class PropertyCallbackTests
     }
 
     [Fact]
-    public void NodeStyleUpdateCommitsAllItsValuesBeforeCallbacksAndStopsAfterFailure()
+    public void NodeStyleUpdateCommitsEachValueBeforeItsCallbackAndStopsAfterFailure()
     {
         var error = new InvalidOperationException("internal");
         var node = new CallbackNode();
         var scene = new UIScene(node);
         node.Trace.Clear();
+        var notified = new List<Property>();
         node.Changed = (_, _) =>
         {
-            Assert.Equal(8, node.GetValue(CallbackNode.OtherProperty));
+            Assert.Equal(notified.Contains(CallbackNode.OtherProperty) ? 8 : 0,
+                node.GetValue(CallbackNode.OtherProperty));
             throw error;
         };
-        var notified = new List<Property>();
         node.PropertyChanged += (_, args) => notified.Add(args.Property);
 
         scene.SetStyleSheets([

@@ -36,11 +36,11 @@ public sealed class EffectiveVisibilityStyleTests
     }
 
     [Fact]
-    public void ALocalWriteDuringStyleComparisonChangesEffectiveVisibilityOnlyOnce()
+    public void ALocalWriteDuringStyleNotificationChangesEffectiveVisibilityOnlyOnce()
     {
         var node = new Panel();
-        var comparer = new ReentrantComparer(() => node.Visibility = Visibility.Hidden);
-        var property = Property.Register<Panel, int>(Guid.NewGuid().ToString(), comparer: comparer);
+        var property = Property.Register<Panel, int>(Guid.NewGuid().ToString(),
+            onChanged: static (owner, _, _) => owner.Visibility = Visibility.Hidden);
         var scene = new UIScene(node);
         scene.SetStyleSheets([
             new StyleSheet([
@@ -61,11 +61,16 @@ public sealed class EffectiveVisibilityStyleTests
     }
 
     [Fact]
-    public void ClearingALocalValueDuringComparisonStillMaintainsTheCommittedStyle()
+    public void ClearingALocalValueDuringNotificationMaintainsTheCurrentStyleAndVisibility()
     {
         var node = new Panel { Visibility = Visibility.Hidden };
-        var comparer = new ReentrantComparer(() => node.ClearValue(UIElement.VisibilityProperty));
-        var property = Property.Register<Panel, int>(Guid.NewGuid().ToString(), comparer: comparer);
+        var visibilityWasStyled = false;
+        var property = Property.Register<Panel, int>(Guid.NewGuid().ToString(),
+            onChanged: (owner, _, _) =>
+            {
+                visibilityWasStyled = owner.GetStyleValueSources(UIElement.VisibilityProperty).Count != 0;
+                owner.ClearValue(UIElement.VisibilityProperty);
+            });
         var scene = new UIScene(node);
         scene.SetStyleSheets([
             new StyleSheet([
@@ -83,7 +88,7 @@ public sealed class EffectiveVisibilityStyleTests
 
         Assert.Equal(Visibility.Hidden, node.Visibility);
         Assert.False(node.IsEffectivelyVisible);
-        Assert.Equal(new[] { true, false }, effectiveValues);
+        Assert.Equal(visibilityWasStyled ? Array.Empty<bool>() : [true, false], effectiveValues);
     }
 
     [Fact]
@@ -103,20 +108,5 @@ public sealed class EffectiveVisibilityStyleTests
 
         Assert.True(node.IsEffectivelyVisible);
         Assert.Equal(new[] { (false, true) }, changes);
-    }
-
-    private sealed class ReentrantComparer(Action callback) : IEqualityComparer<int>
-    {
-        private Action? _callback = callback;
-
-        public bool Equals(int x, int y)
-        {
-            var callback = _callback;
-            _callback = null;
-            callback?.Invoke();
-            return x == y;
-        }
-
-        public int GetHashCode(int value) => value;
     }
 }

@@ -136,22 +136,13 @@ public abstract class StyledObject : ObservableObject
         return false;
     }
 
-    internal void CommitStyleValues(
-        IReadOnlyDictionary<Property, object?> values, IEnumerable<Property> previousProperties)
+    internal void SetStyleValue(Property property, object? value)
     {
-        foreach (var property in previousProperties)
-        {
-            if (!values.ContainsKey(property))
-                ClearStyleValue(property);
-        }
-        foreach (var (property, value) in values)
-        {
-            _styleValues ??= new(ReferenceEqualityComparer.Instance);
-            _styleValues[property] = value;
-        }
+        _styleValues ??= new(ReferenceEqualityComparer.Instance);
+        _styleValues[property] = value;
     }
 
-    private void ClearStyleValue(Property property)
+    internal void ClearStyleValue(Property property)
     {
         var values = _styleValues!;
         values.Remove(property);

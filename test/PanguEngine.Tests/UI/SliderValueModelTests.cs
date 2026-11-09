@@ -169,41 +169,6 @@ public sealed class SliderValueModelTests
     }
 
     [Fact]
-    public void ReentrantEqualityComparisonPreservesTheOuterValueAndCandidatePosition()
-    {
-        Slider<ReentrantValue> slider = null!;
-        var candidateResolved = false;
-        var reentered = false;
-        void OnCompare(int left, int right)
-        {
-            if (left == 2 && right == 2)
-                candidateResolved = true;
-            if (candidateResolved && left == 0 && right == 2)
-            {
-                candidateResolved = false;
-                reentered = true;
-                slider.Value = new ReentrantValue(1);
-            }
-        }
-        var items = new ObservableList<ReentrantValue>([
-            new(0, OnCompare), new(1, OnCompare), new(2, OnCompare)]);
-        slider = new Slider<ReentrantValue>(new ListSliderValueModel<ReentrantValue>(items));
-        var values = new List<int>();
-        using var subscription = slider.Subscribe(Slider<ReentrantValue>.ValueProperty,
-            (_, change) => values.Add(change.NewValue.Number));
-
-        slider.Value = new ReentrantValue(2);
-
-        Assert.True(reentered);
-        Assert.Equal(2, slider.Value.Number);
-        Assert.True(slider.TryGetValue(out var value));
-        Assert.Equal(2, value.Number);
-        Assert.Equal(new[] { 1, 2 }, values);
-        items[2] = new ReentrantValue(4);
-        Assert.Equal(4, slider.Value.Number);
-    }
-
-    [Fact]
     public void SharedModelsKeepIndependentSelectionsThroughReorderAndReplacement()
     {
         var items = new ObservableList<int>([30, 60, 120]);
@@ -618,20 +583,6 @@ public sealed class SliderValueModelTests
     {
         public override bool Equals(object? obj) => obj is ValueEqualList<T> other && this.SequenceEqual(other);
         public override int GetHashCode() => 0;
-    }
-
-    private readonly struct ReentrantValue(int number, Action<int, int>? onCompare = null) : IEquatable<ReentrantValue>
-    {
-        internal int Number { get; } = number;
-
-        public bool Equals(ReentrantValue other)
-        {
-            onCompare?.Invoke(Number, other.Number);
-            return Number == other.Number;
-        }
-
-        public override bool Equals(object? obj) => obj is ReentrantValue other && Equals(other);
-        public override int GetHashCode() => Number.GetHashCode();
     }
 
     private sealed record Preset(string Name, int Distance);

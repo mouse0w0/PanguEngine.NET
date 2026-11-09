@@ -423,7 +423,7 @@ public sealed class StyleCombinatorUpdateTests
     }
 
     [Fact]
-    public void ClassChangeRemainsCommittedOnCalculationFailure()
+    public void ClassChangeAndStyledPropertyRemainCommittedOnComparisonFailure()
     {
         var host = MakePanel();
         var guard = new GuardedNode();
@@ -445,13 +445,13 @@ public sealed class StyleCombinatorUpdateTests
         }
 
         Assert.Contains("host", (IReadOnlySet<string>)host.Classes);
-        Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
+        Assert.Single(guard.GetStyleValueSources(GuardedNode.ValueProperty));
         Assert.True(host.Classes.Remove("host"));
         Assert.Empty(host.Classes);
     }
 
     [Fact]
-    public void PseudoClassCalculationFailureKeepsTheActivePseudoAndOldSnapshot()
+    public void PseudoClassComparisonFailureKeepsTheActivePseudoAndCommittedProperty()
     {
         var host = new PseudoPanel();
         var guard = new GuardedNode();
@@ -473,7 +473,7 @@ public sealed class StyleCombinatorUpdateTests
         }
 
         Assert.True(host.HasActivePseudoClass("loading"));
-        Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
+        Assert.Single(guard.GetStyleValueSources(GuardedNode.ValueProperty));
     }
 
     [Fact]
@@ -670,7 +670,7 @@ public sealed class StyleCombinatorUpdateTests
     }
 
     [Fact]
-    public void StyleIdChangeRemainsCommittedOnCalculationFailure()
+    public void StyleIdChangeAndStyledPropertyRemainCommittedOnComparisonFailure()
     {
         var host = MakePanel();
         var guard = new GuardedNode();
@@ -692,7 +692,7 @@ public sealed class StyleCombinatorUpdateTests
         }
 
         Assert.Equal("menu", host.StyleId);
-        Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
+        Assert.Single(guard.GetStyleValueSources(GuardedNode.ValueProperty));
     }
 
     [Fact]
@@ -853,7 +853,7 @@ public sealed class StyleCombinatorUpdateTests
     }
 
     [Fact]
-    public void FailedApplicationAfterMovingPreservesTheCommittedTreeAndPreviousSnapshot()
+    public void FailedComparisonAfterMovingPreservesTheTreeAndClearedProperty()
     {
         var source = MakePanel("host");
         var destination = MakePanel();
@@ -883,9 +883,8 @@ public sealed class StyleCombinatorUpdateTests
         Assert.Same(scene, guard.Scene);
         Assert.Same(guard, Assert.Single(destination.Children));
         Assert.DoesNotContain(guard, source.Children);
-        Assert.Equal(0.4, guard.Opacity);
-        Assert.NotSame(GuardedNode.ValueProperty.DefaultValue, guard.GetValue(GuardedNode.ValueProperty));
-        Assert.Single(guard.GetStyleValueSources(GuardedNode.ValueProperty));
+        Assert.Same(GuardedNode.ValueProperty.DefaultValue, guard.GetValue(GuardedNode.ValueProperty));
+        Assert.Empty(guard.GetStyleValueSources(GuardedNode.ValueProperty));
     }
 
     private sealed class PseudoPanel : Panel

@@ -1306,7 +1306,7 @@ public sealed class UISceneTests
     }
 
     [Fact]
-    public void StyleCalculationFailureKeepsNewResolverAndPreviousSnapshot()
+    public void StyleComparisonFailureKeepsNewResolverAndCommittedProperty()
     {
         var node = new ThrowingStyleNode();
         var scene = new UIScene(node);
@@ -1331,6 +1331,8 @@ public sealed class UISceneTests
 
         Assert.NotSame(StyleResolver.Default, scene.StyleResolver);
         Assert.Equal(1, node.Opacity);
+        Assert.Equal(0.5, node.GetValue(ThrowingStyleNode.ValueProperty).Number);
+        Assert.Single(node.GetStyleValueSources(ThrowingStyleNode.ValueProperty));
     }
 
     [Fact]
@@ -1442,7 +1444,7 @@ public sealed class UISceneTests
         Assert.Same(target, node.Scene);
         Assert.False(node.IsFocused);
         Assert.Null(source.FocusedNode);
-        Assert.Equal(1d, node.Value);
+        Assert.Equal(2d, node.Value);
     }
 
     private sealed class ProbeNode : UIElement

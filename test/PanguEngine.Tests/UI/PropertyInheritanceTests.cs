@@ -242,7 +242,7 @@ public sealed class PropertyInheritanceTests
     }
 
     [Fact]
-    public void MultipleStyleChangesAreVisibleBeforeTheirNotifications()
+    public void EachInheritedStyleChangeIsVisibleBeforeItsNotification()
     {
         var root = new InheritedPanel { StyleId = "root" };
         var child = new InheritedPanel();
@@ -256,11 +256,13 @@ public sealed class PropertyInheritanceTests
         {
             if (!ReferenceEquals(args.Property, NumberProperty) && !ReferenceEquals(args.Property, LabelProperty))
                 return;
-            Assert.Equal(20d, root.GetValue(NumberProperty));
-            Assert.Equal("parent", root.GetValue(LabelProperty));
-            Assert.Equal(20d, child.GetValue(NumberProperty));
-            Assert.Equal("parent", child.GetValue(LabelProperty));
             changedProperties.Add(args.Property);
+            var expectedNumber = changedProperties.Contains(NumberProperty) ? 20d : 7d;
+            var expectedLabel = changedProperties.Contains(LabelProperty) ? "parent" : "default";
+            Assert.Equal(expectedNumber, root.GetValue(NumberProperty));
+            Assert.Equal(expectedLabel, root.GetValue(LabelProperty));
+            Assert.Equal(expectedNumber, child.GetValue(NumberProperty));
+            Assert.Equal(expectedLabel, child.GetValue(LabelProperty));
         };
 
         Assert.Equal(7d, child.GetValue(NumberProperty));

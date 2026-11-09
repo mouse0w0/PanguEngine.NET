@@ -204,6 +204,8 @@ public sealed class UIElementStylingTests
     public void StyleChangeExceptionStopsRemainingNotifications()
     {
         var button = new Button();
+        var scene = new UIScene(button);
+        scene.SetBaseStyleSheets([]);
         var notified = new List<Property>();
         var failure = new InvalidOperationException("style-fail");
         button.PropertyChanged += (_, e) =>
@@ -216,21 +218,22 @@ public sealed class UIElementStylingTests
             }
         };
 
-        var exception = Assert.Throws<InvalidOperationException>(() => ApplyTheme(
-            button,
+        scene.SetStyleSheets([new StyleSheet([
             Rule(StyleSelector.For<Button>(), Setter(Region.BackgroundProperty, Brush(1))),
-            Rule(StyleSelector.For<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))));
+            Rule(StyleSelector.For<Button>(), Setter(Region.BorderBrushProperty, Brush(2)))
+        ])]);
+        var exception = Assert.Throws<InvalidOperationException>(button.UpdateStyles);
 
         Assert.Same(failure, exception);
-        Assert.Single(notified);
-        Assert.Equal(Brush(1), button.Background);
-        Assert.Equal(Brush(2), button.BorderBrush);
+        var property = Assert.Single(notified);
+        Assert.Equal(property == Region.BackgroundProperty ? Brush(1) : null, button.Background);
+        Assert.Equal(property == Region.BorderBrushProperty ? Brush(2) : null, button.BorderBrush);
         Assert.False(button.IsUpdatingStyles);
         Assert.False(button.Scene!.IsUpdatingLayout);
     }
 
     [Fact]
-    public void FailedNodeUpdateKeepsEarlierUpdatesAndLeavesRemainingNodesPending()
+    public void ComparisonFailureKeepsThePropertyCommitAndLeavesLaterNodesPending()
     {
         var root = new Panel();
         var first = new Panel();
@@ -261,7 +264,7 @@ public sealed class UIElementStylingTests
         }
 
         Assert.Equal(0.4, first.Opacity);
-        Assert.Equal(0d, failing.GetValue(GuardedStyleNode.ValueProperty).Number);
+        Assert.Equal(0.5, failing.GetValue(GuardedStyleNode.ValueProperty).Number);
         Assert.Equal(1d, last.Opacity);
         Assert.False(root.IsStyleSubtreeValid);
         Assert.False(failing.IsStyleSubtreeValid);
@@ -577,7 +580,7 @@ public sealed class UIElementStylingTests
     }
 
     [Fact]
-    public void ClassSetCalculationFailureKeepsTheWholeBatchAndAlreadyPublishedChange()
+    public void ClassSetComparisonFailureKeepsThePropertyCommitAndPublishedSetChange()
     {
         var node = new GuardedStyleNode();
         var scene = new UIScene(node);
@@ -606,10 +609,10 @@ public sealed class UIElementStylingTests
         Assert.True(node.Classes.SetEquals(["kept", "first", "second"]));
         Assert.Equal(1, notifications);
         Assert.Same(scene, node.Scene);
-        Assert.Same(previousSource, Assert.Single(node.GetStyleValueSources(GuardedStyleNode.ValueProperty)));
+        Assert.NotSame(previousSource, Assert.Single(node.GetStyleValueSources(GuardedStyleNode.ValueProperty)));
         node.Classes.UnionWith(["first", "second"]);
         Assert.Equal(1, notifications);
-        Assert.False(node.IsStyleValid);
+        Assert.False(node.IsStyleSubtreeValid);
         Assert.True(node.Classes.Remove("first"));
         Assert.Equal(2, notifications);
         scene.Root!.UpdateStyles();
@@ -1004,7 +1007,7 @@ public sealed class UIElementStylingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void SelectorChangesDuringNodeCalculationRemainPending(bool changeId)
+    public void SelectorChangesDuringNodeNotificationRemainPending(bool changeId)
     {
         var node = new GuardedStyleNode { StyleId = "original" };
         var scene = new UIScene(node);
@@ -1015,22 +1018,15 @@ public sealed class UIElementStylingTests
                     Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5)))
             ])
         ]);
-        GuardedValue.OnCompare = () =>
+        using var subscription = node.Subscribe(GuardedStyleNode.ValueProperty, (_, _) =>
         {
             if (changeId)
                 node.StyleId = "nested";
             else
                 node.Classes.Add("nested");
-        };
-        try
-        {
-            node.Classes.Add("outer");
-            node.GetStyleRoot().UpdateStyles();
-        }
-        finally
-        {
-            GuardedValue.OnCompare = null;
-        }
+        });
+        node.Classes.Add("outer");
+        node.GetStyleRoot().UpdateStyles();
 
         Assert.Equal(changeId ? "nested" : "original", node.StyleId);
         Assert.Equal(!changeId, node.Classes.Contains("nested"));
@@ -1088,9 +1084,12 @@ public sealed class UIElementStylingTests
     }
 
     [Fact]
-    public void PseudoClassCalculationFailureKeepsOldSnapshotUntilExplicitRetry()
+    public void PseudoClassValidationFailureKeepsOldStylesUntilExplicitRetry()
     {
         var node = new GuardedStyleNode();
+        var reject = false;
+        var property = Property.Register<GuardedStyleNode, int>(Guid.NewGuid().ToString(),
+            validate: _ => !reject);
         ApplyTheme(
             node,
             Rule(
@@ -1098,7 +1097,7 @@ public sealed class UIElementStylingTests
                 Setter(UIElement.OpacityProperty, 0.25)),
             Rule(
                 StyleSelector.For<GuardedStyleNode>(),
-                Setter(GuardedStyleNode.ValueProperty, new GuardedValue(0.5))),
+                Setter(property, 1)),
             Rule(
                 StyleSelector.For<GuardedStyleNode>([StyleSelectorCondition.Pseudo(PseudoClass.Hover)]),
                 Setter(UIElement.OpacityProperty, 0.75)));
@@ -1112,16 +1111,10 @@ public sealed class UIElementStylingTests
                 hoverEvents++;
         };
         using var subscription = node.Subscribe(UIElement.IsHoveredProperty, (_, _) => hoverSubscriptions++);
-        GuardedValue.ThrowOnCompare = true;
-        try
-        {
-            node.SetHovered(true);
-            Assert.Throws<InvalidOperationException>(node.GetStyleRoot().UpdateStyles);
-        }
-        finally
-        {
-            GuardedValue.ThrowOnCompare = false;
-        }
+        reject = true;
+        node.SetHovered(true);
+        Assert.Throws<ArgumentException>(node.GetStyleRoot().UpdateStyles);
+        reject = false;
 
         Assert.True(node.HasPseudoClass(PseudoClass.Hover));
         Assert.Equal(0.25, node.Opacity);
@@ -1691,13 +1684,11 @@ public sealed class UIElementStylingTests
     private sealed class GuardedValue(double number) : IEquatable<GuardedValue>
     {
         internal static bool ThrowOnCompare;
-        internal static Action? OnCompare;
 
         internal double Number => number;
 
         public bool Equals(GuardedValue? other)
         {
-            OnCompare?.Invoke();
             if (ThrowOnCompare)
                 throw new InvalidOperationException("guarded value comparison failed");
             return other is not null && number.Equals(other.Number);

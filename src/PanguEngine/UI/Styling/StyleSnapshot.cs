@@ -23,8 +23,6 @@ internal sealed class StyleSnapshot
 
     internal IEnumerable<Property> StyledProperties => _values.Keys;
 
-    internal IReadOnlyDictionary<Property, object?> Values => _values;
-
     internal IReadOnlyDictionary<Property, IReadOnlyList<StyleValueSource>> Sources { get; }
 
     /// <summary>Validates the resolved property values and reports CSS rejection with declaration sources.</summary>

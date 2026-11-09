@@ -9,7 +9,7 @@ namespace PanguEngine.UI;
 
 public abstract partial class UIElement
 {
-    private IReadOnlyDictionary<Property, IReadOnlyList<StyleValueSource>>? _styleSources;
+    private Dictionary<Property, IReadOnlyList<StyleValueSource>>? _styleSources;
     private readonly ObservableSet<PseudoClass> _pseudoClasses = new();
 
     internal bool IsStyleValid { get; private set; }
@@ -203,15 +203,11 @@ public abstract partial class UIElement
             if (!IsStyleValid)
             {
                 IsStyleValid = true;
-                List<(Property Property, object? Old, object? New)> changes;
+                StyleSnapshot snapshot;
                 try
                 {
-                    var snapshot = GetStyleResolver().Resolve(this);
+                    snapshot = GetStyleResolver().Resolve(this);
                     snapshot.ValidateValues();
-
-                    changes = ComputeStyleChanges(snapshot);
-                    CommitStyleValues(snapshot.Values, _styleSources?.Keys ?? []);
-                    _styleSources = snapshot.Sources;
                 }
                 catch
                 {
@@ -219,17 +215,7 @@ public abstract partial class UIElement
                     throw;
                 }
 
-                var notifyNonInherited = true;
-                foreach (var (property, oldValue, newValue) in changes)
-                {
-                    notifyNonInherited &= ReferenceEquals(GetStyleRoot(), root);
-                    if (!property.Inherits &&
-                        (!notifyNonInherited || !IsStyleValueCurrent(property, newValue)))
-                        continue;
-                    property.RaiseEffectiveValueChanged(this, oldValue, newValue);
-                }
-
-                UpdateEffectiveVisibility();
+                ApplyStyleSnapshot(snapshot);
             }
 
             if (!ReferenceEquals(GetStyleRoot(), root))
@@ -280,35 +266,34 @@ public abstract partial class UIElement
             : sources;
     }
 
-    private List<(Property Property, object? Old, object? New)> ComputeStyleChanges(StyleSnapshot newSnapshot)
+    private void ApplyStyleSnapshot(StyleSnapshot snapshot)
     {
-        var changed = new List<(Property, object?, object?)>();
-        var keys = new HashSet<Property>();
+        var properties = new HashSet<Property>();
         if (_styleSources is not null)
+            properties.UnionWith(_styleSources.Keys);
+        properties.UnionWith(snapshot.StyledProperties);
+
+        foreach (var property in properties)
         {
-            foreach (var property in _styleSources.Keys)
-                keys.Add(property);
-        }
+            var oldValue = property.GetBoxedValue(this);
+            if (snapshot.TryGetBoxedValue(property, out var value))
+            {
+                SetStyleValue(property, value);
+                _styleSources ??= new(ReferenceEqualityComparer.Instance);
+                _styleSources[property] = snapshot.Sources[property];
+            }
+            else
+            {
+                ClearStyleValue(property);
+                _styleSources!.Remove(property);
+                if (_styleSources.Count == 0)
+                    _styleSources = null;
+            }
 
-        foreach (var property in newSnapshot.StyledProperties)
-            keys.Add(property);
-
-        foreach (var property in keys)
-        {
-            if (HasLocalValue(property))
-                continue;
-
-            var fallback = property.Inherits &&
-                           TryGetInheritedValue(property, InheritanceParent, out var inherited)
-                ? inherited
-                : property.DefaultValue;
-            var oldValue = GetCommittedStyleValue(property, fallback);
-            var newValue = GetSnapshotValue(newSnapshot, property, fallback);
+            var newValue = property.GetBoxedValue(this);
             if (!property.AreEqual(oldValue, newValue))
-                changed.Add((property, oldValue, newValue));
+                property.RaiseEffectiveValueChanged(this, oldValue, newValue);
         }
-
-        return changed;
     }
 
     internal static void AddRelationshipRefreshEntry(
@@ -337,20 +322,6 @@ public abstract partial class UIElement
         {
             entries.Add(node);
         }
-    }
-
-    private static object? GetSnapshotValue(StyleSnapshot snapshot, Property property, object? defaultValue) =>
-        snapshot.TryGetBoxedValue(property, out var value) ? value : defaultValue;
-
-    private object? GetCommittedStyleValue(Property property, object? fallback) =>
-        TryGetStyleValue(property, out var value) ? value : fallback;
-
-    private bool IsStyleValueCurrent(Property property, object? expectedValue)
-    {
-        if (HasLocalValue(property))
-            return false;
-        var currentValue = GetCommittedStyleValue(property, property.DefaultValue);
-        return property.AreEqual(currentValue, expectedValue);
     }
 
     private static IEnumerable<UIElement> PreOrderTraversal(UIElement root)

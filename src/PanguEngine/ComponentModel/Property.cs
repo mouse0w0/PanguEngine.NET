@@ -3,6 +3,10 @@ namespace PanguEngine.ComponentModel;
 /// <summary>
 /// Describes a registered observable property independently of its value type.
 /// </summary>
+/// <remarks>
+/// Equality comparisons, including custom comparers and value equality implementations,
+/// must not modify property values, tree relationships, or style inputs.
+/// </remarks>
 public abstract class Property
 {
     private static readonly Lock RegistryLock = new();
@@ -69,7 +73,7 @@ public abstract class Property
     /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications. Defaults and unchanged effective values do not invoke it.</param>
     /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
     /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
-    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity.</param>
+    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity. Comparison must not modify property values, tree relationships, or style inputs.</param>
     /// <param name="inherits">Whether hosts that support inheritance may inherit this property's value.</param>
     /// <remarks>
     /// Expose a CLR property whose get accessor calls GetValue with this descriptor and whose set accessor
@@ -119,7 +123,7 @@ public abstract class Property
     /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications. Defaults and unchanged effective values do not invoke it.</param>
     /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
     /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
-    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity.</param>
+    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity. Comparison must not modify property values, tree relationships, or style inputs.</param>
     /// <param name="inherits">Whether hosts that support inheritance may inherit this property's value.</param>
     /// <remarks>The default is validated before registration. Validation failures occur before value commit; onChanged failures preserve the committed value and skip host notifications.</remarks>
     /// <returns>The key that grants owner access to the registered property.</returns>
@@ -165,7 +169,7 @@ public abstract class Property
     /// <param name="onChanged">The callback receiving the target host and the old and new effective values before host notifications.</param>
     /// <param name="validate">The host-independent validator shared by all instances. Returning false rejects the value; callback exceptions propagate.</param>
     /// <param name="validationMessage">The exception message when validation returns false, or null to use the default message.</param>
-    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity.</param>
+    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity. Comparison must not modify property values, tree relationships, or style inputs.</param>
     /// <param name="inherits">Whether hosts that support inheritance may inherit this property's value.</param>
     /// <remarks>
     /// The effective value is committed before <paramref name="onChanged"/> runs; if that callback fails,
@@ -213,7 +217,7 @@ public abstract class Property
     /// <param name="setter">The delegate that assigns the owner's CLR property, whose set accessor calls SetField, or null for a read-only property.</param>
     /// <param name="unsetValue">The value passed to the setter when clearing the property; it does not initialize the field.</param>
     /// <param name="onChanged">The callback receiving the owner and the old and new values before host notifications.</param>
-    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity.</param>
+    /// <param name="comparer">The comparer used to determine equality, or null to compare value types and strings by value and other reference types by identity. Comparison must not modify property values, tree relationships, or style inputs.</param>
     /// <returns>The registered direct property descriptor.</returns>
     /// <remarks>
     /// Getter and setter delegates forward to the owner's CLR property. Its getter reads the backing field,
