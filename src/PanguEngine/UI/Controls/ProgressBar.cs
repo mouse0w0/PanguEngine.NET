@@ -3,7 +3,7 @@ using PanguEngine.UI.Styling;
 
 namespace PanguEngine.UI.Controls;
 
-/// <summary>Displays a numeric progress value within a range.</summary>
+/// <summary>Displays a numeric progress value or a looping indeterminate indicator.</summary>
 public sealed class ProgressBar : Control
 {
     /// <summary>Identifies the lower bound of the progress range.</summary>
@@ -33,7 +33,19 @@ public sealed class ProgressBar : Control
     public static readonly Property<bool> IsReversedProperty = Property.Register<ProgressBar, bool>(
         nameof(IsReversed), onChanged: static (bar, _, _) => bar.OnDirectionChanged());
 
+    /// <summary>Identifies whether progress is displayed as a looping indicator.</summary>
+    public static readonly DirectProperty<ProgressBar, bool> IsIndeterminateProperty =
+        Property.RegisterDirect<ProgressBar, bool>(nameof(IsIndeterminate), static bar => bar.IsIndeterminate,
+            static (bar, value) => bar.IsIndeterminate = value, unsetValue: false,
+            onChanged: static (bar, _, _) => bar.OnModeChanged());
+
     private readonly Panel _fill;
+    private IDisposable? _sceneSubscription;
+    private IDisposable? _sceneOpenSubscription;
+    private IDisposable? _visibilitySubscription;
+    private Ticker? _animationTicker;
+    private TimeSpan? _lastAnimationTime;
+    private double _animationPhase;
 
     static ProgressBar()
     {
@@ -67,7 +79,7 @@ public sealed class ProgressBar : Control
         }
     }
 
-    /// <summary>Gets or sets the finite upper bound. A non-increasing range displays empty progress.</summary>
+    /// <summary>Gets or sets the finite upper bound. A non-increasing range displays empty determinate progress.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The value is not finite.</exception>
     public double Maximum
     {
@@ -105,6 +117,17 @@ public sealed class ProgressBar : Control
         set => SetValue(IsReversedProperty, value);
     }
 
+    /// <summary>Gets or sets whether a looping indicator replaces the displayed numeric proportion.</summary>
+    /// <remarks>
+    /// Numeric values are preserved. Animation runs while the owning scene is open, pauses when this
+    /// element or an ancestor is hidden or collapsed, and continues while disabled.
+    /// </remarks>
+    public bool IsIndeterminate
+    {
+        get;
+        set => SetField(IsIndeterminateProperty, ref field, value);
+    }
+
     /// <inheritdoc />
     protected override Size MeasureContent(Size availableSize)
     {
@@ -118,9 +141,21 @@ public sealed class ProgressBar : Control
         var horizontal = Orientation == Orientation.Horizontal;
         var forward = horizontal ? !IsReversed : IsReversed;
         var length = horizontal ? contentBounds.Width : contentBounds.Height;
-        var progress = GetProgress();
-        var offset = forward ? 0 : (1 - progress) * length;
-        var filledLength = progress * length;
+        double start;
+        double end;
+        if (IsIndeterminate)
+        {
+            var position = -0.3 + 1.3 * _animationPhase;
+            start = Math.Clamp(position, 0, 1);
+            end = Math.Clamp(position + 0.3, 0, 1);
+        }
+        else
+        {
+            start = 0;
+            end = GetProgress();
+        }
+        var offset = (forward ? start : 1 - end) * length;
+        var filledLength = (end - start) * length;
         _fill.Arrange(horizontal
             ? new Rect(contentBounds.X + offset, contentBounds.Y, filledLength, contentBounds.Height)
             : new Rect(contentBounds.X, contentBounds.Y + offset, contentBounds.Width, filledLength));
@@ -136,6 +171,81 @@ public sealed class ProgressBar : Control
         return Math.Clamp(double.IsFinite(range)
             ? (Value - Minimum) / range
             : (Value / 2 - Minimum / 2) / (Maximum / 2 - Minimum / 2), 0, 1);
+    }
+
+    private void OnModeChanged()
+    {
+        SetPseudoClass(PseudoClass.Indeterminate, IsIndeterminate);
+        if (IsIndeterminate)
+        {
+            _sceneSubscription = Subscribe(SceneProperty, OnSceneChanged);
+            _visibilitySubscription = Subscribe(IsEffectivelyVisibleProperty, OnEffectiveVisibilityChanged);
+            _sceneOpenSubscription = Scene?.Subscribe(UIScene.IsOpenProperty, OnSceneOpenChanged);
+        }
+        else
+        {
+            _sceneSubscription?.Dispose();
+            _sceneSubscription = null;
+            _sceneOpenSubscription?.Dispose();
+            _sceneOpenSubscription = null;
+            _visibilitySubscription?.Dispose();
+            _visibilitySubscription = null;
+        }
+        RestartAnimation();
+    }
+
+    private void OnSceneChanged(object? sender, PropertyChangedEventArgs<UIScene?> eventArgs)
+    {
+        if (!IsIndeterminate)
+            return;
+
+        _sceneOpenSubscription?.Dispose();
+        _sceneOpenSubscription = eventArgs.NewValue?.Subscribe(UIScene.IsOpenProperty, OnSceneOpenChanged);
+        RestartAnimation();
+    }
+
+    private void OnSceneOpenChanged(object? sender, PropertyChangedEventArgs<bool> eventArgs)
+    {
+        RestartAnimation();
+    }
+
+    private void OnEffectiveVisibilityChanged(object? sender, PropertyChangedEventArgs<bool> eventArgs)
+    {
+        SynchronizeAnimation();
+    }
+
+    private void RestartAnimation()
+    {
+        _animationTicker?.Stop();
+        _lastAnimationTime = null;
+        _animationPhase = 0;
+        InvalidateArrange();
+        SynchronizeAnimation();
+    }
+
+    private void SynchronizeAnimation()
+    {
+        if (IsIndeterminate && Scene is { IsOpen: true } && IsEffectivelyVisible)
+            (_animationTicker ??= UIToolkit.CreateTicker(OnAnimationTick)).Start();
+        else
+        {
+            _animationTicker?.Stop();
+            _lastAnimationTime = null;
+        }
+    }
+
+    private void OnAnimationTick(TimeSpan frameTime)
+    {
+        var previous = _lastAnimationTime;
+        _lastAnimationTime = frameTime;
+        if (previous is not { } baseline)
+            return;
+        var elapsed = (frameTime - baseline).TotalSeconds;
+        if (elapsed <= 0)
+            return;
+
+        _animationPhase = (_animationPhase + elapsed / 1.5) % 1;
+        InvalidateArrange();
     }
 
     private void OnDirectionChanged()

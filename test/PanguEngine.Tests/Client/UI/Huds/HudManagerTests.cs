@@ -226,12 +226,52 @@ public sealed class HudManagerTests
         }
     }
 
+    [Fact]
+    public void DestroyStopsIndeterminateProgressBeforeHudDestruction()
+    {
+        var manager = new UIManager();
+        var destroying = false;
+        try
+        {
+            var bar = new ProgressBar { Width = 120, Height = 12, IsIndeterminate = true };
+            var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
+            definitions.Register(ResourceKey.Create("test", "progress"),
+                new HudDefinition(() => new ProgressHud(bar)));
+            definitions.Freeze();
+            manager.InitializeHud(definitions);
+            Assert.True(ProgressBarAnimationTests.AnimationTicker(bar).IsActive);
+            manager.UpdateFrame(new Size(200, 100), 0, TimeSpan.FromSeconds(10));
+            manager.UpdateFrame(new Size(200, 100), 0, TimeSpan.FromSeconds(10.6));
+
+            destroying = true;
+            manager.Destroy();
+
+            Assert.False(ProgressBarAnimationTests.AnimationTicker(bar).IsActive);
+        }
+        finally
+        {
+            if (!destroying)
+                manager.Destroy();
+        }
+    }
+
     private static void InitializeHud(UIManager manager, UIElement root)
     {
         var definitions = new Registry<HudDefinition>(RegistryKeys.Hud);
         definitions.Register(ResourceKey.Create("test", "hud"), new HudDefinition(() => new TestHud(root)));
         definitions.Freeze();
         manager.InitializeHud(definitions);
+    }
+
+    private sealed class ProgressHud(ProgressBar bar) : Hud(bar)
+    {
+        protected override void OnDestroy()
+        {
+            Assert.False(ProgressBarAnimationTests.AnimationTicker(bar).IsActive);
+            bar.IsIndeterminate = false;
+            bar.IsIndeterminate = true;
+            Assert.False(ProgressBarAnimationTests.AnimationTicker(bar).IsActive);
+        }
     }
 
     private sealed class TestHud(UIElement root) : Hud(root)
