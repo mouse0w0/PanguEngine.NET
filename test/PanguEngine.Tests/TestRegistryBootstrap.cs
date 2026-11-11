@@ -11,7 +11,11 @@ namespace PanguEngine.Tests;
 
 internal static class TestRegistryBootstrap
 {
+    internal static readonly object CustomIdValue = new();
+
     internal static RegistryManager Manager { get; private set; } = null!;
+
+    internal static RegistryIdTable<object> CustomIdTable { get; private set; } = null!;
 
     [ModuleInitializer]
     internal static void Initialize()
@@ -21,6 +25,12 @@ internal static class TestRegistryBootstrap
 
         Manager = new RegistryManager();
         BuiltinRegistries.Register(Manager);
+        BuiltinIdTables.Register(Manager);
+        var custom = new Registry<object>(ResourceKey.Parse("test:server_ids"));
+        custom.Register(ResourceKey.Parse("test:value"), CustomIdValue);
+        CustomIdTable = new RegistryIdTable<object>(custom);
+        Manager.Register(custom);
+        Manager.RegisterIdTable(CustomIdTable);
         BuiltinHuds.Register(BuiltinRegistries.Hud);
         BuiltinBlocks.Register(BuiltinRegistries.Block);
         BuiltinSoundCategories.Register(BuiltinRegistries.SoundCategory);
@@ -30,5 +40,6 @@ internal static class TestRegistryBootstrap
         BuiltinEntityComponents.Register(BuiltinRegistries.EntityComponentType);
         BuiltinEntityTypes.Register(BuiltinRegistries.EntityType);
         Manager.FreezeAll();
+        typeof(Engine).GetProperty(nameof(Engine.RegistryManager))!.SetValue(null, Manager);
     }
 }

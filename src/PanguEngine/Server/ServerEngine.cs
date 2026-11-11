@@ -96,6 +96,7 @@ public sealed class ServerEngine
 
     internal void Start()
     {
+        Engine.RegistryManager.AllocateIdTables();
         if (IsDedicated)
             Run();
         else

@@ -62,6 +62,7 @@ public static class Engine
         EventBus = new EventBus(ThrowingEventExceptionHandler.Instance);
         RegistryManager = new RegistryManager();
         BuiltinRegistries.Register(RegistryManager);
+        BuiltinIdTables.Register(RegistryManager);
         BuiltinHuds.Register(BuiltinRegistries.Hud);
         BuiltinBlocks.Register(BuiltinRegistries.Block);
         BuiltinSoundCategories.Register(BuiltinRegistries.SoundCategory);

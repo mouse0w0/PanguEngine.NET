@@ -1,4 +1,6 @@
 using PanguEngine.Server;
+using PanguEngine.Registries;
+using PanguEngine.World.Blocks;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
@@ -21,6 +23,8 @@ public sealed class ServerEngineTests
         InitialWorldStatePacket initial;
         try
         {
+            Assert.Same(TestRegistryBootstrap.CustomIdValue, TestRegistryBootstrap.CustomIdTable.Get(0));
+            Assert.Same(BuiltinBlocks.Stone, BuiltinIdTables.Block.Get(BuiltinIdTables.Block.GetId(BuiltinBlocks.Stone)));
             initial = Assert.IsType<InitialWorldStatePacket>(await Task.Run(connection.WaitForPacket).WaitAsync(Timeout));
             Assert.False(connection.TrySend(new InputStatePacket(0, 0, 0, 0)));
         }
@@ -31,6 +35,7 @@ public sealed class ServerEngineTests
 
         var closed = Assert.IsType<ServerClosedPacket>(connection.WaitForPacket());
         Assert.Equal(initial.Tick, closed.Tick);
+        Assert.Same(TestRegistryBootstrap.CustomIdValue, TestRegistryBootstrap.CustomIdTable.Get(0));
     }
 
     [Fact]

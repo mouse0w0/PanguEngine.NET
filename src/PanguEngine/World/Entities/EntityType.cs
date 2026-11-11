@@ -35,7 +35,7 @@ public abstract class EntityType
         {
             if (!seen.Add(componentType))
                 throw new InvalidOperationException("Entity required signature contains a duplicate component type.");
-            if (!componentTypeRegistry.TryGetId(componentType, out _))
+            if (!componentTypeRegistry.TryGetKey(componentType, out _))
                 throw new InvalidOperationException("Entity required signature contains an unregistered component type.");
         }
     }

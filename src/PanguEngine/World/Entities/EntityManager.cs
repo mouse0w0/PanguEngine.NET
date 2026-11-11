@@ -12,7 +12,7 @@ public sealed class EntityManager
     private readonly int _ownerThreadId;
     private readonly List<EntitySlot> _slots = [];
     private readonly Stack<int> _freeSlots = [];
-    private readonly Dictionary<int, Archetype> _archetypes = [];
+    private readonly Dictionary<EntityType, Archetype> _archetypes = new(ReferenceEqualityComparer.Instance);
     private bool _isUpdating;
     private bool _isDestroyed;
 
@@ -161,13 +161,7 @@ public sealed class EntityManager
     {
         EnsureThread();
         EnsureAvailable();
-        if (!_entityTypes.TryGetId(type, out var typeId))
-        {
-            archetype = null;
-            return false;
-        }
-
-        return _archetypes.TryGetValue(typeId, out archetype);
+        return _archetypes.TryGetValue(type, out archetype);
     }
 
     internal void Destroy(EntityHandle handle)
@@ -206,7 +200,7 @@ public sealed class EntityManager
 
     private void ValidateSpawn(EntityType type, IReadOnlyDictionary<ComponentType, object> values)
     {
-        if (!_entityTypes.TryGetId(type, out _))
+        if (!_entityTypes.TryGetKey(type, out _))
             throw new InvalidOperationException("The entity type is not registered in this entity registry.");
         if (values.Count != type.RequiredSignature.Count)
             throw new InvalidOperationException("The required component values do not match the entity type signature.");
@@ -220,12 +214,11 @@ public sealed class EntityManager
 
     private Archetype GetOrCreateArchetype(EntityType type)
     {
-        var typeId = _entityTypes.GetId(type);
-        if (_archetypes.TryGetValue(typeId, out var archetype))
+        if (_archetypes.TryGetValue(type, out var archetype))
             return archetype;
 
         archetype = new Archetype(type.RequiredSignature);
-        _archetypes.Add(typeId, archetype);
+        _archetypes.Add(type, archetype);
         return archetype;
     }
 

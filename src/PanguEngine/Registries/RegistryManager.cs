@@ -8,6 +8,7 @@ namespace PanguEngine.Registries;
 public sealed class RegistryManager
 {
     private readonly Registry<IWritableRegistry> _registries;
+    private readonly Dictionary<ResourceKey, IRegistryIdTable> _idTables = [];
     private readonly List<IHolder> _pendingHolders = [];
 
     /// <summary>
@@ -20,6 +21,9 @@ public sealed class RegistryManager
 
     /// <summary>The registry catalog that stores all registered registries.</summary>
     public IRegistry<IWritableRegistry> Registries => _registries;
+
+    /// <summary>The explicitly registered session identifier tables.</summary>
+    public IReadOnlyDictionary<ResourceKey, IRegistryIdTable> IdTables => _idTables;
 
     /// <summary>Whether all registries have been frozen.</summary>
     public bool IsFrozen => _registries.IsFrozen;
@@ -36,6 +40,63 @@ public sealed class RegistryManager
             throw new InvalidOperationException("Registry catalog key is reserved.");
 
         _registries.Register(registry.Key, registry);
+    }
+
+    /// <summary>
+    /// Registers a session identifier table before registry freezing.
+    /// </summary>
+    /// <param name="table">The identifier table to register.</param>
+    public void RegisterIdTable(IRegistryIdTable table)
+    {
+        if (IsFrozen)
+            throw new InvalidOperationException("Registry manager is frozen.");
+        if (!_idTables.TryAdd(table.Key, table))
+            throw new InvalidOperationException($"Registry id table '{table.Key}' is already registered.");
+    }
+
+    /// <summary>
+    /// Allocates identifiers in every registered identifier table.
+    /// </summary>
+    public void AllocateIdTables()
+    {
+        foreach (var table in _idTables.Values)
+            table.Allocate();
+    }
+
+    /// <summary>
+    /// Exports the mappings of every registered identifier table.
+    /// </summary>
+    /// <returns>The current identifier mappings.</returns>
+    public RegistryIdMappings ExportIdMappings() =>
+        new(_idTables.Values.Select(table => table.ExportMapping()).ToList());
+
+    /// <summary>
+    /// Binds mappings whose table keys exactly match the registered identifier tables.
+    /// </summary>
+    /// <param name="mappings">The authoritative identifier mappings.</param>
+    public void BindIdTables(RegistryIdMappings mappings)
+    {
+        var byKey = new Dictionary<ResourceKey, RegistryIdMapping>();
+        foreach (var mapping in mappings.Tables)
+        {
+            if (!byKey.TryAdd(mapping.RegistryKey, mapping))
+                throw new InvalidOperationException($"Mapping for '{mapping.RegistryKey}' occurs more than once.");
+        }
+
+        if (byKey.Count != _idTables.Count || _idTables.Keys.Any(key => !byKey.ContainsKey(key)))
+            throw new InvalidOperationException("Mapping registries do not match the registered id tables.");
+
+        foreach (var (key, table) in _idTables)
+            table.Bind(byKey[key]);
+    }
+
+    /// <summary>
+    /// Clears the mappings of every registered identifier table.
+    /// </summary>
+    public void ClearIdTables()
+    {
+        foreach (var table in _idTables.Values)
+            table.Clear();
     }
 
     /// <summary>

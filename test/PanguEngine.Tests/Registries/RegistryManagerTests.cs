@@ -136,6 +136,106 @@ public sealed class RegistryManagerTests
         manager.FreezeAll();
     }
 
+    [Fact]
+    public void IdTableRegistrationIsExplicitAndClosesWithRegistryFreezing()
+    {
+        var manager = new RegistryManager();
+        var registry = new Registry<object>(ResourceKey.Parse("test:content"));
+        manager.Register(registry);
+        Assert.Empty(manager.IdTables);
+        manager.FreezeAll();
+
+        Assert.Throws<InvalidOperationException>(() => manager.RegisterIdTable(new RegistryIdTable<object>(registry)));
+    }
+
+    [Fact]
+    public void DuplicateIdTableKeysAreRejectedBeforeFreezing()
+    {
+        var manager = new RegistryManager();
+        var registry = new Registry<object>(ResourceKey.Parse("test:content"));
+        manager.Register(registry);
+        manager.RegisterIdTable(new RegistryIdTable<object>(registry));
+
+        Assert.Throws<InvalidOperationException>(() => manager.RegisterIdTable(new RegistryIdTable<object>(registry)));
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("extra")]
+    [InlineData("duplicate")]
+    [InlineData("replacement")]
+    public void BindIdTablesRejectsMismatchedTableSets(string difference)
+    {
+        var manager = new RegistryManager();
+        var table = RegisterTable(manager, "content", new object());
+        manager.FreezeAll();
+        manager.AllocateIdTables();
+        var expected = table.ExportMapping();
+        var other = new RegistryIdMapping(ResourceKey.Parse("test:other"), []);
+        RegistryIdMapping[] mappings = difference switch
+        {
+            "missing" => [],
+            "extra" => [expected, other],
+            "duplicate" => [expected, expected],
+            "replacement" => [other],
+            _ => throw new InvalidOperationException()
+        };
+
+        Assert.Throws<InvalidOperationException>(() => manager.BindIdTables(new RegistryIdMappings(mappings)));
+    }
+
+    [Fact]
+    public void CustomTablesParticipateInAllGroupOperationsRegardlessOfRegistrationOrder()
+    {
+        var server = new RegistryManager();
+        var serverValue = new object();
+        var serverObjects = RegisterTable(server, "objects", serverValue);
+        RegisterTable(server, "strings", "value");
+        server.FreezeAll();
+        server.AllocateIdTables();
+
+        var client = new RegistryManager();
+        var text = "value";
+        var strings = RegisterTable(client, "strings", text);
+        var value = new object();
+        var objects = RegisterTable(client, "objects", value);
+        client.FreezeAll();
+        Assert.Empty(objects.Entries);
+        Assert.Empty(strings.Entries);
+        client.BindIdTables(server.ExportIdMappings());
+
+        Assert.Same(text, strings.Get(0));
+        Assert.Same(value, objects.Get(0));
+        client.ClearIdTables();
+        Assert.False(objects.TryGetId(value, out _));
+        Assert.False(strings.TryGetId(text, out _));
+        Assert.Same(objects, client.IdTables[objects.Key]);
+        Assert.Same(serverValue, serverObjects.Get(0));
+    }
+
+    [Fact]
+    public void EmptyIdTableDirectorySupportsGroupOperations()
+    {
+        var manager = new RegistryManager();
+        manager.FreezeAll();
+        manager.AllocateIdTables();
+        var mappings = manager.ExportIdMappings();
+        manager.BindIdTables(mappings);
+        manager.ClearIdTables();
+
+        Assert.Empty(mappings.Tables);
+    }
+
+    private static RegistryIdTable<T> RegisterTable<T>(RegistryManager manager, string name, T value) where T : class
+    {
+        var registry = new Registry<T>(ResourceKey.Create("test", name));
+        registry.Register(ResourceKey.Parse("test:value"), value);
+        var table = new RegistryIdTable<T>(registry);
+        manager.Register(registry);
+        manager.RegisterIdTable(table);
+        return table;
+    }
+
     private sealed class CatalogObservingRegistry(ResourceKey key, RegistryManager manager) : Registry<object>(key)
     {
         public bool CatalogWasFrozenWhenFreezeRan { get; private set; }

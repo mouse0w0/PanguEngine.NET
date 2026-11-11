@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace PanguEngine.Registries;
 
 /// <summary>
-/// Stores values by resource key and registry-local numeric identifier.
+/// Stores values by resource key and object identity.
 /// </summary>
 /// <typeparam name="T">The registered value type.</typeparam>
 public class Registry<T> : IWritableRegistry<T> where T : class
@@ -68,7 +68,7 @@ public class Registry<T> : IWritableRegistry<T> where T : class
 
         _validate?.Invoke(this, key, value);
 
-        var entry = new RegistryEntry<T>(_entries.Count, key, value);
+        var entry = new RegistryEntry<T>(key, value);
         _entries.Add(entry);
         _keyToEntry.Add(key, entry);
         _valueToEntry.Add(value, entry);
@@ -79,25 +79,9 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     public virtual T Get(ResourceKey key) => GetEntry(key).Value;
 
     /// <inheritdoc/>
-    public virtual T Get(int id) => GetEntry(id).Value;
-
-    /// <inheritdoc/>
     public bool TryGet(ResourceKey key, [MaybeNullWhen(false)] out T value)
     {
         if (TryGetEntry(key, out var entry))
-        {
-            value = entry.Value;
-            return true;
-        }
-
-        value = null;
-        return false;
-    }
-
-    /// <inheritdoc/>
-    public bool TryGet(int id, [MaybeNullWhen(false)] out T value)
-    {
-        if (TryGetEntry(id, out var entry))
         {
             value = entry.Value;
             return true;
@@ -117,15 +101,6 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     }
 
     /// <inheritdoc/>
-    public int GetId(T value)
-    {
-        ArgumentNullException.ThrowIfNull(value);
-        return TryGetEntry(value, out var entry)
-            ? entry.Id
-            : throw new KeyNotFoundException("Value instance is not registered.");
-    }
-
-    /// <inheritdoc/>
     public bool TryGetKey(T value, [NotNullWhen(true)] out ResourceKey? key)
     {
         if (TryGetEntry(value, out var entry))
@@ -139,32 +114,11 @@ public class Registry<T> : IWritableRegistry<T> where T : class
     }
 
     /// <inheritdoc/>
-    public bool TryGetId(T value, out int id)
-    {
-        if (TryGetEntry(value, out var entry))
-        {
-            id = entry.Id;
-            return true;
-        }
-
-        id = -1;
-        return false;
-    }
-
-    /// <inheritdoc/>
     public virtual RegistryEntry<T> GetEntry(ResourceKey key)
     {
         return TryGetEntry(key, out var entry)
             ? entry
             : throw new KeyNotFoundException($"Resource key '{key}' is not registered.");
-    }
-
-    /// <inheritdoc/>
-    public virtual RegistryEntry<T> GetEntry(int id)
-    {
-        return TryGetEntry(id, out var entry)
-            ? entry
-            : throw new KeyNotFoundException($"Registry id '{id}' is not registered.");
     }
 
     /// <inheritdoc/>
@@ -177,19 +131,6 @@ public class Registry<T> : IWritableRegistry<T> where T : class
         }
 
         return _keyToEntry.TryGetValue(key, out entry);
-    }
-
-    /// <inheritdoc/>
-    public bool TryGetEntry(int id, [NotNullWhen(true)] out RegistryEntry<T>? entry)
-    {
-        if ((uint)id >= (uint)_entries.Count)
-        {
-            entry = null;
-            return false;
-        }
-
-        entry = _entries[id];
-        return true;
     }
 
     private bool TryGetEntry(T? value, [NotNullWhen(true)] out RegistryEntry<T>? entry)
@@ -205,9 +146,6 @@ public class Registry<T> : IWritableRegistry<T> where T : class
 
     /// <inheritdoc/>
     public bool ContainsKey(ResourceKey key) => ResourceKey.IsValid(key) && _keyToEntry.ContainsKey(key);
-
-    /// <inheritdoc/>
-    public bool ContainsId(int id) => (uint)id < (uint)_entries.Count;
 
     /// <inheritdoc/>
     public virtual void Freeze()

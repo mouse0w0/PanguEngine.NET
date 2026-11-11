@@ -19,7 +19,7 @@ public sealed class RegistryTests
             Assert.Same(value, candidate);
             Assert.Empty(current.Entries);
             Assert.False(current.ContainsKey(candidateKey));
-            Assert.False(current.TryGetId(candidate, out _));
+            Assert.False(current.TryGetKey(candidate, out _));
         });
 
         registry.Register(key, value);
@@ -59,32 +59,19 @@ public sealed class RegistryTests
         reject = false;
         var entry = registry.Register(key, value);
 
-        Assert.Equal(0, entry.Id);
+        Assert.Equal(key, entry.Key);
         Assert.Same(value, registry.Get(key));
-        Assert.Equal(entry.Id, registry.GetId(value));
+        Assert.Equal(key, registry.GetKey(value));
     }
 
     [Fact]
-    public void RegisterAssignsIncrementingIds()
-    {
-        var registry = CreateRegistry();
-
-        var first = registry.Register(ResourceKey.Parse("pangu:first"), new object());
-        var second = registry.Register(ResourceKey.Parse("pangu:second"), new object());
-
-        Assert.Equal(0, first.Id);
-        Assert.Equal(1, second.Id);
-    }
-
-    [Fact]
-    public void GetReturnsValuesByKeyAndId()
+    public void GetReturnsValuesByKey()
     {
         var registry = CreateRegistry();
         var value = new object();
-        var entry = registry.Register(ResourceKey.Parse("pangu:stone"), value);
+        registry.Register(ResourceKey.Parse("pangu:stone"), value);
 
         Assert.Same(value, registry.Get(ResourceKey.Parse("pangu:stone")));
-        Assert.Same(value, registry.Get(entry.Id));
     }
 
     [Fact]
@@ -107,29 +94,26 @@ public sealed class RegistryTests
     }
 
     [Fact]
-    public void GetKeyAndGetIdReturnRegisteredIdentity()
+    public void GetKeyReturnsRegisteredIdentity()
     {
         var registry = CreateRegistry();
         var key = ResourceKey.Parse("pangu:stone");
         var value = new object();
-        var entry = registry.Register(key, value);
+        registry.Register(key, value);
 
         Assert.Equal(key, registry.GetKey(value));
-        Assert.Equal(entry.Id, registry.GetId(value));
     }
 
     [Fact]
-    public void TryGetKeyAndTryGetIdReturnRegisteredIdentity()
+    public void TryGetKeyReturnsRegisteredIdentity()
     {
         var registry = CreateRegistry();
         var key = ResourceKey.Parse("pangu:stone");
         var value = new object();
-        var entry = registry.Register(key, value);
+        registry.Register(key, value);
 
         Assert.True(registry.TryGetKey(value, out var actualKey));
         Assert.Equal(key, actualKey);
-        Assert.True(registry.TryGetId(value, out var actualId));
-        Assert.Equal(entry.Id, actualId);
     }
 
     [Fact]
@@ -158,36 +142,30 @@ public sealed class RegistryTests
     }
 
     [Fact]
-    public void GetKeyAndGetIdRejectNullValue()
+    public void GetKeyRejectsNullValue()
     {
         var registry = CreateRegistry();
 
         Assert.Throws<ArgumentNullException>(() => registry.GetKey(null!));
-        Assert.Throws<ArgumentNullException>(() => registry.GetId(null!));
     }
 
     [Fact]
-    public void GetKeyAndGetIdRejectUnregisteredValue()
+    public void GetKeyRejectsUnregisteredValue()
     {
         var registry = CreateRegistry();
 
         Assert.Throws<KeyNotFoundException>(() => registry.GetKey(new object()));
-        Assert.Throws<KeyNotFoundException>(() => registry.GetId(new object()));
     }
 
     [Fact]
-    public void TryGetKeyAndTryGetIdRejectNullAndUnregisteredValues()
+    public void TryGetKeyRejectsNullAndUnregisteredValues()
     {
         var registry = CreateRegistry();
 
         Assert.False(registry.TryGetKey(null!, out var nullKey));
         Assert.Equal(default, nullKey);
-        Assert.False(registry.TryGetId(null!, out var nullId));
-        Assert.Equal(-1, nullId);
         Assert.False(registry.TryGetKey(new object(), out var missingKey));
         Assert.Equal(default, missingKey);
-        Assert.False(registry.TryGetId(new object(), out var missingId));
-        Assert.Equal(-1, missingId);
     }
 
     [Fact]
@@ -208,18 +186,18 @@ public sealed class RegistryTests
 
         Assert.False(registry.TryGet(ResourceKey.Parse("pangu:missing"), out var value));
         Assert.Null(value);
-        Assert.False(registry.TryGetEntry(12, out var entry));
+        Assert.False(registry.TryGetEntry(ResourceKey.Parse("pangu:missing"), out var entry));
         Assert.Null(entry);
     }
 
     [Fact]
-    public void EntriesAreOrderedByIdAndCannotMutateRegistry()
+    public void EntriesKeepRegistrationOrderAndCannotMutateRegistry()
     {
         var registry = CreateRegistry();
         registry.Register(ResourceKey.Parse("pangu:first"), new object());
         registry.Register(ResourceKey.Parse("pangu:second"), new object());
 
-        Assert.Equal([0, 1], registry.Entries.Select(entry => entry.Id).ToArray());
+        Assert.Equal(["pangu:first", "pangu:second"], registry.Entries.Select(entry => entry.Key.ToString()).ToArray());
         Assert.False(registry.Entries is List<RegistryEntry<object>>);
     }
 

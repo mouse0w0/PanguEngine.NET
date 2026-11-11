@@ -87,7 +87,7 @@ public sealed class EntityRegistryTests
     }
 
     [Fact]
-    public void EntityTypeValidationAcceptsComponentsInAnyRegistryIdOrder()
+    public void EntityTypeValidationAcceptsComponentsRegardlessOfRegistrationOrder()
     {
         var (_, entityTypes, first, second) = CreateRegistries();
         var type = new EntityType<TestEntity>(
