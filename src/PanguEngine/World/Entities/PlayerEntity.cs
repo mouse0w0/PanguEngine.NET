@@ -7,7 +7,7 @@ namespace PanguEngine.World.Entities;
 /// </summary>
 public sealed class PlayerEntity : Entity
 {
-    internal PlayerEntity(EntityManager entities, EntityHandle handle) : base(entities, handle)
+    internal PlayerEntity(EntityManager entities, EntityHandle handle, EntityType type) : base(entities, handle, type)
     {
     }
 

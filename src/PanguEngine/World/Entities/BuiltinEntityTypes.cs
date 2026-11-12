@@ -14,7 +14,7 @@ public static class BuiltinEntityTypes
             BuiltinEntityComponents.Rotation,
             BuiltinEntityComponents.MoveIntent
         ],
-        static (entities, handle) => new PlayerEntity(entities, handle));
+        static (entities, handle, type) => new PlayerEntity(entities, handle, type));
 
     internal static void Register(IWritableRegistry<EntityType> registry)
     {

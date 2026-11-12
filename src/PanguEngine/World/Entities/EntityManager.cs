@@ -62,11 +62,10 @@ public sealed class EntityManager
         {
             row = archetype.Add(handle, values);
             slot.IsAlive = true;
-            slot.Type = type;
             slot.Archetype = archetype;
             slot.Row = row;
 
-            var entity = type.Factory(this, handle) as TEntity
+            var entity = type.Create(this, handle) as TEntity
                          ?? throw new InvalidOperationException("The entity factory returned an invalid facade.");
             if (!ReferenceEquals(entity.Entities, this) || entity.Handle != handle)
                 throw new InvalidOperationException("The entity factory returned a facade for another entity.");
@@ -151,12 +150,6 @@ public sealed class EntityManager
         slot.Archetype!.Set(slot.Row, type, value);
     }
 
-    internal EntityType GetEntityType(EntityHandle handle)
-    {
-        EnsureThread();
-        return ResolveSlot(handle).Type!;
-    }
-
     internal bool TryGetArchetype(EntityType type, [NotNullWhen(true)] out Archetype? archetype)
     {
         EnsureThread();
@@ -172,7 +165,6 @@ public sealed class EntityManager
         var slot = ResolveSlot(handle);
         UpdateMovedRow(slot.Archetype!.RemoveAtSwapBack(slot.Row), slot.Row);
         slot.Entity = null;
-        slot.Type = null;
         slot.Archetype = null;
         slot.Row = -1;
         slot.IsAlive = false;
@@ -203,12 +195,14 @@ public sealed class EntityManager
         if (!_entityTypes.TryGetKey(type, out _))
             throw new InvalidOperationException("The entity type is not registered in this entity registry.");
         if (values.Count != type.RequiredSignature.Count)
-            throw new InvalidOperationException("The required component values do not match the entity type signature.");
+            throw new InvalidOperationException(
+                "The required component values do not match the entity type signature.");
 
         foreach (var componentType in type.RequiredSignature)
         {
             if (!values.ContainsKey(componentType))
-                throw new InvalidOperationException("The required component values do not match the entity type signature.");
+                throw new InvalidOperationException(
+                    "The required component values do not match the entity type signature.");
         }
     }
 
@@ -242,7 +236,6 @@ public sealed class EntityManager
     private void InvalidateAndRelease(int slotIndex, EntitySlot slot)
     {
         slot.Entity = null;
-        slot.Type = null;
         slot.Archetype = null;
         slot.Row = -1;
         slot.IsAlive = false;
@@ -299,7 +292,6 @@ public sealed class EntityManager
         internal uint Generation;
         internal bool IsAlive;
         internal Entity? Entity;
-        internal EntityType? Type;
         internal Archetype? Archetype;
         internal int Row = -1;
     }

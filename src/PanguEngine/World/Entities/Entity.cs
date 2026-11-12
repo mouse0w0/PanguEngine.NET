@@ -5,11 +5,11 @@ namespace PanguEngine.World.Entities;
 /// </summary>
 public abstract class Entity
 {
-    protected internal Entity(EntityManager entities, EntityHandle handle)
+    protected internal Entity(EntityManager entities, EntityHandle handle, EntityType type)
     {
         Entities = entities;
         Handle = handle;
-        Type = entities.GetEntityType(handle);
+        Type = type;
     }
 
     /// <summary>The stable entity handle.</summary>

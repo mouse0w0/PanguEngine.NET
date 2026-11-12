@@ -68,7 +68,7 @@ public sealed class EntityRegistryTests
         var writable = manager.GetWritable<EntityType>(entityTypes.Key);
         var type = new EntityType<TestEntity>(
             [first, first],
-            static (entities, handle) => new TestEntity(entities, handle));
+            static (entities, handle, entityType) => new TestEntity(entities, handle, entityType));
 
         Assert.Throws<InvalidOperationException>(() =>
             writable.Register(ResourceKey.Parse("test:duplicate"), type));
@@ -80,7 +80,7 @@ public sealed class EntityRegistryTests
         var (_, entityTypes, _, _) = CreateRegistries();
         var type = new EntityType<TestEntity>(
             [new ComponentType<UnregisteredComponent>()],
-            static (entities, handle) => new TestEntity(entities, handle));
+            static (entities, handle, entityType) => new TestEntity(entities, handle, entityType));
 
         Assert.Throws<InvalidOperationException>(() =>
             entityTypes.Register(ResourceKey.Parse("test:unregistered"), type));
@@ -92,7 +92,7 @@ public sealed class EntityRegistryTests
         var (_, entityTypes, first, second) = CreateRegistries();
         var type = new EntityType<TestEntity>(
             [second, first],
-            static (entities, handle) => new TestEntity(entities, handle));
+            static (entities, handle, entityType) => new TestEntity(entities, handle, entityType));
         var key = ResourceKey.Parse("test:unordered");
 
         entityTypes.Register(key, type);
@@ -139,7 +139,8 @@ public sealed class EntityRegistryTests
 
     private readonly record struct UnregisteredComponent(int Value);
 
-    private sealed class TestEntity(EntityManager entities, EntityHandle handle) : Entity(entities, handle)
+    private sealed class TestEntity(EntityManager entities, EntityHandle handle, EntityType type)
+        : Entity(entities, handle, type)
     {
     }
 }

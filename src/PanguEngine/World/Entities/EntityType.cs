@@ -13,7 +13,7 @@ public abstract class EntityType
     private protected EntityType(
         Type entityClass,
         IEnumerable<ComponentType> requiredSignature,
-        Func<EntityManager, EntityHandle, Entity> factory)
+        Func<EntityManager, EntityHandle, EntityType, Entity> factory)
     {
         EntityClass = entityClass;
         _requiredSignature = Array.AsReadOnly(requiredSignature.ToArray());
@@ -26,7 +26,12 @@ public abstract class EntityType
     /// <summary>The components required for every entity of this type.</summary>
     public IReadOnlyList<ComponentType> RequiredSignature => _requiredSignature;
 
-    internal Func<EntityManager, EntityHandle, Entity> Factory { get; }
+    internal Func<EntityManager, EntityHandle, EntityType, Entity> Factory { get; }
+
+    internal Entity Create(EntityManager entities, EntityHandle handle)
+    {
+        return Factory(entities, handle, this);
+    }
 
     internal void ValidateRegistration(IRegistry<ComponentType> componentTypeRegistry)
     {
@@ -36,7 +41,8 @@ public abstract class EntityType
             if (!seen.Add(componentType))
                 throw new InvalidOperationException("Entity required signature contains a duplicate component type.");
             if (!componentTypeRegistry.TryGetKey(componentType, out _))
-                throw new InvalidOperationException("Entity required signature contains an unregistered component type.");
+                throw new InvalidOperationException(
+                    "Entity required signature contains an unregistered component type.");
         }
     }
 }
@@ -49,7 +55,7 @@ public sealed class EntityType<TEntity> : EntityType where TEntity : Entity
 {
     internal EntityType(
         IEnumerable<ComponentType> requiredSignature,
-        Func<EntityManager, EntityHandle, TEntity> factory)
+        Func<EntityManager, EntityHandle, EntityType, TEntity> factory)
         : base(typeof(TEntity), requiredSignature, factory)
     {
     }

@@ -107,7 +107,7 @@ public sealed class EntityManagerTests
         EntityHandle leakedHandle = default;
         var failingType = new EntityType<FailingEntity>(
             BuiltinEntityTypes.Player.RequiredSignature,
-            (entities, handle) =>
+            (entities, handle, type) =>
             {
                 leakedHandle = handle;
                 throw new TestException();
@@ -138,7 +138,7 @@ public sealed class EntityManagerTests
         var (componentTypes, entityTypes) = EntityTestContext.CreateMutableRegistries();
         var alternateType = new EntityType<AlternateEntity>(
             BuiltinEntityTypes.Player.RequiredSignature,
-            static (entities, handle) => new AlternateEntity(entities, handle));
+            static (entities, handle, type) => new AlternateEntity(entities, handle, type));
         entityTypes.Register(ResourceKey.Parse("test:alternate"), alternateType);
         componentTypes.Freeze();
         entityTypes.Freeze();
@@ -189,11 +189,13 @@ public sealed class EntityManagerTests
 
     private readonly record struct ExtraComponent(int Value);
 
-    private sealed class FailingEntity(EntityManager entities, EntityHandle handle) : Entity(entities, handle)
+    private sealed class FailingEntity(EntityManager entities, EntityHandle handle, EntityType type)
+        : Entity(entities, handle, type)
     {
     }
 
-    private sealed class AlternateEntity(EntityManager entities, EntityHandle handle) : Entity(entities, handle)
+    private sealed class AlternateEntity(EntityManager entities, EntityHandle handle, EntityType type)
+        : Entity(entities, handle, type)
     {
     }
 
