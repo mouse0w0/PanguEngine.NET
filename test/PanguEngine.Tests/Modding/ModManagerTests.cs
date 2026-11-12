@@ -205,19 +205,63 @@ public sealed class ModManagerTests
         Assert.Contains("[1.0.0,)", exception.Message);
     }
 
-    [Fact]
-    public void LoadReportsInvalidDependencyManifestFields()
+    [Theory]
+    [InlineData("Invalid-Id", "", "dependency id")]
+    [InlineData("optional_mod", "not-a-range", "version_range")]
+    public void LoadReportsInvalidDependencyManifestFields(string dependencyId, string versionRange,
+        string expectedField)
     {
         using var directory = TestDirectory.Create();
         CreateModZip(directory.Path, "dependent.zip", "dependent_mod", "Dependent.dll", "Dependent.Entry",
-            ",\n  \"dependencies\": [{ \"id\": \"Invalid-Id\", \"version_range\": \"not-a-range\" }]");
+            $",\n  \"dependencies\": [{{ \"id\": \"{dependencyId}\", \"version_range\": \"{versionRange}\", \"optional\": true }}]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
 
         var exception = Assert.Throws<ModLoadException>(() => manager.Load());
 
-        Assert.Contains("Invalid-Id", exception.Message);
-        Assert.Contains("version_range", exception.Message);
+        Assert.Contains(dependencyId, exception.Message);
+        Assert.Contains(expectedField, exception.Message);
+        Assert.DoesNotContain("Failed to load mod", exception.Message);
+    }
+
+    [Fact]
+    public void LoadReportsInvalidModVersionBeforeLoadingAssemblies()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "invalid.zip", "invalid_mod", "Invalid.dll", "Invalid.Entry",
+            version: "not-a-version");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("invalid.zip", exception.Message);
+        Assert.Contains("invalid_mod", exception.Message);
+        Assert.Contains("version", exception.Message);
+        Assert.DoesNotContain("Failed to load mod", exception.Message);
+    }
+
+    [Fact]
+    public void LoadStopsAtFirstRangeParseErrorPerManifestAndReportsErrorsAcrossMods()
+    {
+        using var directory = TestDirectory.Create();
+        CreateModZip(directory.Path, "first.zip", "first_mod", "First.dll", "First.Entry",
+            ",\n  \"dependencies\": [" +
+            "{ \"id\": \"first_dependency\", \"version_range\": \"not-a-range\" }," +
+            "{ \"id\": \"later_dependency\", \"version_range\": \"not-a-range\" }]");
+        CreateModZip(directory.Path, "second.zip", "second_mod", "Second.dll", "Second.Entry",
+            ",\n  \"dependencies\": [{ \"id\": \"other_dependency\", \"version_range\": \"not-a-range\" }]");
+
+        var manager = new ModManager(directory.Path, NullLogger.Instance);
+
+        var exception = Assert.Throws<ModLoadException>(() => manager.Load());
+
+        Assert.Contains("first_mod", exception.Message);
+        Assert.Contains("first_dependency", exception.Message);
+        Assert.Contains("second_mod", exception.Message);
+        Assert.Contains("other_dependency", exception.Message);
+        Assert.DoesNotContain("later_dependency", exception.Message);
+        Assert.DoesNotContain("Failed to load mod", exception.Message);
     }
 
     [Fact]
@@ -601,12 +645,18 @@ public sealed class ModManagerTests
             missingOptionalAssembly,
             "Value");
         CreateGeneratedModZip(directory.Path, "caller.zip", "caller_mod", callerAssembly, "Generated.CallerMod",
-            ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"optional\": true }]");
+            ",\n  \"dependencies\": [{ \"id\": \"optional_mod\", \"version_range\": \" \", \"optional\": true }]");
 
         var manager = new ModManager(directory.Path, NullLogger.Instance);
         try
         {
             manager.Load();
+
+            var mod = Assert.Single(manager.LoadedMods);
+            var dependency = Assert.Single(mod.Info.Dependencies);
+            Assert.Equal("optional_mod", dependency.Id);
+            Assert.Null(dependency.VersionRange);
+            Assert.True(dependency.Optional);
 
             var exception = Assert.Throws<ModLoadException>(() => manager.RunConfigure());
 
@@ -649,6 +699,8 @@ public sealed class ModManagerTests
             Assert.Equal("test_mod", mod.Info.Id);
             Assert.Equal(SemVersion.Parse("0.1.0"), mod.Info.Version);
             Assert.True(mod.Info.Version >= SemVersion.Parse("0.1.0"));
+            Assert.Equal(assemblyFile, mod.Info.Assembly);
+            Assert.Equal(typeof(TestModEntry).FullName, mod.Info.Entry);
             Assert.Empty(mod.Info.Dependencies);
         }
         finally
@@ -864,14 +916,14 @@ public sealed class ModManagerTests
     }
 
     private static void CreateModZip(string directory, string fileName, string id, string assembly, string entry,
-        string dependencies = "")
+        string dependencies = "", string version = "0.1.0")
     {
         using var file = File.Create(Path.Combine(directory, fileName));
         using var archive = new ZipArchive(file, ZipArchiveMode.Create, leaveOpen: false);
         WriteEntry(archive, "mod.json", $$"""
                                           {
                                             "id": "{{id}}",
-                                            "version": "0.1.0",
+                                            "version": "{{version}}",
                                             "assembly": "{{assembly}}",
                                             "entry": "{{entry}}"{{dependencies}}
                                           }

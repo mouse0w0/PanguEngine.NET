@@ -33,7 +33,7 @@ public sealed class ModManager(
     public void Load()
     {
         var candidates = DiscoverCandidates();
-        var descriptors = ReadManifests(candidates);
+        var descriptors = ReadDescriptors(candidates);
         ValidateDependencies(descriptors);
         var sortedDescriptors = SortByDependencies(descriptors);
         LoadDescriptors(sortedDescriptors);
@@ -103,7 +103,7 @@ public sealed class ModManager(
         return candidates;
     }
 
-    private static List<ModDescriptor> ReadManifests(IReadOnlyList<ModCandidate> candidates)
+    private static List<ModDescriptor> ReadDescriptors(IReadOnlyList<ModCandidate> candidates)
     {
         var descriptors = new List<ModDescriptor>();
         var errors = new List<string>();
@@ -113,9 +113,8 @@ public sealed class ModManager(
             try
             {
                 using var source = OpenSource(candidate);
-                var manifest = ReadManifest(source);
-                ValidateManifest(candidate, source, manifest, errors);
-                descriptors.Add(new ModDescriptor(candidate, manifest));
+                var info = ReadInfo(candidate, source, errors);
+                descriptors.Add(new ModDescriptor(candidate, info));
             }
             catch (Exception ex)
             {
@@ -131,18 +130,42 @@ public sealed class ModManager(
         return descriptors;
     }
 
-    private static ModManifest ReadManifest(ModSource source)
+    private static ModInfo ReadInfo(ModCandidate candidate, ModSource source, List<string> errors)
     {
-        using var stream = source.Open("mod.json");
-        return JsonSerializer.Deserialize<ModManifest>(stream)
-               ?? throw new ModLoadException("mod.json is empty.");
+        ModManifest manifest;
+        using (var stream = source.Open("mod.json"))
+        {
+            manifest = JsonSerializer.Deserialize<ModManifest>(stream)
+                       ?? throw new ModLoadException("mod.json is empty.");
+        }
+
+        ValidateManifest(candidate, source, manifest, errors);
+        var id = manifest.Id!;
+        if (!SemVersion.TryParse(manifest.Version, out var version))
+            throw new ModLoadException($"{id}: version '{manifest.Version}' is invalid.");
+
+        var dependencies = (manifest.Dependencies ?? [])
+            .Select(dependency => ParseDependency(id, dependency))
+            .ToArray();
+
+        return new ModInfo(id, version, manifest.Assembly!, manifest.Entry!, dependencies);
+    }
+
+    private static ModDependencyInfo ParseDependency(string modId, ModDependencyManifest dependency)
+    {
+        SemVersionRange? range = null;
+        if (!string.IsNullOrWhiteSpace(dependency.VersionRange) &&
+            !SemVersionRange.TryParse(dependency.VersionRange, out range))
+            throw new ModLoadException(
+                $"{modId}: dependency '{dependency.Id}' version_range '{dependency.VersionRange}' is invalid.");
+
+        return new ModDependencyInfo(dependency.Id!, range, dependency.Optional);
     }
 
     private static void ValidateManifest(ModCandidate candidate, ModSource source, ModManifest manifest,
         List<string> errors)
     {
         if (!IsValidModId(manifest.Id)) errors.Add($"{candidate.DisplayName}: id is invalid.");
-        if (!IsValidVersion(manifest.Version)) errors.Add($"{candidate.DisplayName}: version is invalid.");
         if (string.IsNullOrWhiteSpace(manifest.Assembly)) errors.Add($"{candidate.DisplayName}: assembly is required.");
         if (string.IsNullOrWhiteSpace(manifest.Entry)) errors.Add($"{candidate.DisplayName}: entry is required.");
         if (!string.IsNullOrWhiteSpace(manifest.Assembly) && !IsFileName(manifest.Assembly))
@@ -154,8 +177,8 @@ public sealed class ModManager(
 
     private static void AddDuplicateIdErrors(IReadOnlyList<ModDescriptor> descriptors, List<string> errors)
     {
-        foreach (var group in descriptors.Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.Manifest.Id))
-                     .GroupBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal)
+        foreach (var group in descriptors.Where(descriptor => !string.IsNullOrWhiteSpace(descriptor.Info.Id))
+                     .GroupBy(descriptor => descriptor.Info.Id, StringComparer.Ordinal)
                      .Where(group => group.Count() > 1))
         {
             var files = string.Join(", ", group.Select(descriptor => descriptor.Candidate.DisplayName));
@@ -166,25 +189,21 @@ public sealed class ModManager(
     private static void ValidateDependencies(IReadOnlyList<ModDescriptor> descriptors)
     {
         var errors = new List<string>();
-        var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, StringComparer.Ordinal);
+        var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Info.Id, StringComparer.Ordinal);
 
-        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal))
+        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Info.Id, StringComparer.Ordinal))
         {
-            var modId = descriptor.Manifest.Id!;
+            var modId = descriptor.Info.Id;
             var dependencyIds = new HashSet<string>(StringComparer.Ordinal);
 
-            foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
+            foreach (var dependency in descriptor.Info.Dependencies)
             {
                 var dependencyId = dependency.Id;
                 var dependencyIdIsValid = IsValidModId(dependencyId);
                 if (!dependencyIdIsValid)
                     errors.Add($"{modId}: dependency id '{dependencyId}' is invalid.");
 
-                var hasVersionRange = !string.IsNullOrWhiteSpace(dependency.VersionRange);
-                SemVersionRange? range = null;
-                if (hasVersionRange && !SemVersionRange.TryParse(dependency.VersionRange, out range))
-                    errors.Add(
-                        $"{modId}: dependency '{dependencyId}' version_range '{dependency.VersionRange}' is invalid.");
+                var range = dependency.VersionRange;
 
                 if (!dependencyIdIsValid)
                     continue;
@@ -195,9 +214,6 @@ public sealed class ModManager(
 
                 if (string.Equals(modId, normalizedDependencyId, StringComparison.Ordinal))
                     errors.Add($"{modId}: mod '{modId}' cannot depend on itself.");
-
-                if (hasVersionRange && range is null)
-                    continue;
 
                 if (!descriptorsById.TryGetValue(normalizedDependencyId, out var target))
                 {
@@ -210,7 +226,7 @@ public sealed class ModManager(
                 if (range is null)
                     continue;
 
-                var targetVersion = SemVersion.Parse(target.Manifest.Version!);
+                var targetVersion = target.Info.Version;
                 if (!range.Contains(targetVersion))
                     errors.Add(
                         $"{modId}: dependency '{normalizedDependencyId}' version {targetVersion} does not satisfy {range}.");
@@ -223,16 +239,16 @@ public sealed class ModManager(
 
     private static ModDescriptor[] SortByDependencies(IReadOnlyList<ModDescriptor> descriptors)
     {
-        var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Manifest.Id!, StringComparer.Ordinal);
+        var descriptorsById = descriptors.ToDictionary(descriptor => descriptor.Info.Id, StringComparer.Ordinal);
         var graph = new DirectedGraph<string>(StringComparer.Ordinal);
 
-        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal))
-            graph.AddNode(descriptor.Manifest.Id!);
+        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Info.Id, StringComparer.Ordinal))
+            graph.AddNode(descriptor.Info.Id);
 
-        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Manifest.Id, StringComparer.Ordinal))
+        foreach (var descriptor in descriptors.OrderBy(descriptor => descriptor.Info.Id, StringComparer.Ordinal))
         {
-            var modId = descriptor.Manifest.Id!;
-            foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
+            var modId = descriptor.Info.Id;
+            foreach (var dependency in descriptor.Info.Dependencies)
             {
                 if (!IsValidModId(dependency.Id))
                     continue;
@@ -266,9 +282,6 @@ public sealed class ModManager(
 
         return true;
     }
-
-    private static bool IsValidVersion(string? value) =>
-        SemVersion.TryParse(value, out _);
 
     private static bool IsFileName(string value) =>
         value == Path.GetFileName(value) && !value.Contains('/') && !value.Contains('\\');
@@ -331,27 +344,22 @@ public sealed class ModManager(
     private ModContainer LoadDescriptor(ModDescriptor descriptor,
         Dictionary<string, ModAssemblyLoadContext> loadedContexts)
     {
-        var id = descriptor.Manifest.Id!;
-        var version = SemVersion.Parse(descriptor.Manifest.Version!);
-        var assemblyName = descriptor.Manifest.Assembly!;
-        var entryName = descriptor.Manifest.Entry!;
+        var info = descriptor.Info;
+        var id = info.Id;
+        var assemblyName = info.Assembly;
+        var entryName = info.Entry;
         ModSource? source = null;
 
         try
         {
             source = OpenSource(descriptor.Candidate);
             var dependencies = new List<ModAssemblyLoadContext>();
-            var dependencyInfos = new List<ModDependencyInfo>();
-            foreach (var dependency in descriptor.Manifest.Dependencies ?? [])
+            foreach (var dependency in info.Dependencies)
             {
                 if (!IsValidModId(dependency.Id))
                     continue;
 
                 var dependencyId = dependency.Id!;
-                var versionRange = string.IsNullOrWhiteSpace(dependency.VersionRange)
-                    ? null
-                    : SemVersionRange.Parse(dependency.VersionRange);
-                dependencyInfos.Add(new ModDependencyInfo(dependencyId, versionRange, dependency.Optional));
                 if (loadedContexts.TryGetValue(dependencyId, out var dependencyContext))
                     dependencies.Add(dependencyContext);
             }
@@ -360,7 +368,6 @@ public sealed class ModManager(
             var assembly = loadContext.LoadOwnAssembly(assemblyName);
             var entryType = assembly.GetType(entryName, throwOnError: true)!;
             var resources = CreateResourceSource(source);
-            var info = new ModInfo(id, version, Array.AsReadOnly(dependencyInfos.ToArray()));
             var modLogger = CreateModLogger(id);
             if (!typeof(IMod).IsAssignableFrom(entryType))
                 throw new ModLoadException($"Mod '{id}' entry '{entryName}' must implement {nameof(IMod)}.");
@@ -413,7 +420,7 @@ public sealed class ModManager(
         public string DisplayName => Path.GetFileName(SourcePath);
     }
 
-    private sealed record ModDescriptor(ModCandidate Candidate, ModManifest Manifest);
+    private sealed record ModDescriptor(ModCandidate Candidate, ModInfo Info);
 
     private enum ModSourceKind
     {
