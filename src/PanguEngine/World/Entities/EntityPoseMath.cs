@@ -17,7 +17,7 @@ public static class EntityPoseMath
     /// <returns>The normalized forward direction.</returns>
     public static Vector3D<double> GetForward(double yaw, double pitch)
     {
-        var yawRadians = double.DegreesToRadians(yaw);
+        var yawRadians = double.DegreesToRadians(yaw % 360d);
         var pitchRadians = double.DegreesToRadians(pitch);
         var direction = Vector3D.Normalize(new Vector3D<double>(
             Math.Cos(pitchRadians) * Math.Cos(yawRadians),
