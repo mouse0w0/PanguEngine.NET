@@ -15,6 +15,7 @@ public sealed class EntityManager
     private readonly Dictionary<EntityType, Archetype> _archetypes = new(ReferenceEqualityComparer.Instance);
     private bool _isUpdating;
     private bool _isDestroyed;
+    private uint _nextNetworkId;
 
     /// <summary>
     /// Creates an entity manager from the frozen process-level entity definitions.
@@ -44,6 +45,10 @@ public sealed class EntityManager
     /// <returns>The created entity facade.</returns>
     public TEntity Spawn<TEntity>(EntityType<TEntity> type, EntitySpawnBuilder initialValues)
         where TEntity : Entity
+        => Spawn(type, initialValues, unchecked(_nextNetworkId++));
+
+    internal TEntity Spawn<TEntity>(EntityType<TEntity> type, EntitySpawnBuilder initialValues, uint networkId)
+        where TEntity : Entity
     {
         ArgumentNullException.ThrowIfNull(type);
         ArgumentNullException.ThrowIfNull(initialValues);
@@ -70,6 +75,7 @@ public sealed class EntityManager
             if (!ReferenceEquals(entity.Entities, this) || entity.Handle != handle)
                 throw new InvalidOperationException("The entity factory returned a facade for another entity.");
 
+            entity.NetworkId = networkId;
             slot.Entity = entity;
             Count++;
             return entity;

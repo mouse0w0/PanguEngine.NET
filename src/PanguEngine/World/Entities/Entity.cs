@@ -18,6 +18,9 @@ public abstract class Entity
     /// <summary>The registered entity type.</summary>
     public EntityType Type { get; }
 
+    /// <summary>The server-assigned network identifier.</summary>
+    public uint NetworkId { get; internal set; }
+
     /// <summary>Whether this facade still identifies a live entity.</summary>
     public bool IsAlive => Entities.IsAlive(Handle);
 

@@ -1,3 +1,4 @@
+using System.Reflection;
 using PanguEngine.Registries;
 using PanguEngine.World.Entities;
 using PanguEngine.World.Entities.Components;
@@ -127,13 +128,14 @@ public sealed class EntityManagerTests
             EntityTestContext.CreatePlayerValues(default));
 
         Assert.Equal(1, entities.Count);
+        Assert.Equal(1u, replacement.NetworkId);
         Assert.False(entities.IsAlive(leakedHandle));
         Assert.NotEqual(leakedHandle, replacement.Handle);
         entities.Destroy();
     }
 
     [Fact]
-    public void DifferentEntityTypesWithSameRequiredSignatureUseDifferentArchetypes()
+    public void DifferentEntityTypesKeepSeparateArchetypesAndShareNetworkIdAllocation()
     {
         var (componentTypes, entityTypes) = EntityTestContext.CreateMutableRegistries();
         var alternateType = new EntityType<AlternateEntity>(
@@ -144,13 +146,53 @@ public sealed class EntityManagerTests
         entityTypes.Freeze();
         var entities = new EntityManager(entityTypes);
 
-        entities.Spawn(BuiltinEntityTypes.Player, EntityTestContext.CreatePlayerValues(default));
-        entities.Spawn(alternateType, EntityTestContext.CreatePlayerValues(default));
+        var first = entities.Spawn(BuiltinEntityTypes.Player, EntityTestContext.CreatePlayerValues(default));
+        var alternate = entities.Spawn(alternateType, EntityTestContext.CreatePlayerValues(default));
+
+        Assert.Equal(0u, first.NetworkId);
+        Assert.Equal(1u, alternate.NetworkId);
+        first.Destroy();
+        var replacement = entities.Spawn(BuiltinEntityTypes.Player, EntityTestContext.CreatePlayerValues(default));
+        Assert.Equal(first.Handle.Index, replacement.Handle.Index);
+        Assert.Equal(2u, replacement.NetworkId);
+        Assert.Equal(0u, first.NetworkId);
+        Assert.Equal(1u, alternate.NetworkId);
 
         Assert.True(entities.TryGetArchetype(BuiltinEntityTypes.Player, out var playerArchetype));
         Assert.True(entities.TryGetArchetype(alternateType, out var alternateArchetype));
         Assert.NotSame(playerArchetype, alternateArchetype);
         entities.Destroy();
+    }
+
+    [Fact]
+    public void NetworkIdsWrapFromMaxValueToZero()
+    {
+        var entities = new EntityManager();
+        typeof(EntityManager).GetField("_nextNetworkId", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(entities, uint.MaxValue);
+
+        var first = entities.Spawn(BuiltinEntityTypes.Player, EntityTestContext.CreatePlayerValues(default));
+        var second = entities.Spawn(BuiltinEntityTypes.Player, EntityTestContext.CreatePlayerValues(default));
+
+        Assert.Equal(uint.MaxValue, first.NetworkId);
+        Assert.Equal(0u, second.NetworkId);
+        entities.Destroy();
+    }
+
+    [Theory]
+    [InlineData(0u)]
+    [InlineData(uint.MaxValue)]
+    public void ExplicitNetworkIdDoesNotAdvanceAutomaticAllocation(uint networkId)
+    {
+        using var context = EntityTestContext.Create();
+        var first = context.SpawnPlayer(default);
+        var replica = context.Entities.Spawn(
+            BuiltinEntityTypes.Player, EntityTestContext.CreatePlayerValues(default), networkId);
+        var next = context.SpawnPlayer(default);
+
+        Assert.Equal(0u, first.NetworkId);
+        Assert.Equal(networkId, replica.NetworkId);
+        Assert.Equal(1u, next.NetworkId);
     }
 
     [Fact]
