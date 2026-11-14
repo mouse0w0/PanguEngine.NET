@@ -5,6 +5,31 @@ namespace PanguEngine.World;
 /// </summary>
 public static class DirectionExtensions
 {
+    private static readonly Direction[] CachedValues = Enum.GetValues<Direction>();
+
+    private static readonly Direction[] CachedHorizontals =
+        [Direction.North, Direction.South, Direction.West, Direction.East];
+
+    private static readonly Direction[] CachedVerticals = [Direction.Down, Direction.Up];
+
+    extension(Direction)
+    {
+        /// <summary>
+        /// Gets a read-only view of all directions in enum value order.
+        /// </summary>
+        public static ReadOnlySpan<Direction> Values => CachedValues;
+
+        /// <summary>
+        /// Gets a read-only view of the horizontal directions in north, south, west, east order.
+        /// </summary>
+        public static ReadOnlySpan<Direction> Horizontals => CachedHorizontals;
+
+        /// <summary>
+        /// Gets a read-only view of the vertical directions in down, up order.
+        /// </summary>
+        public static ReadOnlySpan<Direction> Verticals => CachedVerticals;
+    }
+
     /// <summary>
     /// Converts a direction to its corresponding flag.
     /// </summary>

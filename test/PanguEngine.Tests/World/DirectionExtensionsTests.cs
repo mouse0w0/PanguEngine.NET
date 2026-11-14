@@ -4,6 +4,20 @@ namespace PanguEngine.Tests.World;
 
 public sealed class DirectionExtensionsTests
 {
+    [Fact]
+    public void CollectionsReturnExpectedDirectionsInEnumOrder()
+    {
+        Assert.Equal(
+            new[] { Direction.Down, Direction.Up, Direction.North, Direction.South, Direction.West, Direction.East },
+            Direction.Values.ToArray());
+        Assert.Equal(
+            new[] { Direction.North, Direction.South, Direction.West, Direction.East },
+            Direction.Horizontals.ToArray());
+        Assert.Equal(
+            new[] { Direction.Down, Direction.Up },
+            Direction.Verticals.ToArray());
+    }
+
     [Theory]
     [InlineData(Direction.Down, Direction.Up)]
     [InlineData(Direction.Up, Direction.Down)]

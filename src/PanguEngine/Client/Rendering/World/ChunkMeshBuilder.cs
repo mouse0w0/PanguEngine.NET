@@ -56,7 +56,7 @@ internal sealed class ChunkMeshBuilder
         BlockPos position)
     {
         var result = DirectionFlags.None;
-        foreach (var direction in Enum.GetValues<Direction>())
+        foreach (var direction in Direction.Values)
         {
             var neighbor = snapshot.GetBlock(position.Offset(direction));
             if (neighbor.CanOccludeFace(direction.Opposite()))
