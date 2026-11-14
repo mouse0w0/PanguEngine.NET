@@ -114,11 +114,19 @@ public readonly struct Writer
         WriteByte((byte)value);
     }
 
+    /// <summary>Writes a signed 32-bit integer's two's-complement bit pattern using shortest unsigned LEB128.</summary>
+    /// <remarks>Negative values occupy five bytes.</remarks>
+    public void WriteVarInt32(int value) => WriteVarUInt32(unchecked((uint)value));
+
+    /// <summary>Writes a signed 64-bit integer's two's-complement bit pattern using shortest unsigned LEB128.</summary>
+    /// <remarks>Negative values occupy ten bytes.</remarks>
+    public void WriteVarInt64(long value) => WriteVarUInt64(unchecked((ulong)value));
+
     /// <summary>Writes a signed 32-bit integer using ZigZag and shortest unsigned LEB128.</summary>
-    public void WriteVarInt32(int value) => WriteVarUInt32(unchecked((uint)((value << 1) ^ (value >> 31))));
+    public void WriteVarInt32ZigZag(int value) => WriteVarUInt32(unchecked((uint)((value << 1) ^ (value >> 31))));
 
     /// <summary>Writes a signed 64-bit integer using ZigZag and shortest unsigned LEB128.</summary>
-    public void WriteVarInt64(long value) => WriteVarUInt64(unchecked((ulong)((value << 1) ^ (value >> 63))));
+    public void WriteVarInt64ZigZag(long value) => WriteVarUInt64(unchecked((ulong)((value << 1) ^ (value >> 63))));
 
     /// <summary>Writes a VarUInt32 byte count followed by strict UTF-8 content, without a BOM.</summary>
     /// <exception cref="EncoderFallbackException">The string contains invalid UTF-16.</exception>

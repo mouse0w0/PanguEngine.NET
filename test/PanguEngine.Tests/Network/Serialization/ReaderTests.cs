@@ -62,6 +62,8 @@ public sealed class ReaderTests
     [InlineData(0x200000UL, "80808001")]
     [InlineData(0xfffffffUL, "FFFFFF7F")]
     [InlineData(0x10000000UL, "8080808001")]
+    [InlineData(int.MaxValue, "FFFFFFFF07")]
+    [InlineData(0x80000000UL, "8080808008")]
     [InlineData(uint.MaxValue, "FFFFFFFF0F")]
     [InlineData(0x7ffffffffUL, "FFFFFFFF7F")]
     [InlineData(0x800000000UL, "808080808001")]
@@ -80,11 +82,17 @@ public sealed class ReaderTests
         var reader = new Reader(input);
         Assert.Equal(expected, reader.ReadVarUInt64());
         reader.EnsureEnd();
+        var rawWideReader = new Reader(input);
+        Assert.Equal(unchecked((long)expected), rawWideReader.ReadVarInt64());
+        rawWideReader.EnsureEnd();
         if (expected <= uint.MaxValue)
         {
             var narrowReader = new Reader(input);
             Assert.Equal((uint)expected, narrowReader.ReadVarUInt32());
             narrowReader.EnsureEnd();
+            var rawReader = new Reader(input);
+            Assert.Equal(unchecked((int)expected), rawReader.ReadVarInt32());
+            rawReader.EnsureEnd();
         }
     }
 
@@ -105,12 +113,12 @@ public sealed class ReaderTests
     {
         var input = Convert.FromHexString(hex);
         var reader = new Reader(input);
-        Assert.Equal(expected, reader.ReadVarInt64());
+        Assert.Equal(expected, reader.ReadVarInt64ZigZag());
         reader.EnsureEnd();
         if (expected >= int.MinValue && expected <= int.MaxValue)
         {
             var narrowReader = new Reader(input);
-            Assert.Equal((int)expected, narrowReader.ReadVarInt32());
+            Assert.Equal((int)expected, narrowReader.ReadVarInt32ZigZag());
             narrowReader.EnsureEnd();
         }
     }
@@ -139,8 +147,10 @@ public sealed class ReaderTests
     [Theory]
     [InlineData("varuint32", 5)]
     [InlineData("varint32", 5)]
+    [InlineData("varint32zigzag", 5)]
     [InlineData("varuint64", 10)]
     [InlineData("varint64", 10)]
+    [InlineData("varint64zigzag", 10)]
     public void VarIntegersRejectEveryIncompletePrefix(string kind, int maxBytes)
     {
         for (var length = 0; length < maxBytes; length++)
@@ -154,12 +164,16 @@ public sealed class ReaderTests
     [Theory]
     [InlineData("varuint32", "FFFFFFFF10")]
     [InlineData("varint32", "FFFFFFFF10")]
+    [InlineData("varint32zigzag", "FFFFFFFF10")]
     [InlineData("varuint32", "8080808080")]
     [InlineData("varint32", "8080808080")]
+    [InlineData("varint32zigzag", "8080808080")]
     [InlineData("varuint64", "FFFFFFFFFFFFFFFFFF02")]
     [InlineData("varint64", "FFFFFFFFFFFFFFFFFF02")]
+    [InlineData("varint64zigzag", "FFFFFFFFFFFFFFFFFF02")]
     [InlineData("varuint64", "80808080808080808080")]
     [InlineData("varint64", "80808080808080808080")]
+    [InlineData("varint64zigzag", "80808080808080808080")]
     public void VarIntegersRejectOverflowAndContinuationAtTheWidthLimit(string kind, string hex)
     {
         Assert.Throws<InvalidDataException>(() => ReadValue(Convert.FromHexString(hex), kind));
@@ -324,11 +338,17 @@ public sealed class ReaderTests
             case "varint32":
                 _ = reader.ReadVarInt32();
                 break;
+            case "varint32zigzag":
+                _ = reader.ReadVarInt32ZigZag();
+                break;
             case "varuint64":
                 _ = reader.ReadVarUInt64();
                 break;
             case "varint64":
                 _ = reader.ReadVarInt64();
+                break;
+            case "varint64zigzag":
+                _ = reader.ReadVarInt64ZigZag();
                 break;
             case "string":
                 _ = reader.ReadString(limit);

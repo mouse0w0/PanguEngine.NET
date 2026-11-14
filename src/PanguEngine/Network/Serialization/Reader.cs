@@ -14,6 +14,8 @@ public ref struct Reader
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private ReadOnlySpan<byte> _remaining;
 
+    internal readonly int RemainingLength => _remaining.Length;
+
     /// <summary>Creates a reader over the supplied complete payload.</summary>
     public Reader(ReadOnlySpan<byte> input)
     {
@@ -103,10 +105,22 @@ public ref struct Reader
         return value | ((ulong)last << 63);
     }
 
+    /// <summary>Reads a signed 32-bit integer whose two's-complement bit pattern is encoded as unsigned LEB128.</summary>
+    /// <remarks>Negative values occupy five bytes.</remarks>
+    /// <exception cref="EndOfStreamException">The variable-length value is truncated.</exception>
+    /// <exception cref="InvalidDataException">The encoding exceeds the permitted width or length.</exception>
+    public int ReadVarInt32() => unchecked((int)ReadVarUInt32());
+
+    /// <summary>Reads a signed 64-bit integer whose two's-complement bit pattern is encoded as unsigned LEB128.</summary>
+    /// <remarks>Negative values occupy ten bytes.</remarks>
+    /// <exception cref="EndOfStreamException">The variable-length value is truncated.</exception>
+    /// <exception cref="InvalidDataException">The encoding exceeds the permitted width or length.</exception>
+    public long ReadVarInt64() => unchecked((long)ReadVarUInt64());
+
     /// <summary>Reads a signed 32-bit integer encoded using ZigZag and unsigned LEB128.</summary>
     /// <exception cref="EndOfStreamException">The variable-length value is truncated.</exception>
     /// <exception cref="InvalidDataException">The encoding exceeds the permitted width or length.</exception>
-    public int ReadVarInt32()
+    public int ReadVarInt32ZigZag()
     {
         var value = ReadVarUInt32();
         return (int)(value >> 1) ^ -(int)(value & 1);
@@ -115,7 +129,7 @@ public ref struct Reader
     /// <summary>Reads a signed 64-bit integer encoded using ZigZag and unsigned LEB128.</summary>
     /// <exception cref="EndOfStreamException">The variable-length value is truncated.</exception>
     /// <exception cref="InvalidDataException">The encoding exceeds the permitted width or length.</exception>
-    public long ReadVarInt64()
+    public long ReadVarInt64ZigZag()
     {
         var value = ReadVarUInt64();
         return (long)(value >> 1) ^ -(long)(value & 1);

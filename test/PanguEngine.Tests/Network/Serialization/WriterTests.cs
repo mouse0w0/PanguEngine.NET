@@ -64,6 +64,8 @@ public sealed class WriterTests
     [InlineData(0x200000UL, "80808001")]
     [InlineData(0xfffffffUL, "FFFFFF7F")]
     [InlineData(0x10000000UL, "8080808001")]
+    [InlineData(int.MaxValue, "FFFFFFFF07")]
+    [InlineData(0x80000000UL, "8080808008")]
     [InlineData(uint.MaxValue, "FFFFFFFF0F")]
     [InlineData(0x7ffffffffUL, "FFFFFFFF7F")]
     [InlineData(0x800000000UL, "808080808001")]
@@ -83,12 +85,20 @@ public sealed class WriterTests
         var writer = new Writer(output);
         writer.WriteVarUInt64(value);
         Assert.Equal(expected, output.WrittenSpan.ToArray());
+        var rawWideOutput = new ArrayBufferWriter<byte>();
+        var rawWideWriter = new Writer(rawWideOutput);
+        rawWideWriter.WriteVarInt64(unchecked((long)value));
+        Assert.Equal(expected, rawWideOutput.WrittenSpan.ToArray());
         if (value <= uint.MaxValue)
         {
             var narrowOutput = new ArrayBufferWriter<byte>();
             var narrowWriter = new Writer(narrowOutput);
             narrowWriter.WriteVarUInt32((uint)value);
             Assert.Equal(expected, narrowOutput.WrittenSpan.ToArray());
+            var rawOutput = new ArrayBufferWriter<byte>();
+            var rawWriter = new Writer(rawOutput);
+            rawWriter.WriteVarInt32(unchecked((int)value));
+            Assert.Equal(expected, rawOutput.WrittenSpan.ToArray());
         }
     }
 
@@ -110,13 +120,13 @@ public sealed class WriterTests
         var expected = Convert.FromHexString(hex);
         var output = new ArrayBufferWriter<byte>();
         var writer = new Writer(output);
-        writer.WriteVarInt64(value);
+        writer.WriteVarInt64ZigZag(value);
         Assert.Equal(expected, output.WrittenSpan.ToArray());
         if (value >= int.MinValue && value <= int.MaxValue)
         {
             var narrowOutput = new ArrayBufferWriter<byte>();
             var narrowWriter = new Writer(narrowOutput);
-            narrowWriter.WriteVarInt32((int)value);
+            narrowWriter.WriteVarInt32ZigZag((int)value);
             Assert.Equal(expected, narrowOutput.WrittenSpan.ToArray());
         }
     }
