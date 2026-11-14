@@ -14,9 +14,9 @@ public sealed class BlockInteractionTests
     [Fact]
     public void MissingSelectionIsRejectedWithoutChanges()
     {
-        var game = CreateGame();
+        var (game, playerNetworkId) = CreateGame();
 
-        var update = game.Update([new BlockInteractionPacket(BlockOperation.Place, -90, 0)])!;
+        var update = Update(game, playerNetworkId, [new BlockInteractionPacket(BlockOperation.Place, -90, 0)]);
 
         Assert.Equal(InteractionStatus.NoHit, Assert.Single(update.Results).Status);
         Assert.Empty(update.Changes);
@@ -26,21 +26,21 @@ public sealed class BlockInteractionTests
     [Fact]
     public void PlacementUsesAdjacentFaceAndDoesNotReplaceOccupiedTarget()
     {
-        var game = CreateGame();
+        var (game, playerNetworkId) = CreateGame();
         var world = game.World;
         var hit = new BlockPos(8, 22, 22);
         var target = new BlockPos(8, 22, 23);
         world.SetBlock(hit, BuiltinBlocks.Grass.DefaultState);
         var request = new BlockInteractionPacket(BlockOperation.Place, -90, 0);
 
-        var placed = game.Update([request])!;
+        var placed = Update(game, playerNetworkId, [request]);
 
         Assert.Equal(target, Assert.Single(placed.Changes).Position);
         Assert.Same(BuiltinBlocks.Stone.DefaultState, world.GetBlock(target));
         var occupied = new UnselectableBlock().DefaultState;
         world.SetBlock(target, occupied);
 
-        var refused = game.Update([request])!;
+        var refused = Update(game, playerNetworkId, [request]);
 
         Assert.Equal(InteractionStatus.Occupied, Assert.Single(refused.Results).Status);
         Assert.Empty(refused.Changes);
@@ -48,11 +48,18 @@ public sealed class BlockInteractionTests
         game.Destroy();
     }
 
-    private static ServerGame CreateGame()
+    private static (ServerGame Game, uint PlayerNetworkId) CreateGame()
     {
         var game = new ServerGame();
-        game.JoinLocal(new LocalConnection());
-        return game;
+        return (game, game.JoinPlayer());
+    }
+
+    private static PanguEngine.Network.Packets.Clientbound.WorldUpdatePacket Update(
+        ServerGame game, uint playerNetworkId, IReadOnlyList<ServerboundPacket> packets)
+    {
+        game.BeginTick();
+        var results = game.Apply(playerNetworkId, packets);
+        return game.FinishTick() with { Results = results };
     }
 
     private sealed class UnselectableBlock : Block

@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using System.Net;
+using PanguEngine.Network;
 using PanguEngine.Audio;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.Input;
@@ -124,7 +126,15 @@ public sealed class ClientEngine
         SynchronizationContext.SetSynchronizationContext(new EngineSynchronizationContext(_workQueue));
         try
         {
-            OnInit();
+            try
+            {
+                OnInit();
+            }
+            catch (ConnectionClosedException error)
+            {
+                Engine.Logger.LogInformation("Server connection ended: {Reason}", error.Message);
+                return;
+            }
             try
             {
                 OnRunning();
@@ -206,8 +216,20 @@ public sealed class ClientEngine
             PumpClientEvents,
             OnUpdate,
             GraphicsBackend.Render);
-        ServerEngine.StartIntegrated();
-        Game = new ClientGame(this);
+        IClientConnection connection;
+        if (_launchOptions.ConnectAddress is { } address)
+        {
+            var mods = Engine.ModManager.LoadedMods.Select(mod =>
+                new ModVersionEntry(mod.Info.Id, mod.Info.Version.ToString())).ToArray();
+            connection = RemoteConnection.Connect(new IPEndPoint(address, _launchOptions.Port),
+                Engine.RegistryManager, mods);
+        }
+        else
+        {
+            ServerEngine.StartIntegrated();
+            connection = ServerEngine.Current.ConnectLocal();
+        }
+        Game = new ClientGame(this, connection);
         Input.RegisterHandler(BuiltinInputActions.TogglePause, HandleTogglePause);
         Input.RegisterHandler(BuiltinInputActions.ToggleDebugInfo, HandleToggleDebugInfo);
         Ui.CurrentSceneChanged += OnCurrentSceneChanged;
@@ -254,7 +276,11 @@ public sealed class ClientEngine
     {
         PrimaryWindow.PreRender += (_, alpha) => Game.PrepareFrame(alpha);
         PrimaryWindow.Render += (_, _) => Game.DrawFrame();
-        Loop.Run();
+        try { Loop.Run(); }
+        catch (ConnectionClosedException error)
+        {
+            Engine.Logger.LogInformation("Server connection ended: {Reason}", error.Message);
+        }
     }
 
     private void OnUpdate()
@@ -265,7 +291,8 @@ public sealed class ClientEngine
 
     private void OnCurrentSceneChanged(GameUIScene? oldScene, GameUIScene? newScene)
     {
-        ServerEngine.Current.IsPaused = newScene?.PausesGame == true;
+        if (_launchOptions.ConnectAddress is null)
+            ServerEngine.Current.IsPaused = newScene?.PausesGame == true;
     }
 
     private InputHandling HandleTogglePause(InputActionEvent args)
@@ -315,7 +342,8 @@ public sealed class ClientEngine
         Ui.Destroy();
         Input.Destroy();
         Renderer.Destroy();
-        ServerEngine.Current.Destroy();
+        if (_launchOptions.ConnectAddress is null)
+            ServerEngine.Current.Destroy();
         Game.Destroy();
         UIToolkit.Shutdown();
         Audio.Destroy();

@@ -1,38 +1,30 @@
-using PanguEngine.World.Blocks;
-using PanguEngine.World.Chunking;
+using PanguEngine.Network.Serialization;
 
 namespace PanguEngine.Network.Packets.Clientbound;
 
-internal sealed record InitialWorldStatePacket : ClientboundPacket
+internal sealed record InitialWorldStatePacket(long Tick, uint PlayerNetworkId, double StepSeconds,
+    IReadOnlyList<PlayerState> Players, int ChunkCount) : ClientboundPacket
 {
-    internal InitialWorldStatePacket(long tick, Guid playerId, PlayerPose player, double stepSeconds, IReadOnlyList<ChunkSnapshot> chunks)
+    internal PlayerPose Player => Players.Single(player => player.NetworkId == PlayerNetworkId).Pose;
+
+    internal override void Write(ref Writer writer)
     {
-        Tick = tick;
-        PlayerId = playerId;
-        Player = player;
-        StepSeconds = stepSeconds;
-        Chunks = chunks;
+        writer.WriteInt64(Tick);
+        writer.WriteVarUInt32(PlayerNetworkId);
+        writer.WriteDouble(StepSeconds);
+        PacketData.WritePlayers(ref writer, Players);
+        writer.WriteCount(ChunkCount);
     }
 
-    internal long Tick { get; }
-    internal Guid PlayerId { get; }
-    internal PlayerPose Player { get; }
-    internal double StepSeconds { get; }
-    internal IReadOnlyList<ChunkSnapshot> Chunks { get; }
-
-    internal sealed class ChunkSnapshot(ChunkPos position, IReadOnlyList<BlockState> blocks)
+    internal static InitialWorldStatePacket Read(ref Reader reader)
     {
-        internal ChunkPos Position { get; } = position;
-
-        internal BlockState GetBlock(int index) => blocks[index];
-
-        internal static ChunkSnapshot Capture(Chunk chunk)
-        {
-            var blocks = new BlockState[Chunk.Volume];
-            var index = 0;
-            foreach (var entry in chunk.EnumerateBlocks())
-                blocks[index++] = entry.State;
-            return new ChunkSnapshot(chunk.Position, blocks);
-        }
+        var tick = reader.ReadInt64();
+        var playerNetworkId = reader.ReadVarUInt32();
+        var step = reader.ReadDouble();
+        var players = PacketData.ReadPlayers(ref reader);
+        var count = reader.ReadCount(int.MaxValue);
+        if (tick < 0 || !double.IsFinite(step) || step <= 0 || !players.Any(player => player.NetworkId == playerNetworkId))
+            throw new InvalidDataException("Invalid initial world metadata.");
+        return new InitialWorldStatePacket(tick, playerNetworkId, step, players, count);
     }
 }

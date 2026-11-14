@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Net;
 using PanguEngine.Client;
 using PanguEngine.Server;
 using Silk.NET.Maths;
@@ -33,6 +34,9 @@ public static class Bootstrap
         var modPaths = new List<string>();
         var gpuValidation = false;
         var server = false;
+        IPAddress? connectAddress = null;
+        IPAddress? listenAddress = null;
+        int? port = null;
         string? windowTitle = null;
         Vector2D<int>? windowSize = null;
         WindowMode? windowMode = null;
@@ -56,6 +60,23 @@ public static class Bootstrap
                     break;
                 case "--server":
                     server = true;
+                    break;
+                case "--connect":
+                    if (connectAddress is not null || i + 1 >= args.Length ||
+                        !IPAddress.TryParse(args[++i], out connectAddress))
+                        throw new ArgumentException("--connect requires one IP address.");
+                    break;
+                case "--listen":
+                    if (listenAddress is not null || i + 1 >= args.Length ||
+                        !IPAddress.TryParse(args[++i], out listenAddress))
+                        throw new ArgumentException("--listen requires one IP address.");
+                    break;
+                case "--port":
+                    if (port.HasValue || i + 1 >= args.Length ||
+                        !int.TryParse(args[++i], NumberStyles.None, CultureInfo.InvariantCulture, out var parsedPort) ||
+                        parsedPort is < 1 or > 65535)
+                        throw new ArgumentException("--port requires one port between 1 and 65535.");
+                    port = parsedPort;
                     break;
                 case "--window-title":
                     if (i + 1 >= args.Length)
@@ -102,10 +123,20 @@ public static class Bootstrap
             }
         }
 
+        if (server && connectAddress is not null)
+            throw new ArgumentException("--server and --connect cannot be combined.");
+        if (listenAddress is not null && !server)
+            throw new ArgumentException("--listen requires --server.");
+        if (port.HasValue && !server && connectAddress is null)
+            throw new ArgumentException("--port requires --server or --connect.");
+
         return new LaunchOptions
         {
             GpuValidation = gpuValidation,
             Server = server,
+            ConnectAddress = connectAddress,
+            ListenAddress = listenAddress,
+            Port = port ?? 20202,
             ModPaths = modPaths.ToArray(),
             WindowTitle = windowTitle,
             WindowSize = windowSize,

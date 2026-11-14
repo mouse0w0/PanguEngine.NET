@@ -902,7 +902,11 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:move", action));
         using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
         var connection = new LocalConnection();
-        var session = new ClientSession(connection, new ClientWorld(), new InitialWorldStatePacket(0, Guid.NewGuid(), default, 0.05, []), 0);
+        var id = 1u;
+        var world = new ClientWorld();
+        var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
+        world.ApplyInitial(initial);
+        var session = new ClientSession(connection, world, initial, 0);
         input.RegisterHandler(action, _ =>
         {
             session.RefreshInput(input, 0, 0);
@@ -929,6 +933,36 @@ public sealed class InputManagerTests
     }
 
     [Fact]
+    public void PausedGameplaySampleStopsMovementAndResumeSamplesHeldInput()
+    {
+        var action = BuiltinInputActions.Move;
+        var (input, window, ui) = CreateManager(("test:move", action));
+        using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
+        var connection = new LocalConnection();
+        var world = new ClientWorld();
+        var id = 1u;
+        var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
+        world.ApplyInitial(initial);
+        var session = new ClientSession(connection, world, initial, 0);
+        input.Start();
+        window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
+        Assert.Equal(1, input.GetValue(action).Axis2D.Y);
+
+        session.RefreshInput(input, 42, 12, gameplayPaused: true);
+        List<ServerboundPacket> packets = [];
+        connection.DrainServerboundPackets(packets);
+        var stopped = Assert.IsType<InputStatePacket>(Assert.Single(packets));
+        Assert.Equal((0d, 0d, 42d, 12d), (stopped.Forward, stopped.Right, stopped.Yaw, stopped.Pitch));
+        packets.Clear();
+        session.RefreshInput(input, 42, 12);
+        connection.DrainServerboundPackets(packets);
+        Assert.Equal(1d, Assert.IsType<InputStatePacket>(Assert.Single(packets)).Forward);
+        input.Destroy();
+        ui.Destroy();
+        world.Destroy();
+    }
+
+    [Fact]
     public void InstantMovementSampleDoesNotBecomePersistentIntent()
     {
         var action = BuiltinInputActions.Move;
@@ -936,7 +970,11 @@ public sealed class InputManagerTests
         using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
         input.Bindings.SetBinding(ResourceKey.Parse("test:move/forward"), InputSource.MouseWheel, KeyModifiers.None);
         var connection = new LocalConnection();
-        var session = new ClientSession(connection, new ClientWorld(), new InitialWorldStatePacket(0, Guid.NewGuid(), default, 0.05, []), 0);
+        var id = 1u;
+        var world = new ClientWorld();
+        var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
+        world.ApplyInitial(initial);
+        var session = new ClientSession(connection, world, initial, 0);
         input.RegisterHandler(action, _ =>
         {
             session.RefreshInput(input, 0, 0);
@@ -962,7 +1000,11 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:move", action));
         using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
         var connection = new LocalConnection();
-        var session = new ClientSession(connection, new ClientWorld(), new InitialWorldStatePacket(0, Guid.NewGuid(), default, 0.05, []), 0);
+        var id = 1u;
+        var world = new ClientWorld();
+        var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
+        world.ApplyInitial(initial);
+        var session = new ClientSession(connection, world, initial, 0);
         input.Start();
         window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
         connection.SetAcceptingRequests(false, clearPending: true);

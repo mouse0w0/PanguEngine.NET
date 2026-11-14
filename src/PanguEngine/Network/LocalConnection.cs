@@ -1,10 +1,11 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Network.Packets;
 
 namespace PanguEngine.Network;
 
-internal sealed class LocalConnection
+internal sealed class LocalConnection : IClientConnection
 {
     private readonly object _gate;
     private readonly Queue<ServerboundPacket> _serverboundPackets = [];
@@ -19,7 +20,7 @@ internal sealed class LocalConnection
         _gate = synchronization ?? new object();
     }
 
-    internal (bool IsAccepting, long Epoch) RequestState
+    public (bool IsAccepting, long Epoch) RequestState
     {
         get
         {
@@ -28,7 +29,7 @@ internal sealed class LocalConnection
         }
     }
 
-    internal bool TrySend(ServerboundPacket packet)
+    public bool TrySend(ServerboundPacket packet)
     {
         lock (_gate)
         {
@@ -68,7 +69,7 @@ internal sealed class LocalConnection
         }
     }
 
-    internal bool TryReceive([NotNullWhen(true)] out ClientboundPacket? packet)
+    public bool TryReceive([NotNullWhen(true)] out ClientboundPacket? packet)
     {
         lock (_gate)
         {
@@ -77,12 +78,22 @@ internal sealed class LocalConnection
         }
     }
 
-    internal ClientboundPacket WaitForPacket()
+    public ClientboundPacket WaitForPacket(TimeSpan? timeout = null)
     {
+        var start = Stopwatch.GetTimestamp();
         lock (_gate)
         {
             while (_clientboundPackets.Count == 0 && !_completed)
-                Monitor.Wait(_gate);
+            {
+                if (timeout is { } limit)
+                {
+                    var remaining = limit - Stopwatch.GetElapsedTime(start);
+                    if (remaining <= TimeSpan.Zero || !Monitor.Wait(_gate, remaining))
+                        throw new ConnectionClosedException("Timed out waiting for the local server.");
+                }
+                else
+                    Monitor.Wait(_gate);
+            }
             _fault?.Throw();
             if (_clientboundPackets.TryDequeue(out var packet))
                 return packet;
@@ -100,7 +111,17 @@ internal sealed class LocalConnection
         }
     }
 
-    internal void ThrowIfFaulted()
+    public void Close()
+    {
+        lock (_gate)
+        {
+            SetAcceptingRequests(false, clearPending: true);
+            _completed = true;
+            Monitor.PulseAll(_gate);
+        }
+    }
+
+    public void ThrowIfFaulted()
     {
         lock (_gate)
             _fault?.Throw();

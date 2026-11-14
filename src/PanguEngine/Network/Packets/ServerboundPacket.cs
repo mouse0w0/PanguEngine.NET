@@ -1,3 +1,4 @@
 namespace PanguEngine.Network.Packets;
 
-internal abstract record ServerboundPacket;
+/// <summary>Represents a message sent from a client to a server.</summary>
+internal abstract record ServerboundPacket : Packet;

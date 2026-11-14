@@ -50,7 +50,7 @@ public sealed class LocalConnectionTests
         var chunk = new Chunk(default);
         var position = new BlockPos(1, 2, 3);
         chunk.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
-        var snapshot = InitialWorldStatePacket.ChunkSnapshot.Capture(chunk);
+        var snapshot = ChunkDataPacket.Capture(chunk);
 
         chunk.SetBlock(position, BuiltinBlocks.Air.DefaultState);
 
@@ -63,11 +63,13 @@ public sealed class LocalConnectionTests
     {
         var connection = new LocalConnection();
         var error = new InvalidOperationException("server failed");
-        connection.Publish(new WorldUpdatePacket(1, default, [], []));
+        connection.Publish(new WorldUpdatePacket(1, [], [], []));
         connection.Complete(error);
+        connection.Close();
 
         Assert.Same(error, Assert.Throws<InvalidOperationException>(() => connection.WaitForPacket()));
         Assert.Same(error, Assert.Throws<InvalidOperationException>(() => connection.TryReceive(out _)));
+        Assert.Same(error, Assert.Throws<InvalidOperationException>(connection.ThrowIfFaulted));
         Assert.Same(error, Assert.Throws<InvalidOperationException>(() =>
             connection.TrySend(new InputStatePacket(0, 0, 0, 0))));
     }

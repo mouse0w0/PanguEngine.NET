@@ -5,6 +5,35 @@ namespace PanguEngine.Tests;
 public sealed class BootstrapTests
 {
     [Fact]
+    public void ParseOptionsSeparatesRemoteAddressAndPort()
+    {
+        var remote = Bootstrap.ParseOptions(["--connect", "::1"]);
+        Assert.Equal(System.Net.IPAddress.IPv6Loopback, remote.ConnectAddress);
+        Assert.Equal(20202, remote.Port);
+        var server = Bootstrap.ParseOptions(["--server", "--listen", "0.0.0.0", "--port", "20203"]);
+        Assert.Equal(System.Net.IPAddress.Any, server.ListenAddress);
+        Assert.Equal(20203, server.Port);
+    }
+
+    [Fact]
+    public void ParseOptionsRejectsInvalidNetworkCombinations()
+    {
+        string[][] inputs =
+        [
+            ["--connect"], ["--listen"], ["--port"],
+            ["--connect", "localhost"], ["--connect", "127.0.0.1:20202"],
+            ["--server", "--connect", "127.0.0.1"], ["--listen", "127.0.0.1"],
+            ["--port", "20202"], ["--server", "--port", "0"],
+            ["--server", "--port", "65536"], ["--server", "--port", "abc"],
+            ["--connect", "::1", "--connect", "::1"],
+            ["--server", "--listen", "::1", "--listen", "::1"],
+            ["--server", "--port", "20202", "--port", "20202"]
+        ];
+        foreach (var input in inputs)
+            Assert.Throws<ArgumentException>(() => Bootstrap.ParseOptions(input));
+    }
+
+    [Fact]
     public void ParseOptionsDisablesGpuValidationByDefault()
     {
         var options = Bootstrap.ParseOptions([]);

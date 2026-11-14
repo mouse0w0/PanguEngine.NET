@@ -11,21 +11,20 @@ namespace PanguEngine.Client.Game;
 
 internal sealed class ClientSession
 {
-    private readonly LocalConnection _connection;
+    private readonly IClientConnection _connection;
     private readonly ClientWorld _world;
     private readonly double _stepSeconds;
     private double _receivedAt;
     private bool _closing;
     private long _inputEpoch;
 
-    internal ClientSession(LocalConnection connection, ClientWorld world, InitialWorldStatePacket initial, double now)
+    internal ClientSession(IClientConnection connection, ClientWorld world, InitialWorldStatePacket initial, double now)
     {
         _connection = connection;
         _world = world;
         _stepSeconds = initial.StepSeconds;
         _receivedAt = now;
         _inputEpoch = connection.RequestState.Epoch;
-        _world.ApplyInitial(initial);
     }
 
     internal bool CanSubmitInput => !_closing && _connection.RequestState.IsAccepting;
@@ -43,9 +42,9 @@ internal sealed class ClientSession
         }
     }
 
-    internal void RefreshInput(InputManager input, double yaw, double pitch)
+    internal void RefreshInput(InputManager input, double yaw, double pitch, bool gameplayPaused = false)
     {
-        var movement = input.GetValue(BuiltinInputActions.Move).Axis2D;
+        var movement = gameplayPaused ? default : input.GetValue(BuiltinInputActions.Move).Axis2D;
         SubmitInput(movement.Y, movement.X, yaw, pitch);
     }
 
@@ -68,6 +67,8 @@ internal sealed class ClientSession
             switch (packet)
             {
                 case WorldUpdatePacket update:
+                    if (update.Players.All(player => player.NetworkId != _world.PlayerNetworkId))
+                        throw new ConnectionClosedException("The controlled player is missing from the server update.");
                     _receivedAt = now;
                     _world.Apply(update);
                     foreach (var result in update.Results)
@@ -76,9 +77,15 @@ internal sealed class ClientSession
                             OperationCompleted?.Invoke(result);
                     }
                     break;
+                case DisconnectPacket disconnected:
+                    throw new ConnectionClosedException(disconnected.Reason);
+                default:
+                    throw new ConnectionClosedException("Unexpected message after initial world loading.");
             }
         }
     }
 
     internal void BeginClose() => _closing = true;
+
+    internal void CloseConnection() => _connection.Close();
 }

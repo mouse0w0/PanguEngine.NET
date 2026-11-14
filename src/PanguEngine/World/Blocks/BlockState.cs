@@ -20,6 +20,8 @@ public sealed class BlockState
     /// <summary>The block represented by this state.</summary>
     public Block Block { get; }
 
+    internal int StateIndex => _stateIndex;
+
     /// <summary>Whether this state represents empty space.</summary>
     public bool IsAir => Block.IsAir;
 

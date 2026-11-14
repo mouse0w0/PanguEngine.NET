@@ -16,17 +16,17 @@ public sealed class ServerGameTests
         var (game, initial) = CreateGame();
         var input = new InputStatePacket(1, 0, -90, 0);
 
-        var update = game.Update([input, input with { Forward = -1 }])!;
+        var update = Update(game, initial.PlayerNetworkId, [input, input with { Forward = -1 }]);
 
         Assert.Equal(initial.Tick + 1, update.Tick);
-        Assert.Equal(0.4, update.Player.Position.Z - initial.Player.Position.Z, 8);
+        Assert.Equal(0.4, update.Players[0].Pose.Position.Z - initial.Player.Position.Z, 8);
         game.Destroy();
     }
 
     [Fact]
     public void RepeatedClicksUseCapturedDirectionAndSeePriorEdits()
     {
-        var (game, _) = CreateGame();
+        var (game, initial) = CreateGame();
         var world = game.World;
         var first = new BlockPos(8, 22, 22);
         var second = new BlockPos(8, 22, 21);
@@ -34,10 +34,10 @@ public sealed class ServerGameTests
         world.SetBlock(second, BuiltinBlocks.Stone.DefaultState);
         var click = new BlockInteractionPacket(BlockOperation.Break, -90, 0);
 
-        var update = game.Update([
+        var update = Update(game, initial.PlayerNetworkId, [
             click,
             click,
-            new InputStatePacket(0, 0, 0, 0)])!;
+            new InputStatePacket(0, 0, 0, 0)]);
 
         Assert.Equal([first, second], update.Results.Select(result => result.Position));
         Assert.All(update.Results, result => Assert.True(result.IsSuccess));
@@ -50,13 +50,13 @@ public sealed class ServerGameTests
     [Fact]
     public void MixedInteractionsPreserveOrderAndIntermediateChanges()
     {
-        var (game, _) = CreateGame();
+        var (game, initial) = CreateGame();
         var world = game.World;
         world.SetBlock(new BlockPos(8, 22, 22), BuiltinBlocks.Stone.DefaultState);
 
-        var update = game.Update([
+        var update = Update(game, initial.PlayerNetworkId, [
             new BlockInteractionPacket(BlockOperation.Place, -90, 0),
-            new BlockInteractionPacket(BlockOperation.Break, -90, 0)])!;
+            new BlockInteractionPacket(BlockOperation.Break, -90, 0)]);
 
         Assert.Equal([BlockOperation.Place, BlockOperation.Break], update.Results.Select(result => result.Operation));
         Assert.All(update.Results, result => Assert.True(result.IsSuccess));
@@ -70,18 +70,18 @@ public sealed class ServerGameTests
     [Fact]
     public void InteractionUsesPositionBeforeThisRoundsMovement()
     {
-        var (game, _) = CreateGame();
+        var (game, initial) = CreateGame();
         var world = game.World;
         var target = new BlockPos(8, 22, 18);
         world.SetBlock(target, BuiltinBlocks.Stone.DefaultState);
 
-        var update = game.Update([
+        var update = Update(game, initial.PlayerNetworkId, [
             new InputStatePacket(-1, 0, -90, 0),
-            new BlockInteractionPacket(BlockOperation.Break, -90, 0)])!;
+            new BlockInteractionPacket(BlockOperation.Break, -90, 0)]);
 
         Assert.True(Assert.Single(update.Results).IsSuccess);
         Assert.Equal(target, Assert.Single(update.Changes).Position);
-        Assert.Equal(24.4, update.Player.Position.Z, 8);
+        Assert.Equal(24.4, update.Players[0].Pose.Position.Z, 8);
         game.Destroy();
     }
 
@@ -90,23 +90,28 @@ public sealed class ServerGameTests
     {
         var game = new ServerGame();
         Assert.Equal(0, game.World.Entities.Count);
-        Assert.Null(game.Update([]));
-        var connection = new LocalConnection();
-        game.JoinLocal(connection);
-
-        var initial = Assert.IsType<InitialWorldStatePacket>(connection.WaitForPacket());
+        game.BeginTick();
+        Assert.Empty(game.FinishTick().Players);
+        var playerNetworkId = game.JoinPlayer();
+        var initial = game.CreateInitial(playerNetworkId);
 
         Assert.Equal(1L, initial.Tick);
-        Assert.Equal(game.World.Chunks.Count, initial.Chunks.Count);
-        Assert.Equal(game.Update([], advance: false)!.Player, initial.Player);
+        Assert.Equal(game.World.Chunks.Count, initial.ChunkCount);
+        Assert.Equal(game.FinishTick(advance: false).Players[0].Pose, initial.Player);
         game.Destroy();
     }
 
     private static (ServerGame Game, InitialWorldStatePacket Initial) CreateGame()
     {
         var game = new ServerGame();
-        var connection = new LocalConnection();
-        game.JoinLocal(connection);
-        return (game, Assert.IsType<InitialWorldStatePacket>(connection.WaitForPacket()));
+        var playerNetworkId = game.JoinPlayer();
+        return (game, game.CreateInitial(playerNetworkId));
+    }
+
+    private static WorldUpdatePacket Update(ServerGame game, uint playerNetworkId, IReadOnlyList<ServerboundPacket> packets)
+    {
+        game.BeginTick();
+        var results = game.Apply(playerNetworkId, packets);
+        return game.FinishTick() with { Results = results };
     }
 }

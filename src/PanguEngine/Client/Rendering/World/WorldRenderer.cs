@@ -28,6 +28,8 @@ internal sealed class WorldRenderer
     private readonly DescriptorSet[] _worldDescriptorSets;
     private readonly ChunkRenderer _chunkRenderer;
     private readonly SelectionRenderer _selectionRenderer;
+    private readonly PlayerRenderer _playerRenderer;
+    private double _worldAlpha;
     private List<UploadHandle> _preparedUploadHandles = [];
 
     /// <summary>
@@ -95,10 +97,13 @@ internal sealed class WorldRenderer
             _worldDescriptorLayout,
             world,
             frameSlotCount);
+        _playerRenderer = new PlayerRenderer(_device, colorFormat, depthStencilFormat,
+            _worldDescriptorLayout, world, frameSlotCount);
     }
 
-    internal void PrepareFrame(Camera camera)
+    internal void PrepareFrame(Camera camera, double worldAlpha)
     {
+        _worldAlpha = worldAlpha;
         var uploadHandles = _chunkRenderer.UpdateMeshes(camera.Position);
         _preparedUploadHandles = uploadHandles;
     }
@@ -126,6 +131,7 @@ internal sealed class WorldRenderer
         {
             _chunkRenderer.PrepareDraw(frame.FrameSlot, worldRenderState);
             _selectionRenderer.Prepare(frame.FrameSlot, selection);
+            _playerRenderer.Prepare(frame.FrameSlot, worldRenderState, _worldAlpha);
         }
         return uploadFailure;
     }
@@ -138,6 +144,7 @@ internal sealed class WorldRenderer
         var descriptorSet = _worldDescriptorSets[checked((int)frameSlot)];
         _chunkRenderer.Draw(commandList, descriptorSet, frameSlot);
         _selectionRenderer.Draw(commandList, descriptorSet, frameSlot, worldRenderState);
+        _playerRenderer.Draw(commandList, descriptorSet, frameSlot);
     }
 
     /// <summary>
@@ -145,6 +152,7 @@ internal sealed class WorldRenderer
     /// </summary>
     public void Destroy()
     {
+        _playerRenderer.Destroy();
         _selectionRenderer.Destroy();
         _chunkRenderer.Destroy();
         foreach (var descriptorSet in _worldDescriptorSets)

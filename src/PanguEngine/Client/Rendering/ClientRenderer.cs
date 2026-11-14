@@ -63,10 +63,10 @@ internal sealed class ClientRenderer
     /// </summary>
     internal ClientFrameStatistics FrameStatistics => _frameTimeTracker.CreateSnapshot();
 
-    internal void PrepareFrame(Camera camera, double clientAlpha)
+    internal void PrepareFrame(Camera camera, double clientAlpha, double worldAlpha)
     {
         _uiManager.UpdateFrame(new Size(_presenter.Width, _presenter.Height), clientAlpha);
-        _worldRenderer.PrepareFrame(camera);
+        _worldRenderer.PrepareFrame(camera, worldAlpha);
         EnsureDepthStencilAttachmentSize();
     }
 

@@ -4,6 +4,7 @@ using PanguEngine.Client.World;
 using PanguEngine.Client.Input;
 using PanguEngine.Input;
 using PanguEngine.Server;
+using PanguEngine.Network;
 using PanguEngine.World.Chunking;
 using PanguEngine.World.Interaction;
 using PanguEngine.Network.Packets;
@@ -26,14 +27,13 @@ public sealed class ClientGame
     private readonly AudioSystem _audio;
     private readonly IDisposable _gameContextActivation;
 
-    internal ClientGame(ClientEngine engine)
+    internal ClientGame(ClientEngine engine, IClientConnection connection)
     {
         _engine = engine;
         _input = engine.Input;
         _audio = engine.Audio;
         World = new ClientWorld();
-        var connection = ServerEngine.Current.ConnectLocal();
-        var initial = (InitialWorldStatePacket)connection.WaitForPacket();
+        var initial = LoadInitialWorld(connection, World);
         _session = new ClientSession(connection, World, initial, _displayClock.Elapsed.TotalSeconds);
         _session.OperationCompleted += OnOperationCompleted;
         Camera = new Camera(initial.Player.Position, initial.Player.Yaw, initial.Player.Pitch);
@@ -76,7 +76,7 @@ public sealed class ClientGame
         Camera.Position = position.Previous + (position.Current - position.Previous) * alpha;
         SelectedBlock = RaycastSelection(Camera.Position, Camera.Forward);
         _audio.SetListener(new AudioListenerState(Camera.Position, Camera.Forward, Vector3D<double>.UnitY));
-        _engine.Renderer.PrepareFrame(Camera, clientAlpha);
+        _engine.Renderer.PrepareFrame(Camera, clientAlpha, alpha);
     }
 
     /// <summary>
@@ -85,6 +85,37 @@ public sealed class ClientGame
     internal void DrawFrame()
     {
         _engine.Renderer.DrawFrame(Camera, SelectedBlock);
+    }
+
+    private static InitialWorldStatePacket LoadInitialWorld(IClientConnection connection, ClientWorld world)
+    {
+        var started = Stopwatch.GetTimestamp();
+        var first = WaitForPacket(connection, NetworkLimits.InitialTimeout);
+        if (first is not InitialWorldStatePacket initial)
+            throw new ConnectionClosedException("Expected initial world metadata.");
+        world.ApplyInitial(initial);
+        var chunks = new HashSet<ChunkPos>();
+        while (true)
+        {
+            var remaining = NetworkLimits.InitialTimeout - Stopwatch.GetElapsedTime(started);
+            if (remaining <= TimeSpan.Zero)
+                throw new ConnectionClosedException("Initial world loading timed out.");
+            var packet = WaitForPacket(connection, remaining);
+            if (packet is ChunkDataPacket chunk && chunks.Count < initial.ChunkCount && chunks.Add(chunk.Position))
+                world.ApplyChunk(chunk);
+            else if (packet is InitialWorldCompletePacket && chunks.Count == initial.ChunkCount)
+                return initial;
+            else
+                throw new ConnectionClosedException("Invalid initial world sequence.");
+        }
+    }
+
+    private static ClientboundPacket WaitForPacket(IClientConnection connection, TimeSpan timeout)
+    {
+        var packet = connection.WaitForPacket(timeout);
+        if (packet is DisconnectPacket disconnected)
+            throw new ConnectionClosedException(disconnected.Reason);
+        return packet;
     }
 
     private void OnOperationCompleted(InteractionResult result)
@@ -131,7 +162,7 @@ public sealed class ClientGame
 
     private void SubmitCurrentInput()
     {
-        _session.RefreshInput(_input, Camera.Yaw, Camera.Pitch);
+        _session.RefreshInput(_input, Camera.Yaw, Camera.Pitch, _engine.Ui.CurrentScene?.PausesGame == true);
     }
 
     private void ClearInput() => SubmitCurrentInput();
@@ -171,6 +202,7 @@ public sealed class ClientGame
         _session.BeginClose();
         _input.StateInvalidated -= ClearInput;
         _gameContextActivation.Dispose();
+        _session.CloseConnection();
         World.Destroy();
     }
 }

@@ -1,0 +1,16 @@
+{
+  "profiles": {
+    "Server": {
+      "commandName": "Project",
+      "commandLineArgs": "--server --listen 127.0.0.1 --port 20202"
+    },
+    "Client 1": {
+      "commandName": "Project",
+      "commandLineArgs": "--connect 127.0.0.1 --port 20202 --window-title \"Client 1\""
+    },
+    "Client 2": {
+      "commandName": "Project",
+      "commandLineArgs": "--connect 127.0.0.1 --port 20202 --window-title \"Client 2\""
+    }
+  }
+}

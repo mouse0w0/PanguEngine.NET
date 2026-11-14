@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net;
 using PanguEngine.Server.Game;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;
@@ -19,10 +20,13 @@ public sealed class ServerEngine
     private bool _reschedule;
     private bool _shutdownRequested;
     private long _tick;
+    private readonly IPEndPoint? _listenEndpoint;
+    private uint _localPlayerNetworkId;
 
-    internal ServerEngine(bool isDedicated)
+    internal ServerEngine(bool isDedicated, IPEndPoint? listenEndpoint = null)
     {
         IsDedicated = isDedicated;
+        _listenEndpoint = listenEndpoint;
         _connection = new LocalConnection(_gate);
         _thread = isDedicated ? Thread.CurrentThread : new Thread(Run)
         {
@@ -75,7 +79,7 @@ public sealed class ServerEngine
     internal static void StartDedicated(LaunchOptions options)
     {
         Engine.Initialize(options);
-        Current = new ServerEngine(true);
+        Current = new ServerEngine(true, new IPEndPoint(options.ListenAddress ?? IPAddress.Loopback, options.Port));
         var server = Current;
         ConsoleCancelEventHandler cancel = (_, args) =>
         {
@@ -97,6 +101,7 @@ public sealed class ServerEngine
     internal void Start()
     {
         Engine.RegistryManager.AllocateIdTables();
+        BlockStateIds.Build();
         if (IsDedicated)
             Run();
         else
@@ -107,6 +112,8 @@ public sealed class ServerEngine
     {
         lock (_gate)
         {
+            if (IsDedicated)
+                throw new InvalidOperationException("Dedicated servers do not accept local connections.");
             _connection.ThrowIfFaulted();
             if (_connected || _joinRequested || _shutdownRequested)
                 throw new InvalidOperationException("The server cannot accept another local connection.");
@@ -142,14 +149,14 @@ public sealed class ServerEngine
 
     private void Run()
     {
+        if (IsDedicated)
+        {
+            RunDedicated();
+            return;
+        }
         try
         {
             Game = new ServerGame();
-            if (IsDedicated)
-            {
-                Engine.ModManager.RunDedicatedServerSetup();
-                Engine.ModManager.RunReady();
-            }
             var clock = Stopwatch.StartNew();
             var deadline = ServerGame.StepSeconds;
             List<ServerboundPacket> packets = [];
@@ -198,7 +205,11 @@ public sealed class ServerEngine
                 }
                 if (joinRequested)
                 {
-                    Game.JoinLocal(_connection);
+                    _localPlayerNetworkId = Game.JoinPlayer();
+                    _connection.Publish(Game.CreateInitial(_localPlayerNetworkId));
+                    foreach (var chunk in Game.CaptureChunks())
+                        _connection.Publish(chunk);
+                    _connection.Publish(new InitialWorldCompletePacket());
                     continue;
                 }
                 if (resetInput)
@@ -206,16 +217,16 @@ public sealed class ServerEngine
                 if (shutdownRequested)
                 {
                     if (packets.Count > 0)
-                        _connection.Publish(Game.Update(packets, advance: false)!);
+                        _connection.Publish(UpdateLocal(packets, advance: false));
                     Game.Destroy();
-                    _connection.Publish(new ServerClosedPacket(Game.Tick));
+                    _connection.Publish(new DisconnectPacket("The server is shutting down."));
                     break;
                 }
                 if (resetInput)
                     continue;
-                var update = Game.Update(packets);
+                var update = UpdateLocal(packets);
                 Interlocked.Exchange(ref _tick, Game.Tick);
-                if (update is not null)
+                if (_connected)
                     _connection.Publish(update);
                 deadline += ServerGame.StepSeconds;
             }
@@ -225,5 +236,100 @@ public sealed class ServerEngine
         {
             _connection.Complete(error);
         }
+    }
+
+    private WorldUpdatePacket UpdateLocal(IReadOnlyList<ServerboundPacket> packets, bool advance = true)
+    {
+        Game.BeginTick();
+        IReadOnlyList<WorldUpdatePacket.InteractionResult> results = _connected ? Game.Apply(_localPlayerNetworkId, packets) : [];
+        return Game.FinishTick(advance) with { Results = results };
+    }
+
+    private void RunDedicated()
+    {
+        Game = new ServerGame();
+        Engine.ModManager.RunDedicatedServerSetup();
+        Engine.ModManager.RunReady();
+        var listener = new TcpConnectionListener(_listenEndpoint!);
+        var manifest = new ContentManifestPacket(Engine.RegistryManager.ExportIdMappings());
+        var mods = Engine.ModManager.LoadedMods.Select(mod => mod.Info).ToArray();
+        var sessions = new List<RemoteSession>();
+        var accepted = new List<TcpConnection>();
+        var clock = Stopwatch.StartNew();
+        var deadline = ServerGame.StepSeconds;
+        while (true)
+        {
+            bool shutdown;
+            bool paused;
+            bool reset;
+            lock (_gate)
+            {
+                shutdown = _shutdownRequested;
+                paused = _isPaused;
+                reset = _resetInput;
+                if (_reschedule)
+                {
+                    deadline = clock.Elapsed.TotalSeconds + ServerGame.StepSeconds;
+                    _reschedule = false;
+                }
+                var remaining = deadline - clock.Elapsed.TotalSeconds;
+                if (!shutdown && remaining > 0)
+                {
+                    Monitor.Wait(_gate, (int)Math.Ceiling(remaining * 1000));
+                    continue;
+                }
+                _resetInput = false;
+            }
+            if (shutdown)
+                listener.StopAccepting();
+            accepted.Clear();
+            listener.DrainAccepted(accepted);
+            foreach (var connection in accepted)
+                sessions.Add(new RemoteSession(connection, manifest, mods));
+            if (reset)
+                Game.ClearInput();
+            Game.BeginTick();
+            var batches = new List<(RemoteSession Session, IReadOnlyList<ServerboundPacket> Packets)>();
+            foreach (var session in sessions)
+            {
+                if (shutdown && !session.IsPlaying)
+                    session.Disconnect("The server is shutting down.");
+                batches.Add((session, session.Receive(Game)));
+            }
+            foreach (var batch in batches)
+            {
+                if (!paused)
+                    batch.Session.Apply(Game, batch.Packets);
+            }
+            var update = Game.FinishTick(advance: !paused && !shutdown);
+            Interlocked.Exchange(ref _tick, Game.Tick);
+            foreach (var session in sessions)
+            {
+                if (!paused || shutdown)
+                    session.Publish(update);
+                if (shutdown)
+                    session.Disconnect("The server is shutting down.");
+            }
+            if (shutdown)
+                break;
+            foreach (var session in sessions.Where(session => session.Connection.IsClosed).ToArray())
+            {
+                session.Leave(Game);
+                listener.Remove(session.Connection);
+                sessions.Remove(session);
+            }
+            deadline += ServerGame.StepSeconds;
+        }
+        var drainStarted = Stopwatch.GetTimestamp();
+        while (sessions.Any(session => !session.Connection.IsClosed) &&
+               Stopwatch.GetElapsedTime(drainStarted) < NetworkLimits.FrameTimeout)
+        {
+            foreach (var session in sessions)
+                session.Connection.ThrowIfFaulted();
+            Thread.Sleep(1);
+        }
+        foreach (var session in sessions)
+            listener.Remove(session.Connection);
+        Game.Destroy();
     }
 }

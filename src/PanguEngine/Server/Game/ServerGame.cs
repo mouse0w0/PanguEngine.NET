@@ -17,7 +17,8 @@ public sealed class ServerGame
 {
     internal const double StepSeconds = 1d / 20;
     private readonly PlayerFreeFlightUpdater _movement = new();
-    private PlayerEntity? _player;
+    private readonly Dictionary<uint, PlayerEntity> _players = [];
+    private List<BlockChange> _changes = [];
 
     internal ServerGame()
     {
@@ -29,32 +30,38 @@ public sealed class ServerGame
     public ServerWorld World { get; }
 
     internal long Tick { get; private set; }
-    internal Guid PlayerId { get; private set; }
-
-    internal void JoinLocal(LocalConnection connection)
+    internal uint JoinPlayer()
     {
-        PlayerId = Guid.NewGuid();
         var position = new Vector3D<double>(8, 22, 24);
-        _player = World.Entities.Spawn(BuiltinEntityTypes.Player, new EntitySpawnBuilder()
+        var player = World.Entities.Spawn(BuiltinEntityTypes.Player, new EntitySpawnBuilder()
             .Add(BuiltinEntityComponents.Position, new PositionComponent(position, position))
             .Add(BuiltinEntityComponents.Rotation, new RotationComponent(-90, -20))
             .Add(BuiltinEntityComponents.MoveIntent, default));
-        var chunks = new List<InitialWorldStatePacket.ChunkSnapshot>(World.Chunks.Count);
-        foreach (var chunk in World.Chunks.EnumerateChunks())
-            chunks.Add(InitialWorldStatePacket.ChunkSnapshot.Capture(chunk));
-        connection.Publish(new InitialWorldStatePacket(Tick, PlayerId, GetPose(_player), StepSeconds, chunks));
+        _players.Add(player.NetworkId, player);
+        return player.NetworkId;
     }
 
-    internal WorldUpdatePacket? Update(IReadOnlyList<ServerboundPacket> packets, bool advance = true)
+    internal void LeavePlayer(uint playerNetworkId)
     {
-        if (_player is not { } player)
-        {
-            if (advance)
-                Advance();
-            return null;
-        }
+        var player = _players[playerNetworkId];
+        World.Entities.Destroy(player.Handle);
+        _players.Remove(playerNetworkId);
+    }
 
-        var changes = new List<BlockChange>();
+    internal InitialWorldStatePacket CreateInitial(uint playerNetworkId) =>
+        new(Tick, playerNetworkId, StepSeconds, CapturePlayers(), World.Chunks.Count);
+
+    internal IEnumerable<ChunkDataPacket> CaptureChunks()
+    {
+        foreach (var chunk in World.Chunks.EnumerateChunks())
+            yield return ChunkDataPacket.Capture(chunk);
+    }
+
+    internal void BeginTick() => _changes = [];
+
+    internal IReadOnlyList<InteractionResult> Apply(uint playerNetworkId, IReadOnlyList<ServerboundPacket> packets)
+    {
+        var player = _players[playerNetworkId];
         var results = new List<InteractionResult>();
         foreach (var packet in packets)
         {
@@ -64,14 +71,26 @@ public sealed class ServerGame
                 player.SetRotation(new RotationComponent(input.Yaw, input.Pitch));
             }
             else if (packet is BlockInteractionPacket interaction)
-                results.Add(Interact(player, interaction, changes));
+                results.Add(Interact(player, interaction, _changes));
         }
-        if (advance)
-            Advance();
-        return new WorldUpdatePacket(Tick, GetPose(player), changes, results);
+        return results;
     }
 
-    internal void ClearInput() => _player?.SetMoveIntent(default);
+    internal WorldUpdatePacket FinishTick(bool advance = true)
+    {
+        if (advance)
+            Advance();
+        return new WorldUpdatePacket(Tick, CapturePlayers(), _changes, []);
+    }
+
+    internal void ClearInput()
+    {
+        foreach (var player in _players.Values)
+            player.SetMoveIntent(default);
+    }
+
+    private PlayerState[] CapturePlayers() =>
+        _players.Select(entry => new PlayerState(entry.Key, GetPose(entry.Value))).ToArray();
 
     internal void Destroy() => World.Destroy();
 
