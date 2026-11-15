@@ -1,3 +1,4 @@
+using System.Buffers;
 using PanguEngine.Client.Resources.Models;
 using PanguEngine.World;
 using PanguEngine.World.Chunking;
@@ -18,7 +19,7 @@ internal sealed class ChunkMeshBuilder
     {
         ArgumentNullException.ThrowIfNull(snapshot);
 
-        var writer = new ChunkMeshWriter();
+        using var writer = new ChunkMeshWriter();
         for (var y = 0; y < Chunk.SizeY; y++)
         {
             for (var z = 0; z < Chunk.SizeZ; z++)
@@ -40,7 +41,7 @@ internal sealed class ChunkMeshBuilder
             }
         }
 
-        return new ChunkMesh(writer.Vertices.ToArray(), writer.Indices.ToArray());
+        return writer.Complete();
     }
 
     private static BlockPos ToWorldPosition(ChunkPos chunkPosition, BlockPos localPosition)
@@ -66,20 +67,30 @@ internal sealed class ChunkMeshBuilder
         return result;
     }
 
-    private sealed class ChunkMeshWriter : IBlockMeshWriter
+    private sealed class ChunkMeshWriter : IBlockMeshWriter, IDisposable
     {
-        internal List<ChunkVertex> Vertices { get; } = [];
+        private ChunkVertex[] _vertices = [];
+        private uint[] _indices = [];
+        private int _vertexCount;
+        private int _indexCount;
 
-        internal List<uint> Indices { get; } = [];
-
-        public uint VertexCount => checked((uint)Vertices.Count);
+        public uint VertexCount => checked((uint)_vertexCount);
 
         public void WriteVertex(
             Vector3D<float> position,
             Vector2D<float> texCoord,
             Vector3D<float> normal)
         {
-            Vertices.Add(new ChunkVertex(
+            if (_vertexCount == _vertices.Length)
+            {
+                var vertices = ArrayPool<ChunkVertex>.Shared.Rent(Math.Max(16, checked(_vertices.Length * 2)));
+                _vertices.AsSpan(0, _vertexCount).CopyTo(vertices);
+                if (_vertices.Length > 0)
+                    ArrayPool<ChunkVertex>.Shared.Return(_vertices);
+                _vertices = vertices;
+            }
+
+            _vertices[_vertexCount++] = new ChunkVertex(
                 position.X,
                 position.Y,
                 position.Z,
@@ -87,12 +98,37 @@ internal sealed class ChunkMeshBuilder
                 texCoord.Y,
                 normal.X,
                 normal.Y,
-                normal.Z));
+                normal.Z);
         }
 
         public void WriteIndex(uint index)
         {
-            Indices.Add(index);
+            if (_indexCount == _indices.Length)
+            {
+                var indices = ArrayPool<uint>.Shared.Rent(Math.Max(16, checked(_indices.Length * 2)));
+                _indices.AsSpan(0, _indexCount).CopyTo(indices);
+                if (_indices.Length > 0)
+                    ArrayPool<uint>.Shared.Return(_indices);
+                _indices = indices;
+            }
+
+            _indices[_indexCount++] = index;
+        }
+
+        internal ChunkMesh Complete()
+        {
+            var mesh = new ChunkMesh(_vertices, _vertexCount, _indices, _indexCount);
+            _vertices = [];
+            _indices = [];
+            return mesh;
+        }
+
+        public void Dispose()
+        {
+            if (_vertices.Length > 0)
+                ArrayPool<ChunkVertex>.Shared.Return(_vertices);
+            if (_indices.Length > 0)
+                ArrayPool<uint>.Shared.Return(_indices);
         }
     }
 }

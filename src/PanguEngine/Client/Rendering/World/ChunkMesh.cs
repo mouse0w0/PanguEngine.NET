@@ -1,22 +1,28 @@
+using System.Buffers;
+
 namespace PanguEngine.Client.Rendering.World;
 
-internal sealed class ChunkMesh
+/// <summary>
+/// Owns rented mesh buffers until they are returned once after consumption.
+/// </summary>
+internal sealed class ChunkMesh(ChunkVertex[] vertices, int vertexCount, uint[] indices, int indexCount)
+    : IDisposable
 {
-    public ChunkMesh(ChunkVertex[] vertices, uint[] indices)
-    {
-        ArgumentNullException.ThrowIfNull(vertices);
-        ArgumentNullException.ThrowIfNull(indices);
-        Vertices = vertices;
-        Indices = indices;
-    }
+    public ReadOnlySpan<ChunkVertex> Vertices => vertices.AsSpan(0, VertexCount);
 
-    public ChunkVertex[] Vertices { get; }
+    public ReadOnlySpan<uint> Indices => indices.AsSpan(0, IndexCount);
 
-    public uint[] Indices { get; }
+    public int VertexCount { get; } = vertexCount;
 
-    public int VertexCount => Vertices.Length;
-
-    public int IndexCount => Indices.Length;
+    public int IndexCount { get; } = indexCount;
 
     public bool IsEmpty => VertexCount == 0;
+
+    public void Dispose()
+    {
+        if (vertices.Length > 0)
+            ArrayPool<ChunkVertex>.Shared.Return(vertices);
+        if (indices.Length > 0)
+            ArrayPool<uint>.Shared.Return(indices);
+    }
 }

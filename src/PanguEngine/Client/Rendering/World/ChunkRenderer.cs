@@ -129,13 +129,13 @@ internal sealed class ChunkRenderer
         ChunkMeshBuildResult result,
         List<UploadHandle> uploadHandles)
     {
+        using var mesh = result.Mesh!;
         if (!_meshUpdateState.Complete(result.Position, result.Version))
             return;
 
         if (result.Exception is { } exception)
             exception.Throw();
 
-        var mesh = result.Mesh!;
         _meshes.TryGetValue(result.Position, out var existingMesh);
         var transition = ChunkMeshRecordTransitionPlanner.Plan(existingMesh, mesh);
         ChunkMeshArenaAllocation allocation;

@@ -115,8 +115,9 @@ internal sealed class ChunkMeshBuildQueue : IDisposable
         {
         }
 
-        while (_results.Reader.TryRead(out _))
+        while (_results.Reader.TryRead(out var result))
         {
+            result.Mesh?.Dispose();
         }
 
         _taskSlots.Dispose();
@@ -145,7 +146,15 @@ internal sealed class ChunkMeshBuildQueue : IDisposable
                     result = ChunkMeshBuildResult.Failure(task, exception);
                 }
 
-                await _results.Writer.WriteAsync(result, _cancellation.Token);
+                try
+                {
+                    await _results.Writer.WriteAsync(result, _cancellation.Token);
+                }
+                catch
+                {
+                    result.Mesh?.Dispose();
+                    throw;
+                }
             }
         }
         catch (OperationCanceledException) when (_cancellation.IsCancellationRequested)

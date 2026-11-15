@@ -48,7 +48,7 @@ public sealed class ChunkMeshBuildQueueTests
             Assert.True(received);
             var completed = Assert.IsType<ChunkMeshBuildResult>(result);
             Assert.Null(completed.Exception);
-            var mesh = Assert.IsType<ChunkMesh>(completed.Mesh);
+            using var mesh = Assert.IsType<ChunkMesh>(completed.Mesh);
             Assert.True(mesh.IsEmpty);
         }
         finally

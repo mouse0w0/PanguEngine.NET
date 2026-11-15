@@ -24,7 +24,7 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
         var models = CreateModels();
 
-        var mesh = BuildMesh(models, world, position.ToChunkPos());
+        using var mesh = BuildMesh(models, world, position.ToChunkPos());
 
         Assert.False(mesh.IsEmpty);
         Assert.Equal(24, mesh.VertexCount);
@@ -40,13 +40,14 @@ public sealed class ChunkMeshBuilderTests
                     (uint)(face * 4 + 2),
                     (uint)(face * 4 + 3)
                 }),
-            mesh.Indices);
-        Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.X));
-        Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.X));
-        Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.Y));
-        Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.Y));
-        Assert.Equal(0f, mesh.Vertices.Min(vertex => vertex.Z));
-        Assert.Equal(1f, mesh.Vertices.Max(vertex => vertex.Z));
+            mesh.Indices.ToArray());
+        var vertices = mesh.Vertices.ToArray();
+        Assert.Equal(0f, vertices.Min(vertex => vertex.X));
+        Assert.Equal(1f, vertices.Max(vertex => vertex.X));
+        Assert.Equal(0f, vertices.Min(vertex => vertex.Y));
+        Assert.Equal(1f, vertices.Max(vertex => vertex.Y));
+        Assert.Equal(0f, vertices.Min(vertex => vertex.Z));
+        Assert.Equal(1f, vertices.Max(vertex => vertex.Z));
     }
 
     [Fact]
@@ -59,7 +60,7 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(second, BuiltinBlocks.Stone.DefaultState);
         var models = CreateModels();
 
-        var mesh = BuildMesh(models, world, first.ToChunkPos());
+        using var mesh = BuildMesh(models, world, first.ToChunkPos());
 
         Assert.Equal(40, mesh.VertexCount);
         Assert.Equal(60, mesh.IndexCount);
@@ -73,16 +74,16 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
         var models = CreateModels();
 
-        var mesh = BuildMesh(models, world, position.ToChunkPos());
+        using var mesh = BuildMesh(models, world, position.ToChunkPos());
 
         Assert.Equal(new[]
             {
                 (0f, -1f, 0f), (0f, 1f, 0f), (0f, 0f, -1f),
                 (0f, 0f, 1f), (-1f, 0f, 0f), (1f, 0f, 0f)
             },
-            mesh.Vertices.Chunk(4).Select(group =>
+            mesh.Vertices.ToArray().Chunk(4).Select(group =>
                 (group[0].NX, group[0].NY, group[0].NZ)).ToArray());
-        Assert.All(mesh.Vertices, vertex =>
+        Assert.All(mesh.Vertices.ToArray(), vertex =>
         {
             Assert.InRange(vertex.X, 0f, 1f);
             Assert.InRange(vertex.Y, 0f, 1f);
@@ -100,7 +101,7 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(neighbor, BuiltinBlocks.Stone.DefaultState);
         var models = CreateModels();
 
-        var mesh = BuildMesh(models, world, boundary.ToChunkPos());
+        using var mesh = BuildMesh(models, world, boundary.ToChunkPos());
 
         Assert.Equal(20, mesh.VertexCount);
         Assert.Equal(30, mesh.IndexCount);
@@ -116,7 +117,7 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(neighbor, BuiltinBlocks.Stone.DefaultState);
         var models = CreateModels();
 
-        var mesh = BuildMesh(models, world, boundary.ToChunkPos());
+        using var mesh = BuildMesh(models, world, boundary.ToChunkPos());
 
         Assert.Equal(20, mesh.VertexCount);
         Assert.Equal(30, mesh.IndexCount);
@@ -131,7 +132,7 @@ public sealed class ChunkMeshBuilderTests
         var snapshot = ChunkMeshSnapshot.Capture(world, position.ToChunkPos());
         world.SetBlock(position, BuiltinBlocks.Air.DefaultState);
 
-        var mesh = new ChunkMeshBuilder(CreateModels()).Build(snapshot);
+        using var mesh = new ChunkMeshBuilder(CreateModels()).Build(snapshot);
 
         Assert.Equal(24, mesh.VertexCount);
         Assert.Equal(36, mesh.IndexCount);
@@ -171,8 +172,8 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(firstPosition, BuiltinBlocks.Stone.DefaultState);
         world.SetBlock(secondPosition, BuiltinBlocks.Stone.DefaultState);
 
-        var firstMesh = BuildMesh(models, world, firstPosition.ToChunkPos());
-        var secondMesh = BuildMesh(models, world, secondPosition.ToChunkPos());
+        using var firstMesh = BuildMesh(models, world, firstPosition.ToChunkPos());
+        using var secondMesh = BuildMesh(models, world, secondPosition.ToChunkPos());
 
         Assert.Equal(4, firstMesh.VertexCount);
         Assert.Equal(8, secondMesh.VertexCount);
@@ -215,11 +216,30 @@ public sealed class ChunkMeshBuilderTests
         world.SetBlock(offPosition, block.DefaultState);
         world.SetBlock(onPosition, block.DefaultState.With(Powered, true));
 
-        var offMesh = BuildMesh(models, world, offPosition.ToChunkPos());
-        var onMesh = BuildMesh(models, world, onPosition.ToChunkPos());
+        using var offMesh = BuildMesh(models, world, offPosition.ToChunkPos());
+        using var onMesh = BuildMesh(models, world, onPosition.ToChunkPos());
 
         Assert.Equal(4, offMesh.VertexCount);
         Assert.Equal(8, onMesh.VertexCount);
+    }
+
+    [Fact]
+    public void BuildingAnotherMeshPreservesUnconsumedMeshData()
+    {
+        var world = new ClientWorld();
+        var position = new BlockPos(32, 32, 32);
+        world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
+        var builder = new ChunkMeshBuilder(CreateModels());
+        using var firstMesh = builder.Build(ChunkMeshSnapshot.Capture(world, position.ToChunkPos()));
+        var firstVertices = firstMesh.Vertices.ToArray();
+        var firstIndices = firstMesh.Indices.ToArray();
+        world.SetBlock(new BlockPos(33, 32, 32), BuiltinBlocks.Stone.DefaultState);
+
+        using var secondMesh = builder.Build(ChunkMeshSnapshot.Capture(world, position.ToChunkPos()));
+
+        Assert.Equal(40, secondMesh.VertexCount);
+        Assert.Equal(firstVertices, firstMesh.Vertices.ToArray());
+        Assert.Equal(firstIndices, firstMesh.Indices.ToArray());
     }
 
     private static BlockModelManager CreateModels()

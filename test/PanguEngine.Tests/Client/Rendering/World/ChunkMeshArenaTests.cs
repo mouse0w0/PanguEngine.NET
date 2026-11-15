@@ -1,11 +1,14 @@
+using System.Buffers;
 using PanguEngine.Client.Rendering.World;
 using PanguEngine.Graphics;
 using GraphicsBuffer = PanguEngine.Graphics.Buffer;
 
 namespace PanguEngine.Tests.Client.Rendering.World;
 
-public sealed class ChunkMeshArenaTests
+public sealed class ChunkMeshArenaTests : IDisposable
 {
+    private readonly List<ChunkMesh> _meshes = [];
+
     [Fact]
     public void ReleasedAdjacentRangesAreReusedByFirstFit()
     {
@@ -112,9 +115,36 @@ public sealed class ChunkMeshArenaTests
         Assert.True(allocation.Page.VertexBuffer.IsDestroyed);
         Assert.True(allocation.Page.IndexBuffer.IsDestroyed);
     }
-    private static ChunkMesh CreateMesh(int vertexCount, int indexCount)
+
+    [Fact]
+    public void UploadsOnlyValidElementsFromRentedArrays()
     {
-        return new ChunkMesh(new ChunkVertex[vertexCount], new uint[indexCount]);
+        var device = new TestGraphicsDevice(16);
+        var arena = new ChunkMeshArena(device, 8, 8);
+        using var mesh = new ChunkMesh(
+            ArrayPool<ChunkVertex>.Shared.Rent(16), 3,
+            ArrayPool<uint>.Shared.Rent(16), 3);
+
+        var allocation = arena.Allocate(mesh);
+
+        Assert.Equal(3u, allocation.VertexCapacity);
+        Assert.Equal(3u, allocation.IndexCapacity);
+        Assert.Equal(new[] { 3, 3 }, device.Uploads.Select(upload => upload.ElementCount));
+    }
+
+    public void Dispose()
+    {
+        foreach (var mesh in _meshes)
+            mesh.Dispose();
+    }
+
+    private ChunkMesh CreateMesh(int vertexCount, int indexCount)
+    {
+        var mesh = new ChunkMesh(
+            vertexCount == 0 ? [] : ArrayPool<ChunkVertex>.Shared.Rent(vertexCount), vertexCount,
+            indexCount == 0 ? [] : ArrayPool<uint>.Shared.Rent(indexCount), indexCount);
+        _meshes.Add(mesh);
+        return mesh;
     }
 }
 

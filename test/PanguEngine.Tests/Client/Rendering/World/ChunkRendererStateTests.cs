@@ -1,3 +1,4 @@
+using System.Buffers;
 using PanguEngine.Client.Rendering.World;
 using PanguEngine.Graphics;
 using PanguEngine.World.Chunking;
@@ -5,8 +6,10 @@ using Silk.NET.Maths;
 
 namespace PanguEngine.Tests.Client.Rendering.World;
 
-public sealed class ChunkRendererStateTests
+public sealed class ChunkRendererStateTests : IDisposable
 {
+    private readonly List<ChunkMesh> _meshes = [];
+
     [Fact]
     public void RepeatedInvalidationKeepsOneDirtyEntryAndAdvancesVersion()
     {
@@ -207,8 +210,18 @@ public sealed class ChunkRendererStateTests
         Assert.Equal(7u, transition.InstanceSlot);
     }
 
-    private static ChunkMesh CreateMesh(int vertexCount, int indexCount)
+    public void Dispose()
     {
-        return new ChunkMesh(new ChunkVertex[vertexCount], new uint[indexCount]);
+        foreach (var mesh in _meshes)
+            mesh.Dispose();
+    }
+
+    private ChunkMesh CreateMesh(int vertexCount, int indexCount)
+    {
+        var mesh = new ChunkMesh(
+            vertexCount == 0 ? [] : ArrayPool<ChunkVertex>.Shared.Rent(vertexCount), vertexCount,
+            indexCount == 0 ? [] : ArrayPool<uint>.Shared.Rent(indexCount), indexCount);
+        _meshes.Add(mesh);
+        return mesh;
     }
 }
