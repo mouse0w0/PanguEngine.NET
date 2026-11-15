@@ -102,6 +102,7 @@ internal sealed class BufferUploadScene : IClientTestScene
             BufferUsage.TransferDestination | BufferUsage.Vertex,
             MemoryUsage.GpuOnly));
         _uploadHandle = ClientTestApp.Current.Device.UploadBuffer(_vertexBuffer, _vertices);
+        Array.Clear(_vertices);
     }
 
     private void CreateShaders()

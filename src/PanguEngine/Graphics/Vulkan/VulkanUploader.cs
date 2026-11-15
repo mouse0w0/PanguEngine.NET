@@ -1,6 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.ExceptionServices;
-using System.Runtime.InteropServices;
 using Silk.NET.Vulkan;
 
 namespace PanguEngine.Graphics.Vulkan;
@@ -59,13 +58,11 @@ public static unsafe class VulkanUploader
     {
         internal required VulkanBuffer Dst { get; init; }
 
-        internal required byte[] Data { get; init; }
-
         internal ulong DstOffset { get; init; }
 
         internal ulong Size { get; init; }
 
-        internal VulkanStagingSegment? Segment { get; set; }
+        internal VulkanStagingSegment Segment { get; set; }
 
         protected override VulkanResourceLifetime Lifetime => Dst.Lifetime;
     }
@@ -74,13 +71,11 @@ public static unsafe class VulkanUploader
     {
         internal required VulkanTexture Dst { get; init; }
 
-        internal required byte[] Data { get; init; }
-
         internal ulong Size { get; init; }
 
         internal TextureUploadRegion Region { get; init; }
 
-        internal VulkanStagingSegment? Segment { get; set; }
+        internal VulkanStagingSegment Segment { get; set; }
 
         internal List<PlannedTextureLayer> Layers { get; } = [];
 
@@ -118,6 +113,7 @@ public static unsafe class VulkanUploader
     private static bool _faulted;
     private static Exception? _faultException;
     private static VulkanStagingPagePool _stagingPages = null!;
+    private static VulkanStagingLease? _pendingLease;
     private static VulkanUploadPacketRing _packetRing = null!;
     private static CommandPool _commandPool;
 
@@ -261,12 +257,9 @@ public static unsafe class VulkanUploader
             throw new ArgumentOutOfRangeException(nameof(dstOffset),
                 "Destination offset and data size exceed the buffer bounds.");
 
-        var dataCopy = new byte[dataSize];
-        data.CopyTo(MemoryMarshal.Cast<byte, T>(dataCopy.AsSpan()));
         var upload = new PendingBufferUpload
         {
             Dst = dst,
-            Data = dataCopy,
             DstOffset = dstOffset,
             Size = dataSize,
             Handle = new VulkanUploadHandle()
@@ -277,6 +270,23 @@ public static unsafe class VulkanUploader
         try
         {
             EnsureCanEnqueue();
+            try
+            {
+                _pendingLease ??= _stagingPages.BeginBatch();
+                upload.Segment = _stagingPages.Allocate(_pendingLease, dataSize, 1);
+                data.CopyTo(new Span<T>(upload.Segment.Destination, data.Length));
+            }
+            catch (VulkanStagingPageAllocationException exception)
+            {
+                upload.SignalFailure(exception);
+                return upload.Handle;
+            }
+            catch (OverflowException exception)
+            {
+                upload.SignalFailure(exception);
+                return upload.Handle;
+            }
+
             PendingOperations.Enqueue(upload);
         }
         catch
@@ -303,7 +313,6 @@ public static unsafe class VulkanUploader
         var upload = new PendingTextureUpload
         {
             Dst = dst,
-            Data = data.ToArray(),
             Size = (ulong)data.Length,
             Region = region,
             Handle = new VulkanUploadHandle()
@@ -314,6 +323,26 @@ public static unsafe class VulkanUploader
         try
         {
             EnsureCanEnqueue();
+            try
+            {
+                _pendingLease ??= _stagingPages.BeginBatch();
+                upload.Segment = _stagingPages.Allocate(
+                    _pendingLease,
+                    upload.Size,
+                    VulkanBarrier.GetTextureUploadAlignment(dst.Format));
+                data.CopyTo(new Span<byte>(upload.Segment.Destination, data.Length));
+            }
+            catch (VulkanStagingPageAllocationException exception)
+            {
+                upload.SignalFailure(exception);
+                return upload.Handle;
+            }
+            catch (OverflowException exception)
+            {
+                upload.SignalFailure(exception);
+                return upload.Handle;
+            }
+
             PendingOperations.Enqueue(upload);
         }
         catch
@@ -367,7 +396,15 @@ public static unsafe class VulkanUploader
         var timelineValue = QueryTimeline();
         _packetRing.RetireCompleted(timelineValue, _stagingPages);
         if (PendingOperations.Count == 0)
+        {
+            if (_pendingLease is { } lease)
+            {
+                _pendingLease = null;
+                _stagingPages.Recycle(lease);
+            }
+
             return;
+        }
 
         if (_packetRing.NextPacket.IsSubmitted)
         {
@@ -414,21 +451,21 @@ public static unsafe class VulkanUploader
         var textureStates = new Dictionary<VulkanTexture, VulkanUploadLayoutState>(
             ReferenceEqualityComparer.Instance);
         var batch = DrainPendingUploads();
-        VulkanStagingLease? lease = null;
+        var lease = _pendingLease;
+        _pendingLease = null;
         ulong submissionValue = 0;
         var packetCommitted = false;
 
         try
         {
-            lease = _stagingPages.BeginBatch();
-            PlanBatch(batch, textureStates, lease);
+            lease ??= _stagingPages.BeginBatch();
+            PlanBatch(batch, textureStates);
             if (!batch.Any(operation => operation.IsPlanned && !operation.IsTerminal))
             {
                 _stagingPages.Recycle(lease);
                 return;
             }
 
-            CopyDataToStaging(batch);
             _stagingPages.FlushWrittenRanges(lease);
 
             var packet = _packetRing.NextPacket;
@@ -519,8 +556,7 @@ public static unsafe class VulkanUploader
 
     private static void PlanBatch(
         IReadOnlyList<PendingUpload> batch,
-        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates,
-        VulkanStagingLease lease)
+        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates)
     {
         foreach (var operation in batch)
         {
@@ -529,19 +565,15 @@ public static unsafe class VulkanUploader
                 switch (operation)
                 {
                     case PendingBufferUpload bufferUpload:
-                        PlanBufferUpload(bufferUpload, lease);
+                        bufferUpload.IsPlanned = true;
                         break;
                     case PendingTextureUpload textureUpload:
-                        PlanTextureUpload(textureUpload, textureStates, lease);
+                        PlanTextureUpload(textureUpload, textureStates);
                         break;
                     case PendingMipmapGeneration mipmapGeneration:
                         PlanMipmapGeneration(mipmapGeneration, textureStates);
                         break;
                 }
-            }
-            catch (VulkanStagingPageAllocationException exception)
-            {
-                operation.SignalFailure(exception);
             }
             catch (OverflowException exception)
             {
@@ -550,22 +582,10 @@ public static unsafe class VulkanUploader
         }
     }
 
-    private static void PlanBufferUpload(PendingBufferUpload upload, VulkanStagingLease lease)
-    {
-        upload.Segment = _stagingPages.Allocate(lease, upload.Size, 1);
-        upload.IsPlanned = true;
-    }
-
     private static void PlanTextureUpload(
         PendingTextureUpload upload,
-        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates,
-        VulkanStagingLease lease)
+        Dictionary<VulkanTexture, VulkanUploadLayoutState> textureStates)
     {
-        upload.Segment = _stagingPages.Allocate(
-            lease,
-            upload.Size,
-            VulkanBarrier.GetTextureUploadAlignment(upload.Dst.Format));
-
         var state = GetTextureState(textureStates, upload.Dst);
         var transaction = state.Clone();
         var finalState = VulkanBarrier.GetTextureUploadDestination(upload.Dst.Usage);
@@ -643,35 +663,6 @@ public static unsafe class VulkanUploader
         return state;
     }
 
-    private static void CopyDataToStaging(IReadOnlyList<PendingUpload> batch)
-    {
-        foreach (var operation in batch)
-        {
-            if (!operation.IsPlanned || operation.IsTerminal)
-                continue;
-
-            switch (operation)
-            {
-                case PendingBufferUpload bufferUpload:
-                {
-                    var segment = bufferUpload.Segment ??
-                                  throw new InvalidOperationException("Buffer upload has no staging segment.");
-                    bufferUpload.Data.AsSpan().CopyTo(
-                        new Span<byte>(segment.Destination, bufferUpload.Data.Length));
-                    break;
-                }
-                case PendingTextureUpload textureUpload:
-                {
-                    var segment = textureUpload.Segment ??
-                                  throw new InvalidOperationException("Texture upload has no staging segment.");
-                    textureUpload.Data.AsSpan().CopyTo(
-                        new Span<byte>(segment.Destination, textureUpload.Data.Length));
-                    break;
-                }
-            }
-        }
-    }
-
     private static void RecordBatch(
         IReadOnlyList<PendingUpload> batch,
         CommandBuffer commandBuffer)
@@ -700,8 +691,7 @@ public static unsafe class VulkanUploader
         PendingBufferUpload upload,
         CommandBuffer commandBuffer)
     {
-        var segment = upload.Segment ??
-                      throw new InvalidOperationException("Buffer upload has no staging segment.");
+        var segment = upload.Segment;
         BufferCopy copyRegion = new()
         {
             SrcOffset = segment.Offset,
@@ -732,8 +722,7 @@ public static unsafe class VulkanUploader
         PendingTextureUpload upload,
         CommandBuffer commandBuffer)
     {
-        var segment = upload.Segment ??
-                      throw new InvalidOperationException("Texture upload has no staging segment.");
+        var segment = upload.Segment;
         foreach (var layer in upload.Layers)
         {
             VulkanBarrier.RecordImageLayoutTransition(
@@ -1006,6 +995,12 @@ public static unsafe class VulkanUploader
 
         while (PendingOperations.Count > 0)
             PendingOperations.Dequeue().ReleaseHoldOnce(null);
+
+        if (_pendingLease is { } lease)
+        {
+            _pendingLease = null;
+            _stagingPages.Recycle(lease);
+        }
     }
 
     [DoesNotReturn]
@@ -1027,6 +1022,7 @@ public static unsafe class VulkanUploader
         _faulted = false;
         _faultException = null;
         _stagingPages = null!;
+        _pendingLease = null;
         _packetRing = null!;
         _commandPool = default;
     }

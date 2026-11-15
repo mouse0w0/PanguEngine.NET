@@ -147,6 +147,9 @@ internal sealed class TextureRegionUploadScene : IClientTestScene
             ClientTestApp.Current.Device.UploadTexture(_texture, secondRegionData,
                 TextureUploadRegion.Region2D(2, 2, 4, 4)),
         ];
+        Array.Clear(baseData);
+        Array.Clear(firstRegionData);
+        Array.Clear(secondRegionData);
     }
 
     private void CreateSampler()
