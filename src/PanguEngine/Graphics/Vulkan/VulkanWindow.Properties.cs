@@ -144,11 +144,11 @@ public sealed unsafe partial class VulkanWindow
                 return WindowState.Normal;
             VulkanContext.EnsureRenderThread();
             var flags = SDL3.SDL_GetWindowFlags(NativeWindow);
-            if (flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_FULLSCREEN))
+            if ((flags & SDL_WindowFlags.SDL_WINDOW_FULLSCREEN) != 0)
                 return WindowState.Fullscreen;
-            if (flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_MINIMIZED))
+            if ((flags & SDL_WindowFlags.SDL_WINDOW_MINIMIZED) != 0)
                 return WindowState.Minimized;
-            if (flags.HasFlag(SDL_WindowFlags.SDL_WINDOW_MAXIMIZED))
+            if ((flags & SDL_WindowFlags.SDL_WINDOW_MAXIMIZED) != 0)
                 return WindowState.Maximized;
             return WindowState.Normal;
         }
