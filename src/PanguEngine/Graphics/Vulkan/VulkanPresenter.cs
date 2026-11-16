@@ -182,7 +182,7 @@ internal sealed unsafe class VulkanPresenter : Presenter
     {
         var commandBuffer = context.CommandBuffer;
         var waitSemaphores = stackalloc[] { context.ImageAvailableSemaphore };
-        var waitStages = stackalloc[] { PipelineStageFlags.ColorAttachmentOutputBit };
+        var waitStages = stackalloc[] { PipelineStageFlags.AllCommandsBit };
         var signalSemaphores = stackalloc[]
             { renderFinishedSemaphore, VulkanContext.GlobalTimelineSemaphore };
 
