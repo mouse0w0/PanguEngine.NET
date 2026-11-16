@@ -79,13 +79,7 @@ public sealed class ClientWorld : IReadOnlyBlockAccessor
 
     internal void ApplyChunk(ChunkDataPacket snapshot)
     {
-        var origin = snapshot.Position;
-        var index = 0;
-        for (var y = 0; y < Chunk.SizeY; y++)
-        for (var z = 0; z < Chunk.SizeZ; z++)
-        for (var x = 0; x < Chunk.SizeX; x++)
-            Chunks.SetBlock(new BlockPos(origin.X * Chunk.SizeX + x,
-                origin.Y * Chunk.SizeY + y, origin.Z * Chunk.SizeZ + z), snapshot.GetBlock(index++));
+        Chunks.ApplyChunk(snapshot.Position, snapshot.Blocks);
     }
 
     internal void Apply(WorldUpdatePacket update)

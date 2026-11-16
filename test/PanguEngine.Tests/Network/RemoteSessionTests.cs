@@ -8,6 +8,7 @@ using PanguEngine.Server.Game;
 using PanguEngine.Tests.Client.Game;
 using PanguEngine.Modding;
 using PanguEngine.Versioning;
+using PanguEngine.World.Blocks;
 
 namespace PanguEngine.Tests.Network;
 

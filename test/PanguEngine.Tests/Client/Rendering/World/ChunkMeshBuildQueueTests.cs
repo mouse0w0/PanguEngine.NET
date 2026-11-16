@@ -5,6 +5,7 @@ using PanguEngine.Client.World;
 using PanguEngine.Registries;
 using PanguEngine.Resources;
 using PanguEngine.World.Blocks;
+using PanguEngine.World.Chunking;
 
 namespace PanguEngine.Tests.Client.Rendering.World;
 
@@ -36,9 +37,12 @@ public sealed class ChunkMeshBuildQueueTests
         var queue = new ChunkMeshBuildQueue(CreateModels(resources), 1, 1, 1);
         try
         {
-            var snapshot = ChunkMeshSnapshot.Capture(new ClientWorld(), default);
-            Assert.True(queue.TryReserveTaskSlot());
-            Assert.True(queue.TryEnqueueReserved(new ChunkMeshBuildTask(snapshot, 1)));
+            using (var batch = new ChunkMeshSnapshotBatch())
+            {
+                var snapshot = batch.Capture(new ClientWorld(), default);
+                Assert.True(queue.TryReserveTaskSlot());
+                Assert.True(queue.TryEnqueueReserved(new ChunkMeshBuildTask(snapshot, 1)));
+            }
             ChunkMeshBuildResult? result = null;
 
             var received = SpinWait.SpinUntil(
@@ -66,9 +70,12 @@ public sealed class ChunkMeshBuildQueueTests
         {
             var world = new ClientWorld();
             world.SetBlock(default, BuiltinBlocks.Stone.DefaultState);
-            var snapshot = ChunkMeshSnapshot.Capture(world, default);
-            Assert.True(queue.TryReserveTaskSlot());
-            Assert.True(queue.TryEnqueueReserved(new ChunkMeshBuildTask(snapshot, 1)));
+            using (var batch = new ChunkMeshSnapshotBatch())
+            {
+                var snapshot = batch.Capture(world, default);
+                Assert.True(queue.TryReserveTaskSlot());
+                Assert.True(queue.TryEnqueueReserved(new ChunkMeshBuildTask(snapshot, 1)));
+            }
             ChunkMeshBuildResult? result = null;
 
             var received = SpinWait.SpinUntil(
@@ -95,6 +102,76 @@ public sealed class ChunkMeshBuildQueueTests
         queue.Dispose();
 
         Assert.False(queue.TryReserveTaskSlot());
+    }
+
+    [Fact]
+    public void CompletedTaskDoesNotReturnBuffersWhilePublisherIsStillCapturing()
+    {
+        using var resources = new ResourceManager([]);
+        using var queue = new ChunkMeshBuildQueue(CreateModels(resources), 1, 1, 1);
+        var world = new ClientWorld();
+        world.SetBlock(new BlockPos(16, 0, 0), BuiltinBlocks.Stone.DefaultState);
+        using var batch = new ChunkMeshSnapshotBatch();
+        var first = batch.Capture(world, default);
+        Assert.True(queue.TryReserveTaskSlot());
+        Assert.True(queue.TryEnqueueReserved(new ChunkMeshBuildTask(first, 1)));
+        ChunkMeshBuildResult? firstResult = null;
+        Assert.True(SpinWait.SpinUntil(() => queue.TryReadResult(out firstResult), TimeSpan.FromSeconds(5)));
+        var completed = Assert.IsType<ChunkMeshBuildResult>(firstResult);
+        Assert.Null(completed.Exception);
+        completed.Mesh!.Dispose();
+
+        var second = batch.Capture(world, new ChunkPos(1, 0, 0));
+
+        Assert.Same(BuiltinBlocks.Stone.DefaultState, second.GetBlock(default));
+        Assert.True(queue.TryReserveTaskSlot());
+        Assert.True(queue.TryEnqueueReserved(new ChunkMeshBuildTask(second, 2)));
+        ChunkMeshBuildResult? secondResult = null;
+        Assert.True(SpinWait.SpinUntil(() => queue.TryReadResult(out secondResult), TimeSpan.FromSeconds(5)));
+        Assert.IsType<InvalidOperationException>(Assert.IsType<ChunkMeshBuildResult>(secondResult).Exception?.SourceException);
+    }
+
+    [Fact]
+    public void RunningBuildKeepsSnapshotAliveAfterPublisherFinishes()
+    {
+        using var resources = new ResourceManager([]);
+        using var entered = new ManualResetEventSlim();
+        using var resume = new ManualResetEventSlim();
+        using var queue = new ChunkMeshBuildQueue(CreateModels(resources), 1, 1, 1);
+        var world = new ClientWorld();
+        world.SetBlock(default, BuiltinBlocks.Stone.DefaultState);
+        world.SetBlock(new BlockPos(1, 0, 0), new BlockingOccluder(entered, resume).DefaultState);
+        try
+        {
+            ChunkMeshSnapshot snapshot;
+            using (var batch = new ChunkMeshSnapshotBatch())
+            {
+                snapshot = batch.Capture(world, default);
+                Assert.True(queue.TryReserveTaskSlot());
+                Assert.True(queue.TryEnqueueReserved(new ChunkMeshBuildTask(snapshot, 1)));
+                Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+            }
+
+            Assert.Same(BuiltinBlocks.Stone.DefaultState, snapshot.GetBlock(default));
+        }
+        finally
+        {
+            resume.Set();
+        }
+        ChunkMeshBuildResult? result = null;
+        Assert.True(SpinWait.SpinUntil(() => queue.TryReadResult(out result), TimeSpan.FromSeconds(5)));
+        Assert.IsType<InvalidOperationException>(Assert.IsType<ChunkMeshBuildResult>(result).Exception?.SourceException);
+    }
+
+    private sealed class BlockingOccluder(ManualResetEventSlim entered, ManualResetEventSlim resume) : Block
+    {
+        public override bool CanOccludeFace(BlockState state, PanguEngine.World.Direction direction)
+        {
+            entered.Set();
+            if (!resume.Wait(TimeSpan.FromSeconds(5)))
+                throw new TimeoutException("The test did not release the mesh builder.");
+            return true;
+        }
     }
 
     private static BlockModelManager CreateModels(ResourceManager resources)

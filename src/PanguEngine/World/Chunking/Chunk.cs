@@ -37,7 +37,7 @@ public sealed class Chunk
     /// <summary>The number of block states stored in one chunk.</summary>
     public const int Volume = SizeX * SizeY * SizeZ;
 
-    private readonly BlockState[] _blocks;
+    private BlockStateStorage _blocks;
 
     /// <summary>
     /// Creates a chunk at the specified chunk position.
@@ -46,8 +46,7 @@ public sealed class Chunk
     public Chunk(ChunkPos position)
     {
         Position = position;
-        _blocks = new BlockState[Volume];
-        Array.Fill(_blocks, BuiltinBlocks.Air.DefaultState);
+        _blocks = new BlockStateStorage(BuiltinBlocks.Air.DefaultState);
     }
 
     /// <summary>The position of this chunk in chunk space.</summary>
@@ -60,7 +59,7 @@ public sealed class Chunk
     /// <returns>The block state stored at the local slot mapped from the position.</returns>
     public BlockState GetBlock(BlockPos position)
     {
-        return _blocks[GetIndex(position)];
+        return _blocks.Get(GetIndex(position));
     }
 
     /// <summary>
@@ -72,7 +71,7 @@ public sealed class Chunk
     {
         ArgumentNullException.ThrowIfNull(state);
 
-        _blocks[GetIndex(position)] = state;
+        _blocks.Set(GetIndex(position), state);
     }
 
     /// <summary>
@@ -88,11 +87,15 @@ public sealed class Chunk
             {
                 for (var x = 0; x < SizeX; x++)
                 {
-                    yield return (new BlockPos(x, y, z), _blocks[index++]);
+                    yield return (new BlockPos(x, y, z), _blocks.Get(index++));
                 }
             }
         }
     }
+
+    internal BlockStateSnapshot CaptureBlocks(bool pooled = false) => _blocks.Capture(pooled);
+
+    internal void ReplaceBlocks(BlockStateSnapshot blocks) => _blocks = new BlockStateStorage(blocks);
 
     private static int GetIndex(BlockPos position)
     {

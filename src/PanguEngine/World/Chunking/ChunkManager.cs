@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using PanguEngine.World.Blocks;
 
 namespace PanguEngine.World.Chunking;
@@ -8,6 +9,19 @@ namespace PanguEngine.World.Chunking;
 public sealed class ChunkManager
 {
     private readonly Dictionary<ChunkPos, Chunk> _chunks = [];
+
+    internal bool TryGetChunk(ChunkPos position, [NotNullWhen(true)] out Chunk? chunk) =>
+        _chunks.TryGetValue(position, out chunk);
+
+    internal void ApplyChunk(ChunkPos position, BlockStateSnapshot blocks)
+    {
+        if (!_chunks.TryGetValue(position, out var chunk))
+        {
+            chunk = new Chunk(position);
+            _chunks.Add(position, chunk);
+        }
+        chunk.ReplaceBlocks(blocks);
+    }
 
     /// <summary>
     /// Gets the number of chunks that have been created.

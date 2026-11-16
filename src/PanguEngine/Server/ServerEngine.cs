@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using PanguEngine.World.Blocks;
 using PanguEngine.Server.Game;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;

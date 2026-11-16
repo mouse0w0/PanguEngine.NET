@@ -129,7 +129,8 @@ public sealed class ChunkMeshBuilderTests
         var world = new ClientWorld();
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
-        var snapshot = ChunkMeshSnapshot.Capture(world, position.ToChunkPos());
+        using var batch = new ChunkMeshSnapshotBatch();
+        var snapshot = batch.Capture(world, position.ToChunkPos());
         world.SetBlock(position, BuiltinBlocks.Air.DefaultState);
 
         using var mesh = new ChunkMeshBuilder(CreateModels()).Build(snapshot);
@@ -230,12 +231,14 @@ public sealed class ChunkMeshBuilderTests
         var position = new BlockPos(32, 32, 32);
         world.SetBlock(position, BuiltinBlocks.Stone.DefaultState);
         var builder = new ChunkMeshBuilder(CreateModels());
-        using var firstMesh = builder.Build(ChunkMeshSnapshot.Capture(world, position.ToChunkPos()));
+        using var firstBatch = new ChunkMeshSnapshotBatch();
+        using var firstMesh = builder.Build(firstBatch.Capture(world, position.ToChunkPos()));
         var firstVertices = firstMesh.Vertices.ToArray();
         var firstIndices = firstMesh.Indices.ToArray();
         world.SetBlock(new BlockPos(33, 32, 32), BuiltinBlocks.Stone.DefaultState);
 
-        using var secondMesh = builder.Build(ChunkMeshSnapshot.Capture(world, position.ToChunkPos()));
+        using var secondBatch = new ChunkMeshSnapshotBatch();
+        using var secondMesh = builder.Build(secondBatch.Capture(world, position.ToChunkPos()));
 
         Assert.Equal(40, secondMesh.VertexCount);
         Assert.Equal(firstVertices, firstMesh.Vertices.ToArray());
@@ -280,7 +283,8 @@ public sealed class ChunkMeshBuilderTests
         ClientWorld world,
         ChunkPos position)
     {
-        var snapshot = ChunkMeshSnapshot.Capture(world, position);
+        using var batch = new ChunkMeshSnapshotBatch();
+        var snapshot = batch.Capture(world, position);
         return new ChunkMeshBuilder(models).Build(snapshot);
     }
 

@@ -8,7 +8,7 @@ namespace PanguEngine.Network;
 
 internal static class PacketCodec
 {
-    internal const int ProtocolVersion = 5;
+    internal const int ProtocolVersion = 6;
 
     internal static ReadOnlyMemory<byte> Encode(ServerboundPacket packet)
     {

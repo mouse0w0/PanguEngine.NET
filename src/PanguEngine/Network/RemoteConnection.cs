@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using PanguEngine.World.Blocks;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;

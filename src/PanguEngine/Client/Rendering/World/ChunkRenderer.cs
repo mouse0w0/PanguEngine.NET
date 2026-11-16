@@ -171,6 +171,9 @@ internal sealed class ChunkRenderer
     private void DispatchBuildTasks(Vector3D<double> cameraPosition)
     {
         var ticketCount = _meshUpdateState.CollectNearest(cameraPosition, _dispatchTickets);
+        if (ticketCount == 0)
+            return;
+        using var batch = new ChunkMeshSnapshotBatch();
         for (var index = 0; index < ticketCount; index++)
         {
             if (!_meshBuildQueue.TryReserveTaskSlot())
@@ -180,7 +183,7 @@ internal sealed class ChunkRenderer
             var enqueued = false;
             try
             {
-                var snapshot = ChunkMeshSnapshot.Capture(_world, ticket.Position);
+                var snapshot = batch.Capture(_world, ticket.Position);
                 enqueued = _meshBuildQueue.TryEnqueueReserved(
                     new ChunkMeshBuildTask(snapshot, ticket.Version));
                 if (!enqueued)

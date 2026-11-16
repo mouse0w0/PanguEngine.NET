@@ -14,6 +14,7 @@ internal static class TestRegistryBootstrap
     internal static readonly object CustomIdValue = new();
     internal static readonly Block StatefulBlock = new(
         BlockProperty.CreateBoolean("powered"), BlockProperty.CreateInteger("level", 0, 2));
+    internal static readonly Block PaletteBlock = new(BlockProperty.CreateInteger("variant", 0, 511));
 
     internal static RegistryManager Manager { get; private set; } = null!;
 
@@ -36,6 +37,7 @@ internal static class TestRegistryBootstrap
         BuiltinHuds.Register(BuiltinRegistries.Hud);
         BuiltinBlocks.Register(BuiltinRegistries.Block);
         BuiltinRegistries.Block.Register(ResourceKey.Parse("test:stateful_block"), StatefulBlock);
+        BuiltinRegistries.Block.Register(ResourceKey.Parse("test:palette_block"), PaletteBlock);
         BuiltinSoundCategories.Register(BuiltinRegistries.SoundCategory);
         BuiltinSoundEvents.Register(BuiltinRegistries.SoundEvent);
         BuiltinInputActions.Register(BuiltinRegistries.InputAction);

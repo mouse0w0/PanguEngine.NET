@@ -88,7 +88,13 @@ internal sealed class ChunkMeshBuildQueue : IDisposable
 
     internal bool TryEnqueueReserved(ChunkMeshBuildTask task)
     {
-        return !_destroyed && _tasks.Writer.TryWrite(task);
+        if (_destroyed)
+            return false;
+        task.Snapshot.Batch.Retain();
+        if (_tasks.Writer.TryWrite(task))
+            return true;
+        task.Snapshot.Batch.Release();
+        return false;
     }
 
     internal bool TryReadResult([NotNullWhen(true)] out ChunkMeshBuildResult? result)
@@ -111,8 +117,9 @@ internal sealed class ChunkMeshBuildQueue : IDisposable
         _cancellation.Cancel();
         Task.WhenAll(_workers).GetAwaiter().GetResult();
         _results.Writer.TryComplete();
-        while (_tasks.Reader.TryRead(out _))
+        while (_tasks.Reader.TryRead(out var task))
         {
+            task.Snapshot.Batch.Release();
         }
 
         while (_results.Reader.TryRead(out var result))
@@ -144,6 +151,10 @@ internal sealed class ChunkMeshBuildQueue : IDisposable
                 catch (Exception exception)
                 {
                     result = ChunkMeshBuildResult.Failure(task, exception);
+                }
+                finally
+                {
+                    task.Snapshot.Batch.Release();
                 }
 
                 try

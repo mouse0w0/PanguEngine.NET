@@ -1,13 +1,17 @@
+using System.Numerics;
 using PanguEngine.Registries;
-using PanguEngine.World.Blocks;
 
-namespace PanguEngine.Network;
+namespace PanguEngine.World.Blocks;
 
 /// <summary>Provides session identifiers for states of the bound block definitions.</summary>
 internal static class BlockStateIds
 {
     private static int[] _offsets = [];
     private static BlockState[] _states = [];
+
+    internal static int Count => _states.Length;
+
+    internal static int Bits => Count <= 1 ? 0 : BitOperations.Log2((uint)(Count - 1)) + 1;
 
     /// <summary>Builds identifiers from the current authoritative block order.</summary>
     internal static void Build()

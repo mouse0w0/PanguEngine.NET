@@ -57,10 +57,9 @@ public sealed class ClientWorldTests
     {
         var chunkPosition = new ChunkPos(2, 1, -3);
         var localPosition = new BlockPos(1, 2, 3);
-        var states = new BlockState[Chunk.Volume];
-        Array.Fill(states, BuiltinBlocks.Air.DefaultState);
-        var index = localPosition.X | (localPosition.Z << Chunk.BitsX) | (localPosition.Y << (Chunk.BitsX + Chunk.BitsZ));
-        states[index] = BuiltinBlocks.Stone.DefaultState;
+        var source = new Chunk(chunkPosition);
+        source.SetBlock(localPosition, BuiltinBlocks.Stone.DefaultState);
+        var packet = ChunkDataPacket.Capture(source);
         var position = new BlockPos(
             chunkPosition.X * Chunk.SizeX + localPosition.X,
             chunkPosition.Y * Chunk.SizeY + localPosition.Y,
@@ -70,11 +69,15 @@ public sealed class ClientWorldTests
         world.BlockChanged += _ => notifications++;
         var id = 1u;
         world.ApplyInitial(new InitialWorldStatePacket(7, id, 0.05, [new(id, default)], 1));
-        world.ApplyChunk(new ChunkDataPacket(chunkPosition, states));
+        world.Chunks.SetBlock(position, BuiltinBlocks.Dirt.DefaultState);
+        world.ApplyChunk(packet);
 
         Assert.Same(BuiltinBlocks.Stone.DefaultState, world.GetBlock(position));
         Assert.Equal(0, notifications);
         Assert.Equal(7L, world.Tick);
+        world.Chunks.SetBlock(position, BuiltinBlocks.Air.DefaultState);
+        var index = localPosition.X | (localPosition.Z << Chunk.BitsX) | (localPosition.Y << (Chunk.BitsX + Chunk.BitsZ));
+        Assert.Same(BuiltinBlocks.Stone.DefaultState, packet.GetBlock(index));
     }
 
     [Theory]
