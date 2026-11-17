@@ -234,18 +234,30 @@ public static unsafe class VulkanContext
         {
             PickPhysicalDevice(surface);
 
-            Vk.GetPhysicalDeviceProperties(PhysicalDevice, out var props);
-            Vk.GetPhysicalDeviceFeatures(PhysicalDevice, out var physicalDeviceFeatures);
-            MinUniformBufferOffsetAlignment = props.Limits.MinUniformBufferOffsetAlignment;
-            MinStorageBufferOffsetAlignment = props.Limits.MinStorageBufferOffsetAlignment;
-            MaxDrawIndirectCount = props.Limits.MaxDrawIndirectCount;
-            MaxImageDimension1D = props.Limits.MaxImageDimension1D;
-            MaxImageDimension2D = props.Limits.MaxImageDimension2D;
-            MaxImageDimension3D = props.Limits.MaxImageDimension3D;
-            MaxImageArrayLayers = props.Limits.MaxImageArrayLayers;
+            PhysicalDeviceProperties2 properties2 = new()
+            {
+                SType = StructureType.PhysicalDeviceProperties2
+            };
+            Vk.GetPhysicalDeviceProperties2(PhysicalDevice, &properties2);
+            var properties = properties2.Properties;
+
+            PhysicalDeviceFeatures2 features2 = new()
+            {
+                SType = StructureType.PhysicalDeviceFeatures2
+            };
+            Vk.GetPhysicalDeviceFeatures2(PhysicalDevice, &features2);
+            var physicalDeviceFeatures = features2.Features;
+
+            MinUniformBufferOffsetAlignment = properties.Limits.MinUniformBufferOffsetAlignment;
+            MinStorageBufferOffsetAlignment = properties.Limits.MinStorageBufferOffsetAlignment;
+            MaxDrawIndirectCount = properties.Limits.MaxDrawIndirectCount;
+            MaxImageDimension1D = properties.Limits.MaxImageDimension1D;
+            MaxImageDimension2D = properties.Limits.MaxImageDimension2D;
+            MaxImageDimension3D = properties.Limits.MaxImageDimension3D;
+            MaxImageArrayLayers = properties.Limits.MaxImageArrayLayers;
             SamplerAnisotropySupported = physicalDeviceFeatures.SamplerAnisotropy;
-            MaxSamplerAnisotropy = props.Limits.MaxSamplerAnisotropy;
-            MaxSamplerLodBias = props.Limits.MaxSamplerLodBias;
+            MaxSamplerAnisotropy = properties.Limits.MaxSamplerAnisotropy;
+            MaxSamplerLodBias = properties.Limits.MaxSamplerLodBias;
 
             KhrSurface.GetPhysicalDeviceSurfaceCapabilities(PhysicalDevice, surface, out var capabilities);
             MaxFramesInFlight = capabilities.MinImageCount + 1;
@@ -542,7 +554,12 @@ public static unsafe class VulkanContext
     {
         var indices = FindQueueFamilies(device, surface);
         var extensionsSupported = CheckDeviceExtensionsSupport(device);
-        Vk.GetPhysicalDeviceProperties(device, out var properties);
+        PhysicalDeviceProperties2 properties2 = new()
+        {
+            SType = StructureType.PhysicalDeviceProperties2
+        };
+        Vk.GetPhysicalDeviceProperties2(device, &properties2);
+        var properties = properties2.Properties;
 
         PhysicalDeviceFeatures2 features2 = new()
         {
@@ -597,18 +614,21 @@ public static unsafe class VulkanContext
         var indices = new QueueFamilyIndices();
 
         uint queueFamilyCount = 0;
-        Vk.GetPhysicalDeviceQueueFamilyProperties(device, ref queueFamilyCount, null);
+        Vk.GetPhysicalDeviceQueueFamilyProperties2(device, ref queueFamilyCount, null);
 
-        var queueFamilies = new QueueFamilyProperties[queueFamilyCount];
-        fixed (QueueFamilyProperties* queueFamiliesPtr = queueFamilies)
+        var queueFamilies = new QueueFamilyProperties2[queueFamilyCount];
+        for (var index = 0; index < queueFamilies.Length; index++)
+            queueFamilies[index].SType = StructureType.QueueFamilyProperties2;
+
+        fixed (QueueFamilyProperties2* queueFamiliesPtr = queueFamilies)
         {
-            Vk.GetPhysicalDeviceQueueFamilyProperties(device, ref queueFamilyCount, queueFamiliesPtr);
+            Vk.GetPhysicalDeviceQueueFamilyProperties2(device, ref queueFamilyCount, queueFamiliesPtr);
         }
 
         uint i = 0;
         foreach (var queueFamily in queueFamilies)
         {
-            if (queueFamily.QueueFlags.HasFlag(QueueFlags.GraphicsBit))
+            if (queueFamily.QueueFamilyProperties.QueueFlags.HasFlag(QueueFlags.GraphicsBit))
                 indices.GraphicsFamily = i;
 
             KhrSurface.GetPhysicalDeviceSurfaceSupport(device, i, surface, out var presentSupport);

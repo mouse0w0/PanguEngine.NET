@@ -647,10 +647,15 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             return;
 
         var format = VulkanMapping.ToVulkanFormat(description.Format);
-        VulkanContext.Vk.GetPhysicalDeviceFormatProperties(
+        FormatProperties2 properties2 = new()
+        {
+            SType = StructureType.FormatProperties2
+        };
+        VulkanContext.Vk.GetPhysicalDeviceFormatProperties2(
             VulkanContext.PhysicalDevice,
             format,
-            out var properties);
+            &properties2);
+        var properties = properties2.FormatProperties;
         if ((properties.OptimalTilingFeatures & required) != required)
         {
             throw new InvalidOperationException(
@@ -796,8 +801,13 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
     private static void ValidateMipmapGenerationFormat(TextureFormat format)
     {
         var vkFormat = VulkanMapping.ToVulkanFormat(format);
-        VulkanContext.Vk.GetPhysicalDeviceFormatProperties(VulkanContext.PhysicalDevice, vkFormat,
-            out var properties);
+        FormatProperties2 properties2 = new()
+        {
+            SType = StructureType.FormatProperties2
+        };
+        VulkanContext.Vk.GetPhysicalDeviceFormatProperties2(VulkanContext.PhysicalDevice, vkFormat,
+            &properties2);
+        var properties = properties2.FormatProperties;
         const FormatFeatureFlags required = FormatFeatureFlags.BlitSrcBit
                                             | FormatFeatureFlags.BlitDstBit
                                             | FormatFeatureFlags.SampledImageFilterLinearBit;
@@ -812,8 +822,13 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
                 "Depth/stencil attachment usage requires a depth/stencil texture format.");
 
         var vkFormat = VulkanMapping.ToVulkanFormat(format);
-        VulkanContext.Vk.GetPhysicalDeviceFormatProperties(VulkanContext.PhysicalDevice, vkFormat,
-            out var properties);
+        FormatProperties2 properties2 = new()
+        {
+            SType = StructureType.FormatProperties2
+        };
+        VulkanContext.Vk.GetPhysicalDeviceFormatProperties2(VulkanContext.PhysicalDevice, vkFormat,
+            &properties2);
+        var properties = properties2.FormatProperties;
         if ((properties.OptimalTilingFeatures & FormatFeatureFlags.DepthStencilAttachmentBit) == 0)
             throw new InvalidOperationException(
                 $"Texture format '{format}' does not support depth/stencil attachments.");
@@ -825,8 +840,13 @@ internal sealed unsafe class VulkanGraphicsDevice : GraphicsDevice
             throw new InvalidOperationException("Color attachment usage requires a color texture format.");
 
         var vkFormat = VulkanMapping.ToVulkanFormat(format);
-        VulkanContext.Vk.GetPhysicalDeviceFormatProperties(VulkanContext.PhysicalDevice, vkFormat,
-            out var properties);
+        FormatProperties2 properties2 = new()
+        {
+            SType = StructureType.FormatProperties2
+        };
+        VulkanContext.Vk.GetPhysicalDeviceFormatProperties2(VulkanContext.PhysicalDevice, vkFormat,
+            &properties2);
+        var properties = properties2.FormatProperties;
         if ((properties.OptimalTilingFeatures & FormatFeatureFlags.ColorAttachmentBit) == 0)
             throw new InvalidOperationException($"Texture format '{format}' does not support color attachments.");
     }
