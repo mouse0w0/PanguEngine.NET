@@ -181,7 +181,7 @@ public sealed class ClientEngine
                     ? WindowBorder.Hidden
                     : WindowBorder.Resizable
             },
-            enableValidation: _launchOptions.GpuValidation);
+            validationChecks: _launchOptions.VulkanValidation);
         if (windowMode is not (WindowMode.Maximized or WindowMode.Fullscreen))
             PrimaryWindow.CenterOnScreen();
         PrimaryWindow.Show();

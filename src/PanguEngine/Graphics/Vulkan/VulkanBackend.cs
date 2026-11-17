@@ -32,8 +32,8 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
     /// Creates and initializes a Vulkan graphics backend.
     /// </summary>
     /// <param name="primaryWindowOptions">The options used to create the primary window.</param>
-    /// <param name="enableValidation">Whether Vulkan validation is enabled.</param>
-    internal VulkanBackend(WindowOptions primaryWindowOptions, bool enableValidation)
+    /// <param name="validationChecks">The Vulkan validation check groups requested during startup.</param>
+    internal VulkanBackend(WindowOptions primaryWindowOptions, VulkanValidationChecks validationChecks)
     {
         VulkanContext.BindRenderThread();
 
@@ -45,7 +45,7 @@ internal sealed unsafe class VulkanBackend : GraphicsBackend
         var nativeWindow = windowManager.CreateNativeWindow(primaryWindowOptions);
 
         var requiredExtensions = GetVulkanInstanceExtensions();
-        VulkanContext.InitializeInstance(requiredExtensions, enableValidation);
+        VulkanContext.InitializeInstance(requiredExtensions, validationChecks);
 
         var surface = VulkanWindowManager.CreateVulkanSurface(nativeWindow);
         VulkanContext.InitializeDevice(surface);

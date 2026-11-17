@@ -1,3 +1,4 @@
+using PanguEngine.Graphics.Vulkan;
 using Silk.NET.Maths;
 
 namespace PanguEngine.Tests;
@@ -34,11 +35,11 @@ public sealed class BootstrapTests
     }
 
     [Fact]
-    public void ParseOptionsDisablesGpuValidationByDefault()
+    public void ParseOptionsDisablesVulkanValidationByDefault()
     {
         var options = Bootstrap.ParseOptions([]);
 
-        Assert.False(options.GpuValidation);
+        Assert.Equal(VulkanValidationChecks.None, options.VulkanValidation);
         Assert.False(options.Server);
     }
 
@@ -84,45 +85,79 @@ public sealed class BootstrapTests
         Assert.Equal(expected, options.WindowMode.Value);
     }
 
-    [Fact]
-    public void ParseOptionsEnablesGpuValidation()
+    [Theory]
+    [InlineData("core", VulkanValidationChecks.Core)]
+    [InlineData("sync", VulkanValidationChecks.Synchronization)]
+    [InlineData("gpu-assisted", VulkanValidationChecks.GpuAssisted)]
+    [InlineData("best-practices", VulkanValidationChecks.BestPractices)]
+    [InlineData("legacy", VulkanValidationChecks.Legacy)]
+    public void ParseOptionsSelectsVulkanValidationGroup(string name, VulkanValidationChecks expected)
     {
-        var options = Bootstrap.ParseOptions(["--gpu-validation"]);
+        var options = Bootstrap.ParseOptions(["--vulkan-validation", name]);
 
-        Assert.True(options.GpuValidation);
+        Assert.Equal(expected, options.VulkanValidation);
+    }
+
+    [Theory]
+    [InlineData("core,sync")]
+    [InlineData("sync,core")]
+    [InlineData("core,core,sync")]
+    [InlineData(" CoRe , SyNc ")]
+    public void ParseOptionsCombinesVulkanValidationGroups(string value)
+    {
+        var options = Bootstrap.ParseOptions(["--vulkan-validation", value]);
+
+        Assert.Equal(
+            VulkanValidationChecks.Core | VulkanValidationChecks.Synchronization,
+            options.VulkanValidation);
     }
 
     [Fact]
-    public void ParseOptionsAllowsRepeatedGpuValidationArguments()
+    public void ParseOptionsMergesRepeatedVulkanValidationArguments()
     {
-        var options = Bootstrap.ParseOptions(["--gpu-validation", "--gpu-validation"]);
+        var options = Bootstrap.ParseOptions(
+            ["--vulkan-validation", "core", "--vulkan-validation", "sync,core"]);
 
-        Assert.True(options.GpuValidation);
+        Assert.Equal(
+            VulkanValidationChecks.Core | VulkanValidationChecks.Synchronization,
+            options.VulkanValidation);
     }
 
     [Fact]
-    public void ParseOptionsCombinesGpuValidationWithModArguments()
+    public void ParseOptionsCombinesVulkanValidationWithModArguments()
     {
-        var options = Bootstrap.ParseOptions(["--mod", "A", "--gpu-validation"]);
+        var options = Bootstrap.ParseOptions(["--mod", "A", "--vulkan-validation", "core"]);
 
         Assert.Equal(["A"], options.ModPaths);
-        Assert.True(options.GpuValidation);
+        Assert.Equal(VulkanValidationChecks.Core, options.VulkanValidation);
     }
 
     [Fact]
-    public void ParseOptionsRejectsSeparatedGpuValidationValue()
+    public void ParseOptionsRejectsMissingVulkanValidationGroups()
     {
-        var exception = Assert.Throws<ArgumentException>(() => Bootstrap.ParseOptions(["--gpu-validation", "true"]));
-
-        Assert.Contains("Unknown argument 'true'", exception.Message);
+        Assert.Throws<ArgumentException>(() => Bootstrap.ParseOptions(["--vulkan-validation"]));
     }
 
-    [Fact]
-    public void ParseOptionsRejectsInlineGpuValidationValue()
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData(",core")]
+    [InlineData("core,")]
+    [InlineData("core,,sync")]
+    [InlineData("core, ,sync")]
+    [InlineData("core,unknown")]
+    [InlineData("1")]
+    public void ParseOptionsRejectsInvalidVulkanValidationGroups(string value)
     {
-        var exception = Assert.Throws<ArgumentException>(() => Bootstrap.ParseOptions(["--gpu-validation=true"]));
+        Assert.Throws<ArgumentException>(() => Bootstrap.ParseOptions(["--vulkan-validation", value]));
+    }
 
-        Assert.Contains("Unknown argument '--gpu-validation=true'", exception.Message);
+    [Theory]
+    [InlineData("--gpu-validation")]
+    [InlineData("--sync-validation")]
+    public void ParseOptionsRejectsRemovedValidationArguments(string argument)
+    {
+        Assert.Throws<ArgumentException>(() => Bootstrap.ParseOptions([argument]));
     }
 
     [Fact]

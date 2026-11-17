@@ -1,6 +1,7 @@
 ﻿using System.Globalization;
 using System.Net;
 using PanguEngine.Client;
+using PanguEngine.Graphics.Vulkan;
 using PanguEngine.Server;
 using Silk.NET.Maths;
 
@@ -32,7 +33,7 @@ public static class Bootstrap
     internal static LaunchOptions ParseOptions(string[] args)
     {
         var modPaths = new List<string>();
-        var gpuValidation = false;
+        var vulkanValidation = VulkanValidationChecks.None;
         var server = false;
         IPAddress? connectAddress = null;
         IPAddress? listenAddress = null;
@@ -55,8 +56,23 @@ public static class Bootstrap
 
                     modPaths.Add(path);
                     break;
-                case "--gpu-validation":
-                    gpuValidation = true;
+                case "--vulkan-validation":
+                    if (i + 1 >= args.Length)
+                        throw new ArgumentException("--vulkan-validation requires a non-empty group list.");
+
+                    foreach (var group in args[++i].Split(',', StringSplitOptions.TrimEntries))
+                    {
+                        vulkanValidation |= group.ToLowerInvariant() switch
+                        {
+                            "core" => VulkanValidationChecks.Core,
+                            "sync" => VulkanValidationChecks.Synchronization,
+                            "gpu-assisted" => VulkanValidationChecks.GpuAssisted,
+                            "best-practices" => VulkanValidationChecks.BestPractices,
+                            "legacy" => VulkanValidationChecks.Legacy,
+                            "" => throw new ArgumentException("Vulkan validation groups cannot contain empty entries."),
+                            _ => throw new ArgumentException($"Unknown Vulkan validation group '{group}'.")
+                        };
+                    }
                     break;
                 case "--server":
                     server = true;
@@ -132,7 +148,7 @@ public static class Bootstrap
 
         return new LaunchOptions
         {
-            GpuValidation = gpuValidation,
+            VulkanValidation = vulkanValidation,
             Server = server,
             ConnectAddress = connectAddress,
             ListenAddress = listenAddress,

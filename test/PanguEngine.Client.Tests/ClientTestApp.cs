@@ -87,7 +87,7 @@ public sealed class ClientTestApp
                 Size = new Vector2D<int>(800, 600),
                 Title = _scene.Name
             },
-            enableValidation: true);
+            validationChecks: VulkanValidationChecks.Core);
 
         Window = _graphicsBackend.PrimaryWindow;
         Window.CenterOnScreen();

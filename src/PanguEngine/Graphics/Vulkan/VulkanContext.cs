@@ -171,13 +171,13 @@ public static unsafe class VulkanContext
     /// Initializes the Vulkan instance with the specified required extensions.
     /// </summary>
     /// <param name="requiredExtensions">Extensions required by the application (e.g., surface extensions).</param>
-    /// <param name="enableValidationLayers">Whether to enable Vulkan validation layers for debugging.</param>
-    internal static void InitializeInstance(string[] requiredExtensions, bool enableValidationLayers)
+    /// <param name="validationChecks">The Vulkan validation check groups requested during startup.</param>
+    internal static void InitializeInstance(string[] requiredExtensions, VulkanValidationChecks validationChecks)
     {
         if (_instanceInitialized)
             throw new InvalidOperationException("Vulkan instance already initialized.");
 
-        _enableValidationLayers = enableValidationLayers;
+        _enableValidationLayers = validationChecks != VulkanValidationChecks.None;
         _logger = Log.CreateLogger("Vulkan");
         Vk = Vk.GetApi();
 
@@ -186,7 +186,7 @@ public static unsafe class VulkanContext
             if (_enableValidationLayers && !CheckValidationLayerSupport())
                 throw new InvalidOperationException("Validation layers requested, but not available.");
 
-            CreateInstance(requiredExtensions);
+            CreateInstance(requiredExtensions, validationChecks);
 
             if (_enableValidationLayers)
                 SetupDebugMessenger();
@@ -196,6 +196,9 @@ public static unsafe class VulkanContext
 
             KhrSurface = khrSurface;
             _instanceInitialized = true;
+            _logger.LogInformation(
+                "Vulkan validation groups requested: {ValidationGroups}",
+                validationChecks);
         }
         catch
         {
@@ -330,7 +333,7 @@ public static unsafe class VulkanContext
         }
     }
 
-    private static void CreateInstance(string[] requiredExtensions)
+    private static void CreateInstance(string[] requiredExtensions, VulkanValidationChecks validationChecks)
     {
         ApplicationInfo appInfo = new()
         {
@@ -343,7 +346,7 @@ public static unsafe class VulkanContext
         };
 
         string[] extensions = _enableValidationLayers
-            ? [.. requiredExtensions, ExtDebugUtils.ExtensionName]
+            ? [.. requiredExtensions, ExtDebugUtils.ExtensionName, "VK_EXT_layer_settings"]
             : requiredExtensions;
 
         InstanceCreateInfo createInfo = new()
@@ -376,9 +379,81 @@ public static unsafe class VulkanContext
             createInfo.PNext = null;
         }
 
-        if (Vk.CreateInstance(in createInfo, null, out var instance) != Result.Success)
-            throw new InvalidOperationException("Failed to create Vulkan instance.");
+        const int validationSettingCount = 14;
+        uint coreEnabled = (validationChecks & VulkanValidationChecks.Core) != 0 ? 1u : 0u;
+        uint syncEnabled = (validationChecks & VulkanValidationChecks.Synchronization) != 0 ? 1u : 0u;
+        uint trackingEnabled = coreEnabled | syncEnabled;
+        uint* settingValues = stackalloc uint[validationSettingCount]
+        {
+            coreEnabled,
+            coreEnabled,
+            coreEnabled,
+            trackingEnabled,
+            trackingEnabled,
+            syncEnabled,
+            (validationChecks & VulkanValidationChecks.GpuAssisted) != 0 ? 1u : 0u,
+            (validationChecks & VulkanValidationChecks.BestPractices) != 0 ? 1u : 0u,
+            (validationChecks & VulkanValidationChecks.Legacy) != 0 ? 1u : 0u,
+            coreEnabled,
+            coreEnabled,
+            coreEnabled,
+            coreEnabled,
+            coreEnabled
+        };
+        LayerSettingEXT* settings = stackalloc LayerSettingEXT[validationSettingCount];
+        LayerSettingsCreateInfoEXT layerSettings;
+        nint settingNamesMemory = 0;
+
+        if (_enableValidationLayers)
+        {
+            string[] settingNames =
+            [
+                "validate_core",
+                "stateless_param",
+                "object_lifetime",
+                "thread_safety",
+                "unique_handles",
+                "validate_sync",
+                "gpuav_enable",
+                "validate_best_practices",
+                "legacy_detection",
+                "check_image_layout",
+                "check_command_buffer",
+                "check_object_in_use",
+                "check_query",
+                "check_shaders"
+            ];
+            settingNamesMemory = SilkMarshal.StringArrayToPtr(settingNames);
+            var nativeSettingNames = (byte**)settingNamesMemory;
+            for (var i = 0; i < validationSettingCount; i++)
+            {
+                settings[i] = new LayerSettingEXT
+                {
+                    PLayerName = createInfo.PpEnabledLayerNames[0],
+                    PSettingName = nativeSettingNames[i],
+                    Type = LayerSettingTypeEXT.Bool32Ext,
+                    ValueCount = 1,
+                    PValues = settingValues + i
+                };
+            }
+
+            layerSettings = new LayerSettingsCreateInfoEXT
+            {
+                SType = StructureType.LayerSettingsCreateInfoExt,
+                PNext = createInfo.PNext,
+                SettingCount = validationSettingCount,
+                PSettings = settings
+            };
+            createInfo.PNext = &layerSettings;
+        }
+
+        var result = Vk.CreateInstance(in createInfo, null, out var instance);
+        if (result != Result.Success)
+            throw new InvalidOperationException($"Failed to create Vulkan instance: {result}.");
         VkInstance = instance;
+
+        if (_enableValidationLayers)
+            SilkMarshal.Free(settingNamesMemory);
 
         Marshal.FreeHGlobal((IntPtr)appInfo.PApplicationName);
         Marshal.FreeHGlobal((IntPtr)appInfo.PEngineName);

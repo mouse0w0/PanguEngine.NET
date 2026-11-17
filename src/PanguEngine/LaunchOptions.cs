@@ -1,4 +1,5 @@
 using System.Net;
+using PanguEngine.Graphics.Vulkan;
 using Silk.NET.Maths;
 
 namespace PanguEngine;
@@ -14,9 +15,9 @@ public sealed class LaunchOptions
     public static LaunchOptions Empty { get; } = new();
 
     /// <summary>
-    /// Whether to enable graphics API validation during startup.
+    /// Gets the Vulkan validation check groups requested during startup.
     /// </summary>
-    public bool GpuValidation { get; init; }
+    public VulkanValidationChecks VulkanValidation { get; init; }
 
     /// <summary>Whether to start a dedicated server instead of the client.</summary>
     public bool Server { get; init; }
