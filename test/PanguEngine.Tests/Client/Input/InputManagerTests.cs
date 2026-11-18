@@ -901,7 +901,7 @@ public sealed class InputManagerTests
         var action = BuiltinInputActions.Move;
         var (input, window, ui) = CreateManager(("test:move", action));
         using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
-        var connection = new LocalConnection();
+        var connection = new InMemoryConnection();
         var id = 1u;
         var world = new ClientWorld();
         var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
@@ -915,16 +915,14 @@ public sealed class InputManagerTests
         input.StateInvalidated += () => session.RefreshInput(input, 0, 0);
         input.Start();
         window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
-        List<ServerboundPacket> packets = [];
-        connection.DrainServerboundPackets(packets);
-        packets.Clear();
+        ReceiveRequests(connection);
 
         if (loseFocus)
             window.RaiseFocusChanged(false);
         else
             ui.Open(new GameUIScene { PausesGame = false, InputContext = new InputContext(InputScope.Ui) });
 
-        connection.DrainServerboundPackets(packets);
+        var packets = ReceiveRequests(connection);
         Assert.NotEmpty(packets);
         var submitted = Assert.IsType<InputStatePacket>(packets[^1]);
         Assert.Equal(loseFocus ? 0d : 1d, submitted.Forward);
@@ -933,30 +931,40 @@ public sealed class InputManagerTests
     }
 
     [Fact]
-    public void PausedGameplaySampleStopsMovementAndResumeSamplesHeldInput()
+    public void OpeningPauseMenuSubmitsStopAndClosingDoesNotReplayHeldInput()
     {
         var action = BuiltinInputActions.Move;
         var (input, window, ui) = CreateManager(("test:move", action));
         using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
-        var connection = new LocalConnection();
+        var connection = new InMemoryConnection();
         var world = new ClientWorld();
         var id = 1u;
         var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
         world.ApplyInitial(initial);
         var session = new ClientSession(connection, world, initial, 0);
+        void Submit() => session.RefreshInput(input, 42, 12);
+        input.StateInvalidated += Submit;
+        input.RegisterHandler(action, args =>
+        {
+            if (args.Phase == InputActionPhase.Started)
+                Submit();
+            return InputHandling.Handled;
+        });
         input.Start();
         window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
-        Assert.Equal(1, input.GetValue(action).Axis2D.Y);
+        Assert.Equal(1d, Assert.IsType<InputStatePacket>(ReceiveRequests(connection)[^1]).Forward);
 
-        session.RefreshInput(input, 42, 12, gameplayPaused: true);
-        List<ServerboundPacket> packets = [];
-        connection.DrainServerboundPackets(packets);
-        var stopped = Assert.IsType<InputStatePacket>(Assert.Single(packets));
+        ui.Open(new PauseMenu());
+        var stopped = Assert.IsType<InputStatePacket>(ReceiveRequests(connection)[^1]);
         Assert.Equal((0d, 0d, 42d, 12d), (stopped.Forward, stopped.Right, stopped.Yaw, stopped.Pitch));
-        packets.Clear();
-        session.RefreshInput(input, 42, 12);
-        connection.DrainServerboundPackets(packets);
-        Assert.Equal(1d, Assert.IsType<InputStatePacket>(Assert.Single(packets)).Forward);
+        ui.Close();
+        Assert.Equal(0d, input.GetValue(action).Axis2D.Y);
+        Assert.All(ReceiveRequests(connection), packet => Assert.Equal(0d, Assert.IsType<InputStatePacket>(packet).Forward));
+
+        window.RaiseKeyUp(new KeyEventArgs(Key.W, KeyAction.Release, KeyModifiers.None));
+        window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
+        Assert.Equal(1d, Assert.IsType<InputStatePacket>(ReceiveRequests(connection)[^1]).Forward);
+        input.StateInvalidated -= Submit;
         input.Destroy();
         ui.Destroy();
         world.Destroy();
@@ -969,7 +977,7 @@ public sealed class InputManagerTests
         var (input, window, ui) = CreateManager(("test:move", action));
         using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
         input.Bindings.SetBinding(ResourceKey.Parse("test:move/forward"), InputSource.MouseWheel, KeyModifiers.None);
-        var connection = new LocalConnection();
+        var connection = new InMemoryConnection();
         var id = 1u;
         var world = new ClientWorld();
         var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
@@ -984,41 +992,19 @@ public sealed class InputManagerTests
 
         window.RaiseScroll(new ScrollEventArgs(0, 1));
 
-        List<ServerboundPacket> packets = [];
-        connection.DrainServerboundPackets(packets);
-        var packet = Assert.Single(packets);
+        var packet = Assert.Single(ReceiveRequests(connection));
         var submitted = Assert.IsType<InputStatePacket>(packet);
         Assert.Equal((0d, 0d), (submitted.Forward, submitted.Right));
         input.Destroy();
         ui.Destroy();
     }
 
-    [Fact]
-    public void UnobservedPauseResumeRefreshesEffectiveHeldInput()
+    private static List<ServerboundPacket> ReceiveRequests(IServerConnection connection)
     {
-        var action = BuiltinInputActions.Move;
-        var (input, window, ui) = CreateManager(("test:move", action));
-        using var gameToken = input.ActivateContext(BuiltinInputContexts.Game);
-        var connection = new LocalConnection();
-        var id = 1u;
-        var world = new ClientWorld();
-        var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
-        world.ApplyInitial(initial);
-        var session = new ClientSession(connection, world, initial, 0);
-        input.Start();
-        window.RaiseKeyDown(new KeyEventArgs(Key.W, KeyAction.Press, KeyModifiers.None));
-        connection.SetAcceptingRequests(false, clearPending: true);
-        connection.SetAcceptingRequests(true, clearPending: false);
-
-        session.RefreshInputAfterResume(input, 0, 0);
-        session.RefreshInputAfterResume(input, 0, 0);
-
         List<ServerboundPacket> packets = [];
-        connection.DrainServerboundPackets(packets);
-        var packet = Assert.Single(packets);
-        Assert.Equal(1d, Assert.IsType<InputStatePacket>(packet).Forward);
-        input.Destroy();
-        ui.Destroy();
+        while (connection.TryReceive(out var packet))
+            packets.Add(packet);
+        return packets;
     }
 
     [Fact]

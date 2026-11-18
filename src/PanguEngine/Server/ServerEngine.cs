@@ -13,22 +13,20 @@ public sealed class ServerEngine
 {
     private readonly object _gate = new();
     private readonly Thread _thread;
-    private readonly LocalConnection _connection;
+    private readonly InMemoryConnection _connection;
     private bool _joinRequested;
-    private bool _connected;
+    private bool _connectionClaimed;
     private bool _isPaused;
-    private bool _resetInput;
     private bool _reschedule;
     private bool _shutdownRequested;
     private long _tick;
     private readonly IPEndPoint? _listenEndpoint;
-    private uint _localPlayerNetworkId;
 
     internal ServerEngine(bool isDedicated, IPEndPoint? listenEndpoint = null)
     {
         IsDedicated = isDedicated;
         _listenEndpoint = listenEndpoint;
-        _connection = new LocalConnection(_gate);
+        _connection = new InMemoryConnection(_gate);
         _thread = isDedicated ? Thread.CurrentThread : new Thread(Run)
         {
             IsBackground = true,
@@ -48,7 +46,7 @@ public sealed class ServerEngine
     /// <summary>The number of completed world simulation steps.</summary>
     public long Tick => Interlocked.Read(ref _tick);
 
-    /// <summary>Whether new gameplay requests and world updates are paused.</summary>
+    /// <summary>Whether server rounds discard gameplay input instead of advancing the world.</summary>
     public bool IsPaused
     {
         get
@@ -63,9 +61,7 @@ public sealed class ServerEngine
                 if (_isPaused == value)
                     return;
                 _isPaused = value;
-                _resetInput |= value;
                 _reschedule = true;
-                _connection.SetAcceptingRequests(!value && !_shutdownRequested, clearPending: value);
                 Monitor.PulseAll(_gate);
             }
         }
@@ -109,15 +105,17 @@ public sealed class ServerEngine
             _thread.Start();
     }
 
-    internal LocalConnection ConnectLocal()
+    /// <summary>Reserves the integrated server's in-process session and returns its client endpoint.</summary>
+    internal IClientConnection ConnectInMemory()
     {
         lock (_gate)
         {
             if (IsDedicated)
                 throw new InvalidOperationException("Dedicated servers do not accept local connections.");
             _connection.ThrowIfFaulted();
-            if (_connected || _joinRequested || _shutdownRequested)
+            if (_connectionClaimed || _shutdownRequested)
                 throw new InvalidOperationException("The server cannot accept another local connection.");
+            _connectionClaimed = true;
             _joinRequested = true;
             Monitor.PulseAll(_gate);
             return _connection;
@@ -129,8 +127,11 @@ public sealed class ServerEngine
     {
         lock (_gate)
         {
+            if (_shutdownRequested)
+                return;
             _shutdownRequested = true;
-            _connection.SetAcceptingRequests(false, clearPending: false);
+            if (!IsDedicated)
+                _connection.StopAcceptingRequests(clearPending: _isPaused);
             Monitor.PulseAll(_gate);
         }
     }
@@ -160,35 +161,29 @@ public sealed class ServerEngine
             Game = new ServerGame();
             var clock = Stopwatch.StartNew();
             var deadline = ServerGame.StepSeconds;
-            List<ServerboundPacket> packets = [];
+            RemoteSession? session = null;
             while (true)
             {
-                packets.Clear();
+                IReadOnlyList<ServerboundPacket> packets = [];
                 var joinRequested = false;
-                var resetInput = false;
+                var clientClosed = false;
+                var paused = false;
                 var shutdownRequested = false;
                 lock (_gate)
                 {
                     if (_joinRequested)
                     {
                         _joinRequested = false;
-                        _connected = true;
                         joinRequested = true;
                     }
+                    else if (session is not null && _connection.IsClosed)
+                        clientClosed = true;
                     else
                     {
-                        resetInput = _resetInput;
-                        _resetInput = false;
+                        paused = _isPaused;
                         shutdownRequested = _shutdownRequested;
-                        if (shutdownRequested)
-                            _connection.DrainServerboundPackets(packets);
-                        else if (!resetInput)
+                        if (!shutdownRequested)
                         {
-                            if (_isPaused)
-                            {
-                                Monitor.Wait(_gate);
-                                continue;
-                            }
                             if (_reschedule)
                             {
                                 deadline = clock.Elapsed.TotalSeconds + ServerGame.StepSeconds;
@@ -200,50 +195,55 @@ public sealed class ServerEngine
                                 Monitor.Wait(_gate, (int)Math.Ceiling(remaining * 1000));
                                 continue;
                             }
-                            _connection.DrainServerboundPackets(packets);
                         }
+                        if (session is not null)
+                            packets = session.Receive(Game);
                     }
                 }
                 if (joinRequested)
                 {
-                    _localPlayerNetworkId = Game.JoinPlayer();
-                    _connection.Publish(Game.CreateInitial(_localPlayerNetworkId));
-                    foreach (var chunk in Game.CaptureChunks())
-                        _connection.Publish(chunk);
-                    _connection.Publish(new InitialWorldCompletePacket());
+                    if (!_connection.IsClosed)
+                        session = new RemoteSession(_connection, Game);
                     continue;
                 }
-                if (resetInput)
-                    Game.ClearInput();
+                if (clientClosed)
+                {
+                    session!.Leave(Game);
+                    session = null;
+                    continue;
+                }
                 if (shutdownRequested)
                 {
-                    if (packets.Count > 0)
-                        _connection.Publish(UpdateLocal(packets, advance: false));
+                    if (session is not null && packets.Count > 0)
+                    {
+                        Game.BeginTick();
+                        session.Apply(Game, packets);
+                        session.Publish(Game.FinishTick(advance: false));
+                    }
                     Game.Destroy();
-                    _connection.Publish(new DisconnectPacket("The server is shutting down."));
+                    if (session is not null)
+                        session.Disconnect("The server is shutting down.");
+                    else
+                        _connection.Complete();
                     break;
                 }
-                if (resetInput)
-                    continue;
-                var update = UpdateLocal(packets);
-                Interlocked.Exchange(ref _tick, Game.Tick);
-                if (_connected)
-                    _connection.Publish(update);
                 deadline += ServerGame.StepSeconds;
+                if (paused)
+                {
+                    Game.ClearInput();
+                    continue;
+                }
+                Game.BeginTick();
+                session?.Apply(Game, packets);
+                var update = Game.FinishTick();
+                Interlocked.Exchange(ref _tick, Game.Tick);
+                session?.Publish(update);
             }
-            _connection.Complete();
         }
         catch (Exception error) when (!IsDedicated)
         {
             _connection.Complete(error);
         }
-    }
-
-    private WorldUpdatePacket UpdateLocal(IReadOnlyList<ServerboundPacket> packets, bool advance = true)
-    {
-        Game.BeginTick();
-        IReadOnlyList<WorldUpdatePacket.InteractionResult> results = _connected ? Game.Apply(_localPlayerNetworkId, packets) : [];
-        return Game.FinishTick(advance) with { Results = results };
     }
 
     private void RunDedicated()
@@ -254,7 +254,7 @@ public sealed class ServerEngine
         var listener = new TcpConnectionListener(_listenEndpoint!);
         var manifest = new ContentManifestPacket(Engine.RegistryManager.ExportIdMappings());
         var mods = Engine.ModManager.LoadedMods.Select(mod => mod.Info).ToArray();
-        var sessions = new List<RemoteSession>();
+        var sessions = new List<(TcpConnection Connection, RemoteSession Session)>();
         var accepted = new List<TcpConnection>();
         var clock = Stopwatch.StartNew();
         var deadline = ServerGame.StepSeconds;
@@ -262,12 +262,10 @@ public sealed class ServerEngine
         {
             bool shutdown;
             bool paused;
-            bool reset;
             lock (_gate)
             {
                 shutdown = _shutdownRequested;
                 paused = _isPaused;
-                reset = _resetInput;
                 if (_reschedule)
                 {
                     deadline = clock.Elapsed.TotalSeconds + ServerGame.StepSeconds;
@@ -279,19 +277,18 @@ public sealed class ServerEngine
                     Monitor.Wait(_gate, (int)Math.Ceiling(remaining * 1000));
                     continue;
                 }
-                _resetInput = false;
             }
             if (shutdown)
                 listener.StopAccepting();
             accepted.Clear();
             listener.DrainAccepted(accepted);
             foreach (var connection in accepted)
-                sessions.Add(new RemoteSession(connection, manifest, mods));
-            if (reset)
+                sessions.Add((connection, new RemoteSession(new TcpServerConnection(connection), manifest, mods)));
+            if (paused)
                 Game.ClearInput();
             Game.BeginTick();
             var batches = new List<(RemoteSession Session, IReadOnlyList<ServerboundPacket> Packets)>();
-            foreach (var session in sessions)
+            foreach (var (_, session) in sessions)
             {
                 if (shutdown && !session.IsPlaying)
                     session.Disconnect("The server is shutting down.");
@@ -304,7 +301,7 @@ public sealed class ServerEngine
             }
             var update = Game.FinishTick(advance: !paused && !shutdown);
             Interlocked.Exchange(ref _tick, Game.Tick);
-            foreach (var session in sessions)
+            foreach (var (_, session) in sessions)
             {
                 if (!paused || shutdown)
                     session.Publish(update);
@@ -313,24 +310,24 @@ public sealed class ServerEngine
             }
             if (shutdown)
                 break;
-            foreach (var session in sessions.Where(session => session.Connection.IsClosed).ToArray())
+            foreach (var (connection, session) in sessions.Where(entry => entry.Connection.IsClosed).ToArray())
             {
                 session.Leave(Game);
-                listener.Remove(session.Connection);
-                sessions.Remove(session);
+                listener.Remove(connection);
+                sessions.Remove((connection, session));
             }
             deadline += ServerGame.StepSeconds;
         }
         var drainStarted = Stopwatch.GetTimestamp();
-        while (sessions.Any(session => !session.Connection.IsClosed) &&
+        while (sessions.Any(entry => !entry.Connection.IsClosed) &&
                Stopwatch.GetElapsedTime(drainStarted) < NetworkLimits.FrameTimeout)
         {
-            foreach (var session in sessions)
-                session.Connection.ThrowIfFaulted();
+            foreach (var (connection, _) in sessions)
+                connection.ThrowIfFaulted();
             Thread.Sleep(1);
         }
-        foreach (var session in sessions)
-            listener.Remove(session.Connection);
+        foreach (var (connection, _) in sessions)
+            listener.Remove(connection);
         Game.Destroy();
     }
 }

@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Sockets;
 using PanguEngine.Client.World;
 using PanguEngine.Network;
+using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
 using PanguEngine.Server.Game;
@@ -15,6 +16,58 @@ namespace PanguEngine.Tests.Network;
 [Collection("Network globals")]
 public sealed class RemoteSessionTests
 {
+    [Fact]
+    public void ClosingInMemoryClientLeavesThePlayingSession()
+    {
+        TestRegistryBootstrap.Manager.AllocateIdTables();
+        BlockStateIds.Build();
+        var game = new ServerGame();
+        var connection = new InMemoryConnection();
+        try
+        {
+            var session = new RemoteSession(connection, game);
+            var initial = Assert.IsType<InitialWorldStatePacket>(connection.WaitForPacket(TimeSpan.Zero));
+            Assert.Equal(initial.PlayerNetworkId, Assert.Single(initial.Players).NetworkId);
+
+            connection.Close();
+            session.Receive(game);
+
+            Assert.Empty(game.CreateInitial(initial.PlayerNetworkId).Players);
+        }
+        finally
+        {
+            game.Destroy();
+        }
+    }
+
+    [Fact]
+    public void InMemoryRequestsKeepTheirOrderAndBatchBoundary()
+    {
+        TestRegistryBootstrap.Manager.AllocateIdTables();
+        BlockStateIds.Build();
+        var game = new ServerGame();
+        var connection = new InMemoryConnection();
+        try
+        {
+            var session = new RemoteSession(connection, game);
+            var place = new BlockInteractionPacket(BlockOperation.Place, 0, 0);
+            var remove = new BlockInteractionPacket(BlockOperation.Break, 0, 0);
+            var input = new InputStatePacket(0, 0, 0, 0);
+            Assert.True(connection.TrySend(place));
+            Assert.True(connection.TrySend(remove));
+            var first = session.Receive(game);
+            Assert.True(connection.TrySend(input));
+            var second = session.Receive(game);
+
+            Assert.Equal<ServerboundPacket>([place, remove], first);
+            Assert.Same(input, Assert.Single(second));
+        }
+        finally
+        {
+            game.Destroy();
+        }
+    }
+
     [Theory]
     [InlineData("1.2.3+build1", false, true)]
     [InlineData("1.2.3+build2", false, false)]
@@ -42,7 +95,7 @@ public sealed class RemoteSessionTests
                 [
                     new("required", SemVersion.Parse("1.2.3+build1"), "TestMod.dll", "TestMod.Entry", [])
                 ];
-                var session = new RemoteSession(connection,
+                var session = new RemoteSession(new TcpServerConnection(connection),
                     new ContentManifestPacket(TestRegistryBootstrap.Manager.ExportIdMappings()), mods);
                 var clientMods = new List<ModVersionEntry> { new("extra", "9.0.0") };
                 if (requiredVersion is not null)
@@ -88,7 +141,7 @@ public sealed class RemoteSessionTests
             var connection = new TcpConnection(accepted);
             try
             {
-                var session = new RemoteSession(connection,
+                var session = new RemoteSession(new TcpServerConnection(connection),
                     new ContentManifestPacket(TestRegistryBootstrap.Manager.ExportIdMappings()), []);
                 var reason = "The server stopped before the handshake.";
                 session.Disconnect(reason);
@@ -115,7 +168,8 @@ public sealed class RemoteSessionTests
         var host = Task.Run(() =>
         {
             var game = new ServerGame();
-            var sessions = new List<RemoteSession>();
+            var sessions = new List<(TcpConnection Connection, RemoteSession Session)>();
+            game.World.SetBlock(new(8, 22, 22), BuiltinBlocks.Stone.DefaultState);
             var accepted = new List<TcpConnection>();
             var manifest = new ContentManifestPacket(TestRegistryBootstrap.Manager.ExportIdMappings());
             ModInfo[] mods = [new("a", SemVersion.Parse("1.0.0"), "TestMod.dll", "TestMod.Entry", [])];
@@ -123,42 +177,54 @@ public sealed class RemoteSessionTests
             {
                 accepted.Clear();
                 listener.DrainAccepted(accepted);
-                sessions.AddRange(accepted.Select(connection => new RemoteSession(connection, manifest, mods)));
+                foreach (var connection in accepted)
+                    sessions.Add((connection, new RemoteSession(new TcpServerConnection(connection), manifest, mods)));
                 game.BeginTick();
-                var batches = sessions.Select(session => (Session: session, Packets: session.Receive(game))).ToArray();
+                var batches = sessions.Select(entry => (entry.Session, Packets: entry.Session.Receive(game))).ToArray();
                 foreach (var batch in batches)
                     batch.Session.Apply(game, batch.Packets);
                 var update = game.FinishTick();
-                foreach (var session in sessions)
+                foreach (var (_, session) in sessions)
                     session.Publish(update);
-                foreach (var session in sessions.Where(session => session.Connection.IsClosed).ToArray())
+                foreach (var (connection, session) in sessions.Where(entry => entry.Connection.IsClosed).ToArray())
                 {
                     session.Leave(game);
-                    listener.Remove(session.Connection);
-                    sessions.Remove(session);
+                    listener.Remove(connection);
+                    sessions.Remove((connection, session));
                 }
                 Thread.Sleep(10);
             }
             listener.StopAccepting();
-            foreach (var session in sessions)
-                listener.Remove(session.Connection);
+            foreach (var (connection, _) in sessions)
+                listener.Remove(connection);
             game.Destroy();
         });
-        RemoteConnection? first = null;
-        RemoteConnection? second = null;
+        TcpClientConnection? first = null;
+        TcpClientConnection? second = null;
         var firstWorld = new ClientWorld();
         var secondWorld = new ClientWorld();
         try
         {
-            first = RemoteConnection.Connect(endpoint, TestRegistryBootstrap.Manager, [new("a", "1.0.0")]);
+            first = TcpClientConnection.Connect(endpoint, TestRegistryBootstrap.Manager, [new("a", "1.0.0")]);
             var initial = ClientGameTests.LoadInitialWorld(first, firstWorld);
-            second = RemoteConnection.Connect(endpoint, TestRegistryBootstrap.Manager, [new("a", "1.0.0")]);
+            second = TcpClientConnection.Connect(endpoint, TestRegistryBootstrap.Manager, [new("a", "1.0.0")]);
             var other = ClientGameTests.LoadInitialWorld(second, secondWorld);
             Assert.NotEqual(initial.PlayerNetworkId, other.PlayerNetworkId);
             Assert.Equal(2, secondWorld.Players.Count);
             Assert.Equal(firstWorld.Chunks.Count, secondWorld.Chunks.Count);
-            first.TrySend(new InputStatePacket(1, 0, -90, 0));
+            Assert.True(first.TrySend(new BlockInteractionPacket(BlockOperation.Break, -90, 0)));
             WorldUpdatePacket update;
+            do { update = Assert.IsType<WorldUpdatePacket>(first.WaitForPacket(TimeSpan.FromSeconds(5))); }
+            while (update.Results.Count == 0);
+            Assert.True(Assert.Single(update.Results).IsSuccess);
+            WorldUpdatePacket otherUpdate;
+            do { otherUpdate = Assert.IsType<WorldUpdatePacket>(second.WaitForPacket(TimeSpan.FromSeconds(5))); }
+            while (otherUpdate.Tick < update.Tick);
+            Assert.Equal(update.Tick, otherUpdate.Tick);
+            Assert.Equal(Assert.Single(update.Changes), Assert.Single(otherUpdate.Changes));
+            Assert.Empty(otherUpdate.Results);
+
+            first.TrySend(new InputStatePacket(1, 0, -90, 0));
             do { update = Assert.IsType<WorldUpdatePacket>(first.WaitForPacket(TimeSpan.FromSeconds(5))); }
             while (update.Players.Single(p => p.NetworkId == initial.PlayerNetworkId).Pose.Position == initial.Player.Position);
             Assert.Equal(other.Player.Position, update.Players.Single(p => p.NetworkId == other.PlayerNetworkId).Pose.Position);

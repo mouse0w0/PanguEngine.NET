@@ -11,14 +11,15 @@ using PanguEngine.Registries;
 
 namespace PanguEngine.Network;
 
-internal sealed class RemoteConnection(TcpConnection connection) : IClientConnection
+/// <summary>Connects a client to a remote server and exchanges typed packets over TCP.</summary>
+internal sealed class TcpClientConnection(TcpConnection connection) : IClientConnection
 {
-    internal static RemoteConnection Connect(IPEndPoint endpoint, RegistryManager registries,
+    internal static TcpClientConnection Connect(IPEndPoint endpoint, RegistryManager registries,
         IReadOnlyList<ModVersionEntry> mods)
     {
         var client = new TcpClient(endpoint.AddressFamily);
         ConnectAsync(client, endpoint).GetAwaiter().GetResult();
-        var result = new RemoteConnection(new TcpConnection(client));
+        var result = new TcpClientConnection(new TcpConnection(client));
         var started = Stopwatch.GetTimestamp();
         result.TrySend(new ClientHelloPacket(PacketCodec.ProtocolVersion, mods));
         var packet = result.WaitForPacket(NetworkLimits.HandshakeTimeout - Stopwatch.GetElapsedTime(started));
@@ -44,7 +45,7 @@ internal sealed class RemoteConnection(TcpConnection connection) : IClientConnec
 
     private void EnableHeartbeat() => connection.EnableHeartbeat();
 
-    public (bool IsAccepting, long Epoch) RequestState => (!connection.IsClosed, 0);
+    public bool IsClosed => connection.IsClosed;
 
     public bool TrySend(ServerboundPacket packet) => connection.TrySend(PacketCodec.Encode(packet));
 

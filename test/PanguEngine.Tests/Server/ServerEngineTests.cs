@@ -1,4 +1,8 @@
+using System.Diagnostics;
+using PanguEngine.Client.Game;
+using PanguEngine.Client.World;
 using PanguEngine.Server;
+using PanguEngine.Tests.Client.Game;
 using PanguEngine.Registries;
 using PanguEngine.World.Blocks;
 using PanguEngine.Network.Packets;
@@ -13,13 +17,15 @@ public sealed class ServerEngineTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
-    public async Task PausedServerDiscardsPendingInputAndCanCloseWithoutAdvancing()
+    public async Task PausedShutdownDoesNotApplyPendingInput()
     {
         var server = new ServerEngine(false);
-        var connection = server.ConnectLocal();
-        connection.TrySend(new InputStatePacket(1, 0, 0, 0));
-        connection.TrySend(new BlockInteractionPacket(BlockOperation.Break, 0, 0));
+        var connection = server.ConnectInMemory();
         server.IsPaused = true;
+        Assert.True(connection.TrySend(new InputStatePacket(0, 0, 42, 12)));
+        Assert.True(connection.TrySend(new BlockInteractionPacket(BlockOperation.Break, 0, 0)));
+        server.RequestShutdown();
+        server.IsPaused = false;
         server.Start();
         InitialWorldStatePacket initial;
         try
@@ -27,15 +33,16 @@ public sealed class ServerEngineTests
             Assert.Same(TestRegistryBootstrap.CustomIdValue, TestRegistryBootstrap.CustomIdTable.Get(0));
             Assert.Same(BuiltinBlocks.Stone, BuiltinIdTables.Block.Get(BuiltinIdTables.Block.GetId(BuiltinBlocks.Stone)));
             initial = await Task.Run(() => ReceiveInitial(connection)).WaitAsync(Timeout);
-            Assert.False(connection.TrySend(new InputStatePacket(0, 0, 0, 0)));
         }
         finally
         {
             await Task.Run(server.Destroy).WaitAsync(Timeout);
         }
 
+        Assert.True(connection.IsClosed);
         var closed = Assert.IsType<DisconnectPacket>(connection.WaitForPacket());
         Assert.NotEmpty(closed.Reason);
+        Assert.Throws<InvalidOperationException>(() => connection.WaitForPacket(TimeSpan.Zero));
         Assert.Equal(initial.Tick, server.Tick);
         Assert.Same(TestRegistryBootstrap.CustomIdValue, TestRegistryBootstrap.CustomIdTable.Get(0));
     }
@@ -44,7 +51,7 @@ public sealed class ServerEngineTests
     public async Task RuntimeFailureIsRethrownByReceiverAndShutdown()
     {
         var server = new ServerEngine(false);
-        var connection = server.ConnectLocal();
+        var connection = server.ConnectInMemory();
         server.Start();
         ArgumentOutOfRangeException actual;
         ArgumentOutOfRangeException shutdownError;
@@ -68,14 +75,19 @@ public sealed class ServerEngineTests
         Assert.Same(actual, shutdownError);
     }
 
-    [Fact]
-    public async Task ShutdownDrainsAcceptedInputWithoutExtraSimulation()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ShutdownDrainsAcceptedInputWithoutExtraSimulation(bool pauseAfterShutdown)
     {
         var server = new ServerEngine(false);
-        var connection = server.ConnectLocal();
+        var connection = server.ConnectInMemory();
         var input = new InputStatePacket(0, 0, 42, 12);
-        connection.TrySend(input);
+        Assert.True(connection.TrySend(input));
+        Assert.True(connection.TrySend(new BlockInteractionPacket(BlockOperation.Break, 0, 0)));
         server.RequestShutdown();
+        if (pauseAfterShutdown)
+            server.IsPaused = true;
         server.Start();
         try
         {
@@ -87,6 +99,7 @@ public sealed class ServerEngineTests
             Assert.Equal((input.Yaw, input.Pitch), (player.Yaw, player.Pitch));
             Assert.Equal(initial.Player.Position, player.Position);
             Assert.Equal(initial.Tick, final.Tick);
+            Assert.Equal(BlockOperation.Break, Assert.Single(final.Results).Operation);
             Assert.NotEmpty(closed.Reason);
         }
         finally
@@ -96,46 +109,102 @@ public sealed class ServerEngineTests
     }
 
     [Fact]
-    public async Task QuickPauseResumeClearsOldMovementAndAcceptsNewInput()
+    public async Task PausedRoundDiscardsInputAndMovementRequiresNewInputOnResume()
     {
         var server = new ServerEngine(false);
-        var connection = server.ConnectLocal();
-        connection.TrySend(new InputStatePacket(1, 0, -90, 0));
+        var connection = server.ConnectInMemory();
+        var serverEndpoint = (IServerConnection)connection;
+        server.IsPaused = true;
+        Assert.True(connection.TrySend(new InputStatePacket(1, 0, -90, 0)));
+        server.IsPaused = false;
         server.Start();
         try
         {
-            await Task.Run(() => ReceiveInitial(connection)).WaitAsync(Timeout);
+            var initial = await Task.Run(() => ReceiveInitial(connection)).WaitAsync(Timeout);
             var moving = Assert.IsType<WorldUpdatePacket>(await Task.Run(() => connection.WaitForPacket(Timeout)).WaitAsync(Timeout));
+            var movingPose = Assert.Single(moving.Players).Pose;
+            Assert.NotEqual(initial.Player.Position, movingPose.Position);
+            Assert.Equal((-90d, 0d), (movingPose.Yaw, movingPose.Pitch));
             server.IsPaused = true;
-            var pauseTick = server.Tick;
-            server.IsPaused = false;
+            Assert.True(connection.TrySend(new InputStatePacket(-1, 0, 42, 12)));
+            Assert.True(connection.TrySend(new BlockInteractionPacket(BlockOperation.Break, double.NaN, 0)));
+            using var deadline = new CancellationTokenSource(Timeout);
+            while (serverEndpoint.IncomingCount != 0)
+                await Task.Delay(1, deadline.Token);
 
-            await Task.Run(() =>
+            var lastRunningUpdate = moving;
+            while (connection.TryReceive(out var packet))
             {
-                var previous = moving;
-                var resubmitted = false;
-                while (true)
-                {
-                    var next = Assert.IsType<WorldUpdatePacket>(connection.WaitForPacket(Timeout));
-                    Assert.Equal(previous.Tick + 1, next.Tick);
-                    if (!resubmitted && next.Tick > pauseTick + 1)
-                    {
-                        Assert.Equal(previous.Players[0].Pose.Position, next.Players[0].Pose.Position);
-                        Assert.True(connection.TrySend(new InputStatePacket(1, 0, -90, 0)));
-                        resubmitted = true;
-                    }
-                    else if (resubmitted && next.Players[0].Pose.Position != previous.Players[0].Pose.Position)
-                        return;
-                    previous = next;
-                }
-            }).WaitAsync(Timeout);
+                var queued = Assert.IsType<WorldUpdatePacket>(packet);
+                Assert.Equal(lastRunningUpdate.Tick + 1, queued.Tick);
+                var pose = Assert.Single(queued.Players).Pose;
+                Assert.Equal((-90d, 0d), (pose.Yaw, pose.Pitch));
+                Assert.Empty(queued.Results);
+                lastRunningUpdate = queued;
+            }
+            var lastPose = Assert.Single(lastRunningUpdate.Players).Pose;
+
+            server.IsPaused = false;
+            var update = Assert.IsType<WorldUpdatePacket>(await Task.Run(() => connection.WaitForPacket(Timeout)).WaitAsync(Timeout));
+            Assert.Equal(lastRunningUpdate.Tick + 1, update.Tick);
+            Assert.Equal(lastPose, Assert.Single(update.Players).Pose);
+            Assert.Empty(update.Results);
+
+            Assert.True(connection.TrySend(new InputStatePacket(1, 0, -90, 0)));
+            var started = Stopwatch.GetTimestamp();
+            while (Assert.Single(update.Players).Pose.Position == lastPose.Position && Stopwatch.GetElapsedTime(started) < Timeout)
+                update = Assert.IsType<WorldUpdatePacket>(await Task.Run(() => connection.WaitForPacket(Timeout)).WaitAsync(Timeout));
+            Assert.NotEqual(lastPose.Position, Assert.Single(update.Players).Pose.Position);
         }
         finally
         {
             await Task.Run(server.Destroy).WaitAsync(Timeout);
         }
     }
-    private static InitialWorldStatePacket ReceiveInitial(LocalConnection connection)
+
+    [Fact]
+    public async Task InMemoryClientLoadsWorldAndPlaysWithoutAHandshake()
+    {
+        var server = new ServerEngine(false) { IsPaused = true };
+        server.Start();
+        var connection = server.ConnectInMemory();
+        try
+        {
+            await Task.Run(() =>
+            {
+                var world = new ClientWorld();
+                ClientSession? session = null;
+                try
+                {
+                    var initial = ClientGameTests.LoadInitialWorld(connection, world);
+                    Assert.Equal(0L, initial.Tick);
+                    session = new ClientSession(connection, world, initial, 0);
+                    server.IsPaused = false;
+                    session.SubmitInput(0, 0, 42, 12);
+
+                    var started = Stopwatch.GetTimestamp();
+                    while (world.Player.Rotation.Yaw != 42 && Stopwatch.GetElapsedTime(started) < Timeout)
+                    {
+                        Thread.Sleep(1);
+                        session.ReceivePending(1);
+                    }
+                    Assert.Equal((42d, 12d), (world.Player.Rotation.Yaw, world.Player.Rotation.Pitch));
+                }
+                finally
+                {
+                    session?.BeginClose();
+                    world.Destroy();
+                }
+            }).WaitAsync(Timeout);
+        }
+        finally
+        {
+            await Task.Run(server.Destroy).WaitAsync(Timeout);
+            connection.Close();
+        }
+    }
+
+    private static InitialWorldStatePacket ReceiveInitial(IClientConnection connection)
     {
         var initial = Assert.IsType<InitialWorldStatePacket>(connection.WaitForPacket(Timeout));
         for (var i = 0; i < initial.ChunkCount; i++)

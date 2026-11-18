@@ -15,7 +15,7 @@ public sealed class ClientSessionTests
     [Fact]
     public void QueuedUpdatesAndFeedbackAreAppliedBeforeDisconnectReason()
     {
-        var connection = new LocalConnection();
+        var connection = new InMemoryConnection();
         var world = new ClientWorld();
         var id = 1u;
         var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);
@@ -55,7 +55,7 @@ public sealed class ClientSessionTests
     [Fact]
     public void ReceivedStateUpdatesWorldAndResetsInterpolationClock()
     {
-        var connection = new LocalConnection();
+        var connection = new InMemoryConnection();
         var world = new ClientWorld();
         var id = 1u;
         var initial = new InitialWorldStatePacket(0, id, 0.05, [new(id, default)], 0);

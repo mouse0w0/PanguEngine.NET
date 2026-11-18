@@ -17,7 +17,7 @@ public sealed class ClientGameTests
     [InlineData(true)]
     public void DisconnectPreservesReasonBeforeOrAfterInitialMetadata(bool receivedMetadata)
     {
-        var connection = new LocalConnection();
+        var connection = new InMemoryConnection();
         var world = new ClientWorld();
         if (receivedMetadata)
         {

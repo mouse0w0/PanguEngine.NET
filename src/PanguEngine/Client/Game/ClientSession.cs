@@ -16,7 +16,6 @@ internal sealed class ClientSession
     private readonly double _stepSeconds;
     private double _receivedAt;
     private bool _closing;
-    private long _inputEpoch;
 
     internal ClientSession(IClientConnection connection, ClientWorld world, InitialWorldStatePacket initial, double now)
     {
@@ -24,27 +23,16 @@ internal sealed class ClientSession
         _world = world;
         _stepSeconds = initial.StepSeconds;
         _receivedAt = now;
-        _inputEpoch = connection.RequestState.Epoch;
     }
 
-    internal bool CanSubmitInput => !_closing && _connection.RequestState.IsAccepting;
+    internal bool CanSubmitInput => !_closing && !_connection.IsClosed;
     internal event Action<InteractionResult>? OperationCompleted;
 
     internal double GetInterpolationAlpha(double now) => Math.Clamp((now - _receivedAt) / _stepSeconds, 0, 1);
 
-    internal void RefreshInputAfterResume(InputManager input, double yaw, double pitch)
+    internal void RefreshInput(InputManager input, double yaw, double pitch)
     {
-        var state = _connection.RequestState;
-        if (!_closing && state.IsAccepting && state.Epoch != _inputEpoch)
-        {
-            _inputEpoch = state.Epoch;
-            RefreshInput(input, yaw, pitch);
-        }
-    }
-
-    internal void RefreshInput(InputManager input, double yaw, double pitch, bool gameplayPaused = false)
-    {
-        var movement = gameplayPaused ? default : input.GetValue(BuiltinInputActions.Move).Axis2D;
+        var movement = input.GetValue(BuiltinInputActions.Move).Axis2D;
         SubmitInput(movement.Y, movement.X, yaw, pitch);
     }
 

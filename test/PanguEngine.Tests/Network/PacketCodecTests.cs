@@ -225,13 +225,13 @@ public sealed class PacketCodecTests
         try
         {
             var endpoint = (IPEndPoint)listener.LocalEndpoint;
-            var connecting = Task.Run(() => RemoteConnection.Connect(endpoint, manager, []));
+            var connecting = Task.Run(() => TcpClientConnection.Connect(endpoint, manager, []));
             using var accepted = listener.AcceptTcpClientAsync(deadline.Token).AsTask().GetAwaiter().GetResult();
             var connection = new TcpConnection(accepted);
             var game = new ServerGame();
             try
             {
-                var session = new RemoteSession(connection, manifest, []);
+                var session = new RemoteSession(new TcpServerConnection(connection), manifest, []);
                 connection.WaitForFrame(TimeSpan.FromSeconds(5));
                 session.Receive(game);
                 var client = connecting.WaitAsync(deadline.Token).GetAwaiter().GetResult();

@@ -3,7 +3,6 @@ using PanguEngine.Audio;
 using PanguEngine.Client.World;
 using PanguEngine.Client.Input;
 using PanguEngine.Input;
-using PanguEngine.Server;
 using PanguEngine.Network;
 using PanguEngine.World.Chunking;
 using PanguEngine.World.Interaction;
@@ -59,11 +58,7 @@ public sealed class ClientGame
     /// <summary>The display block selected by the current camera ray, or null when it misses.</summary>
     public BlockHit? SelectedBlock { get; private set; }
 
-    internal void ReceivePending()
-    {
-        _session.ReceivePending(_displayClock.Elapsed.TotalSeconds);
-        _session.RefreshInputAfterResume(_input, Camera.Yaw, Camera.Pitch);
-    }
+    internal void ReceivePending() => _session.ReceivePending(_displayClock.Elapsed.TotalSeconds);
 
     /// <summary>
     /// Prepares resources for the next client frame.
@@ -162,7 +157,7 @@ public sealed class ClientGame
 
     private void SubmitCurrentInput()
     {
-        _session.RefreshInput(_input, Camera.Yaw, Camera.Pitch, _engine.Ui.CurrentScene?.PausesGame == true);
+        _session.RefreshInput(_input, Camera.Yaw, Camera.Pitch);
     }
 
     private void ClearInput() => SubmitCurrentInput();

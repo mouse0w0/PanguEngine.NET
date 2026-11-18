@@ -9,42 +9,59 @@ using PanguEngine.Versioning;
 
 namespace PanguEngine.Server.Game;
 
-internal sealed class RemoteSession(TcpConnection connection, ContentManifestPacket manifest, IReadOnlyList<ModInfo> mods)
+/// <summary>Owns the server-side lifetime of a player's session.</summary>
+internal sealed class RemoteSession
 {
-    private readonly long _startedAt = connection.ConnectedAt;
+    private readonly IServerConnection _connection;
+    private readonly (TcpServerConnection Connection, ContentManifestPacket Manifest, IReadOnlyList<ModInfo> Mods)? _tcp;
     private Stage _stage;
     private uint? _playerNetworkId;
     private IReadOnlyList<WorldUpdatePacket.InteractionResult> _results = [];
 
-    internal TcpConnection Connection => connection;
+    internal RemoteSession(TcpServerConnection connection, ContentManifestPacket manifest, IReadOnlyList<ModInfo> mods)
+    {
+        _connection = connection;
+        _tcp = (connection, manifest, mods);
+    }
+
+    /// <summary>Admits an in-process client that already shares the server's content.</summary>
+    internal RemoteSession(InMemoryConnection connection, ServerGame game)
+    {
+        _connection = connection;
+        EnterPlay(game);
+    }
+
     internal bool IsPlaying => _stage == Stage.Playing;
 
     internal IReadOnlyList<ServerboundPacket> Receive(ServerGame game)
     {
-        connection.ThrowIfFaulted();
+        _connection.ThrowIfFaulted();
         _results = [];
-        if (connection.IsClosed || _stage == Stage.Closing)
+        if (_connection.IsClosed || _stage == Stage.Closing)
         {
             Leave(game);
             return [];
         }
-        if (_stage != Stage.Playing && Stopwatch.GetElapsedTime(_startedAt) >= NetworkLimits.HandshakeTimeout)
+        if (_tcp is { } tcp && _stage != Stage.Playing &&
+            Stopwatch.GetElapsedTime(tcp.Connection.ConnectedAt) >= NetworkLimits.HandshakeTimeout)
         {
             Disconnect("Content handshake timed out.");
             return [];
         }
+        var count = _connection.IncomingCount;
+        if (count == 0)
+            return [];
         var packets = new List<ServerboundPacket>();
-        var count = connection.IncomingCount;
         for (var i = 0; i < count; i++)
         {
             ServerboundPacket packet;
             try
             {
-                if (!connection.TryPeek(out var frame))
+                if (!_connection.TryReceive(out var received))
                     break;
-                packet = PacketCodec.ReadServerbound(frame.Span);
-                connection.Consume();
-                Validate(packet);
+                packet = received;
+                if (_tcp.HasValue)
+                    Validate(packet);
             }
             catch (Exception error) when (error is InvalidDataException or EndOfStreamException or DecoderFallbackException)
             {
@@ -59,16 +76,16 @@ internal sealed class RemoteSession(TcpConnection connection, ContentManifestPac
             }
             switch (packet)
             {
-                case ClientHelloPacket hello:
+                case ClientHelloPacket hello when _tcp is { } content:
                     string? rejection;
-                    try { rejection = CheckMods(mods, hello.Mods); }
+                    try { rejection = CheckMods(content.Mods, hello.Mods); }
                     catch (InvalidDataException error) { rejection = error.Message; }
                     if (rejection is not null)
                     {
                         Disconnect(rejection);
                         return [];
                     }
-                    try { Send(manifest); }
+                    try { Send(content.Manifest); }
                     catch (InvalidDataException)
                     {
                         Disconnect("Server content manifest exceeds the 1 MiB message limit.");
@@ -76,17 +93,9 @@ internal sealed class RemoteSession(TcpConnection connection, ContentManifestPac
                     }
                     _stage = Stage.WaitingReady;
                     break;
-                case ContentReadyPacket:
-                    connection.EnableHeartbeat();
-                    _playerNetworkId = game.JoinPlayer();
-                    Send(game.CreateInitial(_playerNetworkId.Value));
-                    foreach (var chunk in game.CaptureChunks())
-                    {
-                        if (!Send(chunk))
-                            break;
-                    }
-                    Send(new InitialWorldCompletePacket());
-                    _stage = Stage.Playing;
+                case ContentReadyPacket when _tcp is { } ready:
+                    ready.Connection.EnableHeartbeat();
+                    EnterPlay(game);
                     break;
                 default:
                     packets.Add(packet);
@@ -94,6 +103,20 @@ internal sealed class RemoteSession(TcpConnection connection, ContentManifestPac
             }
         }
         return packets;
+    }
+
+    private void EnterPlay(ServerGame game)
+    {
+        var playerNetworkId = game.JoinPlayer();
+        _playerNetworkId = playerNetworkId;
+        Send(game.CreateInitial(playerNetworkId));
+        foreach (var chunk in game.CaptureChunks())
+        {
+            if (!Send(chunk))
+                break;
+        }
+        Send(new InitialWorldCompletePacket());
+        _stage = Stage.Playing;
     }
 
     internal void Apply(ServerGame game, IReadOnlyList<ServerboundPacket> packets)
@@ -104,7 +127,7 @@ internal sealed class RemoteSession(TcpConnection connection, ContentManifestPac
 
     internal void Publish(WorldUpdatePacket update)
     {
-        if (_stage == Stage.Playing && !connection.IsClosed)
+        if (_stage == Stage.Playing && !_connection.IsClosed)
             Send(update with { Results = _results });
     }
 
@@ -125,10 +148,10 @@ internal sealed class RemoteSession(TcpConnection connection, ContentManifestPac
             reason = "The connection was closed; the diagnostic message exceeded its length limit.";
         Send(new DisconnectPacket(reason));
         _stage = Stage.Closing;
-        connection.CompleteSending(reason);
+        _connection.CompleteSending(reason);
     }
 
-    private bool Send(ClientboundPacket packet) => connection.TrySend(PacketCodec.Encode(packet));
+    private bool Send(ClientboundPacket packet) => _connection.TrySend(packet);
 
     private static string? CheckMods(IReadOnlyList<ModInfo> server, IReadOnlyList<ModVersionEntry> client)
     {

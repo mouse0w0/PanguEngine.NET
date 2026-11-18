@@ -5,28 +5,19 @@ using PanguEngine.Network.Packets;
 
 namespace PanguEngine.Network;
 
-internal sealed class LocalConnection : IClientConnection
+/// <summary>Shares a pair of packet queues between the client and integrated server.</summary>
+internal sealed class InMemoryConnection : IClientConnection, IServerConnection
 {
     private readonly object _gate;
     private readonly Queue<ServerboundPacket> _serverboundPackets = [];
     private readonly Queue<ClientboundPacket> _clientboundPackets = [];
-    private long _requestEpoch;
     private bool _completed;
     private bool _acceptingRequests = true;
     private ExceptionDispatchInfo? _fault;
 
-    internal LocalConnection(object? synchronization = null)
+    internal InMemoryConnection(object? synchronization = null)
     {
         _gate = synchronization ?? new object();
-    }
-
-    public (bool IsAccepting, long Epoch) RequestState
-    {
-        get
-        {
-            lock (_gate)
-                return (_acceptingRequests && !_completed, _requestEpoch);
-        }
     }
 
     public bool TrySend(ServerboundPacket packet)
@@ -41,33 +32,46 @@ internal sealed class LocalConnection : IClientConnection
         }
     }
 
-    /// <summary>Drains pending serverbound packets into the supplied list.</summary>
-    /// <remarks>During concurrent access, the caller must hold the shared synchronization gate.</remarks>
-    internal void DrainServerboundPackets(List<ServerboundPacket> packets)
+    public bool IsClosed
     {
-        packets.AddRange(_serverboundPackets);
-        _serverboundPackets.Clear();
+        get { lock (_gate) return _completed; }
     }
 
-    /// <summary>Changes request acceptance and optionally discards pending requests.</summary>
-    /// <remarks>During concurrent access, the caller must hold the shared synchronization gate.</remarks>
-    internal void SetAcceptingRequests(bool accepting, bool clearPending)
+    public int IncomingCount
     {
-        if (_acceptingRequests != accepting || clearPending)
-            _requestEpoch++;
-        _acceptingRequests = accepting;
+        get { lock (_gate) return _serverboundPackets.Count; }
+    }
+
+    bool IServerConnection.TryReceive([NotNullWhen(true)] out ServerboundPacket? packet)
+    {
+        lock (_gate)
+            return _serverboundPackets.TryDequeue(out packet);
+    }
+
+    /// <summary>Stops accepting new requests and optionally discards queued requests.</summary>
+    /// <remarks>The server stops acceptance while holding the shared synchronization gate.</remarks>
+    internal void StopAcceptingRequests(bool clearPending)
+    {
+        _acceptingRequests = false;
         if (clearPending)
             _serverboundPackets.Clear();
     }
 
-    internal void Publish(ClientboundPacket packet)
+    internal bool Publish(ClientboundPacket packet)
     {
         lock (_gate)
         {
+            if (_completed)
+                return false;
             _clientboundPackets.Enqueue(packet);
             Monitor.PulseAll(_gate);
+            return true;
         }
     }
+
+    bool IServerConnection.TrySend(ClientboundPacket packet) => Publish(packet);
+
+    void IServerConnection.CompleteSending(string reason) => Complete();
 
     public bool TryReceive([NotNullWhen(true)] out ClientboundPacket? packet)
     {
@@ -105,7 +109,8 @@ internal sealed class LocalConnection : IClientConnection
     {
         lock (_gate)
         {
-            _fault = error is null ? null : ExceptionDispatchInfo.Capture(error);
+            if (error is not null)
+                _fault = ExceptionDispatchInfo.Capture(error);
             _completed = true;
             Monitor.PulseAll(_gate);
         }
@@ -115,7 +120,7 @@ internal sealed class LocalConnection : IClientConnection
     {
         lock (_gate)
         {
-            SetAcceptingRequests(false, clearPending: true);
+            _serverboundPackets.Clear();
             _completed = true;
             Monitor.PulseAll(_gate);
         }
