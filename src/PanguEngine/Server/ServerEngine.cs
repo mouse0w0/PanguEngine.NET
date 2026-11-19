@@ -14,7 +14,8 @@ public sealed class ServerEngine
     private readonly object _gate = new();
     private readonly Thread _thread;
     private readonly InMemoryConnection _connection;
-    private bool _joinRequested;
+    private readonly PlayerNames _playerNames = new();
+    private RemoteSession? _pendingLocalSession;
     private bool _connectionClaimed;
     private bool _isPaused;
     private bool _reschedule;
@@ -42,6 +43,9 @@ public sealed class ServerEngine
 
     /// <summary>The game owned by the server thread.</summary>
     public ServerGame Game { get; private set; } = null!;
+
+    /// <summary>The play-phase players, accessed from the server game thread.</summary>
+    public PlayerManager PlayerManager { get; } = new();
 
     /// <summary>The number of completed world simulation steps.</summary>
     public long Tick => Interlocked.Read(ref _tick);
@@ -105,8 +109,8 @@ public sealed class ServerEngine
             _thread.Start();
     }
 
-    /// <summary>Reserves the integrated server's in-process session and returns its client endpoint.</summary>
-    internal IClientConnection ConnectInMemory()
+    /// <summary>Submits a ready in-process session to the game thread and returns its client endpoint.</summary>
+    internal IClientConnection ConnectInMemory(string username = "Player")
     {
         lock (_gate)
         {
@@ -115,8 +119,9 @@ public sealed class ServerEngine
             _connection.ThrowIfFaulted();
             if (_connectionClaimed || _shutdownRequested)
                 throw new InvalidOperationException("The server cannot accept another local connection.");
+            _playerNames.Reserve(username);
+            _pendingLocalSession = new RemoteSession(_connection, username, _playerNames);
             _connectionClaimed = true;
-            _joinRequested = true;
             Monitor.PulseAll(_gate);
             return _connection;
         }
@@ -162,20 +167,19 @@ public sealed class ServerEngine
             var clock = Stopwatch.StartNew();
             var deadline = ServerGame.StepSeconds;
             RemoteSession? session = null;
+            Player? player = null;
             while (true)
             {
                 IReadOnlyList<ServerboundPacket> packets = [];
-                var joinRequested = false;
+                RemoteSession? pendingSession;
                 var clientClosed = false;
                 var paused = false;
                 var shutdownRequested = false;
                 lock (_gate)
                 {
-                    if (_joinRequested)
-                    {
-                        _joinRequested = false;
-                        joinRequested = true;
-                    }
+                    pendingSession = _pendingLocalSession;
+                    if (pendingSession is not null)
+                        _pendingLocalSession = null;
                     else if (session is not null && _connection.IsClosed)
                         clientClosed = true;
                     else
@@ -197,34 +201,44 @@ public sealed class ServerEngine
                             }
                         }
                         if (session is not null)
-                            packets = session.Receive(Game);
+                            packets = CollectPlayPackets(Game, PlayerManager, session, ref player);
                     }
                 }
-                if (joinRequested)
+                if (pendingSession is not null)
                 {
-                    if (!_connection.IsClosed)
-                        session = new RemoteSession(_connection, Game);
+                    if (TryEnterPlay(Game, PlayerManager, pendingSession, ref player))
+                        session = pendingSession;
+                    else
+                    {
+                        LeavePlay(Game, PlayerManager, ref player);
+                        pendingSession.ReleaseNameIfClosed();
+                    }
                     continue;
                 }
                 if (clientClosed)
                 {
-                    session!.Leave(Game);
+                    LeavePlay(Game, PlayerManager, ref player);
+                    session!.ReleaseNameIfClosed();
                     session = null;
                     continue;
                 }
                 if (shutdownRequested)
                 {
-                    if (session is not null && packets.Count > 0)
+                    if (player is { } finalPlayer && packets.Count > 0)
                     {
                         Game.BeginTick();
-                        session.Apply(Game, packets);
-                        session.Publish(Game.FinishTick(advance: false));
+                        var results = Game.Apply(finalPlayer.Entity.NetworkId, packets);
+                        PublishPlayUpdate(finalPlayer, Game.FinishTick(advance: false), results);
                     }
-                    Game.Destroy();
                     if (session is not null)
+                    {
                         session.Disconnect("The server is shutting down.");
+                        LeavePlay(Game, PlayerManager, ref player);
+                        session.ReleaseNameIfClosed();
+                    }
                     else
                         _connection.Complete();
+                    Game.Destroy();
                     break;
                 }
                 deadline += ServerGame.StepSeconds;
@@ -234,10 +248,12 @@ public sealed class ServerEngine
                     continue;
                 }
                 Game.BeginTick();
-                session?.Apply(Game, packets);
+                IReadOnlyList<WorldUpdatePacket.InteractionResult> roundResults =
+                    player is not null ? Game.Apply(player.Entity.NetworkId, packets) : [];
                 var update = Game.FinishTick();
                 Interlocked.Exchange(ref _tick, Game.Tick);
-                session?.Publish(update);
+                if (player is not null)
+                    PublishPlayUpdate(player, update, roundResults);
             }
         }
         catch (Exception error) when (!IsDedicated)
@@ -254,7 +270,7 @@ public sealed class ServerEngine
         var listener = new TcpConnectionListener(_listenEndpoint!);
         var manifest = new ContentManifestPacket(Engine.RegistryManager.ExportIdMappings());
         var mods = Engine.ModManager.LoadedMods.Select(mod => mod.Info).ToArray();
-        var sessions = new List<(TcpConnection Connection, RemoteSession Session)>();
+        var sessions = new List<DedicatedSession>();
         var accepted = new List<TcpConnection>();
         var clock = Stopwatch.StartNew();
         var deadline = ServerGame.StepSeconds;
@@ -283,51 +299,142 @@ public sealed class ServerEngine
             accepted.Clear();
             listener.DrainAccepted(accepted);
             foreach (var connection in accepted)
-                sessions.Add((connection, new RemoteSession(new TcpServerConnection(connection), manifest, mods)));
-            if (paused)
-                Game.ClearInput();
-            Game.BeginTick();
-            var batches = new List<(RemoteSession Session, IReadOnlyList<ServerboundPacket> Packets)>();
-            foreach (var (_, session) in sessions)
             {
-                if (shutdown && !session.IsPlaying)
-                    session.Disconnect("The server is shutting down.");
-                batches.Add((session, session.Receive(Game)));
+                var endpoint = new TcpServerConnection(connection);
+                var preparation = endpoint.PrepareAsync(manifest, mods, _playerNames);
+                sessions.Add(new DedicatedSession(connection, new RemoteSession(endpoint, preparation, _playerNames)));
             }
-            foreach (var batch in batches)
-            {
-                if (!paused)
-                    batch.Session.Apply(Game, batch.Packets);
-            }
-            var update = Game.FinishTick(advance: !paused && !shutdown);
-            Interlocked.Exchange(ref _tick, Game.Tick);
-            foreach (var (_, session) in sessions)
-            {
-                if (!paused || shutdown)
-                    session.Publish(update);
-                if (shutdown)
-                    session.Disconnect("The server is shutting down.");
-            }
+            RunDedicatedPlayRound(Game, PlayerManager, sessions, paused, shutdown, ref _tick);
             if (shutdown)
                 break;
-            foreach (var (connection, session) in sessions.Where(entry => entry.Connection.IsClosed).ToArray())
-            {
-                session.Leave(Game);
-                listener.Remove(connection);
-                sessions.Remove((connection, session));
-            }
+            RemoveClosedDedicatedSessions(Game, PlayerManager, listener, sessions);
             deadline += ServerGame.StepSeconds;
         }
         var drainStarted = Stopwatch.GetTimestamp();
         while (sessions.Any(entry => !entry.Connection.IsClosed) &&
                Stopwatch.GetElapsedTime(drainStarted) < NetworkLimits.FrameTimeout)
         {
-            foreach (var (connection, _) in sessions)
-                connection.ThrowIfFaulted();
+            foreach (var entry in sessions)
+                entry.Connection.ThrowIfFaulted();
             Thread.Sleep(1);
         }
-        foreach (var (connection, _) in sessions)
-            listener.Remove(connection);
+        foreach (var entry in sessions)
+        {
+            entry.Connection.Close("The server is shutting down.");
+            entry.Session.Preparation.GetAwaiter().GetResult();
+            LeavePlay(Game, PlayerManager, ref entry.Player);
+            entry.Session.ReleaseNameIfClosed();
+            listener.Remove(entry.Connection);
+        }
         Game.Destroy();
+    }
+
+    /// <summary>Runs one dedicated Play round, preserving the existing connection order for applying player input.</summary>
+    internal static void RunDedicatedPlayRound(ServerGame game, PlayerManager players,
+        IReadOnlyList<DedicatedSession> sessions, bool paused, bool shutdown, ref long tick)
+    {
+        if (paused)
+            game.ClearInput();
+        game.BeginTick();
+        var batches = new (Player? Player, IReadOnlyList<ServerboundPacket> Packets,
+            IReadOnlyList<WorldUpdatePacket.InteractionResult> Results)[sessions.Count];
+        for (var i = 0; i < sessions.Count; i++)
+        {
+            var entry = sessions[i];
+            if (shutdown && entry.Player is null)
+                entry.Session.Disconnect("The server is shutting down.");
+            var packets = CollectPlayPackets(game, players, entry.Session, ref entry.Player);
+            batches[i] = (entry.Player, packets, []);
+        }
+        if (!paused)
+        {
+            for (var i = 0; i < batches.Length; i++)
+            {
+                ref var batch = ref batches[i];
+                if (batch.Player is { } player)
+                    batch.Results = game.Apply(player.Entity.NetworkId, batch.Packets);
+            }
+        }
+        var update = game.FinishTick(advance: !paused && !shutdown);
+        Interlocked.Exchange(ref tick, game.Tick);
+        for (var i = 0; i < batches.Length; i++)
+        {
+            var batch = batches[i];
+            if ((!paused || shutdown) && batch.Player is { } player)
+                PublishPlayUpdate(player, update, batch.Results);
+            if (shutdown)
+                sessions[i].Session.Disconnect("The server is shutting down.");
+        }
+    }
+
+    internal static void RemoveClosedDedicatedSessions(ServerGame game, PlayerManager players,
+        TcpConnectionListener listener, List<DedicatedSession> sessions)
+    {
+        foreach (var entry in sessions.Where(entry => entry.Connection.IsClosed &&
+                     entry.Session.Preparation.IsCompleted).ToArray())
+        {
+            entry.Session.Preparation.GetAwaiter().GetResult();
+            LeavePlay(game, players, ref entry.Player);
+            entry.Session.ReleaseNameIfClosed();
+            listener.Remove(entry.Connection);
+            sessions.Remove(entry);
+        }
+    }
+
+    /// <summary>Hands a ready session to Play, or ends its participation when receiving fails or the session closes.</summary>
+    internal static IReadOnlyList<ServerboundPacket> CollectPlayPackets(ServerGame game, PlayerManager players,
+        RemoteSession session, ref Player? player)
+    {
+        if (TryEnterPlay(game, players, session, ref player) && session.TryReceiveBatch(out var packets))
+            return packets;
+        LeavePlay(game, players, ref player);
+        session.ReleaseNameIfClosed();
+        return [];
+    }
+
+    /// <summary>Checks Play readiness and admits a ready player without consuming queued input.</summary>
+    /// <remarks>On an initial send rejection, the caller must remove the registered player before processing input.</remarks>
+    private static bool TryEnterPlay(ServerGame game, PlayerManager players, RemoteSession session, ref Player? player)
+    {
+        if (session.GetReadyUsername() is not { } username)
+            return false;
+        if (player is not null)
+            return true;
+
+        var entity = game.SpawnPlayerEntity();
+        var joined = players.Add(username, entity, session);
+        player = joined;
+        if (!joined.Session.TrySend(game.CreateInitial(entity.NetworkId)))
+            return false;
+        foreach (var chunk in game.CaptureChunks())
+        {
+            if (!joined.Session.TrySend(chunk))
+                return false;
+        }
+        return joined.Session.TrySend(new InitialWorldCompletePacket());
+    }
+
+    private static void LeavePlay(ServerGame game, PlayerManager players, ref Player? player)
+    {
+        if (player is null)
+            return;
+        game.RemovePlayerEntity(player.Entity);
+        players.Remove(player);
+        player = null;
+    }
+
+    private static void PublishPlayUpdate(Player player, WorldUpdatePacket update,
+        IReadOnlyList<WorldUpdatePacket.InteractionResult> results)
+    {
+        if (!player.Session.IsClosing)
+            player.Session.TrySend(update with { Results = results });
+    }
+
+    /// <summary>Tracks the accepted connection separately from its current Play player.</summary>
+    internal sealed class DedicatedSession(TcpConnection connection, RemoteSession session)
+    {
+        internal TcpConnection Connection { get; } = connection;
+        internal RemoteSession Session { get; } = session;
+        internal Player? Player;
     }
 }

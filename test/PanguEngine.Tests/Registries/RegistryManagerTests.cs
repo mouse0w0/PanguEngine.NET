@@ -181,7 +181,7 @@ public sealed class RegistryManagerTests
             _ => throw new InvalidOperationException()
         };
 
-        Assert.Throws<InvalidOperationException>(() => manager.BindIdTables(new RegistryIdMappings(mappings)));
+        Assert.Throws<InvalidDataException>(() => manager.BindIdTables(new RegistryIdMappings(mappings)));
     }
 
     [Fact]

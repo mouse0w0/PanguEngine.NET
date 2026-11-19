@@ -36,6 +36,7 @@ public static class Bootstrap
         var vulkanValidation = VulkanValidationChecks.None;
         var server = false;
         IPAddress? connectAddress = null;
+        string? username = null;
         IPAddress? listenAddress = null;
         int? port = null;
         string? windowTitle = null;
@@ -86,6 +87,11 @@ public static class Bootstrap
                     if (listenAddress is not null || i + 1 >= args.Length ||
                         !IPAddress.TryParse(args[++i], out listenAddress))
                         throw new ArgumentException("--listen requires one IP address.");
+                    break;
+                case "--username":
+                    if (username is not null || i + 1 >= args.Length)
+                        throw new ArgumentException("--username requires one name and cannot be repeated.");
+                    username = args[++i];
                     break;
                 case "--port":
                     if (port.HasValue || i + 1 >= args.Length ||
@@ -145,12 +151,15 @@ public static class Bootstrap
             throw new ArgumentException("--listen requires --server.");
         if (port.HasValue && !server && connectAddress is null)
             throw new ArgumentException("--port requires --server or --connect.");
+        if (connectAddress is not null && username is null)
+            throw new ArgumentException("--connect requires --username.");
 
         return new LaunchOptions
         {
             VulkanValidation = vulkanValidation,
             Server = server,
             ConnectAddress = connectAddress,
+            Username = username,
             ListenAddress = listenAddress,
             Port = port ?? 20202,
             ModPaths = modPaths.ToArray(),

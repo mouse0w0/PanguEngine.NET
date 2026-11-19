@@ -8,32 +8,41 @@ namespace PanguEngine.Network;
 
 internal static class PacketCodec
 {
-    internal const int ProtocolVersion = 6;
+    internal const int ProtocolVersion = 8;
 
-    internal static ReadOnlyMemory<byte> Encode(ServerboundPacket packet)
+    internal static ReadOnlyMemory<byte> Encode(ConnectionPhase phase, ServerboundPacket packet)
     {
         var buffer = new PacketBuffer();
         var writer = new Writer(buffer);
-        writer.WriteVarUInt32(packet switch
+        writer.WriteVarUInt32((phase, packet) switch
         {
-            InputStatePacket => 1, BlockInteractionPacket => 2,
-            ClientHelloPacket => 3, ContentReadyPacket => 4,
-            _ => throw new InvalidOperationException("Unregistered serverbound packet.")
+            (ConnectionPhase.Handshake, ClientHelloPacket) => 2,
+            (ConnectionPhase.Login, LoginRequestPacket) => 2,
+            (ConnectionPhase.Configuration, ClientModsPacket) => 2,
+            (ConnectionPhase.Configuration, ContentReadyPacket) => 3,
+            (ConnectionPhase.Play, InputStatePacket) => 2,
+            (ConnectionPhase.Play, BlockInteractionPacket) => 3,
+            _ => throw new InvalidOperationException("Serverbound packet is not registered in the current phase.")
         });
         packet.Write(ref writer);
         return buffer.WrittenMemory;
     }
 
-    internal static ReadOnlyMemory<byte> Encode(ClientboundPacket packet)
+    internal static ReadOnlyMemory<byte> Encode(ConnectionPhase phase, ClientboundPacket packet)
     {
         var buffer = new PacketBuffer();
         var writer = new Writer(buffer);
-        writer.WriteVarUInt32(packet switch
+        writer.WriteVarUInt32((phase, packet) switch
         {
-            InitialWorldStatePacket => 1, ChunkDataPacket => 2,
-            InitialWorldCompletePacket => 3, WorldUpdatePacket => 4,
-            DisconnectPacket => 5, ContentManifestPacket => 6,
-            _ => throw new InvalidOperationException("Unregistered clientbound packet.")
+            (ConnectionPhase.Handshake or ConnectionPhase.Login or ConnectionPhase.Configuration or ConnectionPhase.Play, DisconnectPacket) => 1,
+            (ConnectionPhase.Handshake, LoginStartPacket) => 2,
+            (ConnectionPhase.Login, LoginSuccessPacket) => 2,
+            (ConnectionPhase.Configuration, ContentManifestPacket) => 2,
+            (ConnectionPhase.Play, InitialWorldStatePacket) => 2,
+            (ConnectionPhase.Play, ChunkDataPacket) => 3,
+            (ConnectionPhase.Play, InitialWorldCompletePacket) => 4,
+            (ConnectionPhase.Play, WorldUpdatePacket) => 5,
+            _ => throw new InvalidOperationException("Clientbound packet is not registered in the current phase.")
         });
         packet.Write(ref writer);
         return buffer.WrittenMemory;
@@ -45,33 +54,37 @@ internal static class PacketCodec
         return reader.ReadVarUInt32();
     }
 
-    internal static ServerboundPacket ReadServerbound(ReadOnlySpan<byte> frame)
+    internal static ServerboundPacket ReadServerbound(ConnectionPhase phase, ReadOnlySpan<byte> frame)
     {
         var reader = new Reader(frame);
-        var packet = reader.ReadVarUInt32() switch
+        var packet = (phase, reader.ReadVarUInt32()) switch
         {
-            1 => (ServerboundPacket)InputStatePacket.Read(ref reader),
-            2 => BlockInteractionPacket.Read(ref reader),
-            3 => ClientHelloPacket.Read(ref reader),
-            4 => ContentReadyPacket.Read(ref reader),
-            _ => throw new InvalidDataException("Unknown serverbound message identifier.")
+            (ConnectionPhase.Handshake, 2) => (ServerboundPacket)ClientHelloPacket.Read(ref reader),
+            (ConnectionPhase.Login, 2) => LoginRequestPacket.Read(ref reader),
+            (ConnectionPhase.Configuration, 2) => ClientModsPacket.Read(ref reader),
+            (ConnectionPhase.Configuration, 3) => ContentReadyPacket.Read(ref reader),
+            (ConnectionPhase.Play, 2) => InputStatePacket.Read(ref reader),
+            (ConnectionPhase.Play, 3) => BlockInteractionPacket.Read(ref reader),
+            _ => throw new InvalidDataException("Unknown serverbound message identifier in the current phase.")
         };
         reader.EnsureEnd();
         return packet;
     }
 
-    internal static ClientboundPacket ReadClientbound(ReadOnlySpan<byte> frame)
+    internal static ClientboundPacket ReadClientbound(ConnectionPhase phase, ReadOnlySpan<byte> frame)
     {
         var reader = new Reader(frame);
-        var packet = reader.ReadVarUInt32() switch
+        var packet = (phase, reader.ReadVarUInt32()) switch
         {
-            1 => (ClientboundPacket)InitialWorldStatePacket.Read(ref reader),
-            2 => ChunkDataPacket.Read(ref reader),
-            3 => InitialWorldCompletePacket.Read(ref reader),
-            4 => WorldUpdatePacket.Read(ref reader),
-            5 => DisconnectPacket.Read(ref reader),
-            6 => ContentManifestPacket.Read(ref reader),
-            _ => throw new InvalidDataException("Unknown clientbound message identifier.")
+            (ConnectionPhase.Handshake or ConnectionPhase.Login or ConnectionPhase.Configuration or ConnectionPhase.Play, 1) => (ClientboundPacket)DisconnectPacket.Read(ref reader),
+            (ConnectionPhase.Handshake, 2) => LoginStartPacket.Read(ref reader),
+            (ConnectionPhase.Login, 2) => LoginSuccessPacket.Read(ref reader),
+            (ConnectionPhase.Configuration, 2) => ContentManifestPacket.Read(ref reader),
+            (ConnectionPhase.Play, 2) => InitialWorldStatePacket.Read(ref reader),
+            (ConnectionPhase.Play, 3) => ChunkDataPacket.Read(ref reader),
+            (ConnectionPhase.Play, 4) => InitialWorldCompletePacket.Read(ref reader),
+            (ConnectionPhase.Play, 5) => WorldUpdatePacket.Read(ref reader),
+            _ => throw new InvalidDataException("Unknown clientbound message identifier in the current phase.")
         };
         reader.EnsureEnd();
         return packet;

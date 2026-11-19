@@ -17,6 +17,14 @@ public sealed class ServerEngineTests
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     [Fact]
+    public void InvalidLocalUsernameDoesNotConsumeTheConnectionSlot()
+    {
+        var server = new ServerEngine(false);
+        Assert.Throws<InvalidDataException>(() => server.ConnectInMemory("invalid name"));
+        server.ConnectInMemory();
+    }
+
+    [Fact]
     public async Task PausedShutdownDoesNotApplyPendingInput()
     {
         var server = new ServerEngine(false);
@@ -42,7 +50,8 @@ public sealed class ServerEngineTests
         Assert.True(connection.IsClosed);
         var closed = Assert.IsType<DisconnectPacket>(connection.WaitForPacket());
         Assert.NotEmpty(closed.Reason);
-        Assert.Throws<InvalidOperationException>(() => connection.WaitForPacket(TimeSpan.Zero));
+        Assert.Throws<ConnectionClosedException>(() => connection.WaitForPacket(TimeSpan.Zero));
+        Assert.Throws<ConnectionClosedException>(() => connection.TryReceive(out _));
         Assert.Equal(initial.Tick, server.Tick);
         Assert.Same(TestRegistryBootstrap.CustomIdValue, TestRegistryBootstrap.CustomIdTable.Get(0));
     }
@@ -179,6 +188,7 @@ public sealed class ServerEngineTests
                     var initial = ClientGameTests.LoadInitialWorld(connection, world);
                     Assert.Equal(0L, initial.Tick);
                     session = new ClientSession(connection, world, initial, 0);
+                    Assert.Throws<InvalidOperationException>(() => server.ConnectInMemory("AnotherPlayer"));
                     server.IsPaused = false;
                     session.SubmitInput(0, 0, 42, 12);
 

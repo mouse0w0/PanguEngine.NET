@@ -25,6 +25,9 @@ public sealed class LaunchOptions
     /// <summary>The remote server address, or null for an integrated game.</summary>
     public IPAddress? ConnectAddress { get; init; }
 
+    /// <summary>The client username, or null to use the local-game default.</summary>
+    public string? Username { get; init; }
+
     /// <summary>The dedicated server listening address.</summary>
     public IPAddress? ListenAddress { get; init; }
 

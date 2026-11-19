@@ -74,17 +74,18 @@ public sealed class RegistryManager
     /// Binds mappings whose table keys exactly match the registered identifier tables.
     /// </summary>
     /// <param name="mappings">The authoritative identifier mappings.</param>
+    /// <exception cref="InvalidDataException">The supplied mappings do not match the local registrations.</exception>
     public void BindIdTables(RegistryIdMappings mappings)
     {
         var byKey = new Dictionary<ResourceKey, RegistryIdMapping>();
         foreach (var mapping in mappings.Tables)
         {
             if (!byKey.TryAdd(mapping.RegistryKey, mapping))
-                throw new InvalidOperationException($"Mapping for '{mapping.RegistryKey}' occurs more than once.");
+                throw new InvalidDataException($"Mapping for '{mapping.RegistryKey}' occurs more than once.");
         }
 
         if (byKey.Count != _idTables.Count || _idTables.Keys.Any(key => !byKey.ContainsKey(key)))
-            throw new InvalidOperationException("Mapping registries do not match the registered id tables.");
+            throw new InvalidDataException("Mapping registries do not match the registered id tables.");
 
         foreach (var (key, table) in _idTables)
             table.Bind(byKey[key]);

@@ -8,16 +8,17 @@ public sealed class BootstrapTests
     [Fact]
     public void ParseOptionsSeparatesRemoteAddressAndPort()
     {
-        var remote = Bootstrap.ParseOptions(["--connect", "::1"]);
+        var remote = Bootstrap.ParseOptions(["--connect", "::1", "--username", "Alice"]);
         Assert.Equal(System.Net.IPAddress.IPv6Loopback, remote.ConnectAddress);
         Assert.Equal(20202, remote.Port);
+        Assert.Equal("Alice", remote.Username);
         var server = Bootstrap.ParseOptions(["--server", "--listen", "0.0.0.0", "--port", "20203"]);
         Assert.Equal(System.Net.IPAddress.Any, server.ListenAddress);
         Assert.Equal(20203, server.Port);
     }
 
     [Fact]
-    public void ParseOptionsRejectsInvalidNetworkCombinations()
+    public void ParseOptionsRejectsInvalidNetworkAndUsernameArguments()
     {
         string[][] inputs =
         [
@@ -28,10 +29,19 @@ public sealed class BootstrapTests
             ["--server", "--port", "65536"], ["--server", "--port", "abc"],
             ["--connect", "::1", "--connect", "::1"],
             ["--server", "--listen", "::1", "--listen", "::1"],
-            ["--server", "--port", "20202", "--port", "20202"]
+            ["--server", "--port", "20202", "--port", "20202"],
+            ["--connect", "127.0.0.1"], ["--username"],
+            ["--username", "Alice", "--username", "Bob"]
         ];
         foreach (var input in inputs)
             Assert.Throws<ArgumentException>(() => Bootstrap.ParseOptions(input));
+    }
+
+    [Fact]
+    public void ParseOptionsAcceptsLocalUsernameWithoutInventingOne()
+    {
+        Assert.Null(Bootstrap.ParseOptions([]).Username);
+        Assert.Equal("Local_Player", Bootstrap.ParseOptions(["--username", "Local_Player"]).Username);
     }
 
     [Fact]

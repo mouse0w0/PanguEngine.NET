@@ -45,7 +45,8 @@ public sealed class RegistryIdTable<T> : IRegistryIdTable where T : class
         for (var id = 0; id < _entries.Length; id++)
         {
             var entry = _registry.Entries[id];
-            AddEntry(new RegistryIdEntry<T>(id, entry.Key, entry.Value));
+            if (!TryAddEntry(new RegistryIdEntry<T>(id, entry.Key, entry.Value)))
+                throw new InvalidOperationException($"Resource key '{entry.Key}' occurs more than once.");
         }
     }
 
@@ -53,11 +54,13 @@ public sealed class RegistryIdTable<T> : IRegistryIdTable where T : class
     /// Binds an existing identifier mapping to definitions in a frozen local registry.
     /// </summary>
     /// <param name="mapping">The authoritative mapping with resource keys ordered by identifier.</param>
+    /// <exception cref="InvalidDataException">The supplied mapping does not match this registry or its entries.</exception>
+    /// <exception cref="InvalidOperationException">The local registry is not frozen.</exception>
     public void Bind(RegistryIdMapping mapping)
     {
         EnsureFrozen();
         if (mapping.RegistryKey != Key)
-            throw new InvalidOperationException($"Mapping for '{mapping.RegistryKey}' does not describe '{Key}'.");
+            throw new InvalidDataException($"Mapping for '{mapping.RegistryKey}' does not describe '{Key}'.");
 
         Clear();
         _entries = new RegistryIdEntry<T>[mapping.Keys.Count];
@@ -65,9 +68,10 @@ public sealed class RegistryIdTable<T> : IRegistryIdTable where T : class
         {
             var key = mapping.Keys[id];
             if (!_registry.TryGetEntry(key, out var entry))
-                throw new KeyNotFoundException($"Resource key '{key}' is not registered in '{Key}'.");
+                throw new InvalidDataException($"Resource key '{key}' is not registered in '{Key}'.");
 
-            AddEntry(new RegistryIdEntry<T>(id, key, entry.Value));
+            if (!TryAddEntry(new RegistryIdEntry<T>(id, key, entry.Value)))
+                throw new InvalidDataException($"Resource key '{key}' occurs more than once.");
         }
     }
 
@@ -203,13 +207,14 @@ public sealed class RegistryIdTable<T> : IRegistryIdTable where T : class
     public RegistryIdMapping ExportMapping() =>
         new(Key, _entries.Select(entry => entry.Key).ToArray());
 
-    private void AddEntry(RegistryIdEntry<T> entry)
+    private bool TryAddEntry(RegistryIdEntry<T> entry)
     {
         if (!_keyToId.TryAdd(entry.Key, entry.Id))
-            throw new InvalidOperationException($"Resource key '{entry.Key}' occurs more than once.");
+            return false;
 
         _entries[entry.Id] = entry;
         _valueToId.Add(entry.Value, entry.Id);
+        return true;
     }
 
     private void EnsureFrozen()

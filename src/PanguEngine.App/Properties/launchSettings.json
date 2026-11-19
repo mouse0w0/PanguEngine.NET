@@ -9,11 +9,11 @@
     },
     "Client 1 (Auto Connect)": {
       "commandName": "Project",
-      "commandLineArgs": "--connect 127.0.0.1 --port 20202 --window-title \"Client 1\""
+      "commandLineArgs": "--connect 127.0.0.1 --port 20202 --username Player1 --window-title \"Client 1\""
     },
     "Client 2 (Auto Connect)": {
       "commandName": "Project",
-      "commandLineArgs": "--connect 127.0.0.1 --port 20202 --window-title \"Client 2\""
+      "commandLineArgs": "--connect 127.0.0.1 --port 20202 --username Player2 --window-title \"Client 2\""
     }
   }
 }

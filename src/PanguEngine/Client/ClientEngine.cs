@@ -222,12 +222,13 @@ public sealed class ClientEngine
             var mods = Engine.ModManager.LoadedMods.Select(mod =>
                 new ModVersionEntry(mod.Info.Id, mod.Info.Version.ToString())).ToArray();
             connection = TcpClientConnection.Connect(new IPEndPoint(address, _launchOptions.Port),
+                _launchOptions.Username ?? throw new ArgumentException("--connect requires --username."),
                 Engine.RegistryManager, mods);
         }
         else
         {
             ServerEngine.StartIntegrated();
-            connection = ServerEngine.Current.ConnectInMemory();
+            connection = ServerEngine.Current.ConnectInMemory(_launchOptions.Username ?? "Player");
         }
         Game = new ClientGame(this, connection);
         Input.RegisterHandler(BuiltinInputActions.TogglePause, HandleTogglePause);

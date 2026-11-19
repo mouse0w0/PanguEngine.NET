@@ -13,8 +13,9 @@ public sealed class MultiplayerGameTests
     public void SeparatePlayersMoveWithinOneWorldStepAndLeaveIndependently()
     {
         var game = new ServerGame();
-        var first = game.JoinPlayer();
-        var second = game.JoinPlayer();
+        var firstEntity = game.SpawnPlayerEntity();
+        var first = firstEntity.NetworkId;
+        var second = game.SpawnPlayerEntity().NetworkId;
         var before = game.CreateInitial(first).Player.Position;
         game.BeginTick();
         game.Apply(first, [new InputStatePacket(1, 0, -90, 0)]);
@@ -23,7 +24,8 @@ public sealed class MultiplayerGameTests
         Assert.Equal(1L, update.Tick);
         Assert.Equal(before.Z - 0.4, update.Players.Single(p => p.NetworkId == first).Pose.Position.Z, 8);
         Assert.Equal(before.Z + 0.4, update.Players.Single(p => p.NetworkId == second).Pose.Position.Z, 8);
-        game.LeavePlayer(first);
+        game.RemovePlayerEntity(firstEntity);
+        Assert.False(game.World.Entities.IsAlive(firstEntity.Handle));
         Assert.Equal(second, Assert.Single(game.FinishTick(false).Players).NetworkId);
         game.Destroy();
     }
@@ -32,7 +34,7 @@ public sealed class MultiplayerGameTests
     public void ExtremeFiniteYawDoesNotPoisonMovementOrInteraction()
     {
         var game = new ServerGame();
-        var player = game.JoinPlayer();
+        var player = game.SpawnPlayerEntity().NetworkId;
         game.BeginTick();
         game.Apply(player,
         [
@@ -48,8 +50,8 @@ public sealed class MultiplayerGameTests
     public void PlayersShareOrderedEditsButKeepTheirOwnOperationResults()
     {
         var game = new ServerGame();
-        var first = game.JoinPlayer();
-        var second = game.JoinPlayer();
+        var first = game.SpawnPlayerEntity().NetworkId;
+        var second = game.SpawnPlayerEntity().NetworkId;
         var target = new BlockPos(8, 22, 22);
         game.World.SetBlock(target, BuiltinBlocks.Stone.DefaultState);
         game.BeginTick();
@@ -59,7 +61,7 @@ public sealed class MultiplayerGameTests
         Assert.Equal(WorldUpdatePacket.InteractionStatus.Success, Assert.Single(firstResults).Status);
         Assert.Equal(WorldUpdatePacket.InteractionStatus.NoHit, Assert.Single(secondResults).Status);
         Assert.Equal(target, Assert.Single(update.Changes).Position);
-        var third = game.JoinPlayer();
+        var third = game.SpawnPlayerEntity().NetworkId;
         var chunk = game.CaptureChunks().Single(c => c.Position == new ChunkPos(0, 1, 1));
         var index = 8 | (6 << Chunk.BitsX) | (6 << (Chunk.BitsX + Chunk.BitsZ));
         Assert.True(chunk.GetBlock(index).IsAir);

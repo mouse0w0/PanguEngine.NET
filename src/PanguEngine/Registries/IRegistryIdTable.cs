@@ -23,6 +23,8 @@ public interface IRegistryIdTable
     /// Binds an authoritative mapping to definitions in the frozen local registry.
     /// </summary>
     /// <param name="mapping">The identifier mapping.</param>
+    /// <exception cref="InvalidDataException">The supplied mapping does not match the local registry.</exception>
+    /// <exception cref="InvalidOperationException">The local registry is not frozen.</exception>
     void Bind(RegistryIdMapping mapping);
 
     /// <summary>

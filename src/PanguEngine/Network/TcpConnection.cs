@@ -16,6 +16,7 @@ internal sealed class TcpConnection
     private readonly CancellationTokenSource _stop = new();
     private readonly Task _receiveTask;
     private readonly Task _sendTask;
+    private TaskCompletionSource? _incomingAvailable;
     private ExceptionDispatchInfo? _fault;
     private bool _closed;
     private bool _draining;
@@ -76,7 +77,37 @@ internal sealed class TcpConnection
     internal void Consume()
     {
         lock (_gate)
+        {
             _incoming.Dequeue();
+            if (_incoming.Count == 0)
+                _incomingAvailable = null;
+        }
+    }
+
+    internal async Task WaitForFrameAsync(TimeSpan timeout)
+    {
+        Task available;
+        lock (_gate)
+        {
+            _fault?.Throw();
+            if (_incoming.Count > 0)
+                return;
+            if (_closed)
+                throw new ConnectionClosedException(_reason ?? "The connection ended.");
+            _incomingAvailable ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+            available = _incomingAvailable.Task;
+        }
+        try { await available.WaitAsync(timeout).ConfigureAwait(false); }
+        catch (TimeoutException)
+        {
+            throw new ConnectionClosedException("Timed out waiting for remote data.");
+        }
+        lock (_gate)
+        {
+            _fault?.Throw();
+            if (_incoming.Count == 0 && _closed)
+                throw new ConnectionClosedException(_reason ?? "The connection ended.");
+        }
     }
 
     internal void WaitForFrame(TimeSpan timeout)
@@ -124,6 +155,7 @@ internal sealed class TcpConnection
             _reason ??= reason;
             _stop.Cancel();
             _client.Dispose();
+            _incomingAvailable?.TrySetResult();
             Monitor.PulseAll(_gate);
         }
     }
@@ -160,6 +192,7 @@ internal sealed class TcpConnection
                         return;
                     if (!_incoming.TryEnqueue(frame.Value))
                         throw new InvalidDataException("The incoming queue limit was exceeded.");
+                    _incomingAvailable?.TrySetResult();
                     Monitor.PulseAll(_gate);
                 }
             }

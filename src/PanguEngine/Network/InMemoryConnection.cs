@@ -2,6 +2,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using PanguEngine.Network.Packets;
+using PanguEngine.Network.Packets.Clientbound;
 
 namespace PanguEngine.Network;
 
@@ -71,14 +72,27 @@ internal sealed class InMemoryConnection : IClientConnection, IServerConnection
 
     bool IServerConnection.TrySend(ClientboundPacket packet) => Publish(packet);
 
-    void IServerConnection.CompleteSending(string reason) => Complete();
+    void IServerConnection.Disconnect(string reason)
+    {
+        lock (_gate)
+        {
+            if (_completed)
+                return;
+            _clientboundPackets.Enqueue(DisconnectPacket.FromReason(reason));
+            Complete();
+        }
+    }
 
     public bool TryReceive([NotNullWhen(true)] out ClientboundPacket? packet)
     {
         lock (_gate)
         {
             _fault?.Throw();
-            return _clientboundPackets.TryDequeue(out packet);
+            if (_clientboundPackets.TryDequeue(out packet))
+                return true;
+            if (_completed)
+                throw new ConnectionClosedException("The local server has stopped.");
+            return false;
         }
     }
 
@@ -101,7 +115,7 @@ internal sealed class InMemoryConnection : IClientConnection, IServerConnection
             _fault?.Throw();
             if (_clientboundPackets.TryDequeue(out var packet))
                 return packet;
-            throw new InvalidOperationException("The local server has stopped.");
+            throw new ConnectionClosedException("The local server has stopped.");
         }
     }
 

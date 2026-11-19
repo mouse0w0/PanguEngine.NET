@@ -51,7 +51,7 @@ public sealed class BlockInteractionTests
     private static (ServerGame Game, uint PlayerNetworkId) CreateGame()
     {
         var game = new ServerGame();
-        return (game, game.JoinPlayer());
+        return (game, game.SpawnPlayerEntity().NetworkId);
     }
 
     private static PanguEngine.Network.Packets.Clientbound.WorldUpdatePacket Update(

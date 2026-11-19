@@ -143,7 +143,7 @@ public sealed class RegistryIdTableTests
         var mapping = new RegistryIdMapping(key, [ResourceKey.Parse("test:missing")]);
 
         var table = new RegistryIdTable<object>(registry);
-        Assert.Throws<KeyNotFoundException>(() => table.Bind(mapping));
+        Assert.Throws<InvalidDataException>(() => table.Bind(mapping));
 
         table.Allocate();
         var missingKey = ResourceKey.Parse("test:missing");
@@ -181,7 +181,7 @@ public sealed class RegistryIdTableTests
         ]);
 
         var table = new RegistryIdTable<object>(registry);
-        Assert.Throws<InvalidOperationException>(() => table.Bind(mapping));
+        Assert.Throws<InvalidDataException>(() => table.Bind(mapping));
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public sealed class RegistryIdTableTests
         var mapping = new RegistryIdMapping(ResourceKey.Parse("test:other"), []);
 
         var table = new RegistryIdTable<object>(registry);
-        Assert.Throws<InvalidOperationException>(() => table.Bind(mapping));
+        Assert.Throws<InvalidDataException>(() => table.Bind(mapping));
     }
 
     [Fact]

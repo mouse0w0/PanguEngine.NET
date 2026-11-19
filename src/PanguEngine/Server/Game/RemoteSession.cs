@@ -1,207 +1,96 @@
-using System.Diagnostics;
 using System.Text;
-using PanguEngine.Modding;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;
-using PanguEngine.Network.Packets.Clientbound;
-using PanguEngine.Network.Packets.Serverbound;
-using PanguEngine.Versioning;
 
 namespace PanguEngine.Server.Game;
 
-/// <summary>Owns the server-side lifetime of a player's session.</summary>
+/// <summary>Owns the server-side packet endpoint and its reserved username.</summary>
 internal sealed class RemoteSession
 {
     private readonly IServerConnection _connection;
-    private readonly (TcpServerConnection Connection, ContentManifestPacket Manifest, IReadOnlyList<ModInfo> Mods)? _tcp;
-    private Stage _stage;
-    private uint? _playerNetworkId;
-    private IReadOnlyList<WorldUpdatePacket.InteractionResult> _results = [];
+    private readonly PlayerNames _playerNames;
+    private bool _closing;
+    private bool _nameReleased;
 
-    internal RemoteSession(TcpServerConnection connection, ContentManifestPacket manifest, IReadOnlyList<ModInfo> mods)
+    internal RemoteSession(IServerConnection connection,
+        Task<(string? ReservedUsername, bool IsReady)> preparation, PlayerNames playerNames)
     {
         _connection = connection;
-        _tcp = (connection, manifest, mods);
+        _playerNames = playerNames;
+        Preparation = preparation;
     }
 
-    /// <summary>Admits an in-process client that already shares the server's content.</summary>
-    internal RemoteSession(InMemoryConnection connection, ServerGame game)
+    /// <summary>Creates a ready session for an in-process client with a reserved username.</summary>
+    internal RemoteSession(IServerConnection connection, string username, PlayerNames playerNames)
+        : this(connection, Task.FromResult<(string?, bool)>((username, true)), playerNames)
     {
-        _connection = connection;
-        EnterPlay(game);
     }
 
-    internal bool IsPlaying => _stage == Stage.Playing;
+    /// <summary>Completes when preparation stops reading packets and reports whether the session can enter Play.</summary>
+    /// <remarks>A connection can hold a reserved username even if it is not ready to enter Play.</remarks>
+    internal Task<(string? ReservedUsername, bool IsReady)> Preparation { get; }
+    internal bool IsClosing => _closing || _connection.IsClosed;
 
-    internal IReadOnlyList<ServerboundPacket> Receive(ServerGame game)
+    /// <summary>Observes preparation without waiting and returns the username only while ready for Play.</summary>
+    internal string? GetReadyUsername()
     {
         _connection.ThrowIfFaulted();
-        _results = [];
-        if (_connection.IsClosed || _stage == Stage.Closing)
-        {
-            Leave(game);
-            return [];
-        }
-        if (_tcp is { } tcp && _stage != Stage.Playing &&
-            Stopwatch.GetElapsedTime(tcp.Connection.ConnectedAt) >= NetworkLimits.HandshakeTimeout)
-        {
-            Disconnect("Content handshake timed out.");
-            return [];
-        }
+        if (!Preparation.IsCompleted)
+            return null;
+        var (username, isReady) = Preparation.GetAwaiter().GetResult();
+        return isReady && !IsClosing ? username : null;
+    }
+
+    /// <summary>Reads the queued Play batch, discarding the entire batch if an expected receive error occurs.</summary>
+    /// <remarks>Only the game thread reads Play packets, after preparation reports readiness. An empty batch can succeed.</remarks>
+    internal bool TryReceiveBatch(out IReadOnlyList<ServerboundPacket> packets)
+    {
+        packets = [];
         var count = _connection.IncomingCount;
         if (count == 0)
-            return [];
-        var packets = new List<ServerboundPacket>();
-        for (var i = 0; i < count; i++)
+            return true;
+        var received = new List<ServerboundPacket>();
+        try
         {
-            ServerboundPacket packet;
-            try
+            for (var i = 0; i < count; i++)
             {
-                if (!_connection.TryReceive(out var received))
+                if (!_connection.TryReceive(out var packet))
                     break;
-                packet = received;
-                if (_tcp.HasValue)
-                    Validate(packet);
-            }
-            catch (Exception error) when (error is InvalidDataException or EndOfStreamException or DecoderFallbackException)
-            {
-                Disconnect(error.Message);
-                Leave(game);
-                return [];
-            }
-            catch (ConnectionClosedException)
-            {
-                Leave(game);
-                return [];
-            }
-            switch (packet)
-            {
-                case ClientHelloPacket hello when _tcp is { } content:
-                    string? rejection;
-                    try { rejection = CheckMods(content.Mods, hello.Mods); }
-                    catch (InvalidDataException error) { rejection = error.Message; }
-                    if (rejection is not null)
-                    {
-                        Disconnect(rejection);
-                        return [];
-                    }
-                    try { Send(content.Manifest); }
-                    catch (InvalidDataException)
-                    {
-                        Disconnect("Server content manifest exceeds the 1 MiB message limit.");
-                        return [];
-                    }
-                    _stage = Stage.WaitingReady;
-                    break;
-                case ContentReadyPacket when _tcp is { } ready:
-                    ready.Connection.EnableHeartbeat();
-                    EnterPlay(game);
-                    break;
-                default:
-                    packets.Add(packet);
-                    break;
+                received.Add(packet);
             }
         }
-        return packets;
-    }
-
-    private void EnterPlay(ServerGame game)
-    {
-        var playerNetworkId = game.JoinPlayer();
-        _playerNetworkId = playerNetworkId;
-        Send(game.CreateInitial(playerNetworkId));
-        foreach (var chunk in game.CaptureChunks())
+        catch (Exception error) when (error is InvalidDataException or EndOfStreamException or DecoderFallbackException)
         {
-            if (!Send(chunk))
-                break;
+            Disconnect(error.Message);
+            return false;
         }
-        Send(new InitialWorldCompletePacket());
-        _stage = Stage.Playing;
-    }
-
-    internal void Apply(ServerGame game, IReadOnlyList<ServerboundPacket> packets)
-    {
-        if (_playerNetworkId is { } playerNetworkId)
-            _results = game.Apply(playerNetworkId, packets);
-    }
-
-    internal void Publish(WorldUpdatePacket update)
-    {
-        if (_stage == Stage.Playing && !_connection.IsClosed)
-            Send(update with { Results = _results });
-    }
-
-    internal void Leave(ServerGame game)
-    {
-        if (_playerNetworkId is { } playerNetworkId)
+        catch (ConnectionClosedException)
         {
-            game.LeavePlayer(playerNetworkId);
-            _playerNetworkId = null;
+            return false;
+        }
+        packets = received;
+        return true;
+    }
+
+    internal bool TrySend(ClientboundPacket packet) => _connection.TrySend(packet);
+
+    /// <summary>Releases a reserved username once the connection is closed and preparation has ended.</summary>
+    /// <remarks>Only the game thread releases the reservation, including when Play was never entered.</remarks>
+    internal void ReleaseNameIfClosed()
+    {
+        if (!_nameReleased && _connection.IsClosed && Preparation.IsCompleted &&
+            Preparation.GetAwaiter().GetResult().ReservedUsername is { } username)
+        {
+            _playerNames.Release(username);
+            _nameReleased = true;
         }
     }
 
     internal void Disconnect(string reason)
     {
-        if (_stage == Stage.Closing)
+        if (_closing)
             return;
-        if (reason.Length > 512)
-            reason = "The connection was closed; the diagnostic message exceeded its length limit.";
-        Send(new DisconnectPacket(reason));
-        _stage = Stage.Closing;
-        _connection.CompleteSending(reason);
+        _connection.Disconnect(reason);
+        _closing = true;
     }
-
-    private bool Send(ClientboundPacket packet) => _connection.TrySend(packet);
-
-    private static string? CheckMods(IReadOnlyList<ModInfo> server, IReadOnlyList<ModVersionEntry> client)
-    {
-        var versions = new Dictionary<string, SemVersion>(StringComparer.Ordinal);
-        foreach (var mod in client)
-        {
-            if (!SemVersion.TryParse(mod.Version, out var version) || !versions.TryAdd(mod.Id, version))
-                throw new InvalidDataException("Invalid or duplicate client mod version.");
-        }
-        foreach (var mod in server)
-        {
-            if (!versions.TryGetValue(mod.Id, out var version))
-                return $"Required client mod '{mod.Id}' version {mod.Version} is missing.";
-            if (!mod.Version.Equals(version))
-                return $"Required client mod '{mod.Id}' needs {mod.Version}, but client has {version}.";
-        }
-        return null;
-    }
-
-    private void Validate(ServerboundPacket packet)
-    {
-        switch (packet)
-        {
-            case ClientHelloPacket hello when _stage == Stage.WaitingHello:
-                if (hello.ProtocolVersion != PacketCodec.ProtocolVersion)
-                    throw new InvalidDataException("Unsupported network protocol version.");
-                return;
-            case ContentReadyPacket when _stage == Stage.WaitingReady:
-                return;
-            case InputStatePacket input when _stage == Stage.Playing:
-                if (!double.IsFinite(input.Forward) || input.Forward is < -1 or > 1 ||
-                    !double.IsFinite(input.Right) || input.Right is < -1 or > 1)
-                    throw new InvalidDataException("Invalid movement axes.");
-                ValidateAngles(input.Yaw, input.Pitch);
-                return;
-            case BlockInteractionPacket interaction when _stage == Stage.Playing:
-                if (interaction.Operation is not (BlockOperation.Break or BlockOperation.Place))
-                    throw new InvalidDataException("Invalid block operation.");
-                ValidateAngles(interaction.Yaw, interaction.Pitch);
-                return;
-            default:
-                throw new InvalidDataException("Message is not valid in the current connection phase.");
-        }
-    }
-
-    private static void ValidateAngles(double yaw, double pitch)
-    {
-        if (!double.IsFinite(yaw) || !double.IsFinite(pitch) || pitch is < -89 or > 89)
-            throw new InvalidDataException("Invalid player angles.");
-    }
-
-    private enum Stage { WaitingHello, WaitingReady, Playing, Closing }
 }

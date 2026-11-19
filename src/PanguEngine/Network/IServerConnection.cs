@@ -11,8 +11,8 @@ internal interface IServerConnection
     bool TryReceive([NotNullWhen(true)] out ServerboundPacket? packet);
     bool TrySend(ClientboundPacket packet);
 
-    /// <summary>Ends sending without discarding packets already queued for the client.</summary>
-    void CompleteSending(string reason);
+    /// <summary>Queues the disconnect notice and ends sending without discarding earlier packets.</summary>
+    void Disconnect(string reason);
 
     void ThrowIfFaulted();
 }

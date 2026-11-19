@@ -92,7 +92,7 @@ public sealed class ServerGameTests
         Assert.Equal(0, game.World.Entities.Count);
         game.BeginTick();
         Assert.Empty(game.FinishTick().Players);
-        var playerNetworkId = game.JoinPlayer();
+        var playerNetworkId = game.SpawnPlayerEntity().NetworkId;
         var initial = game.CreateInitial(playerNetworkId);
 
         Assert.Equal(1L, initial.Tick);
@@ -104,7 +104,7 @@ public sealed class ServerGameTests
     private static (ServerGame Game, InitialWorldStatePacket Initial) CreateGame()
     {
         var game = new ServerGame();
-        var playerNetworkId = game.JoinPlayer();
+        var playerNetworkId = game.SpawnPlayerEntity().NetworkId;
         return (game, game.CreateInitial(playerNetworkId));
     }
 

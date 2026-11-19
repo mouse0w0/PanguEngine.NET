@@ -30,22 +30,24 @@ public sealed class ServerGame
     public ServerWorld World { get; }
 
     internal long Tick { get; private set; }
-    internal uint JoinPlayer()
+
+    /// <summary>Creates a player entity in the authoritative world.</summary>
+    internal PlayerEntity SpawnPlayerEntity()
     {
         var position = new Vector3D<double>(8, 22, 24);
-        var player = World.Entities.Spawn(BuiltinEntityTypes.Player, new EntitySpawnBuilder()
+        var entity = World.Entities.Spawn(BuiltinEntityTypes.Player, new EntitySpawnBuilder()
             .Add(BuiltinEntityComponents.Position, new PositionComponent(position, position))
             .Add(BuiltinEntityComponents.Rotation, new RotationComponent(-90, -20))
             .Add(BuiltinEntityComponents.MoveIntent, default));
-        _players.Add(player.NetworkId, player);
-        return player.NetworkId;
+        _players.Add(entity.NetworkId, entity);
+        return entity;
     }
 
-    internal void LeavePlayer(uint playerNetworkId)
+    /// <summary>Removes a player entity from the authoritative world.</summary>
+    internal void RemovePlayerEntity(PlayerEntity entity)
     {
-        var player = _players[playerNetworkId];
-        World.Entities.Destroy(player.Handle);
-        _players.Remove(playerNetworkId);
+        World.Entities.Destroy(entity.Handle);
+        _players.Remove(entity.NetworkId);
     }
 
     internal InitialWorldStatePacket CreateInitial(uint playerNetworkId) =>
