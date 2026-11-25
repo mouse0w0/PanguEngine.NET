@@ -46,8 +46,6 @@ public sealed class ProgressBar : Control
     static ProgressBar()
     {
         CssRegistry.RegisterElement<ProgressBar>("ProgressBar");
-        CssRegistry.RegisterProperty<ProgressBar, Orientation>("orientation", OrientationProperty,
-            CssValueConverters.ParseOrientation);
     }
 
     /// <summary>Creates a non-interactive horizontal progress bar.</summary>
@@ -98,6 +96,9 @@ public sealed class ProgressBar : Control
     }
 
     /// <summary>Gets or sets the progress axis. Horizontal progress moves right and vertical progress moves up.</summary>
+    /// <remarks>
+    /// Stylesheets cannot set the axis, but can match it with <c>:horizontal</c> and <c>:vertical</c>.
+    /// </remarks>
     public Orientation Orientation
     {
         get => GetValue(OrientationProperty);

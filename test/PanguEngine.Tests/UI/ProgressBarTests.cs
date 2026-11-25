@@ -157,17 +157,18 @@ public sealed class ProgressBarTests
 
     [Fact]
     [UIThreadTest]
-    public void CssConfiguresOrientationAndRecordsTheOuterRoundedClip()
+    public void CssStylesTheCurrentOrientationAndRecordsTheOuterRoundedClip()
     {
         var bar = CreateBar();
+        bar.Orientation = Orientation.Vertical;
         bar.Value = 50;
         bar.BorderThickness = new Thickness(2);
         bar.Padding = new Thickness(1);
         bar.CornerRadius = new CornerRadius(5);
         var scene = CreateScene(bar);
         scene.SetStyleSheets([StyleSheet.Parse("""
-            ProgressBar { orientation: vertical; }
             ProgressBar:vertical .progress-bar-fill { background-color: #112233; }
+            ProgressBar:horizontal .progress-bar-fill { background-color: #445566; }
             """)]);
         scene.Open();
         try
@@ -179,16 +180,14 @@ public sealed class ProgressBarTests
             var clip = Assert.Single(scene.CreateDrawCommandList().OfType<PushRoundedClipCommand>());
             Assert.Equal(bar.DecorationBounds, clip.Geometry.Outer.Bounds);
             Assert.Equal(new Rect(3, 6, 114, 3), fill.LayoutBounds);
-            scene.SetStyleSheets([StyleSheet.Parse("""
-                ProgressBar { orientation: horizontal; }
-                ProgressBar:horizontal .progress-bar-fill { background-color: #445566; }
-                """)]);
+            bar.Orientation = Orientation.Horizontal;
             Prepare(scene);
             Assert.Equal(Orientation.Horizontal, bar.Orientation);
             Assert.Equal(new Rect(3, 3, 57, 6), fill.LayoutBounds);
             Assert.Equal(new SolidColorBrush(68, 85, 102), fill.Background);
             Assert.False(bar.IsHitTestVisible);
             Assert.False(fill.IsHitTestVisible);
+            Assert.Null(CssRegistry.FindProperty(typeof(ProgressBar), "orientation"));
             Assert.Null(CssRegistry.FindProperty(typeof(ProgressBar), "value"));
         }
         finally
