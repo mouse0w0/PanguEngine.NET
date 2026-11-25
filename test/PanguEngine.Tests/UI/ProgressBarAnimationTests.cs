@@ -58,18 +58,15 @@ public sealed class ProgressBarAnimationTests
     }
 
     [Theory]
-    [InlineData(Orientation.Horizontal, false, 30.88, 8, 31.2, 64)]
-    [InlineData(Orientation.Horizontal, true, 57.92, 8, 31.2, 64)]
-    [InlineData(Orientation.Vertical, false, 8, 38.72, 104, 19.2)]
-    [InlineData(Orientation.Vertical, true, 8, 22.08, 104, 19.2)]
+    [InlineData(Orientation.Horizontal, 30.88, 8, 31.2, 64)]
+    [InlineData(Orientation.Vertical, 8, 38.72, 104, 19.2)]
     [UIThreadTest]
-    public void MotionUsesTheContentBoxAndDirection(Orientation orientation, bool reversed,
+    public void MotionUsesTheContentBoxAndOrientation(Orientation orientation,
         double x, double y, double width, double height)
     {
         var bar = CreateBar();
         bar.IsIndeterminate = true;
         bar.Orientation = orientation;
-        bar.IsReversed = reversed;
         bar.BorderThickness = new Thickness(2);
         bar.Padding = new Thickness(6);
         var scene = CreateScene(bar);
@@ -125,7 +122,7 @@ public sealed class ProgressBarAnimationTests
 
     [Fact]
     [UIThreadTest]
-    public void DirectionAndSizeChangesKeepPhaseAndDisabledDegenerateRangesStillAnimate()
+    public void OrientationAndSizeChangesKeepPhaseAndDisabledDegenerateRangesStillAnimate()
     {
         var bar = CreateBar();
         bar.IsIndeterminate = true;
@@ -144,10 +141,9 @@ public sealed class ProgressBarAnimationTests
             Prepare(scene);
             Assert.Equal(38.4, Fill(bar).LayoutBounds.Y, 8);
             Assert.Equal(24, Fill(bar).LayoutBounds.Height, 8);
-            bar.IsReversed = true;
             bar.Height = 40;
             Prepare(scene);
-            Assert.Equal(8.8, Fill(bar).LayoutBounds.Y, 8);
+            Assert.Equal(19.2, Fill(bar).LayoutBounds.Y, 8);
             Assert.Equal(12, Fill(bar).LayoutBounds.Height, 8);
             bar.Width = 0;
             bar.Height = 0;

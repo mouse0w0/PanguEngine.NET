@@ -8,6 +8,14 @@ namespace PanguEngine.Tests.UI;
 [Collection(UIToolkitCollection.Name)]
 public sealed class ProgressBarTests
 {
+    public static TheoryData<double, double, double, double> ExtremeRanges => new()
+    {
+        { -double.MaxValue, double.MaxValue, 0, 0.5 },
+        { -double.MaxValue, double.MaxValue, double.MaxValue / 2, 0.75 },
+        { double.MaxValue / 2, double.MaxValue, double.MaxValue * 0.75, 0.5 },
+        { 0, 2 * double.Epsilon, double.Epsilon, 0.5 }
+    };
+
     [Fact]
     [UIThreadTest]
     public void RangeChangesKeepTheRawValueAndTwoWayBindingSource()
@@ -74,14 +82,6 @@ public sealed class ProgressBarTests
         Assert.Equal(35, bar.Value);
     }
 
-    public static TheoryData<double, double, double, double> ExtremeRanges => new()
-    {
-        { -double.MaxValue, double.MaxValue, 0, 0.5 },
-        { -double.MaxValue, double.MaxValue, double.MaxValue / 2, 0.75 },
-        { double.MaxValue / 2, double.MaxValue, double.MaxValue * 0.75, 0.5 },
-        { 0, 2 * double.Epsilon, double.Epsilon, 0.5 }
-    };
-
     [Theory]
     [MemberData(nameof(ExtremeRanges))]
     [UIThreadTest]
@@ -106,17 +106,15 @@ public sealed class ProgressBarTests
     }
 
     [Theory]
-    [InlineData(Orientation.Horizontal, false, 8, 8, 26, 64)]
-    [InlineData(Orientation.Horizontal, true, 86, 8, 26, 64)]
-    [InlineData(Orientation.Vertical, false, 8, 56, 104, 16)]
-    [InlineData(Orientation.Vertical, true, 8, 8, 104, 16)]
+    [InlineData(Orientation.Horizontal, 8, 8, 26, 64)]
+    [InlineData(Orientation.Vertical, 8, 56, 104, 16)]
     [UIThreadTest]
-    public void FillUsesTheContentBoxAndRequestedDirection(Orientation orientation, bool reversed,
+    public void FillUsesTheContentBoxAndOrientation(Orientation orientation,
         double x, double y, double width, double height)
     {
         var bar = new ProgressBar
         {
-            Width = 120, Height = 80, Value = 25, Orientation = orientation, IsReversed = reversed,
+            Width = 120, Height = 80, Value = 25, Orientation = orientation,
             BorderThickness = new Thickness(2), Padding = new Thickness(6)
         };
         var scene = CreateScene(bar);
@@ -159,7 +157,7 @@ public sealed class ProgressBarTests
 
     [Fact]
     [UIThreadTest]
-    public void CssConfiguresDirectionAndRecordsTheOuterRoundedClip()
+    public void CssConfiguresOrientationAndRecordsTheOuterRoundedClip()
     {
         var bar = CreateBar();
         bar.Value = 50;
@@ -168,27 +166,25 @@ public sealed class ProgressBarTests
         bar.CornerRadius = new CornerRadius(5);
         var scene = CreateScene(bar);
         scene.SetStyleSheets([StyleSheet.Parse("""
-            ProgressBar { orientation: vertical; is-reversed: true; }
-            ProgressBar:vertical:reversed .progress-bar-fill { background-color: #112233; }
+            ProgressBar { orientation: vertical; }
+            ProgressBar:vertical .progress-bar-fill { background-color: #112233; }
             """)]);
         scene.Open();
         try
         {
             Prepare(scene);
             Assert.Equal(Orientation.Vertical, bar.Orientation);
-            Assert.True(bar.IsReversed);
             var fill = Assert.IsType<Panel>(Fill(bar));
             Assert.Equal(new SolidColorBrush(17, 34, 51), fill.Background);
             var clip = Assert.Single(scene.CreateDrawCommandList().OfType<PushRoundedClipCommand>());
             Assert.Equal(bar.DecorationBounds, clip.Geometry.Outer.Bounds);
-            Assert.Equal(new Rect(3, 3, 114, 3), fill.LayoutBounds);
+            Assert.Equal(new Rect(3, 6, 114, 3), fill.LayoutBounds);
             scene.SetStyleSheets([StyleSheet.Parse("""
-                ProgressBar { orientation: horizontal; is-reversed: false; }
+                ProgressBar { orientation: horizontal; }
                 ProgressBar:horizontal .progress-bar-fill { background-color: #445566; }
                 """)]);
             Prepare(scene);
             Assert.Equal(Orientation.Horizontal, bar.Orientation);
-            Assert.False(bar.IsReversed);
             Assert.Equal(new Rect(3, 3, 57, 6), fill.LayoutBounds);
             Assert.Equal(new SolidColorBrush(68, 85, 102), fill.Background);
             Assert.False(bar.IsHitTestVisible);

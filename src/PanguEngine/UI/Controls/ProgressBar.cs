@@ -27,11 +27,7 @@ public sealed class ProgressBar : Control
     /// <summary>Identifies the progress axis.</summary>
     public static readonly Property<Orientation> OrientationProperty = Property.Register<ProgressBar, Orientation>(
         nameof(Orientation), Orientation.Horizontal,
-        onChanged: static (bar, _, _) => bar.OnDirectionChanged());
-
-    /// <summary>Identifies whether the fill origin is reversed.</summary>
-    public static readonly Property<bool> IsReversedProperty = Property.Register<ProgressBar, bool>(
-        nameof(IsReversed), onChanged: static (bar, _, _) => bar.OnDirectionChanged());
+        onChanged: static (bar, _, _) => bar.OnOrientationChanged());
 
     /// <summary>Identifies whether progress is displayed as a looping indicator.</summary>
     public static readonly DirectProperty<ProgressBar, bool> IsIndeterminateProperty =
@@ -40,20 +36,18 @@ public sealed class ProgressBar : Control
             onChanged: static (bar, _, _) => bar.OnModeChanged());
 
     private readonly Panel _fill;
-    private IDisposable? _sceneSubscription;
-    private IDisposable? _sceneOpenSubscription;
-    private IDisposable? _visibilitySubscription;
+    private double _animationPhase;
     private Ticker? _animationTicker;
     private TimeSpan? _lastAnimationTime;
-    private double _animationPhase;
+    private IDisposable? _sceneOpenSubscription;
+    private IDisposable? _sceneSubscription;
+    private IDisposable? _visibilitySubscription;
 
     static ProgressBar()
     {
         CssRegistry.RegisterElement<ProgressBar>("ProgressBar");
         CssRegistry.RegisterProperty<ProgressBar, Orientation>("orientation", OrientationProperty,
             CssValueConverters.ParseOrientation);
-        CssRegistry.RegisterProperty<ProgressBar, bool>("is-reversed", IsReversedProperty,
-            CssValueConverters.ParseBool);
     }
 
     /// <summary>Creates a non-interactive horizontal progress bar.</summary>
@@ -103,18 +97,11 @@ public sealed class ProgressBar : Control
         }
     }
 
-    /// <summary>Gets or sets the axis. Vertical progress normally increases upwards.</summary>
+    /// <summary>Gets or sets the progress axis. Horizontal progress moves right and vertical progress moves up.</summary>
     public Orientation Orientation
     {
         get => GetValue(OrientationProperty);
         set => SetValue(OrientationProperty, value);
-    }
-
-    /// <summary>Gets or sets whether progress fills from the opposite end of the track.</summary>
-    public bool IsReversed
-    {
-        get => GetValue(IsReversedProperty);
-        set => SetValue(IsReversedProperty, value);
     }
 
     /// <summary>Gets or sets whether a looping indicator replaces the displayed numeric proportion.</summary>
@@ -139,7 +126,6 @@ public sealed class ProgressBar : Control
     protected override void ArrangeContent(Rect contentBounds)
     {
         var horizontal = Orientation == Orientation.Horizontal;
-        var forward = horizontal ? !IsReversed : IsReversed;
         var length = horizontal ? contentBounds.Width : contentBounds.Height;
         double start;
         double end;
@@ -154,7 +140,7 @@ public sealed class ProgressBar : Control
             start = 0;
             end = GetProgress();
         }
-        var offset = (forward ? start : 1 - end) * length;
+        var offset = (horizontal ? start : 1 - end) * length;
         var filledLength = (end - start) * length;
         _fill.Arrange(horizontal
             ? new Rect(contentBounds.X + offset, contentBounds.Y, filledLength, contentBounds.Height)
@@ -248,7 +234,7 @@ public sealed class ProgressBar : Control
         InvalidateArrange();
     }
 
-    private void OnDirectionChanged()
+    private void OnOrientationChanged()
     {
         SynchronizePseudoClasses();
         InvalidateArrange();
@@ -258,7 +244,6 @@ public sealed class ProgressBar : Control
     {
         SetPseudoClass(PseudoClass.Horizontal, Orientation == Orientation.Horizontal);
         SetPseudoClass(PseudoClass.Vertical, Orientation == Orientation.Vertical);
-        SetPseudoClass(PseudoClass.Reversed, IsReversed);
     }
 
     private static void EnsureFinite(double value, string name)
