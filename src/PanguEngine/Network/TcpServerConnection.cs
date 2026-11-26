@@ -14,8 +14,44 @@ namespace PanguEngine.Network;
 internal sealed class TcpServerConnection(TcpConnection connection) : IServerConnection
 {
     private readonly Lock _gate = new();
-    private ConnectionPhase _phase = ConnectionPhase.Handshake;
     private bool _closing;
+    private ConnectionPhase _phase = ConnectionPhase.Handshake;
+
+    public bool IsClosed => connection.IsClosed;
+    public int IncomingCount => connection.IncomingCount;
+
+    public bool TryReceive([NotNullWhen(true)] out ServerboundPacket? packet)
+    {
+        if (!connection.TryPeek(out var frame))
+        {
+            packet = null;
+            return false;
+        }
+        packet = PacketCodec.ReadServerbound(_phase, frame.Span);
+        connection.Consume();
+        return true;
+    }
+
+    public bool TrySend(ClientboundPacket packet)
+    {
+        lock (_gate)
+            return connection.TrySend(PacketCodec.Encode(_phase, packet));
+    }
+
+    public void Disconnect(string reason)
+    {
+        lock (_gate)
+        {
+            if (_closing)
+                return;
+            var notice = DisconnectPacket.FromReason(reason);
+            connection.TrySend(PacketCodec.Encode(_phase, notice));
+            _closing = true;
+            connection.CompleteSending(notice.Reason);
+        }
+    }
+
+    public void ThrowIfFaulted() => connection.ThrowIfFaulted();
 
     /// <summary>Prepares the endpoint for Play and reports any username reserved by the connection.</summary>
     /// <remarks>The game thread may receive packets only after this task completes successfully with a ready result.</remarks>
@@ -52,13 +88,9 @@ internal sealed class TcpServerConnection(TcpConnection connection) : IServerCon
             }
             await ReadExpectedAsync<ContentReadyPacket>().ConfigureAwait(false);
             RemainingPreparationTime();
-            lock (_gate)
-            {
-                if (_closing)
-                    return (username, false);
-                _phase = ConnectionPhase.Play;
-                connection.EnableHeartbeat();
-            }
+            if (!SendTransition(new PlayStartPacket(), ConnectionPhase.Play))
+                return (username, false);
+            connection.EnableHeartbeat(PacketCodec.Encode(ConnectionPhase.Play, new ClientboundHeartbeatPacket()));
             return (username, true);
         }
         catch (Exception error) when (error is InvalidDataException or EndOfStreamException or DecoderFallbackException or ConnectionClosedException)
@@ -82,54 +114,16 @@ internal sealed class TcpServerConnection(TcpConnection connection) : IServerCon
         return remaining > TimeSpan.Zero ? remaining : throw new ConnectionClosedException("Connection setup timed out.");
     }
 
-    public bool IsClosed => connection.IsClosed;
-    public int IncomingCount => connection.IncomingCount;
-
-    public bool TryReceive([NotNullWhen(true)] out ServerboundPacket? packet)
-    {
-        if (!connection.TryPeek(out var frame))
-        {
-            packet = null;
-            return false;
-        }
-        packet = PacketCodec.ReadServerbound(_phase, frame.Span);
-        connection.Consume();
-        if (_phase == ConnectionPhase.Play)
-            ValidatePlayPacket(packet);
-        return true;
-    }
-
-    public bool TrySend(ClientboundPacket packet)
-    {
-        lock (_gate)
-            return connection.TrySend(PacketCodec.Encode(_phase, packet));
-    }
-
     private bool SendTransition(ClientboundPacket packet, ConnectionPhase nextPhase)
     {
         lock (_gate)
         {
-            if (!connection.TrySend(PacketCodec.Encode(_phase, packet)))
+            if (_closing || !connection.TrySend(PacketCodec.Encode(_phase, packet)))
                 return false;
             _phase = nextPhase;
             return true;
         }
     }
-
-    public void Disconnect(string reason)
-    {
-        lock (_gate)
-        {
-            if (_closing)
-                return;
-            var notice = DisconnectPacket.FromReason(reason);
-            connection.TrySend(PacketCodec.Encode(_phase, notice));
-            _closing = true;
-            connection.CompleteSending(notice.Reason);
-        }
-    }
-
-    public void ThrowIfFaulted() => connection.ThrowIfFaulted();
 
     private static string? CheckMods(IReadOnlyList<ModInfo> server, IReadOnlyList<ModVersionEntry> client)
     {
@@ -147,31 +141,5 @@ internal sealed class TcpServerConnection(TcpConnection connection) : IServerCon
                 return $"Required client mod '{mod.Id}' needs {mod.Version}, but client has {version}.";
         }
         return null;
-    }
-
-    private static void ValidatePlayPacket(ServerboundPacket packet)
-    {
-        switch (packet)
-        {
-            case InputStatePacket input:
-                if (!double.IsFinite(input.Forward) || input.Forward is < -1 or > 1 ||
-                    !double.IsFinite(input.Right) || input.Right is < -1 or > 1)
-                    throw new InvalidDataException("Invalid movement axes.");
-                ValidateAngles(input.Yaw, input.Pitch);
-                return;
-            case BlockInteractionPacket interaction:
-                if (interaction.Operation is not (BlockOperation.Break or BlockOperation.Place))
-                    throw new InvalidDataException("Invalid block operation.");
-                ValidateAngles(interaction.Yaw, interaction.Pitch);
-                return;
-            default:
-                throw new InvalidDataException("Message is not valid in the current connection phase.");
-        }
-    }
-
-    private static void ValidateAngles(double yaw, double pitch)
-    {
-        if (!double.IsFinite(yaw) || !double.IsFinite(pitch) || pitch is < -89 or > 89)
-            throw new InvalidDataException("Invalid player angles.");
     }
 }

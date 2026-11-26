@@ -61,10 +61,10 @@ public sealed class TcpConnectionTests
             {
                 var waiting = connection.WaitForFrameAsync(timeout);
                 Assert.False(waiting.IsCompleted);
-                await TcpFraming.WriteAsync(client.GetStream(), new byte[] { 1 }, stop.Token);
+                await TcpFraming.WriteAsync(client.GetStream(), new byte[] { 0 }, stop.Token);
                 await waiting.WaitAsync(timeout);
                 Assert.True(connection.TryPeek(out var frame));
-                Assert.Equal(new byte[] { 1 }, frame.ToArray());
+                Assert.Equal(new byte[] { 0 }, frame.ToArray());
                 connection.Consume();
 
                 waiting = connection.WaitForFrameAsync(timeout);

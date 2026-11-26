@@ -12,6 +12,21 @@ public sealed class ClientGameTests
         typeof(ClientGame).GetMethod("LoadInitialWorld", BindingFlags.NonPublic | BindingFlags.Static)!
             .CreateDelegate<Func<IClientConnection, ClientWorld, InitialWorldStatePacket>>();
 
+    [Fact]
+    public void PlayHeartbeatsDoNotAdvanceTheInitialWorldSequence()
+    {
+        var connection = new InMemoryConnection();
+        var world = new ClientWorld();
+        var initial = new InitialWorldStatePacket(0, 1, 0.05, [new(1, default)], 0);
+        connection.Publish(new ClientboundHeartbeatPacket());
+        connection.Publish(initial);
+        connection.Publish(new ClientboundHeartbeatPacket());
+        connection.Publish(new InitialWorldCompletePacket());
+
+        Assert.Same(initial, LoadInitialWorld(connection, world));
+        world.Destroy();
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

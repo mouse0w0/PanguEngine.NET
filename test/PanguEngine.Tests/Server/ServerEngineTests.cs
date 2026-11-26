@@ -1,14 +1,15 @@
 using System.Diagnostics;
 using PanguEngine.Client.Game;
 using PanguEngine.Client.World;
-using PanguEngine.Server;
-using PanguEngine.Tests.Client.Game;
-using PanguEngine.Registries;
-using PanguEngine.World.Blocks;
+using PanguEngine.Network;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
-using PanguEngine.Network;
+using PanguEngine.Registries;
+using PanguEngine.Server;
+using PanguEngine.Tests.Client.Game;
+using PanguEngine.Tests.Network;
+using PanguEngine.World.Blocks;
 
 namespace PanguEngine.Tests.Server;
 
@@ -210,6 +211,55 @@ public sealed class ServerEngineTests
         finally
         {
             await Task.Run(server.Destroy).WaitAsync(Timeout);
+            connection.Close();
+        }
+    }
+
+    [Fact]
+    public void ShutdownWithOnlyCustomInputDoesNotPublishAFinalUpdate()
+    {
+        var server = new ServerEngine(false);
+        var connection = server.ConnectInMemory();
+        Assert.True(connection.TrySend(new TestPlayPackets.EchoRequest(42)));
+        server.RequestShutdown();
+        server.Start();
+        try
+        {
+            ReceiveInitial(connection);
+            Assert.IsType<DisconnectPacket>(connection.WaitForPacket(Timeout));
+        }
+        finally
+        {
+            server.Destroy();
+            connection.Close();
+        }
+    }
+
+    [Fact]
+    public void InMemoryPlayDispatchesCustomRequestToTheSendingPlayer()
+    {
+        var server = new ServerEngine(false);
+        var connection = server.ConnectInMemory("Alice");
+        server.Start();
+        try
+        {
+            ReceiveInitial(connection);
+            Assert.True(connection.TrySend(new TestPlayPackets.EchoRequest(42)));
+
+            var started = Stopwatch.GetTimestamp();
+            ClientboundPacket packet;
+            do
+            {
+                var remaining = Timeout - Stopwatch.GetElapsedTime(started);
+                Assert.True(remaining > TimeSpan.Zero);
+                packet = connection.WaitForPacket(remaining);
+            } while (packet is WorldUpdatePacket);
+
+            Assert.Equal(new TestPlayPackets.EchoReply("Alice", 42), Assert.IsType<TestPlayPackets.EchoReply>(packet));
+        }
+        finally
+        {
+            server.Destroy();
             connection.Close();
         }
     }

@@ -1,12 +1,11 @@
+using PanguEngine.Network.Packets;
+using PanguEngine.Network.Packets.Clientbound;
+using PanguEngine.Network.Packets.Serverbound;
 using PanguEngine.Server.World;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Entities;
 using PanguEngine.World.Entities.Components;
 using PanguEngine.World.Interaction;
-using PanguEngine.Network;
-using PanguEngine.Network.Packets;
-using PanguEngine.Network.Packets.Clientbound;
-using PanguEngine.Network.Packets.Serverbound;
 using Silk.NET.Maths;
 using static PanguEngine.Network.Packets.Clientbound.WorldUpdatePacket;
 
@@ -61,21 +60,26 @@ public sealed class ServerGame
 
     internal void BeginTick() => _changes = [];
 
-    internal IReadOnlyList<InteractionResult> Apply(uint playerNetworkId, IReadOnlyList<ServerboundPacket> packets)
+    internal IReadOnlyList<InteractionResult> Apply(Player player, IReadOnlyList<ServerboundPacket> packets, bool shutdown = false)
     {
-        var player = _players[playerNetworkId];
         var results = new List<InteractionResult>();
+        var context = new ServerPacketContext(this, player, results);
         foreach (var packet in packets)
         {
-            if (packet is InputStatePacket input)
-            {
-                player.SetMoveIntent(new MoveIntentComponent(input.Forward, input.Right));
-                player.SetRotation(new RotationComponent(input.Yaw, input.Pitch));
-            }
-            else if (packet is BlockInteractionPacket interaction)
-                results.Add(Interact(player, interaction, _changes));
+            if (shutdown && !IsFinalInput(packet))
+                continue;
+            packet.Type.Handle(context, packet);
         }
         return results;
+    }
+
+    /// <summary>Identifies gameplay input that is still applied during the final server round.</summary>
+    internal static bool IsFinalInput(ServerboundPacket packet) => packet is InputStatePacket or BlockInteractionPacket;
+
+    internal static void ApplyInput(PlayerEntity player, InputStatePacket input)
+    {
+        player.SetMoveIntent(new MoveIntentComponent(input.Forward, input.Right));
+        player.SetRotation(new RotationComponent(input.Yaw, input.Pitch));
     }
 
     internal WorldUpdatePacket FinishTick(bool advance = true)
@@ -108,7 +112,7 @@ public sealed class ServerGame
         return new PlayerPose(player.Position.Current, rotation.Yaw, rotation.Pitch);
     }
 
-    private InteractionResult Interact(PlayerEntity player, BlockInteractionPacket packet, List<BlockChange> changes)
+    internal InteractionResult ApplyInteraction(PlayerEntity player, BlockInteractionPacket packet)
     {
         var ray = new Ray3D<double>(player.Position.Current, EntityPoseMath.GetForward(packet.Yaw, packet.Pitch));
         if (!BlockRaycaster.TryRaycast(World, ray, 5, out var hit))
@@ -124,7 +128,7 @@ public sealed class ServerGame
             ? BuiltinBlocks.Air.DefaultState
             : BuiltinBlocks.Stone.DefaultState;
         World.SetBlock(position, state);
-        changes.Add(new BlockChange(position, state));
+        _changes.Add(new BlockChange(position, state));
         return new InteractionResult(packet.Operation, InteractionStatus.Success, position);
     }
 }

@@ -5,6 +5,8 @@ namespace PanguEngine.Network.Packets.Clientbound;
 internal sealed record InitialWorldStatePacket(long Tick, uint PlayerNetworkId, double StepSeconds,
     IReadOnlyList<PlayerState> Players, int ChunkCount) : ClientboundPacket
 {
+    public override ClientboundPacketType Type => BuiltinPackets.InitialWorldState;
+
     internal PlayerPose Player => Players.Single(player => player.NetworkId == PlayerNetworkId).Pose;
 
     internal override void Write(ref Writer writer)

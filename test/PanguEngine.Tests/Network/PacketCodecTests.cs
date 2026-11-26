@@ -1,13 +1,12 @@
+using System.Buffers;
 using System.Net;
 using System.Net.Sockets;
-using System.Buffers;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
 using PanguEngine.Network.Serialization;
 using PanguEngine.Registries;
-using PanguEngine.Server.Game;
 using PanguEngine.Server;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
@@ -39,8 +38,10 @@ public sealed class PacketCodecTests
         finally { listener.Stop(); }
     }
 
-    [Fact]
-    public async Task WrongConfigurationResponseClosesTheClientConnection()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ClientStaysInConfigurationUntilServerConfirmsPlay(bool rejectAfterReady)
     {
         using var stop = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -59,9 +60,25 @@ public sealed class PacketCodecTests
             await TcpFraming.WriteAsync(stream, PacketCodec.Encode(ConnectionPhase.Login, new LoginSuccessPacket()), stop.Token);
             frame = await TcpFraming.ReadAsync(stream, stop.Token);
             Assert.IsType<ClientModsPacket>(PacketCodec.ReadServerbound(ConnectionPhase.Configuration, frame!.Value.Span));
-            await TcpFraming.WriteAsync(stream, PacketCodec.Encode(ConnectionPhase.Play, new InitialWorldCompletePacket()), stop.Token);
+            const string rejected = "Configuration was not accepted.";
+            if (rejectAfterReady)
+            {
+                var manager = TestRegistryBootstrap.Manager;
+                manager.AllocateIdTables();
+                await TcpFraming.WriteAsync(stream, PacketCodec.Encode(ConnectionPhase.Configuration,
+                    new ContentManifestPacket(manager.ExportIdMappings())), stop.Token);
+                frame = await TcpFraming.ReadAsync(stream, stop.Token);
+                Assert.IsType<ContentReadyPacket>(PacketCodec.ReadServerbound(ConnectionPhase.Configuration, frame!.Value.Span));
+                await TcpFraming.WriteAsync(stream, PacketCodec.Encode(ConnectionPhase.Configuration, new DisconnectPacket(rejected)), stop.Token);
+            }
+            else
+            {
+                await TcpFraming.WriteAsync(stream, PacketCodec.Encode(ConnectionPhase.Play, new ClientboundHeartbeatPacket()), stop.Token);
+            }
 
-            await Assert.ThrowsAsync<ConnectionClosedException>(() => connecting.WaitAsync(stop.Token));
+            var error = await Assert.ThrowsAsync<ConnectionClosedException>(() => connecting.WaitAsync(stop.Token));
+            if (rejectAfterReady)
+                Assert.Equal(rejected, error.Message);
             Assert.Null(await TcpFraming.ReadAsync(stream, stop.Token));
         }
         finally { listener.Stop(); }
@@ -133,22 +150,37 @@ public sealed class PacketCodecTests
     }
 
     [Fact]
-    public void DisconnectUsesIdOneAndPreservesReason()
+    public void PlayDisconnectUsesItsAllocatedIdRatherThanTheConfigurationId()
     {
-        var packet = new DisconnectPacket("服务端主动断开连接。");
-        var encoded = PacketCodec.Encode(ConnectionPhase.Play, packet);
+        var ids = BuiltinIdTables.ClientboundPacket;
+        var original = ids.ExportMapping();
+        var keys = original.Keys.Reverse().ToArray();
+        try
+        {
+            ids.Bind(new RegistryIdMapping(ids.Key, keys));
+            var packet = new DisconnectPacket("服务端主动断开连接。");
+            var encoded = PacketCodec.Encode(ConnectionPhase.Play, packet);
 
-        Assert.Equal(1, encoded.Span[0]);
-        Assert.Equal(packet, PacketCodec.ReadClientbound(ConnectionPhase.Play, encoded.Span));
-        Assert.Throws<InvalidDataException>(() => PacketCodec.ReadClientbound(ConnectionPhase.Play, new byte[] { 9 }));
+            var id = new Reader(encoded.Span).ReadVarUInt32();
+            Assert.Equal((uint)Array.IndexOf(keys, ResourceKey.Parse("pangu:disconnect")), id);
+            Assert.NotEqual(1u, id);
+            var decoded = Assert.IsType<DisconnectPacket>(PacketCodec.ReadClientbound(ConnectionPhase.Play, encoded.Span));
+            Assert.Equal(packet, decoded);
+            Assert.Same(BuiltinPackets.Disconnect, decoded.Type);
+            Assert.Same(decoded.Type, ids.Get((int)id));
+            var configuration = PacketCodec.Encode(ConnectionPhase.Configuration, packet);
+            Assert.Equal(1u, new Reader(configuration.Span).ReadVarUInt32());
+            Assert.Equal(packet, PacketCodec.ReadClientbound(ConnectionPhase.Configuration, configuration.Span));
+            Assert.Throws<InvalidDataException>(() => PacketCodec.ReadClientbound(ConnectionPhase.Play, new byte[] { 9 }));
+        }
+        finally { ids.Bind(original); }
     }
 
     [Fact]
-    public void InputUsesExplicitIdAndRejectsTrailingData()
+    public void RegisteredInputRejectsTrailingData()
     {
         var input = new InputStatePacket(1, -1, 45, 20);
         var encoded = PacketCodec.Encode(ConnectionPhase.Play, input);
-        Assert.Equal(2, encoded.Span[0]);
         Assert.Equal(input, PacketCodec.ReadServerbound(ConnectionPhase.Play, encoded.Span));
         var extra = encoded.ToArray().Concat(new byte[] { 0 }).ToArray();
         Assert.Throws<InvalidDataException>(() => PacketCodec.ReadServerbound(ConnectionPhase.Play, extra));
@@ -266,7 +298,7 @@ public sealed class PacketCodecTests
 
     private static void WriteChunkHeader(ref Writer writer, byte bits)
     {
-        writer.WriteVarUInt32(3);
+        writer.WriteVarUInt32(PlayId("chunk_data"));
         writer.WriteInt32(0);
         writer.WriteInt32(0);
         writer.WriteInt32(0);
@@ -286,47 +318,84 @@ public sealed class PacketCodecTests
             table.GetKey(BuiltinBlocks.Stone),
             table.GetKey(BuiltinBlocks.Air)
         ];
+        var requestKey = ResourceKey.Parse("test:echo_request");
+        var replyKey = ResourceKey.Parse("test:echo_reply");
+        var unusedKey = ResourceKey.Parse("test:unused_request");
         var tables = manager.ExportIdMappings().Tables.Select(mapping =>
-            mapping.RegistryKey == table.Key ? new RegistryIdMapping(table.Key, keys) : mapping).ToArray();
+            mapping.RegistryKey == table.Key ? new RegistryIdMapping(table.Key, keys) :
+            mapping.RegistryKey == RegistryKeys.ServerboundPacket ? new RegistryIdMapping(mapping.RegistryKey,
+                [requestKey, .. mapping.Keys.Where(key => key != requestKey && key != unusedKey)]) :
+            mapping.RegistryKey == RegistryKeys.ClientboundPacket ? new RegistryIdMapping(mapping.RegistryKey,
+                [replyKey, .. mapping.Keys.Where(key => key != replyKey)]) : mapping).ToArray();
         var manifest = new ContentManifestPacket(new RegistryIdMappings(tables));
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        using var deadline = new CancellationTokenSource(NetworkLimits.HandshakeTimeout);
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
+        var endpoint = (IPEndPoint)listener.LocalEndpoint;
+        var connecting = Task.Run(() => TcpClientConnection.Connect(endpoint, "Alice", manager, []));
         try
         {
-            var endpoint = (IPEndPoint)listener.LocalEndpoint;
-            var connecting = Task.Run(() => TcpClientConnection.Connect(endpoint, "Alice", manager, []));
             using var accepted = listener.AcceptTcpClientAsync(deadline.Token).AsTask().GetAwaiter().GetResult();
             var connection = new TcpConnection(accepted);
+            var serverConnection = new TcpServerConnection(connection);
+            var preparation = serverConnection.PrepareAsync(manifest, [], new PlayerNames());
             try
             {
-                var serverConnection = new TcpServerConnection(connection);
-                var names = new PlayerNames();
-                var session = new RemoteSession(serverConnection, serverConnection.PrepareAsync(manifest, [], names), names);
                 var client = connecting.WaitAsync(deadline.Token).GetAwaiter().GetResult();
-                try
+                Assert.True(preparation.WaitAsync(deadline.Token).GetAwaiter().GetResult().IsReady);
+                Assert.Same(TestRegistryBootstrap.CustomIdValue, TestRegistryBootstrap.CustomIdTable.Get(0));
+                var states = TestRegistryBootstrap.StatefulBlock.StateDefinition.States;
+                for (var i = 0; i < states.Count; i++)
                 {
-                    Assert.True(session.Preparation.WaitAsync(deadline.Token).GetAwaiter().GetResult().IsReady);
-                    Assert.Same(TestRegistryBootstrap.CustomIdValue, TestRegistryBootstrap.CustomIdTable.Get(0));
-                    var states = TestRegistryBootstrap.StatefulBlock.StateDefinition.States;
-                    for (var i = 0; i < states.Count; i++)
-                    {
-                        Assert.Equal(i, BlockStateIds.GetId(states[i]));
-                        Assert.Same(states[i], BlockStateIds.Get(i));
-                    }
-                    Assert.Equal(states.Count, BlockStateIds.GetId(BuiltinBlocks.Stone.DefaultState));
-                    Assert.Equal(states.Count + 1, BlockStateIds.GetId(BuiltinBlocks.Air.DefaultState));
-                    Assert.Throws<KeyNotFoundException>(() => BlockStateIds.GetId(BuiltinBlocks.Grass.DefaultState));
+                    Assert.Equal(i, BlockStateIds.GetId(states[i]));
+                    Assert.Same(states[i], BlockStateIds.Get(i));
                 }
-                finally { client.Close(); }
+                Assert.Equal(states.Count, BlockStateIds.GetId(BuiltinBlocks.Stone.DefaultState));
+                Assert.Equal(states.Count + 1, BlockStateIds.GetId(BuiltinBlocks.Air.DefaultState));
+                Assert.Throws<KeyNotFoundException>(() => BlockStateIds.GetId(BuiltinBlocks.Grass.DefaultState));
+
+                var request = new TestPlayPackets.EchoRequest(42);
+                Assert.False(PacketCodec.HasPlayId(new TestPlayPackets.UnusedRequest()));
+                Assert.True(client.TrySend(request));
+                connection.WaitForFrameAsync(TimeSpan.FromSeconds(5)).WaitAsync(deadline.Token).GetAwaiter().GetResult();
+                Assert.True(connection.TryPeek(out var requestFrame));
+                Assert.Equal(0u, new Reader(requestFrame.Span).ReadVarUInt32());
+                Assert.True(serverConnection.TryReceive(out var received));
+                Assert.Equal(request, Assert.IsType<TestPlayPackets.EchoRequest>(received));
+                var reply = new TestPlayPackets.EchoReply("Alice", 42);
+                Assert.True(serverConnection.TrySend(reply));
+                Assert.Equal(reply, Assert.IsType<TestPlayPackets.EchoReply>(client.WaitForPacket()));
+                var buffer = new ArrayBufferWriter<byte>();
+                var writer = new Writer(buffer);
+                writer.WriteVarUInt32(0);
+                writer.WriteString(reply.Username);
+                writer.WriteInt32(reply.Value);
+                Assert.Equal(buffer.WrittenSpan.ToArray(), PacketCodec.Encode(ConnectionPhase.Play, reply).ToArray());
+                Assert.True(connection.TrySend(buffer.WrittenMemory));
+                Assert.Equal(reply, Assert.IsType<TestPlayPackets.EchoReply>(client.WaitForPacket()));
+
+                var heartbeatWait = 2 * NetworkLimits.HeartbeatInterval;
+                connection.WaitForFrameAsync(heartbeatWait).WaitAsync(deadline.Token).GetAwaiter().GetResult();
+                Assert.True(serverConnection.TryReceive(out var serverboundHeartbeat));
+                Assert.IsType<ServerboundHeartbeatPacket>(serverboundHeartbeat);
+                Assert.IsType<ClientboundHeartbeatPacket>(client.WaitForPacket(heartbeatWait));
             }
-            finally { connection.Destroy(); }
+            finally
+            {
+                connection.Close("The test stopped.");
+                try { preparation.GetAwaiter().GetResult(); }
+                finally { connection.Destroy(); }
+            }
         }
         finally
         {
             listener.Stop();
-            manager.AllocateIdTables();
-            BlockStateIds.Build();
+            try { CloseClientWhenConnectedAsync(connecting).GetAwaiter().GetResult(); }
+            finally
+            {
+                manager.AllocateIdTables();
+                BlockStateIds.Build();
+            }
         }
     }
 
@@ -342,6 +411,25 @@ public sealed class PacketCodecTests
     }
 
     [Fact]
+    public async Task RemoteHandshakeRejectsMissingRequiredPlayPacketBeforeReady()
+    {
+        var manager = TestRegistryBootstrap.Manager;
+        manager.AllocateIdTables();
+        var missingKey = ResourceKey.Parse("test:missing_play_packet");
+        var tables = manager.ExportIdMappings().Tables.Select(mapping => mapping.RegistryKey == RegistryKeys.ServerboundPacket
+            ? new RegistryIdMapping(mapping.RegistryKey, [.. mapping.Keys, missingKey]) : mapping).ToArray();
+        try
+        {
+            await AssertRemoteMappingFailure(manager, new RegistryIdMappings(tables), localFailure: false, missingKey.ToString());
+        }
+        finally
+        {
+            manager.AllocateIdTables();
+            BlockStateIds.Build();
+        }
+    }
+
+    [Fact]
     public async Task RemoteHandshakeDoesNotWrapAnUnfrozenLocalRegistryAsAConnectionFailure()
     {
         var manager = new RegistryManager();
@@ -351,20 +439,21 @@ public sealed class PacketCodecTests
         await AssertRemoteMappingFailure(manager, new RegistryIdMappings([new(registry.Key, [])]), localFailure: true);
     }
 
-    private static async Task AssertRemoteMappingFailure(RegistryManager manager, RegistryIdMappings mappings, bool localFailure)
+    private static async Task AssertRemoteMappingFailure(RegistryManager manager, RegistryIdMappings mappings, bool localFailure,
+        string reason = "Mapping registries do not match")
     {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
+        var address = (IPEndPoint)listener.LocalEndpoint;
+        var connecting = Task.Run(() => TcpClientConnection.Connect(address, "Alice", manager, []));
         try
         {
-            var address = (IPEndPoint)listener.LocalEndpoint;
-            var connecting = Task.Run(() => TcpClientConnection.Connect(address, "Alice", manager, []));
             var connection = new TcpConnection(await listener.AcceptTcpClientAsync(deadline.Token));
+            var endpoint = new TcpServerConnection(connection);
+            var preparing = endpoint.PrepareAsync(new ContentManifestPacket(mappings), [], new PlayerNames());
             try
             {
-                var endpoint = new TcpServerConnection(connection);
-                var preparing = endpoint.PrepareAsync(new ContentManifestPacket(mappings), [], new PlayerNames());
                 if (localFailure)
                 {
                     var error = await Assert.ThrowsAsync<InvalidOperationException>(() => connecting.WaitAsync(deadline.Token));
@@ -374,15 +463,31 @@ public sealed class PacketCodecTests
                 else
                 {
                     var error = await Assert.ThrowsAsync<ConnectionClosedException>(() => connecting.WaitAsync(deadline.Token));
-                    Assert.Contains("Mapping registries do not match", error.Message, StringComparison.Ordinal);
+                    Assert.Contains(reason, error.Message, StringComparison.Ordinal);
                 }
                 var (username, isReady) = await preparing.WaitAsync(deadline.Token);
                 Assert.Equal("Alice", username);
                 Assert.False(isReady);
             }
-            finally { connection.Destroy(); }
+            finally
+            {
+                connection.Close("The test stopped.");
+                try { await preparing; }
+                finally { connection.Destroy(); }
+            }
         }
-        finally { listener.Stop(); }
+        finally
+        {
+            listener.Stop();
+            await CloseClientWhenConnectedAsync(connecting);
+        }
+    }
+
+    private static async Task CloseClientWhenConnectedAsync(Task<TcpClientConnection> connecting)
+    {
+        await Task.WhenAny(connecting).ConfigureAwait(false);
+        if (connecting.IsCompletedSuccessfully)
+            (await connecting.ConfigureAwait(false)).Close();
     }
 
     [Fact]
@@ -402,7 +507,7 @@ public sealed class PacketCodecTests
         Assert.Equal<WorldUpdatePacket.BlockChange>(update.Changes, decoded.Changes);
         var buffer = new ArrayBufferWriter<byte>();
         var writer = new Writer(buffer);
-        writer.WriteVarUInt32(5);
+        writer.WriteVarUInt32(PlayId("world_update"));
         writer.WriteInt64(1);
         writer.WriteCount(0);
         writer.WriteCount(1);
@@ -412,6 +517,8 @@ public sealed class PacketCodecTests
         Assert.Throws<InvalidDataException>(() => PacketCodec.ReadClientbound(ConnectionPhase.Play, buffer.WrittenSpan));
     }
 
+    private static uint PlayId(string name) =>
+        (uint)BuiltinIdTables.ClientboundPacket.GetId(ResourceKey.Create("pangu", name));
 }
 
 [CollectionDefinition("Network globals", DisableParallelization = true)]

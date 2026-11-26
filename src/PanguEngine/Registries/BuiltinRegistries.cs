@@ -1,6 +1,7 @@
 using PanguEngine.Audio;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
+using PanguEngine.Network.Packets;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Entities;
 
@@ -29,6 +30,7 @@ public static class BuiltinRegistries
 
     /// <summary>The built-in input context registry.</summary>
     public static readonly Registry<InputContext> InputContext = new(RegistryKeys.InputContext);
+
     /// <summary>The built-in entity component type registry.</summary>
     public static readonly Registry<ComponentType> EntityComponentType =
         new(RegistryKeys.EntityComponentType, (current, _, value) => value.ValidateRegistration(current));
@@ -36,6 +38,14 @@ public static class BuiltinRegistries
     /// <summary>The built-in entity type registry.</summary>
     public static readonly Registry<EntityType> EntityType =
         new(RegistryKeys.EntityType, (_, _, value) => value.ValidateRegistration(EntityComponentType));
+
+    /// <summary>The built-in registry for Play packets sent to the server.</summary>
+    public static readonly Registry<ServerboundPacketType> ServerboundPacket =
+        new(RegistryKeys.ServerboundPacket, ServerboundPacketType.ValidateRegistration);
+
+    /// <summary>The built-in registry for Play packets sent to the client.</summary>
+    public static readonly Registry<ClientboundPacketType> ClientboundPacket =
+        new(RegistryKeys.ClientboundPacket, ClientboundPacketType.ValidateRegistration);
 
     /// <summary>
     /// Registers the built-in registries in the specified registry manager.
@@ -51,5 +61,7 @@ public static class BuiltinRegistries
         manager.Register(InputContext);
         manager.Register(EntityComponentType);
         manager.Register(EntityType);
+        manager.Register(ServerboundPacket);
+        manager.Register(ClientboundPacket);
     }
 }

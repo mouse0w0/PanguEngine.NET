@@ -1,13 +1,13 @@
 using System.Diagnostics;
 using PanguEngine.Audio;
-using PanguEngine.Client.World;
 using PanguEngine.Client.Input;
+using PanguEngine.Client.World;
 using PanguEngine.Input;
 using PanguEngine.Network;
-using PanguEngine.World.Chunking;
-using PanguEngine.World.Interaction;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
+using PanguEngine.World.Chunking;
+using PanguEngine.World.Interaction;
 using Silk.NET.Maths;
 using static PanguEngine.Network.Packets.Clientbound.WorldUpdatePacket;
 
@@ -18,13 +18,13 @@ namespace PanguEngine.Client.Game;
 /// </summary>
 public sealed class ClientGame
 {
+    private readonly AudioSystem _audio;
+    private readonly Stopwatch _displayClock = Stopwatch.StartNew();
     private readonly ClientEngine _engine;
+    private readonly IDisposable _gameContextActivation;
     private readonly InputManager _input;
     private readonly PlayerInputController _playerInput;
     private readonly ClientSession _session;
-    private readonly Stopwatch _displayClock = Stopwatch.StartNew();
-    private readonly AudioSystem _audio;
-    private readonly IDisposable _gameContextActivation;
 
     internal ClientGame(ClientEngine engine, IClientConnection connection)
     {
@@ -58,7 +58,14 @@ public sealed class ClientGame
     /// <summary>The display block selected by the current camera ray, or null when it misses.</summary>
     public BlockHit? SelectedBlock { get; private set; }
 
-    internal void ReceivePending() => _session.ReceivePending(_displayClock.Elapsed.TotalSeconds);
+    /// <summary>Queues a registered custom Play packet for the server.</summary>
+    /// <param name="packet">The packet to send. Do not modify it or its payload after queueing it.</param>
+    /// <returns>Whether the packet was queued, not whether the server received it.</returns>
+    /// <remarks>Call from the client game thread.</remarks>
+    public bool TrySendPacket(ServerboundPacket packet) =>
+        PacketCodec.HasPlayId(packet) && _session.TrySendPacket(packet);
+
+    internal void ReceivePending() => _session.ReceivePending(_displayClock.Elapsed.TotalSeconds, this);
 
     /// <summary>
     /// Prepares resources for the next client frame.
@@ -85,32 +92,45 @@ public sealed class ClientGame
     private static InitialWorldStatePacket LoadInitialWorld(IClientConnection connection, ClientWorld world)
     {
         var started = Stopwatch.GetTimestamp();
-        var first = WaitForPacket(connection, NetworkLimits.InitialTimeout);
+        var context = new ClientPacketContext(world);
+        var first = WaitForWorldPacket(connection, started, context);
         if (first is not InitialWorldStatePacket initial)
             throw new ConnectionClosedException("Expected initial world metadata.");
-        world.ApplyInitial(initial);
+        context.Handle(initial);
         var chunks = new HashSet<ChunkPos>();
         while (true)
         {
-            var remaining = NetworkLimits.InitialTimeout - Stopwatch.GetElapsedTime(started);
-            if (remaining <= TimeSpan.Zero)
-                throw new ConnectionClosedException("Initial world loading timed out.");
-            var packet = WaitForPacket(connection, remaining);
+            var packet = WaitForWorldPacket(connection, started, context);
             if (packet is ChunkDataPacket chunk && chunks.Count < initial.ChunkCount && chunks.Add(chunk.Position))
-                world.ApplyChunk(chunk);
+                context.Handle(chunk);
             else if (packet is InitialWorldCompletePacket && chunks.Count == initial.ChunkCount)
+            {
+                context.Handle(packet);
                 return initial;
+            }
             else
                 throw new ConnectionClosedException("Invalid initial world sequence.");
         }
     }
 
-    private static ClientboundPacket WaitForPacket(IClientConnection connection, TimeSpan timeout)
+    private static ClientboundPacket WaitForWorldPacket(IClientConnection connection, long started, ClientPacketContext context)
     {
-        var packet = connection.WaitForPacket(timeout);
-        if (packet is DisconnectPacket disconnected)
-            throw new ConnectionClosedException(disconnected.Reason);
-        return packet;
+        while (true)
+        {
+            var remaining = NetworkLimits.InitialTimeout - Stopwatch.GetElapsedTime(started);
+            if (remaining <= TimeSpan.Zero)
+                throw new ConnectionClosedException("Initial world loading timed out.");
+
+            var packet = connection.WaitForPacket(remaining);
+            if (packet is ClientboundHeartbeatPacket)
+            {
+                context.Handle(packet);
+                continue;
+            }
+            if (packet is DisconnectPacket)
+                context.Handle(packet);
+            return packet;
+        }
     }
 
     private void OnOperationCompleted(InteractionResult result)

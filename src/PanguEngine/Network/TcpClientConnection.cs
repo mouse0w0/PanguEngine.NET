@@ -3,11 +3,11 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
-using PanguEngine.World.Blocks;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
 using PanguEngine.Registries;
+using PanguEngine.World.Blocks;
 
 namespace PanguEngine.Network;
 
@@ -15,55 +15,6 @@ namespace PanguEngine.Network;
 internal sealed class TcpClientConnection(TcpConnection connection) : IClientConnection
 {
     private ConnectionPhase _phase = ConnectionPhase.Handshake;
-
-    internal static TcpClientConnection Connect(IPEndPoint endpoint, string username, RegistryManager registries,
-        IReadOnlyList<ModVersionEntry> mods)
-    {
-        var client = new TcpClient(endpoint.AddressFamily);
-        ConnectAsync(client, endpoint).GetAwaiter().GetResult();
-        var transport = new TcpConnection(client);
-        var result = new TcpClientConnection(transport);
-        var started = Stopwatch.GetTimestamp();
-        try
-        {
-            if (!result.TrySend(new ClientHelloPacket(PacketCodec.ProtocolVersion)))
-                throw new ConnectionClosedException("The server connection ended during the handshake.");
-            result.WaitExpected<LoginStartPacket>(started);
-            result._phase = ConnectionPhase.Login;
-            if (!result.TrySend(new LoginRequestPacket(username)))
-                throw new ConnectionClosedException("The server connection ended during login.");
-            result.WaitExpected<LoginSuccessPacket>(started);
-            result._phase = ConnectionPhase.Configuration;
-            if (!result.TrySend(new ClientModsPacket(mods)))
-                throw new ConnectionClosedException("The server connection ended during configuration.");
-            var manifest = result.WaitExpected<ContentManifestPacket>(started);
-            registries.BindIdTables(manifest.Mappings);
-            BlockStateIds.Build();
-            if (Stopwatch.GetElapsedTime(started) >= NetworkLimits.HandshakeTimeout)
-                throw new ConnectionClosedException("Connection setup timed out.");
-            if (!result.TrySend(new ContentReadyPacket()))
-                throw new ConnectionClosedException("The server connection ended during content confirmation.");
-            result._phase = ConnectionPhase.Play;
-            transport.EnableHeartbeat();
-            return result;
-        }
-        catch (Exception error) when (error is ConnectionClosedException or InvalidDataException or EncoderFallbackException)
-        {
-            result.Close();
-            throw new ConnectionClosedException(error.Message);
-        }
-    }
-
-    private T WaitExpected<T>(long started) where T : ClientboundPacket
-    {
-        var remaining = NetworkLimits.HandshakeTimeout - Stopwatch.GetElapsedTime(started);
-        if (remaining <= TimeSpan.Zero)
-            throw new ConnectionClosedException("Connection setup timed out.");
-        var packet = WaitForPacket(remaining);
-        if (packet is DisconnectPacket disconnected)
-            throw new ConnectionClosedException(disconnected.Reason);
-        return packet is T expected ? expected : throw new ConnectionClosedException("Unexpected message during connection setup.");
-    }
 
     public bool IsClosed => connection.IsClosed;
 
@@ -100,6 +51,56 @@ internal sealed class TcpClientConnection(TcpConnection connection) : IClientCon
     }
 
     public void Close() => connection.Destroy();
+
+    internal static TcpClientConnection Connect(IPEndPoint endpoint, string username, RegistryManager registries,
+        IReadOnlyList<ModVersionEntry> mods)
+    {
+        var client = new TcpClient(endpoint.AddressFamily);
+        ConnectAsync(client, endpoint).GetAwaiter().GetResult();
+        var transport = new TcpConnection(client);
+        var result = new TcpClientConnection(transport);
+        var started = Stopwatch.GetTimestamp();
+        try
+        {
+            if (!result.TrySend(new ClientHelloPacket(PacketCodec.ProtocolVersion)))
+                throw new ConnectionClosedException("The server connection ended during the handshake.");
+            result.WaitExpected<LoginStartPacket>(started);
+            result._phase = ConnectionPhase.Login;
+            if (!result.TrySend(new LoginRequestPacket(username)))
+                throw new ConnectionClosedException("The server connection ended during login.");
+            result.WaitExpected<LoginSuccessPacket>(started);
+            result._phase = ConnectionPhase.Configuration;
+            if (!result.TrySend(new ClientModsPacket(mods)))
+                throw new ConnectionClosedException("The server connection ended during configuration.");
+            var manifest = result.WaitExpected<ContentManifestPacket>(started);
+            registries.BindIdTables(manifest.Mappings);
+            BlockStateIds.Build();
+            if (Stopwatch.GetElapsedTime(started) >= NetworkLimits.HandshakeTimeout)
+                throw new ConnectionClosedException("Connection setup timed out.");
+            if (!result.TrySend(new ContentReadyPacket()))
+                throw new ConnectionClosedException("The server connection ended during content confirmation.");
+            result.WaitExpected<PlayStartPacket>(started);
+            result._phase = ConnectionPhase.Play;
+            transport.EnableHeartbeat(PacketCodec.Encode(ConnectionPhase.Play, new ServerboundHeartbeatPacket()));
+            return result;
+        }
+        catch (Exception error) when (error is ConnectionClosedException or InvalidDataException or EncoderFallbackException)
+        {
+            result.Close();
+            throw new ConnectionClosedException(error.Message);
+        }
+    }
+
+    private T WaitExpected<T>(long started) where T : ClientboundPacket
+    {
+        var remaining = NetworkLimits.HandshakeTimeout - Stopwatch.GetElapsedTime(started);
+        if (remaining <= TimeSpan.Zero)
+            throw new ConnectionClosedException("Connection setup timed out.");
+        var packet = WaitForPacket(remaining);
+        if (packet is DisconnectPacket disconnected)
+            throw new ConnectionClosedException(disconnected.Reason);
+        return packet as T ?? throw new ConnectionClosedException("Unexpected message during connection setup.");
+    }
 
     private static async Task ConnectAsync(TcpClient client, IPEndPoint endpoint)
     {

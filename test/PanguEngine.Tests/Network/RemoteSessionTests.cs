@@ -1,15 +1,15 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
-using System.Diagnostics.CodeAnalysis;
 using PanguEngine.Client.World;
+using PanguEngine.Modding;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
-using PanguEngine.Server.Game;
 using PanguEngine.Server;
+using PanguEngine.Server.Game;
 using PanguEngine.Tests.Client.Game;
-using PanguEngine.Modding;
 using PanguEngine.Versioning;
 using PanguEngine.World.Blocks;
 
@@ -185,6 +185,7 @@ public sealed class RemoteSessionTests
             first.Send(ConnectionPhase.Configuration, new ClientModsPacket([]));
             Assert.IsType<ContentManifestPacket>(first.Read(ConnectionPhase.Configuration));
             first.Send(ConnectionPhase.Configuration, new ContentReadyPacket());
+            Assert.IsType<PlayStartPacket>(first.Read(ConnectionPhase.Configuration));
             var input = new InputStatePacket(0, 0, 42, 12);
             first.Send(ConnectionPhase.Play, input);
             first.Session.Preparation.WaitAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
@@ -390,19 +391,29 @@ public sealed class RemoteSessionTests
             ServerEngine.RemoveClosedDedicatedSessions(game, players, listener, sessions);
             game.Destroy();
         });
-        TcpClientConnection? first = null;
-        TcpClientConnection? second = null;
+        PlayPeer? first = null;
+        PlayPeer? second = null;
         var firstWorld = new ClientWorld();
         var secondWorld = new ClientWorld();
         try
         {
-            first = TcpClientConnection.Connect(endpoint, "Alice", TestRegistryBootstrap.Manager, [new("a", "1.0.0")]);
+            first = ConnectPlayPeer(endpoint, "Alice", stop.Token);
             var initial = ClientGameTests.LoadInitialWorld(first, firstWorld);
-            second = TcpClientConnection.Connect(endpoint, "Bob", TestRegistryBootstrap.Manager, [new("a", "1.0.0")]);
+            second = ConnectPlayPeer(endpoint, "Bob", stop.Token);
             var other = ClientGameTests.LoadInitialWorld(second, secondWorld);
             Assert.NotEqual(initial.PlayerNetworkId, other.PlayerNetworkId);
             Assert.Equal(2, secondWorld.Players.Count);
             Assert.Equal(firstWorld.Chunks.Count, secondWorld.Chunks.Count);
+
+            Assert.True(first.TrySend(new TestPlayPackets.EchoRequest(42)));
+            ClientboundPacket reply;
+            do
+            {
+                stop.Token.ThrowIfCancellationRequested();
+                reply = first.WaitForPacket(TimeSpan.FromSeconds(5));
+            } while (reply is WorldUpdatePacket);
+            Assert.Equal(new TestPlayPackets.EchoReply("Alice", 42), Assert.IsType<TestPlayPackets.EchoReply>(reply));
+
             Assert.True(first.TrySend(new BlockInteractionPacket(BlockOperation.Break, -90, 0)));
             WorldUpdatePacket update;
             do { update = Assert.IsType<WorldUpdatePacket>(first.WaitForPacket(TimeSpan.FromSeconds(5))); }
@@ -453,18 +464,8 @@ public sealed class RemoteSessionTests
             } while (remaining.Pose.Yaw != inputAfterRejection.Yaw);
             Assert.Equal(inputAfterRejection.Pitch, remaining.Pose.Pitch);
 
-            using var reconnected = new TcpClient();
-            reconnected.ConnectAsync(endpoint, stop.Token).AsTask().GetAwaiter().GetResult();
-            Assert.IsType<LoginSuccessPacket>(Login(reconnected, "Alice", stop.Token));
-            TcpFraming.WriteAsync(reconnected.GetStream(),
-                PacketCodec.Encode(ConnectionPhase.Configuration, new ClientModsPacket([new("a", "1.0.0")])), stop.Token)
-                .GetAwaiter().GetResult();
-            frame = TcpFraming.ReadAsync(reconnected.GetStream(), stop.Token).GetAwaiter().GetResult();
-            Assert.IsType<ContentManifestPacket>(PacketCodec.ReadClientbound(ConnectionPhase.Configuration, frame!.Value.Span));
-            TcpFraming.WriteAsync(reconnected.GetStream(),
-                PacketCodec.Encode(ConnectionPhase.Configuration, new ContentReadyPacket()), stop.Token).GetAwaiter().GetResult();
-            frame = TcpFraming.ReadAsync(reconnected.GetStream(), stop.Token).GetAwaiter().GetResult();
-            var rejoined = Assert.IsType<InitialWorldStatePacket>(PacketCodec.ReadClientbound(ConnectionPhase.Play, frame!.Value.Span));
+            using var reconnected = ConnectPlayPeer(endpoint, "Alice", stop.Token);
+            var rejoined = Assert.IsType<InitialWorldStatePacket>(reconnected.WaitForPacket(TimeSpan.FromSeconds(5)));
             Assert.NotEqual(initial.PlayerNetworkId, rejoined.PlayerNetworkId);
         }
         finally
@@ -475,6 +476,32 @@ public sealed class RemoteSessionTests
             host.GetAwaiter().GetResult();
             firstWorld.Destroy();
             secondWorld.Destroy();
+        }
+    }
+
+    private static PlayPeer ConnectPlayPeer(IPEndPoint endpoint, string username, CancellationToken cancellationToken)
+    {
+        var client = new TcpClient();
+        try
+        {
+            client.ConnectAsync(endpoint, cancellationToken).AsTask().GetAwaiter().GetResult();
+            Assert.IsType<LoginSuccessPacket>(Login(client, username, cancellationToken));
+            var stream = client.GetStream();
+            TcpFraming.WriteAsync(stream,
+                PacketCodec.Encode(ConnectionPhase.Configuration, new ClientModsPacket([new("a", "1.0.0")])), cancellationToken)
+                .GetAwaiter().GetResult();
+            var frame = TcpFraming.ReadAsync(stream, cancellationToken).GetAwaiter().GetResult();
+            Assert.IsType<ContentManifestPacket>(PacketCodec.ReadClientbound(ConnectionPhase.Configuration, frame!.Value.Span));
+            TcpFraming.WriteAsync(stream,
+                PacketCodec.Encode(ConnectionPhase.Configuration, new ContentReadyPacket()), cancellationToken).GetAwaiter().GetResult();
+            frame = TcpFraming.ReadAsync(stream, cancellationToken).GetAwaiter().GetResult();
+            Assert.IsType<PlayStartPacket>(PacketCodec.ReadClientbound(ConnectionPhase.Configuration, frame!.Value.Span));
+            return new PlayPeer(new TcpConnection(client));
+        }
+        catch
+        {
+            client.Dispose();
+            throw;
         }
     }
 
@@ -490,14 +517,45 @@ public sealed class RemoteSessionTests
         return PacketCodec.ReadClientbound(ConnectionPhase.Login, frame!.Value.Span);
     }
 
+    private sealed class PlayPeer(TcpConnection connection) : IClientConnection, IDisposable
+    {
+        public bool IsClosed => connection.IsClosed;
+
+        public bool TrySend(ServerboundPacket packet) => connection.TrySend(PacketCodec.Encode(ConnectionPhase.Play, packet));
+
+        public bool TryReceive([NotNullWhen(true)] out ClientboundPacket? packet)
+        {
+            if (!connection.TryPeek(out var frame))
+            {
+                packet = null;
+                return false;
+            }
+            packet = PacketCodec.ReadClientbound(ConnectionPhase.Play, frame.Span);
+            connection.Consume();
+            return true;
+        }
+
+        public ClientboundPacket WaitForPacket(TimeSpan? timeout = null)
+        {
+            connection.WaitForFrame(timeout ?? NetworkLimits.FrameTimeout);
+            if (TryReceive(out var packet))
+                return packet;
+            throw new ConnectionClosedException("The test peer has no packet to read.");
+        }
+
+        public void Close() => connection.Destroy();
+
+        public void Dispose() => Close();
+    }
+
     private sealed class RejectingInitialWorldConnection(Type rejectedType) : IServerConnection
     {
         private bool _sendRejected;
+        internal int ReceiveAttempts { get; private set; }
+        internal Type? LastSendAttempt { get; private set; }
 
         public bool IsClosed { get; set; }
         public int IncomingCount => 1;
-        internal int ReceiveAttempts { get; private set; }
-        internal Type? LastSendAttempt { get; private set; }
 
         public bool TryReceive([NotNullWhen(true)] out ServerboundPacket? packet)
         {
@@ -521,6 +579,7 @@ public sealed class RemoteSessionTests
     private sealed class SessionPeer : IDisposable
     {
         private readonly CancellationTokenSource _stop = new(TimeSpan.FromSeconds(5));
+
         internal SessionPeer(TcpListener listener, PlayerNames playerNames)
         {
             Client = new TcpClient();
@@ -536,15 +595,6 @@ public sealed class RemoteSessionTests
         internal RemoteSession Session { get; }
         internal CancellationToken Token => _stop.Token;
 
-        internal void Send(ConnectionPhase phase, ServerboundPacket packet) =>
-            TcpFraming.WriteAsync(Client.GetStream(), PacketCodec.Encode(phase, packet), Token).GetAwaiter().GetResult();
-
-        internal ClientboundPacket Read(ConnectionPhase phase)
-        {
-            var frame = TcpFraming.ReadAsync(Client.GetStream(), Token).GetAwaiter().GetResult();
-            return PacketCodec.ReadClientbound(phase, frame!.Value.Span);
-        }
-
         public void Dispose()
         {
             Connection.Close("The test peer stopped.");
@@ -553,6 +603,15 @@ public sealed class RemoteSessionTests
             Connection.Destroy();
             Client.Dispose();
             _stop.Dispose();
+        }
+
+        internal void Send(ConnectionPhase phase, ServerboundPacket packet) =>
+            TcpFraming.WriteAsync(Client.GetStream(), PacketCodec.Encode(phase, packet), Token).GetAwaiter().GetResult();
+
+        internal ClientboundPacket Read(ConnectionPhase phase)
+        {
+            var frame = TcpFraming.ReadAsync(Client.GetStream(), Token).GetAwaiter().GetResult();
+            return PacketCodec.ReadClientbound(phase, frame!.Value.Span);
         }
     }
 }

@@ -3,7 +3,9 @@ using System.Runtime.Loader;
 using PanguEngine.Audio;
 using PanguEngine.Client.UI.Huds;
 using PanguEngine.Input;
+using PanguEngine.Network;
 using PanguEngine.Registries;
+using PanguEngine.Tests.Network;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Entities;
 
@@ -12,8 +14,10 @@ namespace PanguEngine.Tests;
 internal static class TestRegistryBootstrap
 {
     internal static readonly object CustomIdValue = new();
+
     internal static readonly Block StatefulBlock = new(
         BlockProperty.CreateBoolean("powered"), BlockProperty.CreateInteger("level", 0, 2));
+
     internal static readonly Block PaletteBlock = new(BlockProperty.CreateInteger("variant", 0, 511));
 
     internal static RegistryManager Manager { get; private set; } = null!;
@@ -29,6 +33,8 @@ internal static class TestRegistryBootstrap
         Manager = new RegistryManager();
         BuiltinRegistries.Register(Manager);
         BuiltinIdTables.Register(Manager);
+        BuiltinPackets.Register(BuiltinRegistries.ServerboundPacket, BuiltinRegistries.ClientboundPacket);
+        TestPlayPackets.Register(Manager);
         var custom = new Registry<object>(ResourceKey.Parse("test:server_ids"));
         custom.Register(ResourceKey.Parse("test:value"), CustomIdValue);
         CustomIdTable = new RegistryIdTable<object>(custom);
@@ -45,6 +51,8 @@ internal static class TestRegistryBootstrap
         BuiltinEntityComponents.Register(BuiltinRegistries.EntityComponentType);
         BuiltinEntityTypes.Register(BuiltinRegistries.EntityType);
         Manager.FreezeAll();
+        BuiltinIdTables.ServerboundPacket.Allocate();
+        BuiltinIdTables.ClientboundPacket.Allocate();
         typeof(Engine).GetProperty(nameof(Engine.RegistryManager))!.SetValue(null, Manager);
     }
 }

@@ -1,9 +1,11 @@
+using PanguEngine.Network;
+using PanguEngine.Network.Packets;
+using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
+using PanguEngine.Server;
 using PanguEngine.Server.Game;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
-using PanguEngine.Network.Packets;
-using PanguEngine.Network.Packets.Clientbound;
 
 namespace PanguEngine.Tests.Server;
 
@@ -13,20 +15,19 @@ public sealed class MultiplayerGameTests
     public void SeparatePlayersMoveWithinOneWorldStepAndLeaveIndependently()
     {
         var game = new ServerGame();
-        var firstEntity = game.SpawnPlayerEntity();
-        var first = firstEntity.NetworkId;
-        var second = game.SpawnPlayerEntity().NetworkId;
-        var before = game.CreateInitial(first).Player.Position;
+        var first = CreatePlayer(game, "Alice");
+        var second = CreatePlayer(game, "Bob");
+        var before = game.CreateInitial(first.Entity.NetworkId).Player.Position;
         game.BeginTick();
         game.Apply(first, [new InputStatePacket(1, 0, -90, 0)]);
         game.Apply(second, [new InputStatePacket(-1, 0, -90, 0)]);
         var update = game.FinishTick();
         Assert.Equal(1L, update.Tick);
-        Assert.Equal(before.Z - 0.4, update.Players.Single(p => p.NetworkId == first).Pose.Position.Z, 8);
-        Assert.Equal(before.Z + 0.4, update.Players.Single(p => p.NetworkId == second).Pose.Position.Z, 8);
-        game.RemovePlayerEntity(firstEntity);
-        Assert.False(game.World.Entities.IsAlive(firstEntity.Handle));
-        Assert.Equal(second, Assert.Single(game.FinishTick(false).Players).NetworkId);
+        Assert.Equal(before.Z - 0.4, update.Players.Single(p => p.NetworkId == first.Entity.NetworkId).Pose.Position.Z, 8);
+        Assert.Equal(before.Z + 0.4, update.Players.Single(p => p.NetworkId == second.Entity.NetworkId).Pose.Position.Z, 8);
+        game.RemovePlayerEntity(first.Entity);
+        Assert.False(game.World.Entities.IsAlive(first.Entity.Handle));
+        Assert.Equal(second.Entity.NetworkId, Assert.Single(game.FinishTick(false).Players).NetworkId);
         game.Destroy();
     }
 
@@ -34,12 +35,12 @@ public sealed class MultiplayerGameTests
     public void ExtremeFiniteYawDoesNotPoisonMovementOrInteraction()
     {
         var game = new ServerGame();
-        var player = game.SpawnPlayerEntity().NetworkId;
+        var player = CreatePlayer(game, "Alice");
         game.BeginTick();
         game.Apply(player,
         [
             new InputStatePacket(1, 0, 1e308, 0),
-            new BlockInteractionPacket(PanguEngine.Network.Packets.BlockOperation.Break, 1e308, 0)
+            new BlockInteractionPacket(BlockOperation.Break, 1e308, 0)
         ]);
         var position = Assert.Single(game.FinishTick().Players).Pose.Position;
         Assert.True(double.IsFinite(position.X) && double.IsFinite(position.Y) && double.IsFinite(position.Z));
@@ -50,8 +51,8 @@ public sealed class MultiplayerGameTests
     public void PlayersShareOrderedEditsButKeepTheirOwnOperationResults()
     {
         var game = new ServerGame();
-        var first = game.SpawnPlayerEntity().NetworkId;
-        var second = game.SpawnPlayerEntity().NetworkId;
+        var first = CreatePlayer(game, "Alice");
+        var second = CreatePlayer(game, "Bob");
         var target = new BlockPos(8, 22, 22);
         game.World.SetBlock(target, BuiltinBlocks.Stone.DefaultState);
         game.BeginTick();
@@ -67,5 +68,13 @@ public sealed class MultiplayerGameTests
         Assert.True(chunk.GetBlock(index).IsAir);
         Assert.Equal(3, game.CreateInitial(third).Players.Count);
         game.Destroy();
+    }
+
+    private static Player CreatePlayer(ServerGame game, string username)
+    {
+        var names = new PlayerNames();
+        names.Reserve(username);
+        var session = new RemoteSession(new InMemoryConnection(), username, names);
+        return new Player(username, game.SpawnPlayerEntity(), session);
     }
 }

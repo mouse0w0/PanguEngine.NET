@@ -1,6 +1,7 @@
 using System.Text;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;
+using PanguEngine.Network.Packets.Clientbound;
 
 namespace PanguEngine.Server.Game;
 
@@ -10,6 +11,7 @@ internal sealed class RemoteSession
     private readonly IServerConnection _connection;
     private readonly PlayerNames _playerNames;
     private bool _closing;
+    private bool _initialWorldSent;
     private bool _nameReleased;
 
     internal RemoteSession(IServerConnection connection,
@@ -29,6 +31,7 @@ internal sealed class RemoteSession
     /// <summary>Completes when preparation stops reading packets and reports whether the session can enter Play.</summary>
     /// <remarks>A connection can hold a reserved username even if it is not ready to enter Play.</remarks>
     internal Task<(string? ReservedUsername, bool IsReady)> Preparation { get; }
+
     internal bool IsClosing => _closing || _connection.IsClosed;
 
     /// <summary>Observes preparation without waiting and returns the username only while ready for Play.</summary>
@@ -73,6 +76,14 @@ internal sealed class RemoteSession
     }
 
     internal bool TrySend(ClientboundPacket packet) => _connection.TrySend(packet);
+
+    internal bool FinishInitialWorld()
+    {
+        _initialWorldSent = TrySend(new InitialWorldCompletePacket());
+        return _initialWorldSent;
+    }
+
+    internal bool TrySendCustom(ClientboundPacket packet) => _initialWorldSent && !IsClosing && TrySend(packet);
 
     /// <summary>Releases a reserved username once the connection is closed and preparation has ended.</summary>
     /// <remarks>Only the game thread releases the reservation, including when Play was never entered.</remarks>

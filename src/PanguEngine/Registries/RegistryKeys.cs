@@ -25,9 +25,16 @@ public static class RegistryKeys
 
     /// <summary>The key of the input context registry.</summary>
     public static ResourceKey InputContext { get; } = ResourceKey.Create("pangu", "input_context");
+
     /// <summary>The key of the entity component type registry.</summary>
     public static ResourceKey EntityComponentType { get; } = ResourceKey.Create("pangu", "entity_component_type");
 
     /// <summary>The key of the entity type registry.</summary>
     public static ResourceKey EntityType { get; } = ResourceKey.Create("pangu", "entity_type");
+
+    /// <summary>The key of the serverbound Play packet registry.</summary>
+    public static ResourceKey ServerboundPacket { get; } = ResourceKey.Create("pangu", "serverbound_packet");
+
+    /// <summary>The key of the clientbound Play packet registry.</summary>
+    public static ResourceKey ClientboundPacket { get; } = ResourceKey.Create("pangu", "clientbound_packet");
 }

@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using PanguEngine.Network;
+using PanguEngine.Network.Packets;
 using PanguEngine.Server.Game;
 using PanguEngine.World.Entities;
 
@@ -31,6 +33,13 @@ public sealed class Player
     /// <summary>The server session through which this player entered Play.</summary>
     /// <remarks>This reference does not indicate whether the player is still online.</remarks>
     internal RemoteSession Session { get; }
+
+    /// <summary>Queues a registered custom Play packet for this player.</summary>
+    /// <param name="packet">The packet to send. Do not modify it or its payload after queueing it.</param>
+    /// <returns>Whether the packet was queued, not whether the player received it.</returns>
+    /// <remarks>Call from the server game thread.</remarks>
+    public bool TrySendPacket(ClientboundPacket packet) =>
+        PacketCodec.HasPlayId(packet) && Session.TrySendCustom(packet);
 
     private static Guid CreateOfflineId(string username)
     {

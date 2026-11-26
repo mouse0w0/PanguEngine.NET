@@ -1,6 +1,6 @@
+using PanguEngine.Network.Serialization;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
-using PanguEngine.Network.Serialization;
 
 namespace PanguEngine.Network.Packets.Clientbound;
 
@@ -8,6 +8,8 @@ internal sealed record WorldUpdatePacket(long Tick, IReadOnlyList<PlayerState> P
     IReadOnlyList<WorldUpdatePacket.BlockChange> Changes,
     IReadOnlyList<WorldUpdatePacket.InteractionResult> Results) : ClientboundPacket
 {
+    public override ClientboundPacketType Type => BuiltinPackets.WorldUpdate;
+
     internal override void Write(ref Writer writer)
     {
         writer.WriteInt64(Tick);

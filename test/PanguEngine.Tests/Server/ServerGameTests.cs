@@ -1,10 +1,11 @@
-using PanguEngine.Server.Game;
-using PanguEngine.World.Blocks;
-using PanguEngine.World.Chunking;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
 using PanguEngine.Network.Packets.Serverbound;
+using PanguEngine.Server;
+using PanguEngine.Server.Game;
+using PanguEngine.World.Blocks;
+using PanguEngine.World.Chunking;
 
 namespace PanguEngine.Tests.Server;
 
@@ -13,10 +14,10 @@ public sealed class ServerGameTests
     [Fact]
     public void LatestInputAdvancesMovementOnlyOnce()
     {
-        var (game, initial) = CreateGame();
+        var (game, player, initial) = CreateGame();
         var input = new InputStatePacket(1, 0, -90, 0);
 
-        var update = Update(game, initial.PlayerNetworkId, [input, input with { Forward = -1 }]);
+        var update = Update(game, player, [input, input with { Forward = -1 }]);
 
         Assert.Equal(initial.Tick + 1, update.Tick);
         Assert.Equal(0.4, update.Players[0].Pose.Position.Z - initial.Player.Position.Z, 8);
@@ -26,7 +27,7 @@ public sealed class ServerGameTests
     [Fact]
     public void RepeatedClicksUseCapturedDirectionAndSeePriorEdits()
     {
-        var (game, initial) = CreateGame();
+        var (game, player, _) = CreateGame();
         var world = game.World;
         var first = new BlockPos(8, 22, 22);
         var second = new BlockPos(8, 22, 21);
@@ -34,7 +35,7 @@ public sealed class ServerGameTests
         world.SetBlock(second, BuiltinBlocks.Stone.DefaultState);
         var click = new BlockInteractionPacket(BlockOperation.Break, -90, 0);
 
-        var update = Update(game, initial.PlayerNetworkId, [
+        var update = Update(game, player, [
             click,
             click,
             new InputStatePacket(0, 0, 0, 0)]);
@@ -50,11 +51,11 @@ public sealed class ServerGameTests
     [Fact]
     public void MixedInteractionsPreserveOrderAndIntermediateChanges()
     {
-        var (game, initial) = CreateGame();
+        var (game, player, _) = CreateGame();
         var world = game.World;
         world.SetBlock(new BlockPos(8, 22, 22), BuiltinBlocks.Stone.DefaultState);
 
-        var update = Update(game, initial.PlayerNetworkId, [
+        var update = Update(game, player, [
             new BlockInteractionPacket(BlockOperation.Place, -90, 0),
             new BlockInteractionPacket(BlockOperation.Break, -90, 0)]);
 
@@ -70,12 +71,12 @@ public sealed class ServerGameTests
     [Fact]
     public void InteractionUsesPositionBeforeThisRoundsMovement()
     {
-        var (game, initial) = CreateGame();
+        var (game, player, _) = CreateGame();
         var world = game.World;
         var target = new BlockPos(8, 22, 18);
         world.SetBlock(target, BuiltinBlocks.Stone.DefaultState);
 
-        var update = Update(game, initial.PlayerNetworkId, [
+        var update = Update(game, player, [
             new InputStatePacket(-1, 0, -90, 0),
             new BlockInteractionPacket(BlockOperation.Break, -90, 0)]);
 
@@ -101,17 +102,20 @@ public sealed class ServerGameTests
         game.Destroy();
     }
 
-    private static (ServerGame Game, InitialWorldStatePacket Initial) CreateGame()
+    private static (ServerGame Game, Player Player, InitialWorldStatePacket Initial) CreateGame()
     {
         var game = new ServerGame();
-        var playerNetworkId = game.SpawnPlayerEntity().NetworkId;
-        return (game, game.CreateInitial(playerNetworkId));
+        var names = new PlayerNames();
+        names.Reserve("Player");
+        var session = new RemoteSession(new InMemoryConnection(), "Player", names);
+        var player = new Player("Player", game.SpawnPlayerEntity(), session);
+        return (game, player, game.CreateInitial(player.Entity.NetworkId));
     }
 
-    private static WorldUpdatePacket Update(ServerGame game, uint playerNetworkId, IReadOnlyList<ServerboundPacket> packets)
+    private static WorldUpdatePacket Update(ServerGame game, Player player, IReadOnlyList<ServerboundPacket> packets)
     {
         game.BeginTick();
-        var results = game.Apply(playerNetworkId, packets);
+        var results = game.Apply(player, packets);
         return game.FinishTick() with { Results = results };
     }
 }

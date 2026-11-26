@@ -6,6 +6,8 @@ namespace PanguEngine.Network.Packets.Clientbound;
 
 internal sealed record ChunkDataPacket(ChunkPos Position, BlockStateSnapshot Blocks) : ClientboundPacket
 {
+    public override ClientboundPacketType Type => BuiltinPackets.ChunkData;
+
     internal BlockState GetBlock(int index) => Blocks.Get(index);
 
     internal static ChunkDataPacket Capture(Chunk chunk)

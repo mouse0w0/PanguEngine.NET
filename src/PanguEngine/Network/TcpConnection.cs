@@ -1,29 +1,26 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
-using PanguEngine.Network.Serialization;
 
 namespace PanguEngine.Network;
 
 internal sealed class TcpConnection
 {
-    private readonly object _gate = new();
     private readonly TcpClient _client;
-    private readonly NetworkStream _stream;
+    private readonly object _gate = new();
     private readonly FrameQueue _incoming = new();
     private readonly FrameQueue _outgoing = new();
-    private readonly SemaphoreSlim _sendSignal = new(0);
-    private readonly CancellationTokenSource _stop = new();
     private readonly Task _receiveTask;
+    private readonly SemaphoreSlim _sendSignal = new(0);
     private readonly Task _sendTask;
-    private TaskCompletionSource? _incomingAvailable;
-    private ExceptionDispatchInfo? _fault;
+    private readonly CancellationTokenSource _stop = new();
+    private readonly NetworkStream _stream;
     private bool _closed;
     private bool _draining;
-    private bool _heartbeat;
+    private ExceptionDispatchInfo? _fault;
+    private ReadOnlyMemory<byte> _heartbeatFrame;
+    private TaskCompletionSource? _incomingAvailable;
     private string? _reason;
-
-    internal long ConnectedAt { get; } = Stopwatch.GetTimestamp();
 
     internal TcpConnection(TcpClient client)
     {
@@ -34,14 +31,17 @@ internal sealed class TcpConnection
         _sendTask = SendAsync();
     }
 
+    internal long ConnectedAt { get; } = Stopwatch.GetTimestamp();
+
     internal bool IsClosed { get { lock (_gate) return _closed; } }
     internal int IncomingCount { get { lock (_gate) return _incoming.Count; } }
     internal string CloseReason { get { lock (_gate) return _reason ?? "The connection ended."; } }
 
-    internal void EnableHeartbeat()
+    /// <summary>Enables idle sends of the heartbeat frame encoded for this connection.</summary>
+    internal void EnableHeartbeat(ReadOnlyMemory<byte> frame)
     {
         lock (_gate)
-            _heartbeat = true;
+            _heartbeatFrame = frame;
     }
 
     internal bool TrySend(ReadOnlyMemory<byte> frame)
@@ -181,11 +181,6 @@ internal sealed class TcpConnection
                     Close("The remote endpoint closed the connection.");
                     return;
                 }
-                if (PacketCodec.ReadId(frame.Value.Span) == 0)
-                {
-                    ValidateHeartbeat(frame.Value.Span);
-                    continue;
-                }
                 lock (_gate)
                 {
                     if (_closed)
@@ -219,9 +214,9 @@ internal sealed class TcpConnection
                             Close(_reason ?? "The connection ended.");
                             return;
                         }
-                        if (signaled || !_heartbeat)
+                        if (signaled || _heartbeatFrame.IsEmpty)
                             continue;
-                        frame = new byte[] { 0 };
+                        frame = _heartbeatFrame;
                     }
                 }
                 await TcpFraming.WriteAsync(_stream, frame, _stop.Token).ConfigureAwait(false);
@@ -233,13 +228,6 @@ internal sealed class TcpConnection
             }
         }
         catch (Exception error) { HandleFailure(error); }
-    }
-
-    private static void ValidateHeartbeat(ReadOnlySpan<byte> frame)
-    {
-        var reader = new Reader(frame);
-        reader.ReadVarUInt32();
-        reader.EnsureEnd();
     }
 
     private void HandleFailure(Exception error)

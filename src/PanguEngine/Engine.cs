@@ -4,6 +4,7 @@ using PanguEngine.Client.UI.Huds;
 using PanguEngine.Events;
 using PanguEngine.Input;
 using PanguEngine.Modding;
+using PanguEngine.Network;
 using PanguEngine.Registries;
 using PanguEngine.Resources;
 using PanguEngine.World.Blocks;
@@ -63,6 +64,7 @@ public static class Engine
         RegistryManager = new RegistryManager();
         BuiltinRegistries.Register(RegistryManager);
         BuiltinIdTables.Register(RegistryManager);
+        BuiltinPackets.Register(BuiltinRegistries.ServerboundPacket, BuiltinRegistries.ClientboundPacket);
         BuiltinHuds.Register(BuiltinRegistries.Hud);
         BuiltinBlocks.Register(BuiltinRegistries.Block);
         BuiltinSoundCategories.Register(BuiltinRegistries.SoundCategory);

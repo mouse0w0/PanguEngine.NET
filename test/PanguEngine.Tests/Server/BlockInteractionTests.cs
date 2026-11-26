@@ -1,10 +1,12 @@
+using PanguEngine.Network;
+using PanguEngine.Network.Packets;
+using PanguEngine.Network.Packets.Clientbound;
+using PanguEngine.Network.Packets.Serverbound;
+using PanguEngine.Server;
 using PanguEngine.Server.Game;
 using PanguEngine.World;
 using PanguEngine.World.Blocks;
 using PanguEngine.World.Chunking;
-using PanguEngine.Network;
-using PanguEngine.Network.Packets;
-using PanguEngine.Network.Packets.Serverbound;
 using static PanguEngine.Network.Packets.Clientbound.WorldUpdatePacket;
 
 namespace PanguEngine.Tests.Server;
@@ -14,9 +16,9 @@ public sealed class BlockInteractionTests
     [Fact]
     public void MissingSelectionIsRejectedWithoutChanges()
     {
-        var (game, playerNetworkId) = CreateGame();
+        var (game, player) = CreateGame();
 
-        var update = Update(game, playerNetworkId, [new BlockInteractionPacket(BlockOperation.Place, -90, 0)]);
+        var update = Update(game, player, [new BlockInteractionPacket(BlockOperation.Place, -90, 0)]);
 
         Assert.Equal(InteractionStatus.NoHit, Assert.Single(update.Results).Status);
         Assert.Empty(update.Changes);
@@ -26,21 +28,21 @@ public sealed class BlockInteractionTests
     [Fact]
     public void PlacementUsesAdjacentFaceAndDoesNotReplaceOccupiedTarget()
     {
-        var (game, playerNetworkId) = CreateGame();
+        var (game, player) = CreateGame();
         var world = game.World;
         var hit = new BlockPos(8, 22, 22);
         var target = new BlockPos(8, 22, 23);
         world.SetBlock(hit, BuiltinBlocks.Grass.DefaultState);
         var request = new BlockInteractionPacket(BlockOperation.Place, -90, 0);
 
-        var placed = Update(game, playerNetworkId, [request]);
+        var placed = Update(game, player, [request]);
 
         Assert.Equal(target, Assert.Single(placed.Changes).Position);
         Assert.Same(BuiltinBlocks.Stone.DefaultState, world.GetBlock(target));
         var occupied = new UnselectableBlock().DefaultState;
         world.SetBlock(target, occupied);
 
-        var refused = Update(game, playerNetworkId, [request]);
+        var refused = Update(game, player, [request]);
 
         Assert.Equal(InteractionStatus.Occupied, Assert.Single(refused.Results).Status);
         Assert.Empty(refused.Changes);
@@ -48,17 +50,20 @@ public sealed class BlockInteractionTests
         game.Destroy();
     }
 
-    private static (ServerGame Game, uint PlayerNetworkId) CreateGame()
+    private static (ServerGame Game, Player Player) CreateGame()
     {
         var game = new ServerGame();
-        return (game, game.SpawnPlayerEntity().NetworkId);
+        var names = new PlayerNames();
+        names.Reserve("Player");
+        var session = new RemoteSession(new InMemoryConnection(), "Player", names);
+        return (game, new Player("Player", game.SpawnPlayerEntity(), session));
     }
 
-    private static PanguEngine.Network.Packets.Clientbound.WorldUpdatePacket Update(
-        ServerGame game, uint playerNetworkId, IReadOnlyList<ServerboundPacket> packets)
+    private static WorldUpdatePacket Update(
+        ServerGame game, Player player, IReadOnlyList<ServerboundPacket> packets)
     {
         game.BeginTick();
-        var results = game.Apply(playerNetworkId, packets);
+        var results = game.Apply(player, packets);
         return game.FinishTick() with { Results = results };
     }
 

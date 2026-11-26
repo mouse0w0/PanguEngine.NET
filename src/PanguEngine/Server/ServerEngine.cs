@@ -1,27 +1,27 @@
 using System.Diagnostics;
 using System.Net;
-using PanguEngine.World.Blocks;
-using PanguEngine.Server.Game;
 using PanguEngine.Network;
 using PanguEngine.Network.Packets;
 using PanguEngine.Network.Packets.Clientbound;
+using PanguEngine.Server.Game;
+using PanguEngine.World.Blocks;
 
 namespace PanguEngine.Server;
 
 /// <summary>Owns the authoritative game and its dedicated or integrated server lifetime.</summary>
 public sealed class ServerEngine
 {
-    private readonly object _gate = new();
-    private readonly Thread _thread;
     private readonly InMemoryConnection _connection;
+    private readonly object _gate = new();
+    private readonly IPEndPoint? _listenEndpoint;
     private readonly PlayerNames _playerNames = new();
-    private RemoteSession? _pendingLocalSession;
+    private readonly Thread _thread;
     private bool _connectionClaimed;
     private bool _isPaused;
+    private RemoteSession? _pendingLocalSession;
     private bool _reschedule;
     private bool _shutdownRequested;
     private long _tick;
-    private readonly IPEndPoint? _listenEndpoint;
 
     internal ServerEngine(bool isDedicated, IPEndPoint? listenEndpoint = null)
     {
@@ -224,10 +224,10 @@ public sealed class ServerEngine
                 }
                 if (shutdownRequested)
                 {
-                    if (player is { } finalPlayer && packets.Count > 0)
+                    if (player is { } finalPlayer && packets.Any(ServerGame.IsFinalInput))
                     {
                         Game.BeginTick();
-                        var results = Game.Apply(finalPlayer.Entity.NetworkId, packets);
+                        var results = Game.Apply(finalPlayer, packets, shutdown: true);
                         PublishPlayUpdate(finalPlayer, Game.FinishTick(advance: false), results);
                     }
                     if (session is not null)
@@ -249,7 +249,7 @@ public sealed class ServerEngine
                 }
                 Game.BeginTick();
                 IReadOnlyList<WorldUpdatePacket.InteractionResult> roundResults =
-                    player is not null ? Game.Apply(player.Entity.NetworkId, packets) : [];
+                    player is not null ? Game.Apply(player, packets) : [];
                 var update = Game.FinishTick();
                 Interlocked.Exchange(ref _tick, Game.Tick);
                 if (player is not null)
@@ -352,7 +352,7 @@ public sealed class ServerEngine
             {
                 ref var batch = ref batches[i];
                 if (batch.Player is { } player)
-                    batch.Results = game.Apply(player.Entity.NetworkId, batch.Packets);
+                    batch.Results = game.Apply(player, batch.Packets, shutdown);
             }
         }
         var update = game.FinishTick(advance: !paused && !shutdown);
@@ -411,7 +411,7 @@ public sealed class ServerEngine
             if (!joined.Session.TrySend(chunk))
                 return false;
         }
-        return joined.Session.TrySend(new InitialWorldCompletePacket());
+        return joined.Session.FinishInitialWorld();
     }
 
     private static void LeavePlay(ServerGame game, PlayerManager players, ref Player? player)
@@ -433,8 +433,8 @@ public sealed class ServerEngine
     /// <summary>Tracks the accepted connection separately from its current Play player.</summary>
     internal sealed class DedicatedSession(TcpConnection connection, RemoteSession session)
     {
+        internal Player? Player;
         internal TcpConnection Connection { get; } = connection;
         internal RemoteSession Session { get; } = session;
-        internal Player? Player;
     }
 }
